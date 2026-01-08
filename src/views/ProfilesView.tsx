@@ -1,29 +1,35 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import { HealthBar } from "@/components/ui/HealthBar";
-import { Crawler, createEmptyCrawler } from "@/lib/gameData";
-import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2 } from "lucide-react";
+import { Crawler, InventoryItem, createEmptyCrawler } from "@/lib/gameData";
+import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload } from "lucide-react";
 
 interface ProfilesViewProps {
   crawlers: Crawler[];
   onUpdateCrawler: (id: string, updates: Partial<Crawler>) => void;
   onAddCrawler: (crawler: Crawler) => void;
   onDeleteCrawler: (id: string) => void;
+  getCrawlerInventory: (crawlerId: string) => InventoryItem[];
+  partyGold: number;
 }
 
 const ProfilesView: React.FC<ProfilesViewProps> = ({ 
   crawlers, 
   onUpdateCrawler, 
   onAddCrawler,
-  onDeleteCrawler 
+  onDeleteCrawler,
+  getCrawlerInventory,
+  partyGold,
 }) => {
   const [selectedId, setSelectedId] = useState(crawlers[0]?.id || "");
   const [editMode, setEditMode] = useState(false);
   const [editData, setEditData] = useState<Partial<Crawler>>({});
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   const selected = crawlers.find((c) => c.id === selectedId) || crawlers[0];
+  const inventory = selected ? getCrawlerInventory(selected.id) : [];
 
   const handleEdit = () => {
     if (selected) {
@@ -58,7 +64,26 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
     }
   };
 
+  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = reader.result as string;
+        if (editMode) {
+          setEditData({ ...editData, avatar: base64 });
+        } else {
+          onUpdateCrawler(selected.id, { avatar: base64 });
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   if (!selected) return null;
+
+  const currentAvatar = editMode ? (editData.avatar ?? selected.avatar) : selected.avatar;
+  const currentGold = editMode ? (editData.gold ?? selected.gold ?? 0) : (selected.gold ?? 0);
 
   return (
     <motion.div
@@ -89,6 +114,12 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
           </DungeonButton>
         </div>
 
+        {/* Party Gold Display */}
+        <div className="flex items-center gap-2 bg-accent/10 border border-accent px-4 py-2">
+          <Coins className="w-5 h-5 text-accent" />
+          <span className="font-display text-accent text-glow-gold">PARTY GOLD: {Math.floor(partyGold)}G</span>
+        </div>
+
         <div className="flex gap-2">
           {editMode && crawlers.length > 1 && (
             <DungeonButton variant="danger" size="sm" onClick={handleDelete}>
@@ -112,49 +143,91 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
       </div>
 
       <DungeonCard className="min-h-[400px]">
-        {/* Character header */}
-        <div className="mb-6">
-          <h1 className="font-display text-3xl md:text-4xl text-primary text-glow-cyan mb-1">
-            {editMode ? (
-              <input
-                type="text"
-                value={editData.name || ""}
-                onChange={(e) => setEditData({ ...editData, name: e.target.value })}
-                className="bg-transparent border-b border-primary w-full"
-              />
-            ) : (
-              selected.name
-            )}
-          </h1>
-          {editMode ? (
-            <div className="flex gap-2 mt-2">
-              <input
-                type="text"
-                value={editData.race || ""}
-                onChange={(e) => setEditData({ ...editData, race: e.target.value })}
-                placeholder="Race"
-                className="bg-muted border border-border px-2 py-1 w-24 text-sm"
-              />
-              <input
-                type="text"
-                value={editData.job || ""}
-                onChange={(e) => setEditData({ ...editData, job: e.target.value })}
-                placeholder="Job"
-                className="bg-muted border border-border px-2 py-1 w-32 text-sm"
-              />
-              <input
-                type="number"
-                value={editData.level ?? ""}
-                onChange={(e) => setEditData({ ...editData, level: parseInt(e.target.value) || 1 })}
-                placeholder="Level"
-                className="bg-muted border border-border px-2 py-1 w-20 text-sm"
-              />
+        {/* Character header with avatar */}
+        <div className="flex gap-6 mb-6">
+          {/* Avatar section */}
+          <div className="flex flex-col items-center">
+            <div className="w-24 h-24 border-2 border-primary bg-muted/50 flex items-center justify-center overflow-hidden">
+              {currentAvatar ? (
+                <img src={currentAvatar} alt={selected.name} className="w-full h-full object-cover" />
+              ) : (
+                <User className="w-12 h-12 text-muted-foreground" />
+              )}
             </div>
-          ) : (
-            <p className="text-muted-foreground">
-              {selected.race} | {selected.job} | Level {selected.level}
-            </p>
-          )}
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleAvatarUpload}
+              className="hidden"
+            />
+            <button
+              onClick={() => avatarInputRef.current?.click()}
+              className="text-xs text-primary mt-2 hover:underline flex items-center gap-1"
+            >
+              <Upload className="w-3 h-3" /> Upload
+            </button>
+          </div>
+
+          {/* Name and info */}
+          <div className="flex-1">
+            <h1 className="font-display text-3xl md:text-4xl text-primary text-glow-cyan mb-1">
+              {editMode ? (
+                <input
+                  type="text"
+                  value={editData.name || ""}
+                  onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                  className="bg-transparent border-b border-primary w-full"
+                />
+              ) : (
+                selected.name
+              )}
+            </h1>
+            {editMode ? (
+              <div className="flex gap-2 mt-2">
+                <input
+                  type="text"
+                  value={editData.race || ""}
+                  onChange={(e) => setEditData({ ...editData, race: e.target.value })}
+                  placeholder="Race"
+                  className="bg-muted border border-border px-2 py-1 w-24 text-sm"
+                />
+                <input
+                  type="text"
+                  value={editData.job || ""}
+                  onChange={(e) => setEditData({ ...editData, job: e.target.value })}
+                  placeholder="Job"
+                  className="bg-muted border border-border px-2 py-1 w-32 text-sm"
+                />
+                <input
+                  type="number"
+                  value={editData.level ?? ""}
+                  onChange={(e) => setEditData({ ...editData, level: parseInt(e.target.value) || 1 })}
+                  placeholder="Level"
+                  className="bg-muted border border-border px-2 py-1 w-20 text-sm"
+                />
+              </div>
+            ) : (
+              <p className="text-muted-foreground">
+                {selected.race} | {selected.job} | Level {selected.level}
+              </p>
+            )}
+
+            {/* Crawler Gold */}
+            <div className="flex items-center gap-2 mt-3">
+              <Coins className="w-4 h-4 text-accent" />
+              {editMode ? (
+                <input
+                  type="number"
+                  value={editData.gold ?? 0}
+                  onChange={(e) => setEditData({ ...editData, gold: parseInt(e.target.value) || 0 })}
+                  className="bg-muted border border-border px-2 py-1 w-24 text-sm"
+                />
+              ) : (
+                <span className="text-accent font-display">{Math.floor(currentGold)}G</span>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* HP Bar */}
@@ -212,8 +285,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
           )}
         </div>
 
-        {/* Stats grid */}
-        <div className="grid md:grid-cols-2 gap-8">
+        {/* Stats, Achievements, and Inventory grid */}
+        <div className="grid md:grid-cols-3 gap-8">
           <div>
             <h3 className="font-display text-primary text-lg mb-4 flex items-center gap-2">
               <Shield className="w-5 h-5" /> STATS
@@ -258,6 +331,28 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
               />
             ) : (
               <p className="text-accent text-sm leading-relaxed">{selected.achievements}</p>
+            )}
+          </div>
+
+          {/* Inventory section */}
+          <div>
+            <h3 className="font-display text-primary text-lg mb-4 flex items-center gap-2">
+              <Sword className="w-5 h-5" /> INVENTORY
+            </h3>
+            {inventory.length === 0 ? (
+              <p className="text-muted-foreground text-sm italic">No items</p>
+            ) : (
+              <ul className="space-y-2 text-sm">
+                {inventory.map((item) => (
+                  <li key={item.id} className="flex items-center gap-2 bg-muted/50 px-3 py-2">
+                    <Sword className="w-3 h-3 text-primary/60" />
+                    <span className="text-foreground">{item.name}</span>
+                    {item.equipped && (
+                      <span className="text-xs bg-primary/20 text-primary px-1 py-0.5 ml-auto">E</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
         </div>

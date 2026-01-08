@@ -14,6 +14,8 @@ export interface Crawler {
   int: number;
   cha: number;
   achievements: string;
+  gold: number;
+  avatar?: string;
 }
 
 export interface InventoryItem {
@@ -30,6 +32,7 @@ export interface Mob {
   type: "normal" | "boss";
   description: string;
   encountered: boolean;
+  image?: string;
 }
 
 export const defaultCrawlers: Crawler[] = [
@@ -49,6 +52,7 @@ export const defaultCrawlers: Crawler[] = [
     int: 10,
     cha: 15,
     achievements: "Survivor. First Blood. Gnome Slayer.",
+    gold: 75,
   },
   {
     id: "2",
@@ -66,6 +70,7 @@ export const defaultCrawlers: Crawler[] = [
     int: 14,
     cha: 20,
     achievements: "Royalty. Fan Favorite. Precious.",
+    gold: 52,
   },
 ];
 
@@ -85,6 +90,7 @@ export const createEmptyCrawler = (): Crawler => ({
   int: 10,
   cha: 10,
   achievements: "",
+  gold: 0,
 });
 
 export const defaultInventory: { crawlerId: string; items: InventoryItem[] }[] = [
@@ -131,5 +137,3 @@ export const defaultMobs: Mob[] = [
     encountered: true,
   },
 ];
-
-export const partyGold = 127.5;
