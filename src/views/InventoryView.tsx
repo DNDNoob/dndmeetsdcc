@@ -1,19 +1,69 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
+import { DungeonButton } from "@/components/ui/DungeonButton";
 import { Crawler, InventoryItem } from "@/lib/gameData";
-import { Coins, Package, Sword, Shield } from "lucide-react";
+import { Coins, Package, Sword, Shield, Plus, Trash2, Minus, Edit2, Save } from "lucide-react";
 
 interface InventoryViewProps {
   crawlers: Crawler[];
   getCrawlerInventory: (crawlerId: string) => InventoryItem[];
   gold: number;
+  onUpdateInventory: (crawlerId: string, items: InventoryItem[]) => void;
+  onUpdateGold: (gold: number) => void;
 }
 
 const InventoryView: React.FC<InventoryViewProps> = ({
   crawlers,
   getCrawlerInventory,
   gold,
+  onUpdateInventory,
+  onUpdateGold,
 }) => {
+  const [editMode, setEditMode] = useState(false);
+  const [goldEdit, setGoldEdit] = useState(gold);
+  const [newItem, setNewItem] = useState<{ crawlerId: string; name: string; description: string }>({
+    crawlerId: "",
+    name: "",
+    description: "",
+  });
+
+  const handleGoldChange = (delta: number) => {
+    const newGold = Math.max(0, gold + delta);
+    onUpdateGold(newGold);
+  };
+
+  const handleAddItem = (crawlerId: string) => {
+    if (!newItem.name.trim()) return;
+    const items = getCrawlerInventory(crawlerId);
+    const item: InventoryItem = {
+      id: Date.now().toString(),
+      name: newItem.name,
+      description: newItem.description,
+      equipped: false,
+    };
+    onUpdateInventory(crawlerId, [...items, item]);
+    setNewItem({ crawlerId: "", name: "", description: "" });
+  };
+
+  const handleRemoveItem = (crawlerId: string, itemId: string) => {
+    const items = getCrawlerInventory(crawlerId);
+    onUpdateInventory(crawlerId, items.filter((i) => i.id !== itemId));
+  };
+
+  const handleToggleEquip = (crawlerId: string, itemId: string) => {
+    const items = getCrawlerInventory(crawlerId);
+    onUpdateInventory(
+      crawlerId,
+      items.map((i) => (i.id === itemId ? { ...i, equipped: !i.equipped } : i))
+    );
+  };
+
+  const handleSaveGold = () => {
+    onUpdateGold(goldEdit);
+    setEditMode(false);
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -21,18 +71,61 @@ const InventoryView: React.FC<InventoryViewProps> = ({
       className="max-w-4xl mx-auto p-4 md:p-6"
     >
       <DungeonCard>
-        <h2 className="font-display text-2xl text-primary text-glow-cyan mb-6 flex items-center gap-3">
-          <Package className="w-6 h-6" />
-          CRAWLER INVENTORY
-        </h2>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="font-display text-2xl text-primary text-glow-cyan flex items-center gap-3">
+            <Package className="w-6 h-6" />
+            CRAWLER INVENTORY
+          </h2>
+          <DungeonButton
+            variant="admin"
+            size="sm"
+            onClick={() => {
+              if (editMode) handleSaveGold();
+              else {
+                setGoldEdit(gold);
+                setEditMode(true);
+              }
+            }}
+          >
+            {editMode ? (
+              <>
+                <Save className="w-4 h-4 mr-1" /> Save
+              </>
+            ) : (
+              <>
+                <Edit2 className="w-4 h-4 mr-1" /> Edit
+              </>
+            )}
+          </DungeonButton>
+        </div>
 
         {/* Party Gold */}
-        <div className="bg-accent/10 border border-accent p-4 mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Coins className="w-6 h-6 text-accent" />
-            <span className="font-display text-accent text-glow-gold">SHARED PARTY GOLD</span>
+        <div className="bg-accent/10 border border-accent p-4 mb-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Coins className="w-6 h-6 text-accent" />
+              <span className="font-display text-accent text-glow-gold">SHARED PARTY GOLD</span>
+            </div>
+            {editMode ? (
+              <div className="flex items-center gap-2">
+                <DungeonButton variant="danger" size="sm" onClick={() => handleGoldChange(-10)}>
+                  <Minus className="w-4 h-4" />
+                </DungeonButton>
+                <input
+                  type="number"
+                  value={goldEdit}
+                  onChange={(e) => setGoldEdit(parseFloat(e.target.value) || 0)}
+                  className="bg-background border border-accent px-2 py-1 w-24 text-right font-display text-accent"
+                  step="0.01"
+                />
+                <DungeonButton variant="default" size="sm" onClick={() => handleGoldChange(10)}>
+                  <Plus className="w-4 h-4" />
+                </DungeonButton>
+              </div>
+            ) : (
+              <span className="font-display text-2xl text-accent">{gold.toFixed(2)}G</span>
+            )}
           </div>
-          <span className="font-display text-2xl text-accent">{gold.toFixed(2)}G</span>
         </div>
 
         {/* Crawler inventories */}
@@ -47,9 +140,9 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 </h3>
 
                 {items.length === 0 ? (
-                  <p className="text-muted-foreground text-sm italic">No items in inventory</p>
+                  <p className="text-muted-foreground text-sm italic mb-3">No items in inventory</p>
                 ) : (
-                  <ul className="space-y-2">
+                  <ul className="space-y-2 mb-3">
                     {items.map((item) => (
                       <li
                         key={item.id}
@@ -57,19 +150,69 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                       >
                         <Sword className="w-4 h-4 text-primary/60" />
                         <span className="text-foreground">{item.name}</span>
-                        {item.equipped && (
-                          <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 ml-auto">
-                            EQUIPPED
-                          </span>
-                        )}
                         {item.description && (
-                          <span className="text-muted-foreground text-xs ml-2">
-                            ({item.description})
-                          </span>
+                          <span className="text-muted-foreground text-xs">({item.description})</span>
+                        )}
+                        {editMode ? (
+                          <div className="ml-auto flex items-center gap-2">
+                            <button
+                              onClick={() => handleToggleEquip(crawler.id, item.id)}
+                              className={`text-xs px-2 py-0.5 ${
+                                item.equipped
+                                  ? "bg-primary/20 text-primary"
+                                  : "bg-muted text-muted-foreground"
+                              }`}
+                            >
+                              {item.equipped ? "EQUIPPED" : "EQUIP"}
+                            </button>
+                            <button
+                              onClick={() => handleRemoveItem(crawler.id, item.id)}
+                              className="text-destructive hover:text-destructive/80"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          item.equipped && (
+                            <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 ml-auto">
+                              EQUIPPED
+                            </span>
+                          )
                         )}
                       </li>
                     ))}
                   </ul>
+                )}
+
+                {/* Add new item form */}
+                {editMode && (
+                  <div className="flex gap-2 mt-3 pt-3 border-t border-border/50">
+                    <input
+                      type="text"
+                      placeholder="Item name"
+                      value={newItem.crawlerId === crawler.id ? newItem.name : ""}
+                      onChange={(e) =>
+                        setNewItem({ crawlerId: crawler.id, name: e.target.value, description: newItem.crawlerId === crawler.id ? newItem.description : "" })
+                      }
+                      className="bg-muted border border-border px-2 py-1 text-sm flex-1"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Description"
+                      value={newItem.crawlerId === crawler.id ? newItem.description : ""}
+                      onChange={(e) =>
+                        setNewItem({ ...newItem, crawlerId: crawler.id, description: e.target.value })
+                      }
+                      className="bg-muted border border-border px-2 py-1 text-sm flex-1"
+                    />
+                    <DungeonButton
+                      variant="default"
+                      size="sm"
+                      onClick={() => handleAddItem(crawler.id)}
+                    >
+                      <Plus className="w-4 h-4" />
+                    </DungeonButton>
+                  </div>
                 )}
               </div>
             );

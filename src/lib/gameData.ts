@@ -6,11 +6,12 @@ export interface Crawler {
   level: number;
   hp: number;
   maxHP: number;
+  mana: number;
+  maxMana: number;
   str: number;
   dex: number;
   con: number;
   int: number;
-  wis: number;
   cha: number;
   achievements: string;
 }
@@ -40,11 +41,12 @@ export const defaultCrawlers: Crawler[] = [
     level: 3,
     hp: 85,
     maxHP: 100,
+    mana: 30,
+    maxMana: 50,
     str: 14,
     dex: 12,
     con: 16,
     int: 10,
-    wis: 8,
     cha: 15,
     achievements: "Survivor. First Blood. Gnome Slayer.",
   },
@@ -56,15 +58,34 @@ export const defaultCrawlers: Crawler[] = [
     level: 3,
     hp: 45,
     maxHP: 50,
+    mana: 80,
+    maxMana: 100,
     str: 4,
     dex: 18,
     con: 8,
     int: 14,
-    wis: 12,
     cha: 20,
     achievements: "Royalty. Fan Favorite. Precious.",
   },
 ];
+
+export const createEmptyCrawler = (): Crawler => ({
+  id: Date.now().toString(),
+  name: "New Crawler",
+  race: "Human",
+  job: "Adventurer",
+  level: 1,
+  hp: 50,
+  maxHP: 50,
+  mana: 25,
+  maxMana: 25,
+  str: 10,
+  dex: 10,
+  con: 10,
+  int: 10,
+  cha: 10,
+  achievements: "",
+});
 
 export const defaultInventory: { crawlerId: string; items: InventoryItem[] }[] = [
   {
