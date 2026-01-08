@@ -56,16 +56,39 @@ export const useGameState = () => {
     );
   };
 
+  const addCrawler = (crawler: Crawler) => {
+    setCrawlers((prev) => [...prev, crawler]);
+    setInventory((prev) => [...prev, { crawlerId: crawler.id, items: [] }]);
+  };
+
+  const deleteCrawler = (id: string) => {
+    setCrawlers((prev) => prev.filter((c) => c.id !== id));
+    setInventory((prev) => prev.filter((i) => i.crawlerId !== id));
+  };
+
   const getCrawlerInventory = (crawlerId: string) => {
     return inventory.find((i) => i.crawlerId === crawlerId)?.items || [];
+  };
+
+  const updateCrawlerInventory = (crawlerId: string, items: InventoryItem[]) => {
+    setInventory((prev) => {
+      const existing = prev.find((i) => i.crawlerId === crawlerId);
+      if (existing) {
+        return prev.map((i) => (i.crawlerId === crawlerId ? { ...i, items } : i));
+      }
+      return [...prev, { crawlerId, items }];
+    });
   };
 
   return {
     crawlers,
     setCrawlers,
     updateCrawler,
+    addCrawler,
+    deleteCrawler,
     inventory,
     getCrawlerInventory,
+    updateCrawlerInventory,
     mobs,
     setMobs,
     gold,

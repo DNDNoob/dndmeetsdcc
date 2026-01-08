@@ -16,8 +16,18 @@ const Index = () => {
   const [screen, setScreen] = useState<AppScreen>("splash");
   const [currentView, setCurrentView] = useState<GameView>("profiles");
 
-  const { crawlers, updateCrawler, getCrawlerInventory, mobs, gold, isLoaded } =
-    useGameState();
+  const { 
+    crawlers, 
+    updateCrawler, 
+    addCrawler,
+    deleteCrawler,
+    getCrawlerInventory, 
+    updateCrawlerInventory,
+    mobs, 
+    gold, 
+    setGold,
+    isLoaded 
+  } = useGameState();
 
   const handleEnter = () => setScreen("menu");
 
@@ -57,7 +67,12 @@ const Index = () => {
 
           <main className="pb-12">
             {currentView === "profiles" && (
-              <ProfilesView crawlers={crawlers} onUpdateCrawler={updateCrawler} />
+              <ProfilesView 
+                crawlers={crawlers} 
+                onUpdateCrawler={updateCrawler}
+                onAddCrawler={addCrawler}
+                onDeleteCrawler={deleteCrawler}
+              />
             )}
             {currentView === "maps" && <MapsView />}
             {currentView === "inventory" && (
@@ -65,6 +80,8 @@ const Index = () => {
                 crawlers={crawlers}
                 getCrawlerInventory={getCrawlerInventory}
                 gold={gold}
+                onUpdateInventory={updateCrawlerInventory}
+                onUpdateGold={setGold}
               />
             )}
             {currentView === "mobs" && <MobsView mobs={mobs} />}
