@@ -1,0 +1,19 @@
+[
+  {
+    "date": "2026-01-08",
+    "changes": [
+      "Added player selection dropdown on splash screen (includes all crawlers, Dungeon AI, and NPC option)",
+      "Added player identity display in top left corner of main page",
+      "Made dice roller configurable - can now add multiple dice before rolling",
+      "Added 'Show Time' button that navigates to a dedicated presentation page",
+      "Added ability for admin to populate maps on Show Time page",
+      "Added map visibility controls for admin (show/hide from other crawlers)",
+      "Added Sound Effects button on main page",
+      "Created Sound Effects page with searchable sound library",
+      "Implemented real-time sound effect playback for all connected users",
+      "Added changelog system with date-stamped records",
+      "Added changelog button on main page",
+      "Made changelog closeable with X button in top right corner"
+    ]
+  }
+]
