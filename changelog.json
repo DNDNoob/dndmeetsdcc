@@ -8,6 +8,8 @@
       "DM page: allow content to wrap and resize so controls (Hide / Trash) remain visible on narrow windows",
       "Dice Roller: moved roll history to the top; panel now grows up to the top of the viewport and becomes scrollable when full",
       "Dice Roller: grouped multi-dice rolls into collapsible entries showing per-die results and a roll total",
+      "Added new Sound Effects system: searchable library (Freesound API integration via server proxy), recent and favorites boxes, upload support, and server-backed broadcast for site-wide playback",
+      "Added server proxy endpoint `/api/sounds/search` with caching and basic rate limiting",
       "Fixed Dungeon AI page layout and overflow issues so boxes no longer extend past the main container",
       "Made active navigation buttons' borders thicker to better indicate current page",
       "When signed in as Dungeon AI, the top-right player field now displays 'DUNGEON AI'",
