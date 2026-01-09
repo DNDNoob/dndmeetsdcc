@@ -2,6 +2,12 @@
   {
     "date": "2026-01-09",
     "changes": [
+      "Fixed Dungeon AI login persistence across navigations (localStorage + in-memory state)",
+      "When logged into the Dungeon AI, the main crawler field now switches to the Dungeon AI profile (and restores previous player on logout)",
+      "Dice Roller: controls are pinned and visible when panel is expanded (no more hidden button controls)",
+      "DM page: allow content to wrap and resize so controls (Hide / Trash) remain visible on narrow windows",
+      "Dice Roller: moved roll history to the top; panel now grows up to the top of the viewport and becomes scrollable when full",
+      "Dice Roller: grouped multi-dice rolls into collapsible entries showing per-die results and a roll total",
       "Fixed Dungeon AI page layout and overflow issues so boxes no longer extend past the main container",
       "Made active navigation buttons' borders thicker to better indicate current page",
       "When signed in as Dungeon AI, the top-right player field now displays 'DUNGEON AI'",

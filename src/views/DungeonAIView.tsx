@@ -88,9 +88,9 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="max-w-4xl mx-auto p-4 md:p-6 overflow-x-hidden"
+      className="max-w-4xl mx-auto p-4 md:p-6"
     >
-      <DungeonCard glowColor="gold" className="overflow-hidden">
+      <DungeonCard glowColor="gold">
         <div className="flex items-center gap-3 mb-6">
           <Brain className="w-8 h-8 text-accent" />
           <h2 className="font-display text-2xl text-accent text-glow-gold">
@@ -119,9 +119,9 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
         {activeTab === "mobs" && (
           <div className="space-y-6">
             {/* Add new mob form */}
-            <div className="bg-muted/30 border border-border p-4 overflow-x-hidden">
+            <div className="bg-muted/30 border border-border p-4">
               <h3 className="font-display text-primary text-lg mb-4">Add New Mob</h3>
-              <div className="grid md:grid-cols-2 gap-4 overflow-x-hidden">
+              <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-3">
                   <input
                     type="text"
@@ -189,19 +189,19 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
               {mobs.map((mob) => (
                 <div
                   key={mob.id}
-                  className={`border p-3 flex items-center gap-4 ${
+                  className={`border p-3 flex flex-wrap items-center gap-4 ${
                     mob.type === "boss" ? "border-destructive bg-destructive/5" : "border-border bg-muted/20"
                   }`}
                 >
                   {mob.image ? (
-                    <img src={mob.image} alt={mob.name} className="w-16 h-16 object-cover" />
+                    <img src={mob.image} alt={mob.name} className="w-16 h-16 object-cover flex-shrink-0" />
                   ) : (
-                    <div className="w-16 h-16 bg-muted flex items-center justify-center">
+                    <div className="w-16 h-16 bg-muted flex items-center justify-center flex-shrink-0">
                       <Skull className="w-8 h-8 text-muted-foreground" />
                     </div>
                   )}
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className="font-display text-foreground">{mob.name}</span>
                       <span className="text-xs text-muted-foreground">Lvl {mob.level}</span>
                       {mob.type === "boss" && (
@@ -215,9 +215,9 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                         {mob.encountered ? "ENCOUNTERED" : "HIDDEN"}
                       </span>
                     </div>
-                    <p className="text-sm text-muted-foreground truncate">{mob.description}</p>
+                    <p className="text-sm text-muted-foreground">{mob.description}</p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 mt-2 md:mt-0 ml-auto">
                     <DungeonButton
                       variant="default"
                       size="sm"
@@ -253,10 +253,10 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
             </div>
 
             {/* Maps grid */}
-            <div className="grid md:grid-cols-2 gap-4 overflow-x-hidden">
+            <div className="grid sm:grid-cols-1 md:grid-cols-2 gap-4">
               {maps.map((map, index) => (
-                <div key={index} className="border border-border p-2 relative group w-full overflow-hidden">
-                  <img src={map} alt={`Map ${index + 1}`} className="w-full h-48 object-cover" />
+                <div key={index} className="border border-border p-2 relative group w-full">
+                  <img src={map} alt={`Map ${index + 1}`} className="w-full h-auto object-contain max-h-[40vh]" />
                   <DungeonButton
                     variant="danger"
                     size="sm"

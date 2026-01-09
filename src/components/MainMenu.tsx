@@ -9,6 +9,7 @@ interface MainMenuProps {
   isDungeonAILoggedIn?: boolean;
   onDungeonAILogout?: () => void;
   playerName?: string;
+  onDungeonAILogin?: () => void;
 }
 
 const menuItems = [
@@ -22,7 +23,7 @@ const menuItems = [
 
 const DM_PASSWORD = "DND_IS_LIFE!";
 
-const MainMenu: React.FC<MainMenuProps> = ({ onNavigate, onDungeonAI, isDungeonAILoggedIn = false, onDungeonAILogout, playerName = "Crawler" }) => {
+const MainMenu: React.FC<MainMenuProps> = ({ onNavigate, onDungeonAI, isDungeonAILoggedIn = false, onDungeonAILogout, playerName = "Crawler", onDungeonAILogin }) => {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [password, setPassword] = useState("");
   const [error, setError] = useState(false);
@@ -41,6 +42,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ onNavigate, onDungeonAI, isDungeonA
     if (password === DM_PASSWORD) {
       localStorage.setItem("dcc_dungeon_ai_login", "true");
       setShowPasswordModal(false);
+      if (onDungeonAILogin) onDungeonAILogin();
       onDungeonAI();
     } else {
       setError(true);

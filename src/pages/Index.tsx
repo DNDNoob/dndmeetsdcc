@@ -32,6 +32,11 @@ const Index = () => {
   } | null>(null);
   const [mapVisibility, setMapVisibility] = useState<boolean[]>([]);
   const [isDungeonAILoggedIn, setIsDungeonAILoggedIn] = useState(false);
+  const [previousPlayer, setPreviousPlayer] = useState<{
+    id: string;
+    name: string;
+    type: "crawler" | "ai" | "npc";
+  } | null>(null);
 
   const {
     crawlers,
@@ -71,6 +76,9 @@ const Index = () => {
     const savedDungeonAILogin = localStorage.getItem(STORAGE_KEY_DUNGEON_AI_LOGIN);
     if (savedDungeonAILogin === "true") {
       setIsDungeonAILoggedIn(true);
+      // If a Dungeon AI login was persisted, switch the current player to the Dungeon AI profile
+      setPreviousPlayer(savedPlayer ? JSON.parse(savedPlayer) : null);
+      setCurrentPlayer({ id: "dungeonai", name: "DUNGEON AI", type: "ai" });
     }
   }, []);
 
@@ -99,10 +107,28 @@ const Index = () => {
     setScreen("game");
   };
 
+  const handleDungeonAILogin = () => {
+    // store previous player and switch to Dungeon AI profile for UI
+    setPreviousPlayer(currentPlayer);
+    setCurrentPlayer({ id: "dungeonai", name: "DUNGEON AI", type: "ai" });
+    setIsDungeonAILoggedIn(true);
+    localStorage.setItem(STORAGE_KEY_DUNGEON_AI_LOGIN, "true");
+  };
+
   const handleDungeonAILogout = () => {
     setIsDungeonAILoggedIn(false);
+    // restore previous player if one existed
+    if (previousPlayer) {
+      setCurrentPlayer(previousPlayer);
+      setPreviousPlayer(null);
+      setScreen("menu");
+    } else {
+      setCurrentPlayer(null);
+      setScreen("splash");
+    }
+
     setCurrentView("profiles");
-    setScreen("menu");
+    localStorage.removeItem(STORAGE_KEY_DUNGEON_AI_LOGIN);
   };
 
   const handleReturnToMenu = () => {
@@ -152,6 +178,7 @@ const Index = () => {
             onDungeonAI={handleDungeonAI}
             isDungeonAILoggedIn={isDungeonAILoggedIn}
             onDungeonAILogout={handleDungeonAILogout}
+            onDungeonAILogin={handleDungeonAILogin}
             playerName={currentPlayer.name}
           />
         )}
