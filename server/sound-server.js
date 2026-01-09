@@ -24,10 +24,17 @@ if (fs.existsSync(envPath)) {
 }
 
 // Informative startup log (do NOT print secret value)
-if (process.env.FREESOUND_API_KEY) {
-  console.log("FREESOUND_API_KEY: configured");
+const FREESOUND_ENV_VARS = [
+  'FREESOUND_API_KEY',
+  'NETLIFY_FREESOUND_API_KEY',
+  'NEXT_PUBLIC_FREESOUND_API_KEY',
+  'VITE_FREESOUND_API_KEY'
+];
+const FREESOUND_CONFIGURED = FREESOUND_ENV_VARS.some((n) => !!process.env[n]);
+if (FREESOUND_CONFIGURED) {
+  console.log('FREESOUND_API_KEY: configured via environment');
 } else {
-  console.warn("FREESOUND_API_KEY is not configured — Freesound search will fall back to local samples. Set server/.env or provide the variable in your deployment.");
+  console.warn('FREESOUND_API_KEY is not configured — Freesound search will fall back to local samples. Set server/.env or provide the variable in your deployment.');
 }
 
 const UPLOAD_DIR = path.join(process.cwd(), "server", "uploads");
@@ -97,7 +104,7 @@ app.get('/api/sounds/search', async (req, res) => {
       return res.json({ source: 'cache', results: cached.data });
     }
 
-    const FREESOUND_KEY = process.env.FREESOUND_API_KEY;
+    const FREESOUND_KEY = process.env.FREESOUND_API_KEY || process.env.NETLIFY_FREESOUND_API_KEY || process.env.NEXT_PUBLIC_FREESOUND_API_KEY || process.env.VITE_FREESOUND_API_KEY;
     if (!FREESOUND_KEY) {
       // return local samples filtered by q
       const filtered = q ? LOCAL_SOUNDS.filter(s => s.name.toLowerCase().includes(q.toLowerCase()) || s.tags.some(t => t.includes(q.toLowerCase()))) : LOCAL_SOUNDS;
