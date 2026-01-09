@@ -1,5 +1,17 @@
 [
   {
+    "date": "2026-01-09",
+    "changes": [
+      "Fixed Dungeon AI page layout and overflow issues so boxes no longer extend past the main container",
+      "Made active navigation buttons' borders thicker to better indicate current page",
+      "When signed in as Dungeon AI, the top-right player field now displays 'DUNGEON AI'",
+      "Persist Dungeon AI login in browser (localStorage) and added a LOGOUT button on the main menu",
+      "Dice Roller: added full roll history with crawler name identification and expanded history capacity",
+      "Crawler name now displays on the Main Menu's top-left corner",
+      "Added Show Time and Sound Effects buttons to the Main Menu and adjusted the grid layout"
+    ]
+  },
+  {
     "date": "2026-01-08",
     "changes": [
       "Added player selection dropdown on splash screen (includes all crawlers, Dungeon AI, and NPC option)",

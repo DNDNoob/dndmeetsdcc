@@ -43,7 +43,7 @@ const Navigation: React.FC<NavigationProps> = ({
           <div className="flex items-center gap-2">
             <User className="w-4 h-4 text-muted-foreground" />
             <span className={`text-xs md:text-sm font-display ${getPlayerColor()}`}>
-              {playerName}
+              {playerType === "ai" ? "DUNGEON AI" : playerName}
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -64,7 +64,7 @@ const Navigation: React.FC<NavigationProps> = ({
             variant="nav"
             size="sm"
             onClick={onReturnToMenu}
-            className="flex items-center gap-2"
+            className={`flex items-center gap-2 ${currentView === "none" ? "border-4" : ""}`}
           >
             <Home className="w-4 h-4" />
             <span className="hidden sm:inline">Main Menu</span>
@@ -76,7 +76,7 @@ const Navigation: React.FC<NavigationProps> = ({
               variant={currentView === item.id ? "default" : "nav"}
               size="sm"
               onClick={() => onNavigate(item.id)}
-              className="flex items-center gap-2"
+              className={`flex items-center gap-2 ${currentView === item.id ? "border-4" : ""}`}
             >
               <item.icon className="w-4 h-4" />
               <span className="hidden sm:inline">{item.label}</span>
@@ -87,7 +87,7 @@ const Navigation: React.FC<NavigationProps> = ({
             variant={currentView === "showtime" ? "default" : "nav"}
             size="sm"
             onClick={() => onNavigate("showtime")}
-            className="flex items-center gap-2"
+            className={`flex items-center gap-2 ${currentView === "showtime" ? "border-4" : ""}`}
           >
             <Presentation className="w-4 h-4" />
             <span className="hidden sm:inline">Show Time</span>
@@ -97,7 +97,7 @@ const Navigation: React.FC<NavigationProps> = ({
             variant={currentView === "sounds" ? "default" : "nav"}
             size="sm"
             onClick={() => onNavigate("sounds")}
-            className="flex items-center gap-2"
+            className={`flex items-center gap-2 ${currentView === "sounds" ? "border-4" : ""}`}
           >
             <Volume2 className="w-4 h-4" />
             <span className="hidden sm:inline">Sounds</span>

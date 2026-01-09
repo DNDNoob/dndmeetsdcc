@@ -17,6 +17,7 @@ interface RollResult {
   dice: string;
   result: number;
   timestamp: number;
+  crawlerName?: string;
 }
 
 interface QueuedDice {
@@ -25,7 +26,7 @@ interface QueuedDice {
   label: string;
 }
 
-const DiceRoller: React.FC = () => {
+const DiceRoller: React.FC<{ crawlerName?: string }> = ({ crawlerName = "Unknown" }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [rollHistory, setRollHistory] = useState<RollResult[]>([]);
   const [currentRoll, setCurrentRoll] = useState<RollResult | null>(null);
@@ -57,6 +58,7 @@ const DiceRoller: React.FC = () => {
         dice: dice.label,
         result: Math.floor(Math.random() * dice.sides) + 1,
         timestamp: Date.now(),
+        crawlerName,
       }));
 
       if (randomResults.length > 0) {
@@ -73,12 +75,13 @@ const DiceRoller: React.FC = () => {
             dice: dice.label,
             result,
             timestamp: Date.now(),
+            crawlerName,
           };
         });
 
         if (finalResults.length > 0) {
           setCurrentRoll(finalResults[0]);
-          setRollHistory((prev) => [...finalResults.reverse(), ...prev.slice(0, 10)]);
+          setRollHistory((prev) => [...finalResults.reverse(), ...prev.slice(0, 20)]);
         }
 
         setIsRolling(false);
@@ -196,15 +199,13 @@ const DiceRoller: React.FC = () => {
             {/* Roll history */}
             {rollHistory.length > 0 && (
               <div className="border-t border-border pt-3">
-                <span className="text-muted-foreground text-xs mb-2 block">Recent rolls:</span>
-                <div className="flex flex-wrap gap-1">
-                  {rollHistory.slice(0, 8).map((roll, i) => (
-                    <span
-                      key={roll.timestamp + i}
-                      className="text-xs bg-muted px-2 py-1 text-muted-foreground"
-                    >
-                      {roll.dice}: {roll.result}
-                    </span>
+                <span className="text-muted-foreground text-xs mb-2 block font-display">ROLL HISTORY:</span>
+                <div className="space-y-1 max-h-32 overflow-y-auto">
+                  {rollHistory.map((roll, i) => (
+                    <div key={roll.timestamp + i} className="text-xs bg-muted/50 px-2 py-1 flex justify-between items-center text-muted-foreground">
+                      <span className="font-display text-primary">{roll.crawlerName}</span>
+                      <span>{roll.dice}: <span className="font-bold text-primary">{roll.result}</span></span>
+                    </div>
                   ))}
                 </div>
               </div>

@@ -19,6 +19,7 @@ type GameView = "profiles" | "maps" | "inventory" | "mobs" | "dungeonai" | "show
 
 const STORAGE_KEY_PLAYER = "dcc_current_player";
 const STORAGE_KEY_MAP_VISIBILITY = "dcc_map_visibility";
+const STORAGE_KEY_DUNGEON_AI_LOGIN = "dcc_dungeon_ai_login";
 
 const Index = () => {
   const [screen, setScreen] = useState<AppScreen>("splash");
@@ -30,6 +31,7 @@ const Index = () => {
     type: "crawler" | "ai" | "npc";
   } | null>(null);
   const [mapVisibility, setMapVisibility] = useState<boolean[]>([]);
+  const [isDungeonAILoggedIn, setIsDungeonAILoggedIn] = useState(false);
 
   const {
     crawlers,
@@ -65,6 +67,11 @@ const Index = () => {
         console.error("Failed to load map visibility:", e);
       }
     }
+
+    const savedDungeonAILogin = localStorage.getItem(STORAGE_KEY_DUNGEON_AI_LOGIN);
+    if (savedDungeonAILogin === "true") {
+      setIsDungeonAILoggedIn(true);
+    }
   }, []);
 
   useEffect(() => {
@@ -90,6 +97,12 @@ const Index = () => {
   const handleDungeonAI = () => {
     setCurrentView("dungeonai");
     setScreen("game");
+  };
+
+  const handleDungeonAILogout = () => {
+    setIsDungeonAILoggedIn(false);
+    setCurrentView("profiles");
+    setScreen("menu");
   };
 
   const handleReturnToMenu = () => {
@@ -137,6 +150,9 @@ const Index = () => {
             key="menu"
             onNavigate={handleNavigate}
             onDungeonAI={handleDungeonAI}
+            isDungeonAILoggedIn={isDungeonAILoggedIn}
+            onDungeonAILogout={handleDungeonAILogout}
+            playerName={currentPlayer.name}
           />
         )}
       </AnimatePresence>
@@ -198,7 +214,7 @@ const Index = () => {
             {currentView === "sounds" && <SoundEffectsView />}
           </main>
 
-          <DiceRoller />
+          <DiceRoller crawlerName={currentPlayer.name} />
 
           <ChangelogViewer
             isOpen={showChangelog}

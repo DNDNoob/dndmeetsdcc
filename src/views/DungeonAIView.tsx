@@ -88,9 +88,9 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="max-w-4xl mx-auto p-4 md:p-6"
+      className="max-w-4xl mx-auto p-4 md:p-6 overflow-x-hidden"
     >
-      <DungeonCard glowColor="gold">
+      <DungeonCard glowColor="gold" className="overflow-hidden">
         <div className="flex items-center gap-3 mb-6">
           <Brain className="w-8 h-8 text-accent" />
           <h2 className="font-display text-2xl text-accent text-glow-gold">
@@ -99,7 +99,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-6 border-b border-border pb-4">
+        <div className="flex gap-2 mb-6 border-b border-border pb-4 overflow-x-auto">
           <DungeonButton
             variant={activeTab === "mobs" ? "default" : "menu"}
             size="sm"
@@ -119,9 +119,9 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
         {activeTab === "mobs" && (
           <div className="space-y-6">
             {/* Add new mob form */}
-            <div className="bg-muted/30 border border-border p-4">
+            <div className="bg-muted/30 border border-border p-4 overflow-x-hidden">
               <h3 className="font-display text-primary text-lg mb-4">Add New Mob</h3>
-              <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid md:grid-cols-2 gap-4 overflow-x-hidden">
                 <div className="space-y-3">
                   <input
                     type="text"
@@ -253,9 +253,9 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
             </div>
 
             {/* Maps grid */}
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid md:grid-cols-2 gap-4 overflow-x-hidden">
               {maps.map((map, index) => (
-                <div key={index} className="border border-border p-2 relative group">
+                <div key={index} className="border border-border p-2 relative group w-full overflow-hidden">
                   <img src={map} alt={`Map ${index + 1}`} className="w-full h-48 object-cover" />
                   <DungeonButton
                     variant="danger"
