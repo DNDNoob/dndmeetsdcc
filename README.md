@@ -60,32 +60,6 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
-## Sound Effects Server (local option)
-
-A small optional server is included to enable site-wide sound broadcasts and uploads. Features:
-
-- WebSocket broadcast for "play" events so all connected browsers will play the same sound
-- Upload endpoint (POST /upload) which saves files in `server/uploads` and serves them at `/uploads/<filename>`
-
-To run the server locally:
-
-```sh
-# install server dependencies
-npm install --no-audit --no-fund express ws multer cors
-
-# start the sound server
-npm run start:sfx-server
-
-# local env
-Copy `server/.env.example` to `server/.env` and set `FREESOUND_API_KEY` to your Freesound API key (do NOT commit `server/.env`).
-```
-
-Then set `VITE_SOUND_WS_URL` and `VITE_SOUND_SERVER_BASE` if not `http://localhost:4000`.
-
-To enable searching a large public sound database (Freesound), set the environment variable `FREESOUND_API_KEY` on the server (not the frontend) and, if different, set `VITE_SOUND_API_BASE` on the frontend to the server base URL.
-
-The server proxy endpoint is `/api/sounds/search?q=<query>&page=1&page_size=50` and will be used automatically by the Sound Effects tab to populate results on open. This keeps the Freesound API key secret and avoids exposing it in browser bundles.
-
 ## How can I deploy this project?
 
 Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.

@@ -8,29 +8,6 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
-    proxy: {
-      "/api": {
-        target: "http://localhost:4000",
-        changeOrigin: true,
-        secure: false,
-        ws: true,
-      },
-      "/upload": {
-        target: "http://localhost:4000",
-        changeOrigin: true,
-        secure: false,
-      },
-      "/uploads": {
-        target: "http://localhost:4000",
-        changeOrigin: true,
-        secure: false,
-      },
-      "/ws": {
-        target: "ws://localhost:4000",
-        changeOrigin: true,
-        ws: true,
-      },
-    },
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
