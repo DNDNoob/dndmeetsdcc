@@ -27,12 +27,13 @@ if (fs.existsSync(envPath)) {
 const FREESOUND_ENV_VARS = [
   'FREESOUND_API_KEY',
   'NETLIFY_FREESOUND_API_KEY',
+  'GITHUB_FREESOUND_API_KEY',
   'NEXT_PUBLIC_FREESOUND_API_KEY',
   'VITE_FREESOUND_API_KEY'
 ];
 const FREESOUND_CONFIGURED = FREESOUND_ENV_VARS.some((n) => !!process.env[n]);
 if (FREESOUND_CONFIGURED) {
-  console.log('FREESOUND_API_KEY: configured via environment');
+  console.log('FREESOUND_API_KEY: configured via environment (including Netlify/GitHub Actions/Vite)');
 } else {
   console.warn('FREESOUND_API_KEY is not configured — Freesound search will fall back to local samples. Set server/.env or provide the variable in your deployment.');
 }
@@ -60,7 +61,7 @@ app.post("/upload", upload.single("file"), (req, res) => {
   res.json({ url, name: req.body.name || req.file.originalname, id: Date.now().toString() });
 });
 
-app.get("/health", (req, res) => res.json({ ok: true, freesound: !!process.env.FREESOUND_API_KEY }));
+app.get("/health", (req, res) => res.json({ ok: true, freesound: FREESOUND_CONFIGURED }));
 
 // Simple in-memory cache and rate limiter
 const CACHE_TTL = 1000 * 60 * 5; // 5 minutes
@@ -104,7 +105,7 @@ app.get('/api/sounds/search', async (req, res) => {
       return res.json({ source: 'cache', results: cached.data });
     }
 
-    const FREESOUND_KEY = process.env.FREESOUND_API_KEY || process.env.NETLIFY_FREESOUND_API_KEY || process.env.NEXT_PUBLIC_FREESOUND_API_KEY || process.env.VITE_FREESOUND_API_KEY;
+    const FREESOUND_KEY = process.env.FREESOUND_API_KEY || process.env.NETLIFY_FREESOUND_API_KEY || process.env.GITHUB_FREESOUND_API_KEY || process.env.NEXT_PUBLIC_FREESOUND_API_KEY || process.env.VITE_FREESOUND_API_KEY;
     if (!FREESOUND_KEY) {
       // return local samples filtered by q
       const filtered = q ? LOCAL_SOUNDS.filter(s => s.name.toLowerCase().includes(q.toLowerCase()) || s.tags.some(t => t.includes(q.toLowerCase()))) : LOCAL_SOUNDS;
