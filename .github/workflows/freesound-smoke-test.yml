@@ -1,0 +1,48 @@
+name: Freesound Smoke Test
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_FREESOUND_API_KEY: ${{ secrets.FREESOUND_API_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start sound server
+        run: nohup npm run start:sfx-server >/tmp/sfx.log 2>&1 &
+
+      - name: Wait for server
+        run: npx wait-on http://localhost:4000/health --timeout 20000
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Health check (must show freesound=true)
+        run: |
+          curl -sSf http://localhost:4000/health | tee /tmp/health.json
+          test "$(jq -r '.freesound' /tmp/health.json)" = "true"
+
+      - name: Freesound search smoke test
+        run: |
+          echo 'Running search smoke test...'
+          curl -sSf "http://localhost:4000/api/sounds/search?q=coin&page=1&page_size=1" -o /tmp/sfx_response.json
+          cat /tmp/sfx_response.json
+          test "$(jq -r '.source' /tmp/sfx_response.json)" = "freesound"
+
+      - name: Dump server log
+        if: failure()
+        run: sed -n '1,200p' /tmp/sfx.log || true
