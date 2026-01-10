@@ -31,6 +31,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   const mobImageRef = useRef<HTMLInputElement>(null);
   const mapImageRef = useRef<HTMLInputElement>(null);
   const [editingMobId, setEditingMobId] = useState<string | null>(null);
+  const [editedMobData, setEditedMobData] = useState<Mob | null>(null);
 
   const handleAddMob = () => {
     if (!newMob.name?.trim()) return;
@@ -46,6 +47,9 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
       weaknesses: newMob.weaknesses,
       strengths: newMob.strengths,
       hitPoints: newMob.hitPoints || 50,
+      hideHitPoints: false,
+      hideWeaknesses: false,
+      hideStrengths: false,
     };
     onUpdateMobs([...mobs, mob]);
     setNewMob({ name: "", level: 1, type: "normal", description: "", weaknesses: "", strengths: "", hitPoints: 50 });
@@ -73,15 +77,18 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
 
   const handleStartEdit = (mob: Mob) => {
     setEditingMobId(mob.id);
+    setEditedMobData(mob);
   };
 
   const handleCancelEdit = () => {
     setEditingMobId(null);
+    setEditedMobData(null);
   };
 
   const handleSaveEdit = (mobId: string, editedMob: Partial<Mob>) => {
     handleUpdateMob(mobId, editedMob);
     setEditingMobId(null);
+    setEditedMobData(null);
   };
 
   const handleMobImageUpload = (e: React.ChangeEvent<HTMLInputElement>, mobId?: string) => {
@@ -190,11 +197,12 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                       <label className="text-xs text-muted-foreground mb-1 block">Type</label>
                       <select
                         value={newMob.type || "normal"}
-                        onChange={(e) => setNewMob({ ...newMob, type: e.target.value as "normal" | "boss" })}
+                        onChange={(e) => setNewMob({ ...newMob, type: e.target.value as "normal" | "boss" | "npc" })}
                         className="w-full bg-muted border border-border px-3 py-2"
                       >
                         <option value="normal">Normal</option>
                         <option value="boss">Boss</option>
+                        <option value="npc">NPC</option>
                       </select>
                     </div>
                   </div>
@@ -263,7 +271,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
               <h3 className="font-display text-primary text-lg">Existing Mobs</h3>
               {mobs.map((mob) => {
                 const isEditing = editingMobId === mob.id;
-                const [editedMob, setEditedMob] = useState<Mob>(mob);
+                const editedMob = (isEditing && editedMobData) ? editedMobData : mob;
 
                 return (
                   <div
@@ -281,7 +289,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                             <input
                               type="text"
                               value={editedMob.name}
-                              onChange={(e) => setEditedMob({ ...editedMob, name: e.target.value })}
+                              onChange={(e) => setEditedMobData(prev => prev ? { ...prev, name: e.target.value } : prev)}
                               className="w-full bg-muted border border-border px-2 py-1 text-sm"
                             />
                           </div>
@@ -291,7 +299,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                               <input
                                 type="number"
                                 value={editedMob.level}
-                                onChange={(e) => setEditedMob({ ...editedMob, level: parseInt(e.target.value) || 1 })}
+                                onChange={(e) => setEditedMobData(prev => prev ? { ...prev, level: parseInt(e.target.value) || 1 } : prev)}
                                 className="w-full bg-muted border border-border px-2 py-1 text-sm"
                               />
                             </div>
@@ -300,7 +308,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                               <input
                                 type="number"
                                 value={editedMob.hitPoints || 50}
-                                onChange={(e) => setEditedMob({ ...editedMob, hitPoints: parseInt(e.target.value) || 50 })}
+                                onChange={(e) => setEditedMobData(prev => prev ? { ...prev, hitPoints: parseInt(e.target.value) || 50 } : prev)}
                                 className="w-full bg-muted border border-border px-2 py-1 text-sm"
                               />
                             </div>
@@ -308,11 +316,12 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                               <label className="text-xs text-muted-foreground mb-1 block">Type</label>
                               <select
                                 value={editedMob.type}
-                                onChange={(e) => setEditedMob({ ...editedMob, type: e.target.value as "normal" | "boss" })}
+                                onChange={(e) => setEditedMobData(prev => prev ? { ...prev, type: e.target.value as "normal" | "boss" | "npc" } : prev)}
                                 className="w-full bg-muted border border-border px-2 py-1 text-sm"
                               >
                                 <option value="normal">Normal</option>
                                 <option value="boss">Boss</option>
+                                <option value="npc">NPC</option>
                               </select>
                             </div>
                           </div>
@@ -321,17 +330,52 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                           <label className="text-xs text-muted-foreground mb-1 block">Description</label>
                           <textarea
                             value={editedMob.description}
-                            onChange={(e) => setEditedMob({ ...editedMob, description: e.target.value })}
+                            onChange={(e) => setEditedMobData(prev => prev ? { ...prev, description: e.target.value } : prev)}
                             className="w-full bg-muted border border-border px-2 py-1 text-sm min-h-[50px]"
                           />
                         </div>
+                        
+                        {/* Image Upload */}
+                        <div className="flex items-center gap-3 bg-muted/40 border border-border p-2 rounded">
+                          {editedMob.image && (
+                            <img src={editedMob.image} alt="Mob preview" className="w-16 h-16 object-cover" />
+                          )}
+                          <div className="flex-1">
+                            <label className="text-xs text-muted-foreground mb-1 block">Mob Image</label>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const reader = new FileReader();
+                                  reader.onload = () => {
+                                    setEditedMobData(prev => prev ? { ...prev, image: reader.result as string } : prev);
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              }}
+                              className="text-xs w-full"
+                            />
+                          </div>
+                          {editedMob.image && (
+                            <DungeonButton
+                              variant="default"
+                              size="sm"
+                              onClick={() => setEditedMobData(prev => prev ? { ...prev, image: undefined } : prev)}
+                            >
+                              <X className="w-3 h-3" />
+                            </DungeonButton>
+                          )}
+                        </div>
+
                         <div className="grid grid-cols-2 gap-3">
                           <div>
                             <label className="text-xs text-muted-foreground mb-1 block">Weaknesses</label>
                             <input
                               type="text"
                               value={editedMob.weaknesses || ""}
-                              onChange={(e) => setEditedMob({ ...editedMob, weaknesses: e.target.value })}
+                              onChange={(e) => setEditedMobData(prev => prev ? { ...prev, weaknesses: e.target.value } : prev)}
                               className="w-full bg-muted border border-border px-2 py-1 text-sm"
                             />
                           </div>
@@ -340,11 +384,46 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                             <input
                               type="text"
                               value={editedMob.strengths || ""}
-                              onChange={(e) => setEditedMob({ ...editedMob, strengths: e.target.value })}
+                              onChange={(e) => setEditedMobData(prev => prev ? { ...prev, strengths: e.target.value } : prev)}
                               className="w-full bg-muted border border-border px-2 py-1 text-sm"
                             />
                           </div>
                         </div>
+
+                        {/* Hide Detail Toggles */}
+                        <div className="bg-muted/40 border border-border p-2 mt-3 rounded">
+                          <p className="text-xs text-muted-foreground font-semibold mb-2">Hide Details From Players:</p>
+                          <div className="grid grid-cols-3 gap-2">
+                            <label className="flex items-center gap-2 cursor-pointer text-xs">
+                              <input
+                                type="checkbox"
+                                checked={editedMob.hideHitPoints || false}
+                                onChange={(e) => setEditedMobData(prev => prev ? { ...prev, hideHitPoints: e.target.checked } : prev)}
+                                className="w-4 h-4"
+                              />
+                              <span>Hide HP</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer text-xs">
+                              <input
+                                type="checkbox"
+                                checked={editedMob.hideWeaknesses || false}
+                                onChange={(e) => setEditedMobData(prev => prev ? { ...prev, hideWeaknesses: e.target.checked } : prev)}
+                                className="w-4 h-4"
+                              />
+                              <span>Hide Weaknesses</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer text-xs">
+                              <input
+                                type="checkbox"
+                                checked={editedMob.hideStrengths || false}
+                                onChange={(e) => setEditedMobData(prev => prev ? { ...prev, hideStrengths: e.target.checked } : prev)}
+                                className="w-4 h-4"
+                              />
+                              <span>Hide Strengths</span>
+                            </label>
+                          </div>
+                        </div>
+
                         <div className="flex gap-2">
                           <DungeonButton
                             variant="admin"

@@ -41,9 +41,12 @@ if (FREESOUND_CONFIGURED) {
 const UPLOAD_DIR = path.join(process.cwd(), "server", "uploads");
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
+const GAME_DATA_FILE = path.join(process.cwd(), "server", "game-data.json");
+
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' })); // Increased limit for map images
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use("/uploads", express.static(UPLOAD_DIR));
 
 const storage = multer.diskStorage({
@@ -78,6 +81,35 @@ const LOCAL_SOUNDS = [
   { id: "mixkit-2462", name: "Footsteps", url: "https://assets.mixkit.co/active_storage/sfx/2462/2462.wav", tags: ["footsteps","movement"], source: "local" },
   { id: "mixkit-1997", name: "Coin Drop", url: "https://assets.mixkit.co/active_storage/sfx/1997/1997.wav", tags: ["coin","treasure"], source: "local" },
 ];
+
+// Game data save endpoint
+app.post('/api/game/save', (req, res) => {
+  try {
+    fs.writeFileSync(GAME_DATA_FILE, JSON.stringify(req.body, null, 2));
+    console.log('Game data saved successfully');
+    res.json({ success: true });
+  } catch (e) {
+    console.error('Failed to save game data:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Game data load endpoint
+app.get('/api/game/load', (req, res) => {
+  try {
+    if (fs.existsSync(GAME_DATA_FILE)) {
+      const data = JSON.parse(fs.readFileSync(GAME_DATA_FILE, 'utf8'));
+      console.log('Game data loaded successfully');
+      res.json(data);
+    } else {
+      console.log('No saved game data found');
+      res.json(null);
+    }
+  } catch (e) {
+    console.error('Failed to load game data:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
 
 app.get('/api/sounds/search', async (req, res) => {
   try {

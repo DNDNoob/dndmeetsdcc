@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Test</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #00ff00; }
+        h1 { color: #00ff00; }
+        .success { color: #00ff00; }
+        .error { color: #ff0000; }
+        pre { background: #000; padding: 10px; border: 1px solid #00ff00; overflow: auto; }
+        button { padding: 10px 20px; margin: 10px 0; background: #00ff00; border: none; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>🎮 DnD Game API Test</h1>
+    <button onclick="testAPI()">Test API Connection</button>
+    <button onclick="clearStorage()">Clear LocalStorage</button>
+    <div id="output"></div>
+
+    <script>
+        const API_BASE = 'http://localhost:4000';
+        const output = document.getElementById('output');
+
+        async function testAPI() {
+            output.innerHTML = '<p>Testing API connection...</p>';
+            
+            try {
+                const res = await fetch(`${API_BASE}/api/game/load`);
+                output.innerHTML += `<p class="success">✅ Response Status: ${res.status}</p>`;
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    output.innerHTML += `<p class="success">✅ Data received!</p>`;
+                    output.innerHTML += `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                    output.innerHTML += `<p class="success">📊 Summary:</p>`;
+                    output.innerHTML += `<p>- Crawlers: ${data.crawlers?.length || 0}</p>`;
+                    output.innerHTML += `<p>- Mobs: ${data.mobs?.length || 0}</p>`;
+                    output.innerHTML += `<p>- Maps: ${data.maps?.length || 0}</p>`;
+                    output.innerHTML += `<p>- Inventory: ${data.inventory?.length || 0}</p>`;
+                } else {
+                    output.innerHTML += `<p class="error">❌ Failed to load data</p>`;
+                }
+            } catch (err) {
+                output.innerHTML += `<p class="error">❌ Error: ${err.message}</p>`;
+                output.innerHTML += `<p>Make sure the server is running on port 4000!</p>`;
+            }
+        }
+
+        function clearStorage() {
+            localStorage.clear();
+            output.innerHTML = '<p class="success">✅ LocalStorage cleared!</p>';
+        }
+
+        // Auto-test on load
+        testAPI();
+    </script>
+</body>
+</html>

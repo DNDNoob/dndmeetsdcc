@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { DungeonButton } from "./ui/DungeonButton";
-import { Home, User, Map, Backpack, Skull, Presentation, Volume2, FileText } from "lucide-react";
+import { Home, User, Map, Backpack, Skull, Presentation, Volume2, FileText, Brain } from "lucide-react";
 
 interface NavigationProps {
   onNavigate: (view: string) => void;
@@ -102,6 +102,18 @@ const Navigation: React.FC<NavigationProps> = ({
             <Volume2 className="w-4 h-4" />
             <span className="hidden sm:inline">Sounds</span>
           </DungeonButton>
+
+          {playerType === "ai" && (
+            <DungeonButton
+              variant={currentView === "dungeonai" ? "default" : "nav"}
+              size="sm"
+              onClick={() => onNavigate("dungeonai")}
+              className={`flex items-center gap-2 ${currentView === "dungeonai" ? "border-4" : ""}`}
+            >
+              <Brain className="w-4 h-4" />
+              <span className="hidden sm:inline">DM Console</span>
+            </DungeonButton>
+          )}
         </div>
       </div>
     </motion.nav>

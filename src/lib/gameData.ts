@@ -29,7 +29,7 @@ export interface Mob {
   id: string;
   name: string;
   level: number;
-  type: "normal" | "boss";
+  type: "normal" | "boss" | "npc";
   description: string;
   encountered: boolean;
   hidden: boolean;
@@ -37,6 +37,9 @@ export interface Mob {
   weaknesses?: string;
   strengths?: string;
   hitPoints?: number;
+  hideWeaknesses?: boolean;
+  hideStrengths?: boolean;
+  hideHitPoints?: boolean;
 }
 
 export const defaultCrawlers: Crawler[] = [

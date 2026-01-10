@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import {
   Crawler,
   InventoryItem,
@@ -7,72 +7,83 @@ import {
   defaultInventory,
   defaultMobs,
 } from "@/lib/gameData";
+import { useGame } from "@/contexts/GameContext";
 
-const STORAGE_KEY = "dcc_game_data";
-
-interface GameState {
-  crawlers: Crawler[];
-  inventory: { crawlerId: string; items: InventoryItem[] }[];
-  mobs: Mob[];
-  maps: string[];
+interface InventoryEntry {
+  crawlerId: string;
+  items: InventoryItem[];
 }
 
 export const useGameState = () => {
-  const [crawlers, setCrawlers] = useState<Crawler[]>(defaultCrawlers);
-  const [inventory, setInventory] = useState(defaultInventory);
-  const [mobs, setMobs] = useState<Mob[]>(defaultMobs);
-  const [maps, setMaps] = useState<string[]>([]);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const { 
+    getCollection, 
+    setCollection, 
+    addItem, 
+    updateItem, 
+    deleteItem,
+    isLoaded 
+  } = useGame();
+
+  // Get collections with defaults
+  const crawlers = useMemo(() => {
+    const stored = getCollection('crawlers') as Crawler[];
+    if (!isLoaded || stored.length === 0) return defaultCrawlers;
+    return stored;
+  }, [getCollection('crawlers'), isLoaded]);
+
+  const inventory = useMemo(() => {
+    const stored = getCollection('inventory') as InventoryEntry[];
+    if (!isLoaded || stored.length === 0) return defaultInventory;
+    return stored;
+  }, [getCollection('inventory'), isLoaded]);
+
+  const mobs = useMemo(() => {
+    const stored = getCollection('mobs') as Mob[];
+    if (!isLoaded || stored.length === 0) return defaultMobs;
+    return stored;
+  }, [getCollection('mobs'), isLoaded]);
+
+  const maps = useMemo(() => {
+    return getCollection('maps') as string[];
+  }, [getCollection('maps'), isLoaded]);
 
   // Calculate party gold as sum of all crawler gold
   const partyGold = useMemo(() => {
     return crawlers.reduce((sum, c) => sum + (c.gold || 0), 0);
   }, [crawlers]);
 
-  // Load from localStorage on mount
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        const data: GameState = JSON.parse(saved);
-        // Ensure gold field exists on crawlers (migration)
-        const migratedCrawlers = data.crawlers.map((c) => ({
-          ...c,
-          gold: c.gold ?? 0,
-        }));
-        setCrawlers(migratedCrawlers);
-        setInventory(data.inventory);
-        setMobs(data.mobs);
-        setMaps(data.maps || []);
-      } catch (e) {
-        console.error("Failed to load game state:", e);
-      }
-    }
-    setIsLoaded(true);
-  }, []);
+  // Helper functions that work with the new data store
+  const setCrawlers = (newCrawlers: Crawler[]) => {
+    setCollection('crawlers', newCrawlers);
+  };
 
-  // Save to localStorage on changes
-  useEffect(() => {
-    if (isLoaded) {
-      const data: GameState = { crawlers, inventory, mobs, maps };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    }
-  }, [crawlers, inventory, mobs, maps, isLoaded]);
+  const setInventory = (newInventory: InventoryEntry[]) => {
+    setCollection('inventory', newInventory);
+  };
+
+  const setMobs = (newMobs: Mob[]) => {
+    setCollection('mobs', newMobs);
+  };
+
+  const setMaps = (newMaps: string[]) => {
+    setCollection('maps', newMaps);
+  };
 
   const updateCrawler = (id: string, updates: Partial<Crawler>) => {
-    setCrawlers((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, ...updates } : c))
-    );
+    updateItem('crawlers', id, updates);
   };
 
   const addCrawler = (crawler: Crawler) => {
-    setCrawlers((prev) => [...prev, crawler]);
-    setInventory((prev) => [...prev, { crawlerId: crawler.id, items: [] }]);
+    addItem('crawlers', crawler);
+    addItem('inventory', { crawlerId: crawler.id, items: [] });
   };
 
   const deleteCrawler = (id: string) => {
-    setCrawlers((prev) => prev.filter((c) => c.id !== id));
-    setInventory((prev) => prev.filter((i) => i.crawlerId !== id));
+    deleteItem('crawlers', id);
+    const invToDelete = inventory.find((i) => i.crawlerId === id);
+    if (invToDelete) {
+      deleteItem('inventory', id);
+    }
   };
 
   const getCrawlerInventory = (crawlerId: string) => {
@@ -80,13 +91,15 @@ export const useGameState = () => {
   };
 
   const updateCrawlerInventory = (crawlerId: string, items: InventoryItem[]) => {
-    setInventory((prev) => {
-      const existing = prev.find((i) => i.crawlerId === crawlerId);
-      if (existing) {
-        return prev.map((i) => (i.crawlerId === crawlerId ? { ...i, items } : i));
-      }
-      return [...prev, { crawlerId, items }];
-    });
+    const existing = inventory.find((i) => i.crawlerId === crawlerId);
+    if (existing) {
+      const newInventory = inventory.map((i) => 
+        i.crawlerId === crawlerId ? { ...i, items } : i
+      );
+      setInventory(newInventory);
+    } else {
+      setInventory([...inventory, { crawlerId, items }]);
+    }
   };
 
   return {
