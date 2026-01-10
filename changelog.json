@@ -1,5 +1,22 @@
 [
   {
+    "date": "2026-01-10",
+    "changes": [
+      "Implemented universal data persistence system - all user-created data (crawlers, mobs, maps, inventory) now automatically saves to server and localStorage",
+      "Fixed server API endpoints that were incorrectly nested, making game data loading/saving functional",
+      "Fixed CORS issues by configuring Vite proxy for seamless API communication",
+      "Created generic DataStore hook (useDataStore) that automatically persists any data type without additional configuration",
+      "Added GameContext provider for global data access throughout the app",
+      "Increased server payload limit to 50MB to support large map images",
+      "Optimized localStorage to exclude large data (maps) and prevent quota errors",
+      "Added comprehensive documentation (DATA_PERSISTENCE.md) with usage examples and best practices",
+      "Added GitHub Copilot instructions file to guide AI assistants in using correct data patterns",
+      "Added TypeScript types for collection names with autocomplete support",
+      "Enhanced logging system with detailed [DataStore] console messages for debugging",
+      "Made data persistence extensible - new data types (quests, NPCs, spells, etc.) can be added with zero configuration"
+    ]
+  },
+  {
     "date": "2026-01-09",
     "changes": [
       "Fixed Dungeon AI login persistence across navigations (localStorage + in-memory state)",
