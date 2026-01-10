@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import { Mob } from "@/lib/gameData";
-import { Brain, Upload, Plus, Trash2, Map, Skull, Image, Save } from "lucide-react";
+import { Brain, Upload, Plus, Trash2, Map, Skull, Image, Save, Edit2, X } from "lucide-react";
 
 interface DungeonAIViewProps {
   mobs: Mob[];
@@ -53,10 +53,35 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
 
   const handleDeleteMob = (id: string) => {
     onUpdateMobs(mobs.filter((m) => m.id !== id));
+    if (editingMobId === id) {
+      setEditingMobId(null);
+    }
   };
 
   const handleUpdateMob = (id: string, updates: Partial<Mob>) => {
     onUpdateMobs(mobs.map((m) => (m.id === id ? { ...m, ...updates } : m)));
+  };
+
+  const handleToggleEncountered = (id: string, currentEncountered: boolean) => {
+    // When marking as encountered, automatically reveal (hidden=false)
+    // When marking as unencountered, automatically hide (hidden=true)
+    handleUpdateMob(id, { 
+      encountered: !currentEncountered,
+      hidden: currentEncountered // if was encountered, now hide it; if was unencountered, now reveal it
+    });
+  };
+
+  const handleStartEdit = (mob: Mob) => {
+    setEditingMobId(mob.id);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMobId(null);
+  };
+
+  const handleSaveEdit = (mobId: string, editedMob: Partial<Mob>) => {
+    handleUpdateMob(mobId, editedMob);
+    setEditingMobId(null);
   };
 
   const handleMobImageUpload = (e: React.ChangeEvent<HTMLInputElement>, mobId?: string) => {
@@ -130,59 +155,81 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
               <h3 className="font-display text-primary text-lg mb-4">Add New Mob</h3>
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-3">
-                  <input
-                    type="text"
-                    placeholder="Mob name"
-                    value={newMob.name || ""}
-                    onChange={(e) => setNewMob({ ...newMob, name: e.target.value })}
-                    className="w-full bg-muted border border-border px-3 py-2"
-                  />
-                  <div className="flex gap-2">
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Name *</label>
                     <input
-                      type="number"
-                      placeholder="Level"
-                      value={newMob.level || ""}
-                      onChange={(e) => setNewMob({ ...newMob, level: parseInt(e.target.value) || 1 })}
-                      className="w-20 bg-muted border border-border px-3 py-2"
+                      type="text"
+                      placeholder="Mob name"
+                      value={newMob.name || ""}
+                      onChange={(e) => setNewMob({ ...newMob, name: e.target.value })}
+                      className="w-full bg-muted border border-border px-3 py-2"
                     />
-                    <input
-                      type="number"
-                      placeholder="Hit Points"
-                      value={newMob.hitPoints || ""}
-                      onChange={(e) => setNewMob({ ...newMob, hitPoints: parseInt(e.target.value) || 50 })}
-                      className="flex-1 bg-muted border border-border px-3 py-2"
-                    />
-                    <select
-                      value={newMob.type || "normal"}
-                      onChange={(e) => setNewMob({ ...newMob, type: e.target.value as "normal" | "boss" })}
-                      className="bg-muted border border-border px-3 py-2"
-                    >
-                      <option value="normal">Normal</option>
-                      <option value="boss">Boss</option>
-                    </select>
                   </div>
-                  <textarea
-                    placeholder="Description"
-                    value={newMob.description || ""}
-                    onChange={(e) => setNewMob({ ...newMob, description: e.target.value })}
-                    className="w-full bg-muted border border-border px-3 py-2 min-h-[60px]"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Weaknesses (e.g., fire, water)"
-                    value={newMob.weaknesses || ""}
-                    onChange={(e) => setNewMob({ ...newMob, weaknesses: e.target.value })}
-                    className="w-full bg-muted border border-border px-3 py-2"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Strengths (e.g., armor, speed)"
-                    value={newMob.strengths || ""}
-                    onChange={(e) => setNewMob({ ...newMob, strengths: e.target.value })}
-                    className="w-full bg-muted border border-border px-3 py-2"
-                  />
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="text-xs text-muted-foreground mb-1 block">Level</label>
+                      <input
+                        type="number"
+                        placeholder="Level"
+                        value={newMob.level || ""}
+                        onChange={(e) => setNewMob({ ...newMob, level: parseInt(e.target.value) || 1 })}
+                        className="w-full bg-muted border border-border px-3 py-2"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground mb-1 block">Hit Points</label>
+                      <input
+                        type="number"
+                        placeholder="HP"
+                        value={newMob.hitPoints || ""}
+                        onChange={(e) => setNewMob({ ...newMob, hitPoints: parseInt(e.target.value) || 50 })}
+                        className="w-full bg-muted border border-border px-3 py-2"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground mb-1 block">Type</label>
+                      <select
+                        value={newMob.type || "normal"}
+                        onChange={(e) => setNewMob({ ...newMob, type: e.target.value as "normal" | "boss" })}
+                        className="w-full bg-muted border border-border px-3 py-2"
+                      >
+                        <option value="normal">Normal</option>
+                        <option value="boss">Boss</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Description</label>
+                    <textarea
+                      placeholder="Description"
+                      value={newMob.description || ""}
+                      onChange={(e) => setNewMob({ ...newMob, description: e.target.value })}
+                      className="w-full bg-muted border border-border px-3 py-2 min-h-[60px]"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Weaknesses</label>
+                    <input
+                      type="text"
+                      placeholder="e.g., fire, water"
+                      value={newMob.weaknesses || ""}
+                      onChange={(e) => setNewMob({ ...newMob, weaknesses: e.target.value })}
+                      className="w-full bg-muted border border-border px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Strengths</label>
+                    <input
+                      type="text"
+                      placeholder="e.g., armor, speed"
+                      value={newMob.strengths || ""}
+                      onChange={(e) => setNewMob({ ...newMob, strengths: e.target.value })}
+                      className="w-full bg-muted border border-border px-3 py-2"
+                    />
+                  </div>
                 </div>
                 <div className="flex flex-col items-center justify-center border border-dashed border-border p-4">
+                  <label className="text-xs text-muted-foreground mb-2">Mob Image</label>
                   {newMob.image ? (
                     <img src={newMob.image} alt="Mob preview" className="max-h-32 mb-2" />
                   ) : (
@@ -214,78 +261,171 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
             {/* Existing mobs list */}
             <div className="space-y-3">
               <h3 className="font-display text-primary text-lg">Existing Mobs</h3>
-              {mobs.map((mob) => (
-                <div
-                  key={mob.id}
-                  className={`border p-3 flex flex-wrap items-start gap-4 ${
-                    mob.type === "boss" ? "border-destructive bg-destructive/5" : "border-border bg-muted/20"
-                  }`}
-                >
-                  {mob.image ? (
-                    <img src={mob.image} alt={mob.name} className="w-16 h-16 object-cover flex-shrink-0" />
-                  ) : (
-                    <div className="w-16 h-16 bg-muted flex items-center justify-center flex-shrink-0">
-                      <Skull className="w-8 h-8 text-muted-foreground" />
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2 mb-2">
-                      <span className="font-display text-foreground">{mob.name}</span>
-                      <span className="text-xs text-muted-foreground">Lvl {mob.level}</span>
-                      {mob.hitPoints !== undefined && (
-                        <span className="text-xs text-muted-foreground">HP: {mob.hitPoints}</span>
-                      )}
-                      {mob.type === "boss" && (
-                        <span className="text-xs bg-destructive/20 text-destructive px-2 py-0.5">BOSS</span>
-                      )}
-                      <span
-                        className={`text-xs px-2 py-0.5 ${
-                          mob.encountered ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
-                        }`}
-                      >
-                        {mob.encountered ? "ENCOUNTERED" : "UNENCOUNTERED"}
-                      </span>
-                      <span
-                        className={`text-xs px-2 py-0.5 ${
-                          mob.hidden ? "bg-destructive/20 text-destructive" : "bg-accent/20 text-accent"
-                        }`}
-                      >
-                        {mob.hidden ? "HIDDEN" : "REVEALED"}
-                      </span>
-                    </div>
-                    <p className="text-sm text-muted-foreground mb-1">{mob.description}</p>
-                    {mob.weaknesses && (
-                      <p className="text-xs text-muted-foreground">
-                        <span className="text-destructive">Weaknesses:</span> {mob.weaknesses}
-                      </p>
-                    )}
-                    {mob.strengths && (
-                      <p className="text-xs text-muted-foreground">
-                        <span className="text-primary">Strengths:</span> {mob.strengths}
-                      </p>
+              {mobs.map((mob) => {
+                const isEditing = editingMobId === mob.id;
+                const [editedMob, setEditedMob] = useState<Mob>(mob);
+
+                return (
+                  <div
+                    key={mob.id}
+                    className={`border p-3 ${
+                      mob.type === "boss" ? "border-destructive bg-destructive/5" : "border-border bg-muted/20"
+                    }`}
+                  >
+                    {isEditing ? (
+                      /* Edit Mode */
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-xs text-muted-foreground mb-1 block">Name</label>
+                            <input
+                              type="text"
+                              value={editedMob.name}
+                              onChange={(e) => setEditedMob({ ...editedMob, name: e.target.value })}
+                              className="w-full bg-muted border border-border px-2 py-1 text-sm"
+                            />
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            <div>
+                              <label className="text-xs text-muted-foreground mb-1 block">Level</label>
+                              <input
+                                type="number"
+                                value={editedMob.level}
+                                onChange={(e) => setEditedMob({ ...editedMob, level: parseInt(e.target.value) || 1 })}
+                                className="w-full bg-muted border border-border px-2 py-1 text-sm"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-muted-foreground mb-1 block">HP</label>
+                              <input
+                                type="number"
+                                value={editedMob.hitPoints || 50}
+                                onChange={(e) => setEditedMob({ ...editedMob, hitPoints: parseInt(e.target.value) || 50 })}
+                                className="w-full bg-muted border border-border px-2 py-1 text-sm"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-muted-foreground mb-1 block">Type</label>
+                              <select
+                                value={editedMob.type}
+                                onChange={(e) => setEditedMob({ ...editedMob, type: e.target.value as "normal" | "boss" })}
+                                className="w-full bg-muted border border-border px-2 py-1 text-sm"
+                              >
+                                <option value="normal">Normal</option>
+                                <option value="boss">Boss</option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground mb-1 block">Description</label>
+                          <textarea
+                            value={editedMob.description}
+                            onChange={(e) => setEditedMob({ ...editedMob, description: e.target.value })}
+                            className="w-full bg-muted border border-border px-2 py-1 text-sm min-h-[50px]"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-xs text-muted-foreground mb-1 block">Weaknesses</label>
+                            <input
+                              type="text"
+                              value={editedMob.weaknesses || ""}
+                              onChange={(e) => setEditedMob({ ...editedMob, weaknesses: e.target.value })}
+                              className="w-full bg-muted border border-border px-2 py-1 text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-muted-foreground mb-1 block">Strengths</label>
+                            <input
+                              type="text"
+                              value={editedMob.strengths || ""}
+                              onChange={(e) => setEditedMob({ ...editedMob, strengths: e.target.value })}
+                              className="w-full bg-muted border border-border px-2 py-1 text-sm"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <DungeonButton
+                            variant="admin"
+                            size="sm"
+                            onClick={() => handleSaveEdit(mob.id, editedMob)}
+                          >
+                            <Save className="w-4 h-4 mr-1" /> Save
+                          </DungeonButton>
+                          <DungeonButton
+                            variant="default"
+                            size="sm"
+                            onClick={handleCancelEdit}
+                          >
+                            <X className="w-4 h-4 mr-1" /> Cancel
+                          </DungeonButton>
+                        </div>
+                      </div>
+                    ) : (
+                      /* View Mode */
+                      <div className="flex flex-wrap items-start gap-4">
+                        {mob.image ? (
+                          <img src={mob.image} alt={mob.name} className="w-16 h-16 object-cover flex-shrink-0" />
+                        ) : (
+                          <div className="w-16 h-16 bg-muted flex items-center justify-center flex-shrink-0">
+                            <Skull className="w-8 h-8 text-muted-foreground" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2 mb-2">
+                            <span className="font-display text-foreground">{mob.name}</span>
+                            <span className="text-xs text-muted-foreground">Lvl {mob.level}</span>
+                            {mob.hitPoints !== undefined && (
+                              <span className="text-xs text-muted-foreground">HP: {mob.hitPoints}</span>
+                            )}
+                            {mob.type === "boss" && (
+                              <span className="text-xs bg-destructive/20 text-destructive px-2 py-0.5">BOSS</span>
+                            )}
+                            <span
+                              className={`text-xs px-2 py-0.5 ${
+                                mob.encountered ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
+                              }`}
+                            >
+                              {mob.encountered ? "ENCOUNTERED" : "UNENCOUNTERED"}
+                            </span>
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-1">{mob.description}</p>
+                          {mob.weaknesses && (
+                            <p className="text-xs text-muted-foreground">
+                              <span className="text-destructive">Weaknesses:</span> {mob.weaknesses}
+                            </p>
+                          )}
+                          {mob.strengths && (
+                            <p className="text-xs text-muted-foreground">
+                              <span className="text-primary">Strengths:</span> {mob.strengths}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-2 mt-2 md:mt-0">
+                          <DungeonButton
+                            variant="default"
+                            size="sm"
+                            onClick={() => handleToggleEncountered(mob.id, mob.encountered)}
+                          >
+                            {mob.encountered ? "Mark Unencountered" : "Mark Encountered"}
+                          </DungeonButton>
+                          <DungeonButton
+                            variant="default"
+                            size="sm"
+                            onClick={() => handleStartEdit(mob)}
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </DungeonButton>
+                          <DungeonButton variant="danger" size="sm" onClick={() => handleDeleteMob(mob.id)}>
+                            <Trash2 className="w-4 h-4" />
+                          </DungeonButton>
+                        </div>
+                      </div>
                     )}
                   </div>
-                  <div className="flex flex-wrap gap-2 mt-2 md:mt-0">
-                    <DungeonButton
-                      variant="default"
-                      size="sm"
-                      onClick={() => handleUpdateMob(mob.id, { encountered: !mob.encountered })}
-                    >
-                      {mob.encountered ? "Mark Unencountered" : "Mark Encountered"}
-                    </DungeonButton>
-                    <DungeonButton
-                      variant="default"
-                      size="sm"
-                      onClick={() => handleUpdateMob(mob.id, { hidden: !mob.hidden })}
-                    >
-                      {mob.hidden ? "Reveal to Players" : "Hide from Players"}
-                    </DungeonButton>
-                    <DungeonButton variant="danger" size="sm" onClick={() => handleDeleteMob(mob.id)}>
-                      <Trash2 className="w-4 h-4" />
-                    </DungeonButton>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
