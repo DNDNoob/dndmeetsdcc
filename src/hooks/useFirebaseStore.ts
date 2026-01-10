@@ -1,0 +1,179 @@
+import { useState, useEffect, useCallback } from 'react';
+import { db, getCollectionRef, getDocs, setDoc, doc, deleteDoc, updateDoc, onSnapshot } from '../lib/firebase';
+import type { CollectionName } from '../types/collections';
+
+interface DataStore {
+  [collectionName: string]: any[];
+}
+
+interface UseFirebaseStoreReturn {
+  data: DataStore;
+  loading: boolean;
+  error: string | null;
+  addItem: (collection: CollectionName, item: any) => Promise<void>;
+  updateItem: (collection: CollectionName, id: string, updates: any) => Promise<void>;
+  deleteItem: (collection: CollectionName, id: string) => Promise<void>;
+  getCollection: <T = any>(collection: CollectionName) => T[];
+  setCollection: (collection: CollectionName, items: any[]) => void;
+  isLoaded: boolean;
+  setRoomId: (roomId: string | null) => void;
+  roomId: string | null;
+}
+
+/**
+ * Firebase Data Store Hook - Real-time multiplayer support
+ * 
+ * @example
+ * ```typescript
+ * const { getCollection, addItem, setRoomId } = useGame();
+ * 
+ * // Set room for multiplayer
+ * setRoomId('room-123');
+ * 
+ * // Get data
+ * const mobs = getCollection('mobs');
+ * 
+ * // Add item - syncs in real-time!
+ * addItem('mobs', { id: crypto.randomUUID(), name: 'Dragon' });
+ * ```
+ */
+export function useFirebaseStore(): UseFirebaseStoreReturn {
+  const [data, setData] = useState<DataStore>({});
+  const [loading, setLoading] = useState(true);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [roomId, setRoomId] = useState<string | null>(null);
+
+  // Collections to sync
+  const collections: CollectionName[] = ['crawlers', 'mobs', 'maps', 'inventory'];
+
+  // Load and subscribe to real-time updates
+  useEffect(() => {
+    const unsubscribers: (() => void)[] = [];
+
+    const setupRealtimeSync = async () => {
+      setLoading(true);
+      console.log('[FirebaseStore] 📂 Setting up real-time sync...', { roomId });
+
+      try {
+        // Set up real-time listeners for each collection
+        for (const collectionName of collections) {
+          const collectionRef = getCollectionRef(collectionName, roomId || undefined);
+
+          const unsubscribe = onSnapshot(
+            collectionRef,
+            (snapshot) => {
+              const items = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+              }));
+
+              console.log(`[FirebaseStore] 🔄 Real-time update: ${collectionName}`, items.length);
+
+              setData(prevData => ({
+                ...prevData,
+                [collectionName]: items
+              }));
+            },
+            (err) => {
+              console.error(`[FirebaseStore] ❌ Listener error for ${collectionName}:`, err);
+              setError(err.message);
+            }
+          );
+
+          unsubscribers.push(unsubscribe);
+        }
+
+        console.log('[FirebaseStore] ✅ Real-time sync active');
+        setIsLoaded(true);
+      } catch (err) {
+        console.error('[FirebaseStore] ❌ Setup error:', err);
+        setError(err instanceof Error ? err.message : 'Failed to setup Firebase');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    setupRealtimeSync();
+
+    // Cleanup listeners on unmount or roomId change
+    return () => {
+      console.log('[FirebaseStore] 🧹 Cleaning up listeners');
+      unsubscribers.forEach(unsub => unsub());
+    };
+  }, [roomId]);
+
+  const addItem = useCallback(async (collection: CollectionName, item: any) => {
+    try {
+      const itemId = item.id || crypto.randomUUID();
+      const itemWithId = { ...item, id: itemId };
+      
+      if (roomId) {
+        itemWithId.roomId = roomId;
+      }
+
+      const collectionRef = getCollectionRef(collection, roomId || undefined);
+      const docRef = doc(collectionRef, itemId);
+
+      await setDoc(docRef, itemWithId);
+      console.log('[FirebaseStore] ✅ Added item:', collection, itemId);
+    } catch (err) {
+      console.error('[FirebaseStore] ❌ Add error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to add item');
+      throw err;
+    }
+  }, [roomId]);
+
+  const updateItem = useCallback(async (collection: CollectionName, id: string, updates: any) => {
+    try {
+      const collectionRef = getCollectionRef(collection, roomId || undefined);
+      const docRef = doc(collectionRef, id);
+
+      await updateDoc(docRef, updates);
+      console.log('[FirebaseStore] ✅ Updated item:', collection, id);
+    } catch (err) {
+      console.error('[FirebaseStore] ❌ Update error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update item');
+      throw err;
+    }
+  }, [roomId]);
+
+  const deleteItem = useCallback(async (collection: CollectionName, id: string) => {
+    try {
+      const collectionRef = getCollectionRef(collection, roomId || undefined);
+      const docRef = doc(collectionRef, id);
+
+      await deleteDoc(docRef);
+      console.log('[FirebaseStore] ✅ Deleted item:', collection, id);
+    } catch (err) {
+      console.error('[FirebaseStore] ❌ Delete error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to delete item');
+      throw err;
+    }
+  }, [roomId]);
+
+  const getCollection = useCallback(<T = any>(collection: CollectionName): T[] => {
+    return (data[collection] || []) as T[];
+  }, [data]);
+
+  const setCollection = useCallback((collection: CollectionName, items: any[]) => {
+    setData(prevData => ({
+      ...prevData,
+      [collection]: items
+    }));
+  }, []);
+
+  return {
+    data,
+    loading,
+    error,
+    addItem,
+    updateItem,
+    deleteItem,
+    getCollection,
+    setCollection,
+    isLoaded,
+    setRoomId,
+    roomId
+  };
+}

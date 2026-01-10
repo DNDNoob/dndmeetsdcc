@@ -1,7 +1,7 @@
 import React, { createContext, useContext, ReactNode } from 'react';
-import { useDataStore } from '../hooks/useDataStore';
+import { useFirebaseStore } from '../hooks/useFirebaseStore';
 
-type GameContextType = ReturnType<typeof useDataStore>;
+type GameContextType = ReturnType<typeof useFirebaseStore>;
 
 const GameContext = createContext<GameContextType | null>(null);
 
@@ -10,7 +10,7 @@ interface GameProviderProps {
 }
 
 export function GameProvider({ children }: GameProviderProps) {
-  const store = useDataStore();
+  const store = useFirebaseStore();
   
   return (
     <GameContext.Provider value={store}>
