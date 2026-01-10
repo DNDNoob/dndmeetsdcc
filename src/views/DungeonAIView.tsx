@@ -24,6 +24,9 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
     level: 1,
     type: "normal",
     description: "",
+    weaknesses: "",
+    strengths: "",
+    hitPoints: 50,
   });
   const mobImageRef = useRef<HTMLInputElement>(null);
   const mapImageRef = useRef<HTMLInputElement>(null);
@@ -38,10 +41,14 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
       type: newMob.type || "normal",
       description: newMob.description || "",
       encountered: false,
+      hidden: true,
       image: newMob.image,
+      weaknesses: newMob.weaknesses,
+      strengths: newMob.strengths,
+      hitPoints: newMob.hitPoints || 50,
     };
     onUpdateMobs([...mobs, mob]);
-    setNewMob({ name: "", level: 1, type: "normal", description: "" });
+    setNewMob({ name: "", level: 1, type: "normal", description: "", weaknesses: "", strengths: "", hitPoints: 50 });
   };
 
   const handleDeleteMob = (id: string) => {
@@ -138,6 +145,13 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                       onChange={(e) => setNewMob({ ...newMob, level: parseInt(e.target.value) || 1 })}
                       className="w-20 bg-muted border border-border px-3 py-2"
                     />
+                    <input
+                      type="number"
+                      placeholder="Hit Points"
+                      value={newMob.hitPoints || ""}
+                      onChange={(e) => setNewMob({ ...newMob, hitPoints: parseInt(e.target.value) || 50 })}
+                      className="flex-1 bg-muted border border-border px-3 py-2"
+                    />
                     <select
                       value={newMob.type || "normal"}
                       onChange={(e) => setNewMob({ ...newMob, type: e.target.value as "normal" | "boss" })}
@@ -151,7 +165,21 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                     placeholder="Description"
                     value={newMob.description || ""}
                     onChange={(e) => setNewMob({ ...newMob, description: e.target.value })}
-                    className="w-full bg-muted border border-border px-3 py-2 min-h-[80px]"
+                    className="w-full bg-muted border border-border px-3 py-2 min-h-[60px]"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Weaknesses (e.g., fire, water)"
+                    value={newMob.weaknesses || ""}
+                    onChange={(e) => setNewMob({ ...newMob, weaknesses: e.target.value })}
+                    className="w-full bg-muted border border-border px-3 py-2"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Strengths (e.g., armor, speed)"
+                    value={newMob.strengths || ""}
+                    onChange={(e) => setNewMob({ ...newMob, strengths: e.target.value })}
+                    className="w-full bg-muted border border-border px-3 py-2"
                   />
                 </div>
                 <div className="flex flex-col items-center justify-center border border-dashed border-border p-4">
@@ -189,7 +217,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
               {mobs.map((mob) => (
                 <div
                   key={mob.id}
-                  className={`border p-3 flex flex-wrap items-center gap-4 ${
+                  className={`border p-3 flex flex-wrap items-start gap-4 ${
                     mob.type === "boss" ? "border-destructive bg-destructive/5" : "border-border bg-muted/20"
                   }`}
                 >
@@ -201,9 +229,12 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
                       <span className="font-display text-foreground">{mob.name}</span>
                       <span className="text-xs text-muted-foreground">Lvl {mob.level}</span>
+                      {mob.hitPoints !== undefined && (
+                        <span className="text-xs text-muted-foreground">HP: {mob.hitPoints}</span>
+                      )}
                       {mob.type === "boss" && (
                         <span className="text-xs bg-destructive/20 text-destructive px-2 py-0.5">BOSS</span>
                       )}
@@ -212,18 +243,42 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                           mob.encountered ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
                         }`}
                       >
-                        {mob.encountered ? "ENCOUNTERED" : "HIDDEN"}
+                        {mob.encountered ? "ENCOUNTERED" : "UNENCOUNTERED"}
+                      </span>
+                      <span
+                        className={`text-xs px-2 py-0.5 ${
+                          mob.hidden ? "bg-destructive/20 text-destructive" : "bg-accent/20 text-accent"
+                        }`}
+                      >
+                        {mob.hidden ? "HIDDEN" : "REVEALED"}
                       </span>
                     </div>
-                    <p className="text-sm text-muted-foreground">{mob.description}</p>
+                    <p className="text-sm text-muted-foreground mb-1">{mob.description}</p>
+                    {mob.weaknesses && (
+                      <p className="text-xs text-muted-foreground">
+                        <span className="text-destructive">Weaknesses:</span> {mob.weaknesses}
+                      </p>
+                    )}
+                    {mob.strengths && (
+                      <p className="text-xs text-muted-foreground">
+                        <span className="text-primary">Strengths:</span> {mob.strengths}
+                      </p>
+                    )}
                   </div>
-                  <div className="flex gap-2 mt-2 md:mt-0 ml-auto">
+                  <div className="flex flex-wrap gap-2 mt-2 md:mt-0">
                     <DungeonButton
                       variant="default"
                       size="sm"
                       onClick={() => handleUpdateMob(mob.id, { encountered: !mob.encountered })}
                     >
-                      {mob.encountered ? "Hide" : "Reveal"}
+                      {mob.encountered ? "Mark Unencountered" : "Mark Encountered"}
+                    </DungeonButton>
+                    <DungeonButton
+                      variant="default"
+                      size="sm"
+                      onClick={() => handleUpdateMob(mob.id, { hidden: !mob.hidden })}
+                    >
+                      {mob.hidden ? "Reveal to Players" : "Hide from Players"}
                     </DungeonButton>
                     <DungeonButton variant="danger" size="sm" onClick={() => handleDeleteMob(mob.id)}>
                       <Trash2 className="w-4 h-4" />

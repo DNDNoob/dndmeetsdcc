@@ -32,7 +32,11 @@ export interface Mob {
   type: "normal" | "boss";
   description: string;
   encountered: boolean;
+  hidden: boolean;
   image?: string;
+  weaknesses?: string;
+  strengths?: string;
+  hitPoints?: number;
 }
 
 export const defaultCrawlers: Crawler[] = [
@@ -117,8 +121,12 @@ export const defaultMobs: Mob[] = [
     name: "Gnome Decapitator",
     level: 2,
     type: "normal",
-    description: "Nasty little buggers with a fondness for ankles and heavy blades. Weakness: Being stepped on.",
+    description: "Nasty little buggers with a fondness for ankles and heavy blades.",
     encountered: true,
+    hidden: false,
+    weaknesses: "Being stepped on, fire",
+    strengths: "Speed, ambush tactics",
+    hitPoints: 25,
   },
   {
     id: "2",
@@ -127,6 +135,10 @@ export const defaultMobs: Mob[] = [
     type: "boss",
     description: "A terrifying creature that haunts the first floor. Many crawlers have fallen to its claws.",
     encountered: false,
+    hidden: true,
+    weaknesses: "Unknown",
+    strengths: "Unknown",
+    hitPoints: 150,
   },
   {
     id: "3",
@@ -135,5 +147,9 @@ export const defaultMobs: Mob[] = [
     type: "normal",
     description: "A twisted creature made of what appears to be baked goods. Surprisingly deadly.",
     encountered: true,
+    hidden: false,
+    weaknesses: "Water, milk",
+    strengths: "Hardened crust armor",
+    hitPoints: 40,
   },
 ];

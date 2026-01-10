@@ -1,13 +1,18 @@
 import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { Mob } from "@/lib/gameData";
-import { Skull, Crown, HelpCircle } from "lucide-react";
+import { Skull, Crown, HelpCircle, Heart, Shield, Zap } from "lucide-react";
 
 interface MobsViewProps {
   mobs: Mob[];
 }
 
 const MobsView: React.FC<MobsViewProps> = ({ mobs }) => {
+  // Filter out hidden mobs for player view
+  const visibleMobs = mobs.filter((mob) => !mob.hidden);
+  const hiddenCount = mobs.filter((mob) => mob.hidden).length;
+  const revealedBosses = mobs.filter((mob) => mob.type === "boss" && !mob.hidden).length;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -21,7 +26,7 @@ const MobsView: React.FC<MobsViewProps> = ({ mobs }) => {
         </h2>
 
         <div className="space-y-4">
-          {mobs.map((mob) => (
+          {visibleMobs.map((mob) => (
             <motion.div
               key={mob.id}
               initial={{ opacity: 0, x: -20 }}
@@ -32,44 +37,93 @@ const MobsView: React.FC<MobsViewProps> = ({ mobs }) => {
                   : "border-muted bg-muted/20"
               }`}
             >
-              <div className="flex items-start justify-between mb-2">
-                <div className="flex items-center gap-3">
-                  {mob.type === "boss" ? (
-                    <Crown className="w-5 h-5 text-accent" />
+              <div className="flex items-start gap-4">
+                {/* Mob Image */}
+                {mob.image && (
+                  <div className="flex-shrink-0">
+                    <img
+                      src={mob.image}
+                      alt={mob.name}
+                      className="w-24 h-24 object-cover border border-border"
+                    />
+                  </div>
+                )}
+
+                {/* Mob Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-3">
+                      {mob.type === "boss" ? (
+                        <Crown className="w-5 h-5 text-accent" />
+                      ) : (
+                        <Skull className="w-5 h-5 text-destructive" />
+                      )}
+                      <h3
+                        className={`font-display text-lg ${
+                          mob.type === "boss"
+                            ? "text-accent text-glow-gold"
+                            : "text-destructive"
+                        }`}
+                      >
+                        {mob.name}
+                      </h3>
+                    </div>
+                    <span className="text-xs bg-muted px-2 py-1 text-muted-foreground">
+                      Level {mob.level}
+                    </span>
+                  </div>
+
+                  {mob.encountered ? (
+                    <>
+                      <p className="text-muted-foreground text-sm mb-3">{mob.description}</p>
+                      
+                      {/* Stats Grid */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+                        {mob.hitPoints !== undefined && (
+                          <div className="bg-muted/50 p-2 border border-border">
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                              <Heart className="w-3 h-3" />
+                              <span>Hit Points</span>
+                            </div>
+                            <p className="text-sm font-semibold text-foreground">{mob.hitPoints} HP</p>
+                          </div>
+                        )}
+                        {mob.weaknesses && (
+                          <div className="bg-muted/50 p-2 border border-border">
+                            <div className="flex items-center gap-2 text-xs text-destructive mb-1">
+                              <Zap className="w-3 h-3" />
+                              <span>Weaknesses</span>
+                            </div>
+                            <p className="text-sm text-foreground">{mob.weaknesses}</p>
+                          </div>
+                        )}
+                        {mob.strengths && (
+                          <div className="bg-muted/50 p-2 border border-border">
+                            <div className="flex items-center gap-2 text-xs text-primary mb-1">
+                              <Shield className="w-3 h-3" />
+                              <span>Strengths</span>
+                            </div>
+                            <p className="text-sm text-foreground">{mob.strengths}</p>
+                          </div>
+                        )}
+                      </div>
+                    </>
                   ) : (
-                    <Skull className="w-5 h-5 text-destructive" />
+                    <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                      <HelpCircle className="w-4 h-4" />
+                      <span className="italic">Status: Unencountered</span>
+                    </div>
                   )}
-                  <h3
-                    className={`font-display text-lg ${
-                      mob.type === "boss"
-                        ? "text-accent text-glow-gold"
-                        : "text-destructive"
-                    }`}
-                  >
-                    {mob.name}
-                  </h3>
+
+                  {mob.type === "boss" && (
+                    <div className="mt-3">
+                      <span className="text-xs bg-accent/20 text-accent px-2 py-1 font-bold">
+                        ⚠ BOSS MONSTER
+                      </span>
+                    </div>
+                  )}
                 </div>
-                <span className="text-xs bg-muted px-2 py-1 text-muted-foreground">
-                  Level {mob.level}
-                </span>
               </div>
-
-              {mob.encountered ? (
-                <p className="text-muted-foreground text-sm pl-8">{mob.description}</p>
-              ) : (
-                <div className="flex items-center gap-2 text-muted-foreground text-sm pl-8">
-                  <HelpCircle className="w-4 h-4" />
-                  <span className="italic">Status: Unencountered</span>
-                </div>
-              )}
-
-              {mob.type === "boss" && (
-                <div className="mt-3 pl-8">
-                  <span className="text-xs bg-accent/20 text-accent px-2 py-1 font-bold">
-                    ⚠ BOSS MONSTER
-                  </span>
-                </div>
-              )}
             </motion.div>
           ))}
         </div>
@@ -78,21 +132,21 @@ const MobsView: React.FC<MobsViewProps> = ({ mobs }) => {
         <div className="mt-8 border-t border-border pt-6 grid grid-cols-3 gap-4 text-center">
           <div>
             <p className="text-2xl font-display text-destructive">
-              {mobs.filter((m) => m.encountered).length}
+              {visibleMobs.filter((m) => m.encountered).length}
             </p>
             <p className="text-xs text-muted-foreground">Encountered</p>
           </div>
           <div>
             <p className="text-2xl font-display text-muted-foreground">
-              {mobs.filter((m) => !m.encountered).length}
+              {hiddenCount}
             </p>
-            <p className="text-xs text-muted-foreground">Unknown</p>
+            <p className="text-xs text-muted-foreground">Undiscovered Mobs</p>
           </div>
           <div>
             <p className="text-2xl font-display text-accent">
-              {mobs.filter((m) => m.type === "boss").length}
+              {revealedBosses}
             </p>
-            <p className="text-xs text-muted-foreground">Bosses</p>
+            <p className="text-xs text-muted-foreground">Encountered Bosses</p>
           </div>
         </div>
       </DungeonCard>
