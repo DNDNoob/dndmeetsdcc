@@ -25,7 +25,17 @@
 4. Choose a location (e.g., us-central)
 5. Click "Enable"
 
-### 3. Configure Firestore Security Rules
+### 3. Enable Firebase Authentication
+
+1. In Firebase Console, go to **Build > Authentication**
+2. Click "Get started"
+3. Go to the **Sign-in method** tab
+4. Click on **Anonymous**
+5. Toggle **Enable** and click **Save**
+
+This allows users to join without creating accounts while still maintaining security.
+
+### 4. Configure Firestore Security Rules
 
 Go to **Firestore Database > Rules** and paste:
 
@@ -33,14 +43,14 @@ Go to **Firestore Database > Rules** and paste:
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow read/write to all documents (you can add auth later)
+    // Only allow authenticated users (including anonymous)
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if request.auth != null;
     }
     
-    // Room-based access (optional, for future use)
+    // Room-based access - users must be authenticated
     match /rooms/{roomId}/{document=**} {
-      allow read, write: if true;
+      allow read, write: if request.auth != null;
     }
   }
 }
@@ -48,7 +58,9 @@ service cloud.firestore {
 
 Click "Publish"
 
-### 4. Get Firebase Configuration
+**Security Note**: These rules require users to be authenticated (even anonymously) before accessing data. This prevents unauthorized access while keeping the app easy to use.
+
+### 5. Get Firebase Configuration
 
 1. Go to **Project Settings** (⚙️ icon)
 2. Scroll to "Your apps"
@@ -56,7 +68,7 @@ Click "Publish"
 4. Register app with a nickname (e.g., "DnD Web App")
 5. Copy the `firebaseConfig` values
 
-### 5. Configure Environment Variables
+### 6. Configure Environment Variables
 
 1. Copy `.env.example` to `.env`:
    ```bash
@@ -75,7 +87,7 @@ Click "Publish"
 
 3. **IMPORTANT**: Never commit `.env` to Git (it's in `.gitignore`)
 
-### 6. Test Locally
+### 7. Test Locally
 
 ```bash
 npm run dev
@@ -87,7 +99,7 @@ Open the app and try:
 - Refresh the page - data should persist!
 - Open in another browser/tab - changes sync in real-time!
 
-### 7. Deploy to Production
+### 8. Deploy to Production
 
 #### Option A: GitHub Pages
 
@@ -171,9 +183,36 @@ for (const crawler of oldData.crawlers) {
 - Verify internet connection
 - Check Firebase Console > Firestore for data
 
+### "Permission denied" errors
+- Make sure you completed **Step 3** (Enable Anonymous Authentication)
+- Verify security rules in **Step 4** allow `request.auth != null`
+- Check browser console for auth initialization messages
+- Try refreshing the page - authentication happens automatically
+
 ### "Quota exceeded"
 - Free tier limits: 50K reads/day, 20K writes/day
 - For production, upgrade to Blaze plan (pay-as-you-go)
+
+## Security & Privacy
+
+### Anonymous Authentication
+- Users are automatically signed in without creating accounts
+- Each user gets a unique anonymous ID
+- No personal information is collected
+- Sessions persist until browser data is cleared
+
+### Firestore Rules
+The security rules (`request.auth != null`) ensure:
+- ✅ Only authenticated users can access data
+- ✅ Prevents unauthorized access from bots/scripts
+- ✅ No rate limiting issues from public access
+- ✅ Better quota management
+
+### Future Enhancements
+You can later add:
+- Email/password authentication
+- Room-specific permissions (owners can delete, others can only read)
+- User profiles and preferences
 
 ## Cost Estimate
 
@@ -193,8 +232,10 @@ for (const crawler of oldData.crawlers) {
 
 - [ ] Set up Firebase project
 - [ ] Configure Firestore
+- [ ] Enable Anonymous Authentication
+- [ ] Configure security rules
 - [ ] Add environment variables
 - [ ] Test locally
 - [ ] Deploy to production
-- [ ] (Optional) Add authentication
 - [ ] (Optional) Add file storage for map images
+- [ ] (Optional) Upgrade to email/password authentication

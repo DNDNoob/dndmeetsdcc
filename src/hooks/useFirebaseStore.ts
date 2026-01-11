@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { db, getCollectionRef, getDocs, setDoc, doc, deleteDoc, updateDoc, onSnapshot } from '../lib/firebase';
+import { db, getCollectionRef, getDocs, setDoc, doc, deleteDoc, updateDoc, onSnapshot, initAuth } from '../lib/firebase';
 import type { CollectionName } from '../types/collections';
 
 interface DataStore {
@@ -53,9 +53,15 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
 
     const setupRealtimeSync = async () => {
       setLoading(true);
-      console.log('[FirebaseStore] 📂 Setting up real-time sync...', { roomId });
+      console.log('[FirebaseStore] � Initializing authentication...');
 
       try {
+        // Initialize authentication first
+        await initAuth();
+        console.log('[FirebaseStore] ✅ Authentication ready');
+        
+        console.log('[FirebaseStore] 📂 Setting up real-time sync...', { roomId });
+
         // Set up real-time listeners for each collection
         for (const collectionName of collections) {
           const collectionRef = getCollectionRef(collectionName, roomId || undefined);

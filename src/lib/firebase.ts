@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, doc, setDoc, getDoc, getDocs, deleteDoc, updateDoc, onSnapshot, query, where } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 
 // Firebase configuration - get these from Firebase Console
 const firebaseConfig = {
@@ -20,6 +21,47 @@ export const db = getFirestore(app);
 
 // Initialize Storage
 export const storage = getStorage(app);
+
+// Initialize Auth
+export const auth = getAuth(app);
+
+// Sign in anonymously when the app loads
+let authInitialized = false;
+let authPromise: Promise<void> | null = null;
+
+export const initAuth = () => {
+  if (authPromise) return authPromise;
+  
+  authPromise = new Promise((resolve, reject) => {
+    if (authInitialized) {
+      resolve();
+      return;
+    }
+
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        // User is already signed in
+        authInitialized = true;
+        unsubscribe();
+        resolve();
+      } else {
+        // Sign in anonymously
+        try {
+          await signInAnonymously(auth);
+          authInitialized = true;
+          unsubscribe();
+          resolve();
+        } catch (error) {
+          console.error('Error signing in anonymously:', error);
+          unsubscribe();
+          reject(error);
+        }
+      }
+    });
+  });
+
+  return authPromise;
+};
 
 // Collection references
 export const getCollectionRef = (collectionName: string, roomId?: string) => {
