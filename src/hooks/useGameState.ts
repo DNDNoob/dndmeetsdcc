@@ -61,8 +61,52 @@ export const useGameState = () => {
     setCollection('inventory', newInventory);
   };
 
-  const setMobs = (newMobs: Mob[]) => {
-    setCollection('mobs', newMobs);
+  // Remove undefined fields before sending to Firestore
+  const stripUndefinedDeep = (obj: any): any => {
+    if (obj === null || obj === undefined) return obj;
+    if (Array.isArray(obj)) {
+      return obj
+        .map((v) => (typeof v === 'object' && v !== null ? stripUndefinedDeep(v) : v))
+        .filter((v) => v !== undefined);
+    }
+    if (typeof obj === 'object') {
+      const out: any = {};
+      for (const [key, value] of Object.entries(obj)) {
+        if (value === undefined) continue;
+        out[key] = typeof value === 'object' && value !== null ? stripUndefinedDeep(value) : value;
+      }
+      return out;
+    }
+    return obj;
+  };
+
+  const setMobs = async (newMobs: Mob[]) => {
+    // Persist changes to Firestore by diffing existing vs new
+    const existingMobs = getCollection('mobs') as Mob[];
+
+    const newIds = newMobs.map(m => m.id);
+    const existingIds = existingMobs.map(m => m.id);
+
+    const toAdd = newMobs.filter(m => !existingIds.includes(m.id));
+    const toUpdate = newMobs.filter(m => existingIds.includes(m.id));
+    const toDelete = existingMobs.filter(m => !newIds.includes(m.id));
+
+    console.log('[GameState] 🔄 Persisting mobs', {
+      add: toAdd.map(m => m.id),
+      update: toUpdate.map(m => m.id),
+      delete: toDelete.map(m => m.id),
+    });
+
+    // Execute writes sequentially to surface logs deterministically
+    for (const mob of toAdd) {
+      await addItem('mobs', stripUndefinedDeep(mob));
+    }
+    for (const mob of toUpdate) {
+      await updateItem('mobs', mob.id, stripUndefinedDeep({ ...mob }));
+    }
+    for (const mob of toDelete) {
+      await deleteItem('mobs', mob.id);
+    }
   };
 
   const setMaps = (newMaps: string[]) => {

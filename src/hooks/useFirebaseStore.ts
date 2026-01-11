@@ -109,6 +109,27 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
     };
   }, [roomId]);
 
+  // Remove undefined values before writing to Firestore
+  const cleanObject = (obj: any): any => {
+    if (obj === null || obj === undefined) return obj;
+    if (Array.isArray(obj)) {
+      return obj
+        .map((v) => (typeof v === 'object' && v !== null ? cleanObject(v) : v))
+        .filter((v) => v !== undefined);
+    }
+    if (typeof obj === 'object') {
+      const out: any = {};
+      for (const [key, value] of Object.entries(obj)) {
+        if (value === undefined) continue;
+        out[key] = typeof value === 'object' && value !== null ? cleanObject(value) : value;
+      }
+      return out;
+    }
+    return obj;
+  };
+
+  const MAX_IMAGE_LENGTH = 1_000_000; // ~750 KB of raw image data once base64 is decoded
+
   const addItem = useCallback(async (collection: CollectionName, item: any) => {
     try {
       const itemId = item.id || crypto.randomUUID();
@@ -118,10 +139,19 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
         itemWithId.roomId = roomId;
       }
 
+      // Drop undefined/oversized image fields to satisfy Firestore
+      if (itemWithId.image === undefined || itemWithId.image === null) {
+        delete itemWithId.image;
+      } else if (typeof itemWithId.image === 'string' && itemWithId.image.length > MAX_IMAGE_LENGTH) {
+        console.warn('[FirebaseStore] ⚠️ Image too large; stripping before save');
+        delete itemWithId.image;
+      }
+
       const collectionRef = getCollectionRef(collection, roomId || undefined);
       const docRef = doc(collectionRef, itemId);
 
-      await setDoc(docRef, itemWithId);
+      const cleaned = cleanObject(itemWithId);
+      await setDoc(docRef, cleaned);
       console.log('[FirebaseStore] ✅ Added item:', collection, itemId);
     } catch (err) {
       console.error('[FirebaseStore] ❌ Add error:', err);
@@ -135,7 +165,17 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
       const collectionRef = getCollectionRef(collection, roomId || undefined);
       const docRef = doc(collectionRef, id);
 
-      await updateDoc(docRef, updates);
+        // Drop undefined/oversized image fields to satisfy Firestore
+      const updatesCopy = { ...updates };
+      if (updatesCopy.image === undefined || updatesCopy.image === null) {
+        delete updatesCopy.image;
+      } else if (typeof updatesCopy.image === 'string' && updatesCopy.image.length > MAX_IMAGE_LENGTH) {
+        console.warn('[FirebaseStore] ⚠️ Image too large; stripping before update');
+        delete updatesCopy.image;
+      }
+
+      const cleanedFinal = cleanObject(updatesCopy);
+      await updateDoc(docRef, cleanedFinal);
       console.log('[FirebaseStore] ✅ Updated item:', collection, id);
     } catch (err) {
       console.error('[FirebaseStore] ❌ Update error:', err);

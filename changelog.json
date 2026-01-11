@@ -1,5 +1,15 @@
 [
   {
+    "date": "2026-01-11",
+    "changes": [
+      "Hardened Firebase mob persistence: strip undefined fields, diff adds/updates/deletes, and raise image size guard",
+      "Added client-side mob image resize/compress with oversize protection to prevent Firestore rejects",
+      "Fixed Dungeon AI console render break by aliasing lucide Image icon",
+      "Documented end-to-end Firebase persistence testing steps (FIREBASE_PERSISTENCE_TEST.md)",
+      "Added scripts for Firebase CRUD smoke tests and deployment diagnostics"
+    ]
+  },
+  {
     "date": "2026-01-10",
     "changes": [
       "🔥 MAJOR: Migrated from file-based storage to Firebase Firestore for cloud persistence and real-time multiplayer",

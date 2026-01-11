@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import { Mob } from "@/lib/gameData";
-import { Brain, Upload, Plus, Trash2, Map, Skull, Image, Save, Edit2, X } from "lucide-react";
+import { Brain, Upload, Plus, Trash2, Map, Skull, Image as ImageIcon, Save, Edit2, X } from "lucide-react";
 
 interface DungeonAIViewProps {
   mobs: Mob[];
@@ -33,7 +33,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   const [editingMobId, setEditingMobId] = useState<string | null>(null);
   const [editedMobData, setEditedMobData] = useState<Mob | null>(null);
 
-  const handleAddMob = () => {
+  const handleAddMob = async () => {
     if (!newMob.name?.trim()) return;
     const mob: Mob = {
       id: Date.now().toString(),
@@ -51,19 +51,79 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
       hideWeaknesses: false,
       hideStrengths: false,
     };
-    onUpdateMobs([...mobs, mob]);
+    console.log('[DungeonAI] ➕ Add Mob clicked', mob);
+    try {
+      await onUpdateMobs([...mobs, mob]);
+      console.log('[DungeonAI] ✅ Mob persisted request sent');
+    } catch (err) {
+      console.error('[DungeonAI] ❌ Failed to persist mob', err);
+    }
     setNewMob({ name: "", level: 1, type: "normal", description: "", weaknesses: "", strengths: "", hitPoints: 50 });
   };
 
-  const handleDeleteMob = (id: string) => {
-    onUpdateMobs(mobs.filter((m) => m.id !== id));
+  const handleDeleteMob = async (id: string) => {
+    console.log('[DungeonAI] 🗑️ Delete Mob clicked', id);
+    try {
+      await onUpdateMobs(mobs.filter((m) => m.id !== id));
+      console.log('[DungeonAI] ✅ Delete request sent');
+    } catch (err) {
+      console.error('[DungeonAI] ❌ Failed to delete mob', err);
+    }
     if (editingMobId === id) {
       setEditingMobId(null);
     }
   };
 
-  const handleUpdateMob = (id: string, updates: Partial<Mob>) => {
-    onUpdateMobs(mobs.map((m) => (m.id === id ? { ...m, ...updates } : m)));
+  const handleUpdateMob = async (id: string, updates: Partial<Mob>) => {
+    console.log('[DungeonAI] 📝 Update Mob clicked', { id, updates });
+    try {
+      await onUpdateMobs(mobs.map((m) => (m.id === id ? { ...m, ...updates } : m)));
+      console.log('[DungeonAI] ✅ Update request sent');
+    } catch (err) {
+      console.error('[DungeonAI] ❌ Failed to update mob', err);
+    }
+  };
+
+  // Resize and compress images before saving to Firestore (keep under size limits)
+  const resizeImage = async (file: File, maxDim = 512, quality = 0.7): Promise<string | null> => {
+    const readAsDataUrl = (f: File) =>
+      new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(f);
+      });
+
+    const dataUrl = await readAsDataUrl(file);
+    // If already reasonably small, keep as is
+    if (dataUrl.length < 700_000) return dataUrl;
+
+    const img = new window.Image();
+    const loaded: Promise<void> = new Promise((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = reject;
+    });
+    img.src = dataUrl;
+    await loaded;
+
+    const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+    const targetW = Math.max(1, Math.round(img.width * scale));
+    const targetH = Math.max(1, Math.round(img.height * scale));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = targetW;
+    canvas.height = targetH;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.drawImage(img, 0, 0, targetW, targetH);
+
+    const compressed = canvas.toDataURL('image/jpeg', quality);
+    // Final guard against oversize
+    if (compressed.length >= 700_000) {
+      console.warn('[DungeonAI] ⚠️ Image still too large after resize; skipping image');
+      return null;
+    }
+    return compressed;
   };
 
   const handleToggleEncountered = (id: string, currentEncountered: boolean) => {
@@ -94,16 +154,14 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   const handleMobImageUpload = (e: React.ChangeEvent<HTMLInputElement>, mobId?: string) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const base64 = reader.result as string;
+      resizeImage(file).then((base64) => {
+        if (!base64) return;
         if (mobId) {
           handleUpdateMob(mobId, { image: base64 });
         } else {
           setNewMob({ ...newMob, image: base64 });
         }
-      };
-      reader.readAsDataURL(file);
+      }).catch((err) => console.error('[DungeonAI] Image resize failed', err));
     }
   };
 
@@ -241,7 +299,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                   {newMob.image ? (
                     <img src={newMob.image} alt="Mob preview" className="max-h-32 mb-2" />
                   ) : (
-                    <Image className="w-12 h-12 text-muted-foreground mb-2" />
+                    <ImageIcon className="w-12 h-12 text-muted-foreground mb-2" />
                   )}
                   <input
                     ref={mobImageRef}
@@ -348,11 +406,10 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                               onChange={(e) => {
                                 const file = e.target.files?.[0];
                                 if (file) {
-                                  const reader = new FileReader();
-                                  reader.onload = () => {
-                                    setEditedMobData(prev => prev ? { ...prev, image: reader.result as string } : prev);
-                                  };
-                                  reader.readAsDataURL(file);
+                                  resizeImage(file).then((base64) => {
+                                    if (!base64) return;
+                                    setEditedMobData(prev => prev ? { ...prev, image: base64 } : prev);
+                                  }).catch((err) => console.error('[DungeonAI] Image resize failed', err));
                                 }
                               }}
                               className="text-xs w-full"
