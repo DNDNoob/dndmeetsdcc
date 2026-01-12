@@ -95,6 +95,8 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
       } catch (err) {
         console.error('[FirebaseStore] ❌ Setup error:', err);
         setError(err instanceof Error ? err.message : 'Failed to setup Firebase');
+        // Still mark as loaded even if Firebase fails, so the app can function offline
+        setIsLoaded(true);
       } finally {
         setLoading(false);
       }
