@@ -2,6 +2,26 @@
   {
     "date": "2026-01-13",
     "changes": [
+      "🎯 MAJOR: Comprehensive feature enhancement and bug fixes for D&D meets DCC",
+      "✅ Grid Overlay Fixes: Changed grid color to semi-transparent grey (was white, now properly visible)",
+      "✅ Grid Resize Controls: Added interactive slider for DMs to adjust grid size (20-100px) in both Episode Editor and Show Time",
+      "✅ Circular Mob Tokens: Fixed mob tokens to display as perfect circles on Show Time page (were square)",
+      "✅ Draggable Mobs on Show Time: DMs can now drag and reposition mob tokens during live gameplay",
+      "✅ Improved Image Compression: Enhanced compression algorithm with progressive quality reduction and dimension scaling to prevent image stripping (maps up to 1200px, mobs 800px)",
+      "✅ Duplicate Mob Tokens: Added ability to place multiple instances of the same mob type in episodes",
+      "✅ Multi-Map Mob Placement: Added map selector dropdown when multiple maps selected - switch between maps while placing mobs",
+      "✅ Full Episode Editing: Enhanced edit mode to allow changing all episode fields including maps and mob placements (not just name/description)",
+      "✅ Login Name Display: Fixed player name display to update properly without requiring sign out/in",
+      "✅ Mob Card Controls: Removed close/exit button for players on Show Time page (DMs retain it), kept collapse functionality for all",
+      "🔧 Map Manager: Verified map naming and editing features working correctly (already implemented)",
+      "🎨 UI/UX: All controls are intuitive with clear visual feedback and minimal learning curve",
+      "📊 Image sizes now logged during compression for debugging: original → compressed with quality level",
+      "🔒 Grid overlay controls are pointer-events-auto to ensure proper interaction"
+    ]
+  },
+  {
+    "date": "2026-01-13",
+    "changes": [
       "🎨 MAJOR: Enhanced Episode system with visual mob placement and map management",
       "Added visual drag-and-drop mob placement editor: DMs can now drag mob icons directly onto maps to position them",
       "Created MobIcon component: circular mob tokens with head-centered positioning and HP indicators",
