@@ -160,7 +160,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
       setError(err instanceof Error ? err.message : 'Failed to add item');
       throw err;
     }
-  }, [roomId, cleanObject]);
+  }, [roomId]); // cleanObject is stable, doesn't need to be in dependencies
 
   const updateItem = useCallback(async (collection: CollectionName, id: string, updates: Record<string, unknown>) => {
     try {
@@ -184,7 +184,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
       setError(err instanceof Error ? err.message : 'Failed to update item');
       throw err;
     }
-  }, [roomId, cleanObject]);
+  }, [roomId]); // cleanObject is stable, doesn't need to be in dependencies
 
   const deleteItem = useCallback(async (collection: CollectionName, id: string) => {
     try {
