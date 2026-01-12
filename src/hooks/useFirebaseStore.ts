@@ -3,18 +3,18 @@ import { db, getCollectionRef, getDocs, setDoc, doc, deleteDoc, updateDoc, onSna
 import type { CollectionName } from '../types/collections';
 
 interface DataStore {
-  [collectionName: string]: any[];
+  [collectionName: string]: Record<string, unknown>[];
 }
 
 interface UseFirebaseStoreReturn {
   data: DataStore;
   loading: boolean;
   error: string | null;
-  addItem: (collection: CollectionName, item: any) => Promise<void>;
-  updateItem: (collection: CollectionName, id: string, updates: any) => Promise<void>;
+  addItem: (collection: CollectionName, item: Record<string, unknown>) => Promise<void>;
+  updateItem: (collection: CollectionName, id: string, updates: Record<string, unknown>) => Promise<void>;
   deleteItem: (collection: CollectionName, id: string) => Promise<void>;
-  getCollection: <T = any>(collection: CollectionName) => T[];
-  setCollection: (collection: CollectionName, items: any[]) => void;
+  getCollection: <T = Record<string, unknown>>(collection: CollectionName) => T[];
+  setCollection: (collection: CollectionName, items: Record<string, unknown>[]) => void;
   isLoaded: boolean;
   setRoomId: (roomId: string | null) => void;
   roomId: string | null;
@@ -95,6 +95,8 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
       } catch (err) {
         console.error('[FirebaseStore] ❌ Setup error:', err);
         setError(err instanceof Error ? err.message : 'Failed to setup Firebase');
+        // Still mark as loaded even if Firebase fails, so the app can function offline
+        setIsLoaded(true);
       } finally {
         setLoading(false);
       }
@@ -110,7 +112,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
   }, [roomId]);
 
   // Remove undefined values before writing to Firestore
-  const cleanObject = (obj: any): any => {
+  const cleanObject = (obj: unknown): unknown => {
     if (obj === null || obj === undefined) return obj;
     if (Array.isArray(obj)) {
       return obj
@@ -118,7 +120,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
         .filter((v) => v !== undefined);
     }
     if (typeof obj === 'object') {
-      const out: any = {};
+      const out: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(obj)) {
         if (value === undefined) continue;
         out[key] = typeof value === 'object' && value !== null ? cleanObject(value) : value;
@@ -130,9 +132,9 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
 
   const MAX_IMAGE_LENGTH = 1_000_000; // ~750 KB of raw image data once base64 is decoded
 
-  const addItem = useCallback(async (collection: CollectionName, item: any) => {
+  const addItem = useCallback(async (collection: CollectionName, item: Record<string, unknown>) => {
     try {
-      const itemId = item.id || crypto.randomUUID();
+      const itemId = (item.id as string) || crypto.randomUUID();
       const itemWithId = { ...item, id: itemId };
       
       if (roomId) {
@@ -158,9 +160,9 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
       setError(err instanceof Error ? err.message : 'Failed to add item');
       throw err;
     }
-  }, [roomId]);
+  }, [roomId]); // cleanObject is stable, doesn't need to be in dependencies
 
-  const updateItem = useCallback(async (collection: CollectionName, id: string, updates: any) => {
+  const updateItem = useCallback(async (collection: CollectionName, id: string, updates: Record<string, unknown>) => {
     try {
       const collectionRef = getCollectionRef(collection, roomId || undefined);
       const docRef = doc(collectionRef, id);
@@ -175,14 +177,14 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
       }
 
       const cleanedFinal = cleanObject(updatesCopy);
-      await updateDoc(docRef, cleanedFinal);
+      await updateDoc(docRef, cleanedFinal as Record<string, unknown>);
       console.log('[FirebaseStore] ✅ Updated item:', collection, id);
     } catch (err) {
       console.error('[FirebaseStore] ❌ Update error:', err);
       setError(err instanceof Error ? err.message : 'Failed to update item');
       throw err;
     }
-  }, [roomId]);
+  }, [roomId]); // cleanObject is stable, doesn't need to be in dependencies
 
   const deleteItem = useCallback(async (collection: CollectionName, id: string) => {
     try {
@@ -198,11 +200,11 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
     }
   }, [roomId]);
 
-  const getCollection = useCallback(<T = any>(collection: CollectionName): T[] => {
+  const getCollection = useCallback(<T = Record<string, unknown>>(collection: CollectionName): T[] => {
     return (data[collection] || []) as T[];
   }, [data]);
 
-  const setCollection = useCallback((collection: CollectionName, items: any[]) => {
+  const setCollection = useCallback((collection: CollectionName, items: Record<string, unknown>[]) => {
     setData(prevData => ({
       ...prevData,
       [collection]: items
