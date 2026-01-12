@@ -20,6 +20,9 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, episodes, mobs, isAdm
   const [displayedMobIds, setDisplayedMobIds] = useState<string[]>([]);
   const [selectedMap, setSelectedMap] = useState<string | null>(null);
   const [showGrid, setShowGrid] = useState(false);
+  const [gridCellSize, setGridCellSize] = useState(50);
+  const [draggingMobId, setDraggingMobId] = useState<string | null>(null);
+  const [mobPositions, setMobPositions] = useState<Record<string, { x: number; y: number }>>({});
 
   // Debug logging
   console.log('[ShowTime] Rendering with:', { 
@@ -72,6 +75,35 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, episodes, mobs, isAdm
     setSelectedMap(null);
     setCurrentMapIndex(0);
     setDisplayedMobIds([]);
+    setMobPositions({});
+  };
+
+  const handleMobMouseDown = (e: React.MouseEvent, mobId: string) => {
+    if (!isAdmin) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setDraggingMobId(mobId);
+  };
+
+  const handleMapMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isAdmin || !draggingMobId) return;
+    
+    const mapContainer = e.currentTarget;
+    const rect = mapContainer.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+
+    const clampedX = Math.max(0, Math.min(100, x));
+    const clampedY = Math.max(0, Math.min(100, y));
+
+    setMobPositions(prev => ({
+      ...prev,
+      [draggingMobId]: { x: clampedX, y: clampedY }
+    }));
+  };
+
+  const handleMapMouseUp = () => {
+    setDraggingMobId(null);
   };
 
   // Main view when no episode is selected
@@ -251,7 +283,12 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, episodes, mobs, isAdm
       className="min-h-screen bg-background relative flex flex-col"
     >
       {/* Map display */}
-      <div className="flex-1 flex items-center justify-center p-4 relative">
+      <div 
+        className="flex-1 flex items-center justify-center p-4 relative"
+        onMouseMove={handleMapMouseMove}
+        onMouseUp={handleMapMouseUp}
+        onMouseLeave={handleMapMouseUp}
+      >
         <img
           src={selectedMap}
           alt="Current Map"
@@ -259,7 +296,15 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, episodes, mobs, isAdm
         />
 
         {/* Grid overlay */}
-        {isAdmin && <GridOverlay isVisible={showGrid} cellSize={50} opacity={0.15} />}
+        {isAdmin && (
+          <GridOverlay 
+            isVisible={showGrid} 
+            cellSize={gridCellSize} 
+            opacity={0.15}
+            onCellSizeChange={setGridCellSize}
+            showControls={true}
+          />
+        )}
 
         {/* Displayed mobs on the map */}
         {displayedMobIds.map(mobId => {
@@ -268,15 +313,20 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, episodes, mobs, isAdm
 
           if (!mob || !placement) return null;
 
+          // Use custom position if moved by DM, otherwise use placement
+          const position = mobPositions[mobId] || { x: placement.x, y: placement.y };
+
           return (
             <div
               key={mobId}
               style={{
                 position: "absolute",
-                left: `${placement.x}%`,
-                top: `${placement.y}%`,
+                left: `${position.x}%`,
+                top: `${position.y}%`,
                 transform: "translate(-50%, -50%)",
+                cursor: isAdmin ? (draggingMobId === mobId ? "grabbing" : "grab") : "default",
               }}
+              onMouseDown={(e) => handleMobMouseDown(e, mobId)}
             >
               <motion.div
                 initial={{ scale: 0, opacity: 0 }}
@@ -284,18 +334,21 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, episodes, mobs, isAdm
                 transition={{ type: "spring", stiffness: 260, damping: 20 }}
                 className="relative"
               >
-                {mob.image && (
-                  <img
-                    src={mob.image}
-                    alt={mob.name}
-                    className="w-16 h-16 object-cover rounded-lg shadow-lg border-2 border-primary"
-                  />
-                )}
-                {!mob.image && (
-                  <div className="w-16 h-16 bg-destructive/20 border-2 border-destructive rounded-lg flex items-center justify-center shadow-lg">
-                    <span className="text-xs font-bold text-center px-1">{mob.name}</span>
-                  </div>
-                )}
+                {/* Circular mob token */}
+                <div
+                  className="w-16 h-16 rounded-full overflow-hidden border-2 border-primary shadow-lg hover:scale-110 transition-transform"
+                  style={{
+                    backgroundImage: mob.image ? `url(${mob.image})` : undefined,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center 20%",
+                  }}
+                >
+                  {!mob.image && (
+                    <div className="w-full h-full bg-destructive/20 flex items-center justify-center">
+                      <span className="text-xs font-bold text-center px-1">{mob.name.charAt(0)}</span>
+                    </div>
+                  )}
+                </div>
               </motion.div>
             </div>
           );
@@ -355,6 +408,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, episodes, mobs, isAdm
               key={mobId}
               mob={mob}
               onClose={() => handleHideMob(mobId)}
+              isAdmin={isAdmin}
             />
           );
         })}

@@ -55,6 +55,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   const [selectedMobsForEpisode, setSelectedMobsForEpisode] = useState<{ mobId: string; x: number; y: number }[]>([]);
   const [editingEpisodeId, setEditingEpisodeId] = useState<string | null>(null);
   const [editingEpisode, setEditingEpisode] = useState<Episode | null>(null);
+  const [currentMapIndexForPlacement, setCurrentMapIndexForPlacement] = useState(0);
 
   const handleAddMob = async () => {
     if (!newMob.name?.trim()) return;
@@ -108,7 +109,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   };
 
   // Resize and compress images before saving to Firestore (keep under size limits)
-  const resizeImage = async (file: File, maxDim = 512, quality = 0.7): Promise<string | null> => {
+  const resizeImage = async (file: File, maxDim = 800, quality = 0.6): Promise<string | null> => {
     const readAsDataUrl = (f: File) =>
       new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
@@ -118,9 +119,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
       });
 
     const dataUrl = await readAsDataUrl(file);
-    // If already reasonably small, keep as is
-    if (dataUrl.length < 700_000) return dataUrl;
-
+    
     const img = new window.Image();
     const loaded: Promise<void> = new Promise((resolve, reject) => {
       img.onload = () => resolve();
@@ -129,6 +128,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
     img.src = dataUrl;
     await loaded;
 
+    // Calculate scaling to fit within maxDim
     const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
     const targetW = Math.max(1, Math.round(img.width * scale));
     const targetH = Math.max(1, Math.round(img.height * scale));
@@ -140,12 +140,36 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
     if (!ctx) return null;
     ctx.drawImage(img, 0, 0, targetW, targetH);
 
-    const compressed = canvas.toDataURL('image/jpeg', quality);
+    // Try progressively lower quality if still too large
+    let compressed = canvas.toDataURL('image/jpeg', quality);
+    let attempts = 0;
+    let currentQuality = quality;
+    
+    // Target size is 700KB (conservative limit)
+    while (compressed.length >= 700_000 && attempts < 5) {
+      currentQuality -= 0.1;
+      if (currentQuality < 0.2) {
+        // If quality too low, try reducing dimensions instead
+        const newScale = scale * 0.8;
+        const newW = Math.max(1, Math.round(img.width * newScale));
+        const newH = Math.max(1, Math.round(img.height * newScale));
+        canvas.width = newW;
+        canvas.height = newH;
+        ctx.drawImage(img, 0, 0, newW, newH);
+        compressed = canvas.toDataURL('image/jpeg', 0.6);
+        break;
+      }
+      compressed = canvas.toDataURL('image/jpeg', currentQuality);
+      attempts++;
+    }
+    
     // Final guard against oversize
     if (compressed.length >= 700_000) {
-      console.warn('[DungeonAI] ⚠️ Image still too large after resize; skipping image');
-      return null;
+      console.warn('[DungeonAI] ⚠️ Image still too large after compression; may be stripped by Firestore');
+      // Return it anyway - let Firestore handle it
     }
+    
+    console.log(`[DungeonAI] 📸 Image compressed: ${(dataUrl.length / 1024).toFixed(0)}KB → ${(compressed.length / 1024).toFixed(0)}KB (quality: ${currentQuality.toFixed(1)})`);
     return compressed;
   };
 
@@ -188,22 +212,24 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
     }
   };
 
-  const handleMapUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleMapUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       console.log('[DungeonAI] 📤 Uploading map...');
-      const reader = new FileReader();
-      reader.onload = () => {
-        const base64 = reader.result as string;
-        console.log('[DungeonAI] ✅ Map loaded, size:', base64.length);
-        const updatedMaps = [...maps, base64];
+      try {
+        // Compress map images too, but use higher resolution (1200px) for better quality
+        const compressed = await resizeImage(file, 1200, 0.7);
+        if (!compressed) {
+          console.error('[DungeonAI] ❌ Failed to compress map image');
+          return;
+        }
+        console.log('[DungeonAI] ✅ Map compressed and ready');
+        const updatedMaps = [...maps, compressed];
         onUpdateMaps(updatedMaps);
         console.log('[DungeonAI] 📊 Total maps:', updatedMaps.length);
-      };
-      reader.onerror = (err) => {
-        console.error('[DungeonAI] ❌ Failed to read map file', err);
-      };
-      reader.readAsDataURL(file);
+      } catch (err) {
+        console.error('[DungeonAI] ❌ Failed to process map file', err);
+      }
     }
   };
 
@@ -264,9 +290,9 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   };
 
   const handleAddMobToEpisode = (mobId: string) => {
-    if (!selectedMobsForEpisode.find(m => m.mobId === mobId)) {
-      setSelectedMobsForEpisode([...selectedMobsForEpisode, { mobId, x: 50, y: 50 }]);
-    }
+    // Allow duplicate mob tokens - generate unique placement ID
+    const placementId = `${mobId}-${Date.now()}-${Math.random()}`;
+    setSelectedMobsForEpisode([...selectedMobsForEpisode, { mobId, x: 50, y: 50 }]);
   };
 
   const handleRemoveMobFromEpisode = (mobId: string) => {
@@ -794,8 +820,30 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                     <label className="text-xs text-muted-foreground mb-2 block font-semibold">
                       Place Mobs on Map (Drag & Drop)
                     </label>
+                    
+                    {/* Map selector if multiple maps selected */}
+                    {selectedMapsForEpisode.length > 1 && (
+                      <div className="flex items-center gap-2 mb-3">
+                        <label className="text-xs text-muted-foreground">Current Map:</label>
+                        <select
+                          value={currentMapIndexForPlacement}
+                          onChange={(e) => setCurrentMapIndexForPlacement(parseInt(e.target.value))}
+                          className="bg-muted border border-border px-2 py-1 text-sm"
+                        >
+                          {selectedMapsForEpisode.map((mapId, idx) => (
+                            <option key={idx} value={idx}>
+                              Map {parseInt(mapId) + 1}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="text-xs text-muted-foreground">
+                          ({currentMapIndexForPlacement + 1} of {selectedMapsForEpisode.length})
+                        </span>
+                      </div>
+                    )}
+                    
                     <MapMobPlacementEditor
-                      mapUrl={maps[parseInt(selectedMapsForEpisode[0], 10)]}
+                      mapUrl={maps[parseInt(selectedMapsForEpisode[currentMapIndexForPlacement] || selectedMapsForEpisode[0], 10)]}
                       mobs={mobs}
                       placements={selectedMobsForEpisode}
                       onPlacementsChange={setSelectedMobsForEpisode}
@@ -822,7 +870,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                 episodes.map(episode => (
                   <div key={episode.id} className="border border-primary bg-muted/20 p-4">
                     {editingEpisodeId === episode.id && editingEpisode ? (
-                      /* Edit mode */
+                      /* Edit mode - Full Episode Editing */
                       <div className="space-y-3">
                         <div>
                           <label className="text-xs text-muted-foreground mb-1 block">Name</label>
@@ -841,6 +889,69 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                             className="w-full bg-muted border border-border px-3 py-2 min-h-[60px]"
                           />
                         </div>
+
+                        {/* Map selection in edit mode */}
+                        <div>
+                          <label className="text-xs text-muted-foreground mb-2 block font-semibold">Maps</label>
+                          <div className="grid sm:grid-cols-2 gap-2 max-h-[200px] overflow-y-auto">
+                            {maps.map((map, index) => (
+                              <label
+                                key={index}
+                                className={`flex items-center gap-2 p-2 border cursor-pointer transition-colors ${
+                                  editingEpisode.mapIds.includes(index.toString())
+                                    ? "border-primary bg-primary/10"
+                                    : "border-border hover:border-primary/50"
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={editingEpisode.mapIds.includes(index.toString())}
+                                  onChange={() => {
+                                    const mapId = index.toString();
+                                    setEditingEpisode({
+                                      ...editingEpisode,
+                                      mapIds: editingEpisode.mapIds.includes(mapId)
+                                        ? editingEpisode.mapIds.filter(id => id !== mapId)
+                                        : [...editingEpisode.mapIds, mapId]
+                                    });
+                                  }}
+                                  className="w-4 h-4"
+                                />
+                                <img src={map} alt={`Map ${index + 1}`} className="w-12 h-12 object-cover" />
+                                <span className="text-sm">Map {index + 1}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Mob placement editing */}
+                        {editingEpisode.mapIds.length > 0 && (
+                          <div>
+                            <label className="text-xs text-muted-foreground mb-2 block font-semibold">
+                              Edit Mob Placements
+                            </label>
+                            <MapMobPlacementEditor
+                              mapUrl={maps[parseInt(editingEpisode.mapIds[0], 10)]}
+                              mobs={mobs}
+                              placements={editingEpisode.mobPlacements}
+                              onPlacementsChange={(placements) => 
+                                setEditingEpisode({ ...editingEpisode, mobPlacements: placements })
+                              }
+                              onAddMob={(mobId) => {
+                                setEditingEpisode({
+                                  ...editingEpisode,
+                                  mobPlacements: [...editingEpisode.mobPlacements, { mobId, x: 50, y: 50 }]
+                                });
+                              }}
+                              onRemoveMob={(mobId) => {
+                                setEditingEpisode({
+                                  ...editingEpisode,
+                                  mobPlacements: editingEpisode.mobPlacements.filter(p => p.mobId !== mobId)
+                                });
+                              }}
+                            />
+                          </div>
+                        )}
 
                         <div className="flex gap-2">
                           <DungeonButton variant="admin" size="sm" onClick={handleSaveEditEpisode}>

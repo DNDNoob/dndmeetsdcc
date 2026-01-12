@@ -6,12 +6,14 @@ interface ResizableMobDisplayProps {
   mob: Mob;
   initialScale?: number;
   onClose: () => void;
+  isAdmin?: boolean;
 }
 
 export const ResizableMobDisplay: React.FC<ResizableMobDisplayProps> = ({
   mob,
   initialScale = 1,
   onClose,
+  isAdmin = false,
 }) => {
   const [scale, setScale] = useState(initialScale);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -116,15 +118,18 @@ export const ResizableMobDisplay: React.FC<ResizableMobDisplayProps> = ({
           >
             {isExpanded ? "⬇" : "⬆"}
           </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onClose();
-            }}
-            className="text-xs px-2 py-1 bg-destructive text-destructive-foreground hover:bg-destructive/80 rounded"
-          >
-            ✕
-          </button>
+          {/* Only show close button for admin */}
+          {isAdmin && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+              }}
+              className="text-xs px-2 py-1 bg-destructive text-destructive-foreground hover:bg-destructive/80 rounded"
+            >
+              ✕
+            </button>
+          )}
         </div>
       </div>
 

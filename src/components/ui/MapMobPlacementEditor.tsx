@@ -25,6 +25,7 @@ const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
 }) => {
   const [draggingMobId, setDraggingMobId] = useState<string | null>(null);
   const [showGrid, setShowGrid] = useState(false);
+  const [gridCellSize, setGridCellSize] = useState(50);
   const mapContainerRef = useRef<HTMLDivElement>(null);
 
   const handleMouseDown = (e: React.MouseEvent, mobId: string) => {
@@ -115,7 +116,13 @@ const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
       >
-        <GridOverlay isVisible={showGrid} cellSize={50} opacity={0.15} />
+        <GridOverlay 
+          isVisible={showGrid} 
+          cellSize={gridCellSize} 
+          opacity={0.15}
+          onCellSizeChange={setGridCellSize}
+          showControls={true}
+        />
 
         {/* Placed mobs */}
         {placements.map(placement => {
