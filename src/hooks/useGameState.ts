@@ -46,11 +46,11 @@ export const useGameState = () => {
 
   // Maps are stored as Firestore documents; normalize to string[] of image data
   const maps = useMemo(() => {
-    const docs = getCollection('maps') as any[];
+    const docs = getCollection('maps') as Record<string, unknown>[];
     // Support both raw string (legacy) and object with image/url/value
     const normalized = (docs || []).map((m) => {
       if (typeof m === 'string') return m;
-      return m?.image || m?.imageUrl || m?.url || m?.value || '';
+      return (m?.image as string) || (m?.imageUrl as string) || (m?.url as string) || (m?.value as string) || '';
     }).filter(Boolean);
     return normalized as string[];
   }, [getCollection('maps'), isLoaded]);
@@ -74,7 +74,7 @@ export const useGameState = () => {
   };
 
   // Remove undefined fields before sending to Firestore
-  const stripUndefinedDeep = (obj: any): any => {
+  const stripUndefinedDeep = (obj: unknown): unknown => {
     if (obj === null || obj === undefined) return obj;
     if (Array.isArray(obj)) {
       return obj
@@ -82,7 +82,7 @@ export const useGameState = () => {
         .filter((v) => v !== undefined);
     }
     if (typeof obj === 'object') {
-      const out: any = {};
+      const out: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(obj)) {
         if (value === undefined) continue;
         out[key] = typeof value === 'object' && value !== null ? stripUndefinedDeep(value) : value;
@@ -123,15 +123,15 @@ export const useGameState = () => {
 
   // Persist maps by diffing Firestore docs against provided array of base64 strings
   const setMaps = async (newMaps: string[]) => {
-    const existingDocs = getCollection('maps') as any[];
+    const existingDocs = getCollection('maps') as Record<string, unknown>[];
     // Build image arrays and id map for existing docs
     const existingImages: string[] = (existingDocs || []).map((d) => (
-      typeof d === 'string' ? d : d?.image || d?.imageUrl || d?.url || d?.value || ''
+      typeof d === 'string' ? d : (d?.image as string) || (d?.imageUrl as string) || (d?.url as string) || (d?.value as string) || ''
     )).filter(Boolean);
     const idByImage: Record<string, string> = {};
-    (existingDocs || []).forEach((d: any) => {
-      const img = typeof d === 'string' ? d : d?.image || d?.imageUrl || d?.url || d?.value || '';
-      if (img && d?.id) idByImage[img] = d.id;
+    (existingDocs || []).forEach((d: Record<string, unknown>) => {
+      const img = typeof d === 'string' ? d : (d?.image as string) || (d?.imageUrl as string) || (d?.url as string) || (d?.value as string) || '';
+      if (img && d?.id) idByImage[img] = d.id as string;
     });
 
     const toAdd = newMaps.filter((img) => !existingImages.includes(img));
