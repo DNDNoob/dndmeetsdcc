@@ -1,5 +1,37 @@
 [
   {
+    "date": "2026-01-13",
+    "changes": [
+      "🎨 MAJOR: Enhanced Episode system with visual mob placement and map management",
+      "Added visual drag-and-drop mob placement editor: DMs can now drag mob icons directly onto maps to position them",
+      "Created MobIcon component: circular mob tokens with head-centered positioning and HP indicators",
+      "Created MapMobPlacementEditor component: full visual editor with available/placed mob management",
+      "Added grid overlay system: DMs can toggle a semi-transparent grid on maps (both in Episode Editor and ShowTime)",
+      "Map naming feature: DMs can now name and edit map labels in the Map Manager for better organization",
+      "ShowTime improvements: DMs can toggle grid overlay while presenting episodes to players",
+      "Grid overlay helps DMs with precise mob positioning and provides visual reference for gameplay",
+      "Improved UI/UX: all controls are intuitive with clear visual feedback and minimal learning curve",
+      "Created GridOverlay SVG component for smooth, scalable grid rendering",
+      "Enhanced MapsView with inline editing for map names (click edit icon, type name, save with checkmark)"
+    ]
+  },
+  {
+    "date": "2026-01-12",
+    "changes": [
+      "🎬 MAJOR: Added Episode system for D&D session management",
+      "Episodes feature: DMs can now create named episodes with descriptions, predefined maps, and positioned mobs",
+      "Episode Creator in Dungeon AI console: intuitive form to create episodes with map selection (checkboxes) and mob positioning (0-100% X/Y sliders)",
+      "ShowTime view redesigned to support Episodes: DMs select an episode, then choose which map to display and which mobs to show",
+      "Real-time mob placement on maps using percentage-based coordinates (0-100%) for flexible scaling",
+      "Created ResizableMobDisplay component: draggable, resizable mob tokens with expandable details panel",
+      "Mob display features: compact mode (bottom-right corner) and expanded mode (full details with stats, weaknesses, strengths)",
+      "Episodes support multiple maps per session and multiple mobs with independent positioning",
+      "Added full Episode CRUD operations to useGameState hook with timestamps",
+      "Episodes automatically sync across all players in real-time via Firebase",
+      "Added 'episodes' collection type to Firebase Firestore persistence"
+    ]
+  },
+  {
     "date": "2026-01-11",
     "changes": [
       "Hardened Firebase mob persistence: strip undefined fields, diff adds/updates/deletes, and raise image size guard",

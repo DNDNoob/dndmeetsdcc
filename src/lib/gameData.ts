@@ -42,6 +42,31 @@ export interface Mob {
   hideHitPoints?: boolean;
 }
 
+export interface EpisodeMobPlacement {
+  mobId: string;
+  x: number; // Percentage of map width (0-100)
+  y: number; // Percentage of map height (0-100)
+  scale?: number; // Optional scale multiplier for display (1 = normal size)
+}
+
+export interface MapData {
+  id: string;
+  name: string;
+  imageUrl: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Episode {
+  id: string;
+  name: string;
+  description: string;
+  mapIds: string[]; // Indices of maps in the maps array
+  mobPlacements: EpisodeMobPlacement[]; // Mobs with positions
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export const defaultCrawlers: Crawler[] = [
   {
     id: "1",

@@ -9,6 +9,7 @@ export type CollectionName =
   | 'mobs'
   | 'maps'
   | 'inventory'
+  | 'episodes'
   // Add new collections below:
   | 'quests'
   | 'npcs'

@@ -3,6 +3,7 @@ import {
   Crawler,
   InventoryItem,
   Mob,
+  Episode,
   defaultCrawlers,
   defaultInventory,
   defaultMobs,
@@ -43,9 +44,20 @@ export const useGameState = () => {
     return stored;
   }, [getCollection('mobs'), isLoaded]);
 
+  // Maps are stored as Firestore documents; normalize to string[] of image data
   const maps = useMemo(() => {
-    return getCollection('maps') as string[];
+    const docs = getCollection('maps') as any[];
+    // Support both raw string (legacy) and object with image/url/value
+    const normalized = (docs || []).map((m) => {
+      if (typeof m === 'string') return m;
+      return m?.image || m?.imageUrl || m?.url || m?.value || '';
+    }).filter(Boolean);
+    return normalized as string[];
   }, [getCollection('maps'), isLoaded]);
+
+  const episodes = useMemo(() => {
+    return getCollection('episodes') as Episode[];
+  }, [getCollection('episodes'), isLoaded]);
 
   // Calculate party gold as sum of all crawler gold
   const partyGold = useMemo(() => {
@@ -109,7 +121,32 @@ export const useGameState = () => {
     }
   };
 
-  const setMaps = (newMaps: string[]) => {
+  // Persist maps by diffing Firestore docs against provided array of base64 strings
+  const setMaps = async (newMaps: string[]) => {
+    const existingDocs = getCollection('maps') as any[];
+    // Build image arrays and id map for existing docs
+    const existingImages: string[] = (existingDocs || []).map((d) => (
+      typeof d === 'string' ? d : d?.image || d?.imageUrl || d?.url || d?.value || ''
+    )).filter(Boolean);
+    const idByImage: Record<string, string> = {};
+    (existingDocs || []).forEach((d: any) => {
+      const img = typeof d === 'string' ? d : d?.image || d?.imageUrl || d?.url || d?.value || '';
+      if (img && d?.id) idByImage[img] = d.id;
+    });
+
+    const toAdd = newMaps.filter((img) => !existingImages.includes(img));
+    const toDelete = existingImages.filter((img) => !newMaps.includes(img));
+
+    // Perform writes
+    for (const img of toAdd) {
+      await addItem('maps', { image: img, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+    }
+    for (const img of toDelete) {
+      const id = idByImage[img];
+      if (id) await deleteItem('maps', id);
+    }
+
+    // Update local cache for immediate UI responsiveness
     setCollection('maps', newMaps);
   };
 
@@ -146,6 +183,26 @@ export const useGameState = () => {
     }
   };
 
+  // Episode management
+  const addEpisode = (episode: Episode) => {
+    addItem('episodes', {
+      ...episode,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+  };
+
+  const updateEpisode = (id: string, updates: Partial<Episode>) => {
+    updateItem('episodes', id, {
+      ...updates,
+      updatedAt: new Date().toISOString()
+    });
+  };
+
+  const deleteEpisode = (id: string) => {
+    deleteItem('episodes', id);
+  };
+
   return {
     crawlers,
     setCrawlers,
@@ -159,6 +216,10 @@ export const useGameState = () => {
     setMobs,
     maps,
     setMaps,
+    episodes,
+    addEpisode,
+    updateEpisode,
+    deleteEpisode,
     partyGold,
     isLoaded,
   };

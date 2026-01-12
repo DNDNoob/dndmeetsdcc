@@ -32,6 +32,7 @@ const Index = () => {
     type: "crawler" | "ai" | "npc";
   } | null>(null);
   const [mapVisibility, setMapVisibility] = useState<boolean[]>([]);
+  const [mapNames, setMapNames] = useState<string[]>([]);
   const [isDungeonAILoggedIn, setIsDungeonAILoggedIn] = useState(false);
   const [previousPlayer, setPreviousPlayer] = useState<{
     id: string;
@@ -50,6 +51,10 @@ const Index = () => {
     setMobs,
     maps,
     setMaps,
+    episodes,
+    addEpisode,
+    updateEpisode,
+    deleteEpisode,
     partyGold,
     isLoaded
   } = useGameState();
@@ -71,6 +76,15 @@ const Index = () => {
         setMapVisibility(JSON.parse(savedVisibility));
       } catch (e) {
         console.error("Failed to load map visibility:", e);
+      }
+    }
+
+    const savedMapNames = localStorage.getItem('dcc_map_names');
+    if (savedMapNames) {
+      try {
+        setMapNames(JSON.parse(savedMapNames));
+      } catch (e) {
+        console.error("Failed to load map names:", e);
       }
     }
 
@@ -144,11 +158,24 @@ const Index = () => {
     });
   };
 
+  const handleUpdateMapName = (index: number, name: string) => {
+    setMapNames((prev) => {
+      const newNames = [...prev];
+      newNames[index] = name;
+      // Persist to localStorage
+      localStorage.setItem('dcc_map_names', JSON.stringify(newNames));
+      return newNames;
+    });
+  };
+
   useEffect(() => {
     if (maps.length > mapVisibility.length) {
       setMapVisibility((prev) => [...prev, ...Array(maps.length - prev.length).fill(true)]);
     }
-  }, [maps.length, mapVisibility.length]);
+    if (maps.length > mapNames.length) {
+      setMapNames((prev) => [...prev, ...Array(maps.length - prev.length).fill(undefined).map((_, i) => `Map ${prev.length + i + 1}`)]);
+    }
+  }, [maps.length, mapVisibility.length, mapNames.length]);
 
   if (!isLoaded) {
     return (
@@ -210,6 +237,8 @@ const Index = () => {
             {currentView === "maps" && (
               <MapsView
                 maps={maps}
+                mapNames={mapNames}
+                onUpdateMapName={handleUpdateMapName}
                 mapVisibility={mapVisibility}
                 onToggleVisibility={handleToggleMapVisibility}
                 isAdmin={isAdmin}
@@ -231,11 +260,19 @@ const Index = () => {
                 onUpdateMobs={setMobs}
                 maps={maps}
                 onUpdateMaps={setMaps}
+                mapNames={mapNames}
+                onUpdateMapName={handleUpdateMapName}
+                episodes={episodes}
+                onAddEpisode={addEpisode}
+                onUpdateEpisode={updateEpisode}
+                onDeleteEpisode={deleteEpisode}
               />
             )}
             {currentView === "showtime" && (
               <ShowTimeView
                 maps={maps}
+                episodes={episodes}
+                mobs={mobs}
                 isAdmin={isAdmin}
               />
             )}

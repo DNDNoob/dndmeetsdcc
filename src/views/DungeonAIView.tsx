@@ -2,14 +2,21 @@ import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
-import { Mob } from "@/lib/gameData";
-import { Brain, Upload, Plus, Trash2, Map, Skull, Image as ImageIcon, Save, Edit2, X } from "lucide-react";
+import MapMobPlacementEditor from "@/components/ui/MapMobPlacementEditor";
+import { Mob, Episode, EpisodeMobPlacement } from "@/lib/gameData";
+import { Brain, Upload, Plus, Trash2, Map, Skull, Image as ImageIcon, Save, Edit2, X, Layers } from "lucide-react";
 
 interface DungeonAIViewProps {
   mobs: Mob[];
   onUpdateMobs: (mobs: Mob[]) => void;
   maps: string[];
   onUpdateMaps: (maps: string[]) => void;
+  mapNames?: string[];
+  onUpdateMapName?: (index: number, name: string) => void;
+  episodes: Episode[];
+  onAddEpisode: (episode: Episode) => void;
+  onUpdateEpisode: (id: string, updates: Partial<Episode>) => void;
+  onDeleteEpisode: (id: string) => void;
 }
 
 const DungeonAIView: React.FC<DungeonAIViewProps> = ({
@@ -17,8 +24,14 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   onUpdateMobs,
   maps,
   onUpdateMaps,
+  mapNames,
+  onUpdateMapName,
+  episodes,
+  onAddEpisode,
+  onUpdateEpisode,
+  onDeleteEpisode,
 }) => {
-  const [activeTab, setActiveTab] = useState<"mobs" | "maps">("mobs");
+  const [activeTab, setActiveTab] = useState<"mobs" | "maps" | "episodes">("mobs");
   const [newMob, setNewMob] = useState<Partial<Mob>>({
     name: "",
     level: 1,
@@ -32,6 +45,16 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   const mapImageRef = useRef<HTMLInputElement>(null);
   const [editingMobId, setEditingMobId] = useState<string | null>(null);
   const [editedMobData, setEditedMobData] = useState<Mob | null>(null);
+  const [editingMapIndex, setEditingMapIndex] = useState<number | null>(null);
+  const [editingMapName, setEditingMapName] = useState<string>('');
+
+  // Episode state
+  const [newEpisodeName, setNewEpisodeName] = useState("");
+  const [newEpisodeDescription, setNewEpisodeDescription] = useState("");
+  const [selectedMapsForEpisode, setSelectedMapsForEpisode] = useState<string[]>([]);
+  const [selectedMobsForEpisode, setSelectedMobsForEpisode] = useState<{ mobId: string; x: number; y: number }[]>([]);
+  const [editingEpisodeId, setEditingEpisodeId] = useState<string | null>(null);
+  const [editingEpisode, setEditingEpisode] = useState<Episode | null>(null);
 
   const handleAddMob = async () => {
     if (!newMob.name?.trim()) return;
@@ -168,10 +191,17 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   const handleMapUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      console.log('[DungeonAI] 📤 Uploading map...');
       const reader = new FileReader();
       reader.onload = () => {
         const base64 = reader.result as string;
-        onUpdateMaps([...maps, base64]);
+        console.log('[DungeonAI] ✅ Map loaded, size:', base64.length);
+        const updatedMaps = [...maps, base64];
+        onUpdateMaps(updatedMaps);
+        console.log('[DungeonAI] 📊 Total maps:', updatedMaps.length);
+      };
+      reader.onerror = (err) => {
+        console.error('[DungeonAI] ❌ Failed to read map file', err);
       };
       reader.readAsDataURL(file);
     }
@@ -179,6 +209,92 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
 
   const handleDeleteMap = (index: number) => {
     onUpdateMaps(maps.filter((_, i) => i !== index));
+  };
+
+  const startEditingMapName = (index: number) => {
+    setEditingMapIndex(index);
+    setEditingMapName((mapNames && mapNames[index]) || `Map ${index + 1}`);
+  };
+
+  const saveEditingMapName = (index: number) => {
+    if (onUpdateMapName && editingMapName.trim()) {
+      onUpdateMapName(index, editingMapName.trim());
+    }
+    setEditingMapIndex(null);
+    setEditingMapName('');
+  };
+
+  // Episode handlers
+  const handleCreateEpisode = () => {
+    if (!newEpisodeName.trim()) return;
+    if (selectedMapsForEpisode.length === 0) {
+      alert("Select at least one map for the episode");
+      return;
+    }
+
+    const mobPlacements: EpisodeMobPlacement[] = selectedMobsForEpisode.map(mob => ({
+      mobId: mob.mobId,
+      x: mob.x,
+      y: mob.y,
+      scale: 1
+    }));
+
+    const episode: Episode = {
+      id: crypto.randomUUID(),
+      name: newEpisodeName,
+      description: newEpisodeDescription,
+      mapIds: selectedMapsForEpisode,
+      mobPlacements: mobPlacements
+    };
+
+    onAddEpisode(episode);
+    
+    // Reset form
+    setNewEpisodeName("");
+    setNewEpisodeDescription("");
+    setSelectedMapsForEpisode([]);
+    setSelectedMobsForEpisode([]);
+  };
+
+  const handleToggleMapForEpisode = (mapIndex: number) => {
+    const mapIdStr = mapIndex.toString();
+    setSelectedMapsForEpisode(prev =>
+      prev.includes(mapIdStr) ? prev.filter(i => i !== mapIdStr) : [...prev, mapIdStr]
+    );
+  };
+
+  const handleAddMobToEpisode = (mobId: string) => {
+    if (!selectedMobsForEpisode.find(m => m.mobId === mobId)) {
+      setSelectedMobsForEpisode([...selectedMobsForEpisode, { mobId, x: 50, y: 50 }]);
+    }
+  };
+
+  const handleRemoveMobFromEpisode = (mobId: string) => {
+    setSelectedMobsForEpisode(prev => prev.filter(m => m.mobId !== mobId));
+  };
+
+  const handleUpdateMobPosition = (mobId: string, x: number, y: number) => {
+    setSelectedMobsForEpisode(prev =>
+      prev.map(m => m.mobId === mobId ? { ...m, x, y } : m)
+    );
+  };
+
+  const handleStartEditEpisode = (episode: Episode) => {
+    setEditingEpisodeId(episode.id);
+    setEditingEpisode(episode);
+  };
+
+  const handleSaveEditEpisode = () => {
+    if (!editingEpisode || !editingEpisodeId) return;
+    onUpdateEpisode(editingEpisodeId, editingEpisode);
+    setEditingEpisodeId(null);
+    setEditingEpisode(null);
+  };
+
+  const handleDeleteEpisode = (id: string) => {
+    if (confirm("Are you sure you want to delete this episode?")) {
+      onDeleteEpisode(id);
+    }
   };
 
   return (
@@ -195,21 +311,28 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
           </h2>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-2 mb-6 border-b border-border pb-4 overflow-x-auto">
+        {/* Tab Navigation */}
+        <div className="flex gap-2 mb-6 border-b border-border">
           <DungeonButton
-            variant={activeTab === "mobs" ? "default" : "menu"}
-            size="sm"
+            variant={activeTab === "mobs" ? "admin" : "default"}
             onClick={() => setActiveTab("mobs")}
+            className="flex-1"
           >
-            <Skull className="w-4 h-4 mr-2" /> Mob Manager
+            <Skull className="w-4 h-4 mr-2" /> Mobs
           </DungeonButton>
           <DungeonButton
-            variant={activeTab === "maps" ? "default" : "menu"}
-            size="sm"
+            variant={activeTab === "maps" ? "admin" : "default"}
             onClick={() => setActiveTab("maps")}
+            className="flex-1"
           >
-            <Map className="w-4 h-4 mr-2" /> Map Manager
+            <Map className="w-4 h-4 mr-2" /> Maps
+          </DungeonButton>
+          <DungeonButton
+            variant={activeTab === "episodes" ? "admin" : "default"}
+            onClick={() => setActiveTab("episodes")}
+            className="flex-1"
+          >
+            <Layers className="w-4 h-4 mr-2" /> Episodes
           </DungeonButton>
         </div>
 
@@ -602,6 +725,177 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                 <p className="text-muted-foreground text-sm col-span-2 text-center py-8">
                   No maps uploaded yet. Upload your first map!
                 </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === "episodes" && (
+          <div className="space-y-6">
+            {/* Create new episode form */}
+            <div className="bg-muted/30 border border-border p-4">
+              <h3 className="font-display text-primary text-lg mb-4">Create Episode</h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Episode Name *</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., The Goblin Caves"
+                    value={newEpisodeName}
+                    onChange={(e) => setNewEpisodeName(e.target.value)}
+                    className="w-full bg-muted border border-border px-3 py-2"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Description</label>
+                  <textarea
+                    placeholder="Optional description of this episode..."
+                    value={newEpisodeDescription}
+                    onChange={(e) => setNewEpisodeDescription(e.target.value)}
+                    className="w-full bg-muted border border-border px-3 py-2 min-h-[80px]"
+                  />
+                </div>
+
+                {/* Map selection */}
+                <div>
+                  <label className="text-xs text-muted-foreground mb-2 block font-semibold">Select Maps for Episode *</label>
+                  <div className="grid sm:grid-cols-1 md:grid-cols-2 gap-2 max-h-[300px] overflow-y-auto">
+                    {maps.length === 0 ? (
+                      <p className="text-sm text-muted-foreground col-span-2">No maps available. Upload maps first.</p>
+                    ) : (
+                      maps.map((map, index) => (
+                        <label
+                          key={index}
+                          className={`flex items-center gap-2 p-2 border cursor-pointer transition-colors ${
+                            selectedMapsForEpisode.includes(index.toString())
+                              ? "border-primary bg-primary/10"
+                              : "border-border hover:border-primary/50"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedMapsForEpisode.includes(index.toString())}
+                            onChange={() => handleToggleMapForEpisode(index)}
+                            className="w-4 h-4"
+                          />
+                          <img src={map} alt={`Map ${index + 1}`} className="w-12 h-12 object-cover" />
+                          <span className="text-sm">Map {index + 1}</span>
+                        </label>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* Visual mob placement - only show if at least one map is selected */}
+                {selectedMapsForEpisode.length > 0 && (
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-2 block font-semibold">
+                      Place Mobs on Map (Drag & Drop)
+                    </label>
+                    <MapMobPlacementEditor
+                      mapUrl={maps[parseInt(selectedMapsForEpisode[0], 10)]}
+                      mobs={mobs}
+                      placements={selectedMobsForEpisode}
+                      onPlacementsChange={setSelectedMobsForEpisode}
+                      onAddMob={handleAddMobToEpisode}
+                      onRemoveMob={handleRemoveMobFromEpisode}
+                    />
+                  </div>
+                )}
+
+                <div className="flex gap-2 pt-4">
+                  <DungeonButton variant="admin" onClick={handleCreateEpisode} className="flex-1">
+                    <Plus className="w-4 h-4 mr-2" /> Create Episode
+                  </DungeonButton>
+                </div>
+              </div>
+            </div>
+
+            {/* Existing episodes list */}
+            <div className="space-y-3">
+              <h3 className="font-display text-primary text-lg">Existing Episodes</h3>
+              {episodes.length === 0 ? (
+                <p className="text-muted-foreground text-sm py-8">No episodes created yet.</p>
+              ) : (
+                episodes.map(episode => (
+                  <div key={episode.id} className="border border-primary bg-muted/20 p-4">
+                    {editingEpisodeId === episode.id && editingEpisode ? (
+                      /* Edit mode */
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-xs text-muted-foreground mb-1 block">Name</label>
+                          <input
+                            type="text"
+                            value={editingEpisode.name}
+                            onChange={(e) => setEditingEpisode({ ...editingEpisode, name: e.target.value })}
+                            className="w-full bg-muted border border-border px-3 py-2"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground mb-1 block">Description</label>
+                          <textarea
+                            value={editingEpisode.description}
+                            onChange={(e) => setEditingEpisode({ ...editingEpisode, description: e.target.value })}
+                            className="w-full bg-muted border border-border px-3 py-2 min-h-[60px]"
+                          />
+                        </div>
+
+                        <div className="flex gap-2">
+                          <DungeonButton variant="admin" size="sm" onClick={handleSaveEditEpisode}>
+                            <Save className="w-4 h-4 mr-1" /> Save
+                          </DungeonButton>
+                          <DungeonButton
+                            variant="default"
+                            size="sm"
+                            onClick={() => {
+                              setEditingEpisodeId(null);
+                              setEditingEpisode(null);
+                            }}
+                          >
+                            <X className="w-4 h-4 mr-1" /> Cancel
+                          </DungeonButton>
+                        </div>
+                      </div>
+                    ) : (
+                      /* View mode */
+                      <div>
+                        <div className="mb-3">
+                          <h4 className="font-display text-foreground mb-1">{episode.name}</h4>
+                          {episode.description && (
+                            <p className="text-sm text-muted-foreground mb-2">{episode.description}</p>
+                          )}
+                          <div className="flex flex-wrap gap-4 text-xs">
+                            <span className="text-muted-foreground">
+                              📍 {episode.mapIds.length} map{episode.mapIds.length !== 1 ? "s" : ""}
+                            </span>
+                            <span className="text-muted-foreground">
+                              👹 {episode.mobPlacements.length} mob{episode.mobPlacements.length !== 1 ? "s" : ""}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          <DungeonButton
+                            variant="default"
+                            size="sm"
+                            onClick={() => handleStartEditEpisode(episode)}
+                          >
+                            <Edit2 className="w-4 h-4 mr-1" /> Edit
+                          </DungeonButton>
+                          <DungeonButton
+                            variant="danger"
+                            size="sm"
+                            onClick={() => handleDeleteEpisode(episode.id)}
+                          >
+                            <Trash2 className="w-4 h-4 mr-1" /> Delete
+                          </DungeonButton>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))
               )}
             </div>
           </div>

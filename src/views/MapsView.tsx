@@ -1,16 +1,46 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
-import { MapPin, Layers, Eye, EyeOff } from "lucide-react";
+import { MapPin, Layers, Eye, EyeOff, Edit2, Check, X } from "lucide-react";
 
 interface MapsViewProps {
   maps: string[];
+  mapNames?: string[];
+  onUpdateMapName?: (index: number, name: string) => void;
   mapVisibility: boolean[];
   onToggleVisibility: (index: number) => void;
   isAdmin: boolean;
 }
 
-const MapsView: React.FC<MapsViewProps> = ({ maps, mapVisibility, onToggleVisibility, isAdmin }) => {
+const MapsView: React.FC<MapsViewProps> = ({ 
+  maps, 
+  mapNames,
+  onUpdateMapName,
+  mapVisibility, 
+  onToggleVisibility, 
+  isAdmin 
+}) => {
+  const [editingMapIndex, setEditingMapIndex] = useState<number | null>(null);
+  const [editingMapName, setEditingMapName] = useState("");
+
+  const startEditingMap = (index: number) => {
+    setEditingMapIndex(index);
+    setEditingMapName(mapNames?.[index] || `Map ${index + 1}`);
+  };
+
+  const saveMapName = (index: number) => {
+    if (onUpdateMapName && editingMapName.trim()) {
+      onUpdateMapName(index, editingMapName.trim());
+    }
+    setEditingMapIndex(null);
+  };
+
+  const cancelEditing = () => {
+    setEditingMapIndex(null);
+    setEditingMapName("");
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -28,6 +58,8 @@ const MapsView: React.FC<MapsViewProps> = ({ maps, mapVisibility, onToggleVisibi
             maps.map((map, index) => {
               const isVisible = mapVisibility[index] ?? true;
               const canView = isAdmin || isVisible;
+              const displayName = mapNames?.[index] || `Map ${index + 1}`;
+              const isEditing = editingMapIndex === index;
 
               return (
                 <div
@@ -37,10 +69,48 @@ const MapsView: React.FC<MapsViewProps> = ({ maps, mapVisibility, onToggleVisibi
                   } bg-background/50 p-4`}
                 >
                   <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-display text-lg text-primary">
-                      Map {index + 1}
-                    </h3>
-                    {isAdmin && (
+                    <div className="flex-1">
+                      {isEditing ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={editingMapName}
+                            onChange={(e) => setEditingMapName(e.target.value)}
+                            className="flex-1 bg-muted border border-primary px-2 py-1 font-display text-lg"
+                            autoFocus
+                          />
+                          <DungeonButton
+                            variant="admin"
+                            size="sm"
+                            onClick={() => saveMapName(index)}
+                          >
+                            <Check className="w-4 h-4" />
+                          </DungeonButton>
+                          <DungeonButton
+                            variant="default"
+                            size="sm"
+                            onClick={cancelEditing}
+                          >
+                            <X className="w-4 h-4" />
+                          </DungeonButton>
+                        </div>
+                      ) : (
+                        <h3 className="font-display text-lg text-primary flex items-center gap-2">
+                          {displayName}
+                          {isAdmin && (
+                            <button
+                              onClick={() => startEditingMap(index)}
+                              className="p-1 hover:bg-primary/10 rounded transition-colors"
+                              title="Edit map name"
+                            >
+                              <Edit2 className="w-4 h-4 text-muted-foreground hover:text-primary" />
+                            </button>
+                          )}
+                        </h3>
+                      )}
+                    </div>
+
+                    {!isEditing && isAdmin && (
                       <DungeonButton
                         variant={isVisible ? "default" : "ghost"}
                         size="sm"
@@ -67,7 +137,7 @@ const MapsView: React.FC<MapsViewProps> = ({ maps, mapVisibility, onToggleVisibi
                   {canView ? (
                     <img
                       src={map}
-                      alt={`Map ${index + 1}`}
+                      alt={displayName}
                       className="w-full border border-border"
                     />
                   ) : (
