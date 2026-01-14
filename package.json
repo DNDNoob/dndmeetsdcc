@@ -10,8 +10,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "start:sfx-server": "node server/sound-server.js",
-    "test:firebase": "node scripts/firebase-crud-test.mjs",
-    "deploy": "npm run build && gh-pages -d dist"
+    "test:firebase": "node scripts/firebase-crud-test.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

@@ -52,6 +52,29 @@ export const useGameState = () => {
       if (typeof m === 'string') return m;
       return (m?.image as string) || (m?.imageUrl as string) || (m?.url as string) || (m?.value as string) || '';
     }).filter(Boolean);
+    
+    // Check if we have empty documents that need cleanup
+    const emptyDocs = (docs || []).filter((m) => {
+      const img = typeof m === 'string' ? m : (m?.image as string) || (m?.imageUrl as string) || (m?.url as string) || (m?.value as string) || '';
+      return !img;
+    });
+    
+    if (emptyDocs.length > 0) {
+      console.warn('[GameState] ⚠️ Found', emptyDocs.length, 'empty maps in Firestore (missing image data). These need to be deleted and re-uploaded.', {
+        emptyMapIds: emptyDocs.map(d => (d?.id as string)?.substring?.(0, 8) || 'no-id')
+      });
+    }
+    
+    if (docs && docs.length > 0) {
+      console.log('[GameState] 🗺️ Maps from collection:', {
+        rawCount: docs.length,
+        normalizedCount: normalized.length,
+        emptyCount: emptyDocs.length,
+        rawIds: docs.map(d => (d?.id as string)?.substring?.(0, 8) || 'no-id').join(', '),
+        rawSample: docs[0] ? { id: (docs[0]?.id as string)?.substring?.(0, 8), hasImage: !!(docs[0]?.image), docKeys: Object.keys(docs[0] || {}) } : null
+      });
+    }
+    
     return normalized as string[];
   }, [getCollection('maps'), isLoaded]);
 
@@ -124,30 +147,123 @@ export const useGameState = () => {
   // Persist maps by diffing Firestore docs against provided array of base64 strings
   const setMaps = async (newMaps: string[]) => {
     const existingDocs = getCollection('maps') as Record<string, unknown>[];
-    // Build image arrays and id map for existing docs
-    const existingImages: string[] = (existingDocs || []).map((d) => (
-      typeof d === 'string' ? d : (d?.image as string) || (d?.imageUrl as string) || (d?.url as string) || (d?.value as string) || ''
-    )).filter(Boolean);
-    const idByImage: Record<string, string> = {};
-    (existingDocs || []).forEach((d: Record<string, unknown>) => {
-      const img = typeof d === 'string' ? d : (d?.image as string) || (d?.imageUrl as string) || (d?.url as string) || (d?.value as string) || '';
-      if (img && d?.id) idByImage[img] = d.id as string;
+    
+    console.log('[GameState] 🗺️ setMaps called', {
+      newMapsCount: newMaps.length,
+      existingDocsCount: existingDocs?.length || 0,
+      existingIds: existingDocs?.map((d) => d?.id)?.slice(0, 3) || []
     });
 
-    const toAdd = newMaps.filter((img) => !existingImages.includes(img));
-    const toDelete = existingImages.filter((img) => !newMaps.includes(img));
+    // Create a fingerprint of each image based on length and middle/end sections (avoiding data: prefix)
+    // This avoids collisions that occur with just first/last characters
+    const getImageFingerprint = (img: string): string => {
+      const dataIndex = img.indexOf(',');
+      const actualData = dataIndex > -1 ? img.substring(dataIndex + 1) : img;
+      // Use: length + middle 30 chars + last 30 chars to create a unique fingerprint
+      const midStart = Math.floor(actualData.length / 2) - 15;
+      const mid = actualData.substring(Math.max(0, midStart), midStart + 30);
+      const end = actualData.substring(Math.max(0, actualData.length - 30));
+      return `${actualData.length}:${mid}:${end}`;
+    };
 
-    // Perform writes
-    for (const img of toAdd) {
-      await addItem('maps', { image: img, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
-    }
-    for (const img of toDelete) {
-      const id = idByImage[img];
-      if (id) await deleteItem('maps', id);
+    // Build maps by id and fingerprint for efficient lookup
+    const existingMapsByFingerprint = new Map<string, string>(); // fingerprint -> docId
+    const existingMapIds = new Set<string>(); // all docIds
+    
+    (existingDocs || []).forEach((d: Record<string, unknown>) => {
+      const img = typeof d === 'string' ? d : (d?.image as string) || (d?.imageUrl as string) || (d?.url as string) || (d?.value as string) || '';
+      if (img && d?.id) {
+        const fingerprint = getImageFingerprint(img);
+        existingMapsByFingerprint.set(fingerprint, d.id as string);
+        existingMapIds.add(d.id as string);
+      }
+    });
+
+    console.log('[GameState] 🗺️ Existing maps:', {
+      count: existingMapIds.size,
+      ids: Array.from(existingMapIds).slice(0, 3),
+      fingerprintSample: Array.from(existingMapsByFingerprint.keys()).slice(0, 2)
+    });
+
+    // Find maps to add and delete using fingerprints
+    const newMapFingerprints = newMaps.map(getImageFingerprint);
+    const mapsToAddIndices = newMapFingerprints
+      .map((fp, idx) => ({ fp, idx }))
+      .filter(({ fp }) => !existingMapsByFingerprint.has(fp))
+      .map(({ idx }) => idx);
+    
+    const newFingerprintSet = new Set(newMapFingerprints);
+    const mapsToDeleteIds = Array.from(existingMapIds).filter(id => {
+      const docWithId = existingDocs.find(d => d?.id === id);
+      if (!docWithId) return false;
+      const img = typeof docWithId === 'string' ? docWithId : (docWithId?.image as string) || (docWithId?.imageUrl as string) || (docWithId?.url as string) || (docWithId?.value as string) || '';
+      const fp = getImageFingerprint(img);
+      return !newFingerprintSet.has(fp);
+    });
+
+    console.log('[GameState] 🗺️ Maps diff', {
+      toAdd: mapsToAddIndices.length,
+      toDelete: mapsToDeleteIds.length,
+      toDeleteIds: mapsToDeleteIds.slice(0, 3),
+      newFingerprintSample: newMapFingerprints.slice(0, 2)
+    });
+
+    // Perform Firebase writes sequentially to ensure they complete
+    // Add new maps first
+    for (let i = 0; i < mapsToAddIndices.length; i++) {
+      const mapIdx = mapsToAddIndices[i];
+      const img = newMaps[mapIdx];
+      console.log('[GameState] ➕ Adding map', i + 1, 'of', mapsToAddIndices.length);
+      try {
+        await addItem('maps', { image: img, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+      } catch (err) {
+        console.error('[GameState] ❌ Failed to add map:', err);
+        throw err;
+      }
     }
 
-    // Update local cache for immediate UI responsiveness
-    setCollection('maps', newMaps);
+    // Delete removed maps
+    for (let i = 0; i < mapsToDeleteIds.length; i++) {
+      const id = mapsToDeleteIds[i];
+      console.log('[GameState] 🗑️ Deleting map', i + 1, 'of', mapsToDeleteIds.length, 'with id:', id);
+      try {
+        await deleteItem('maps', id);
+      } catch (err) {
+        console.error('[GameState] ❌ Failed to delete map:', err);
+        throw err;
+      }
+    }
+    
+    console.log('[GameState] ✅ setMaps completed');
+  };
+
+  // Clean up empty maps that were saved without image data (migration from old size limits)
+  const cleanupEmptyMaps = async () => {
+    const existingDocs = getCollection('maps') as Record<string, unknown>[];
+    const emptyMapIds = (existingDocs || [])
+      .filter((m) => {
+        const img = typeof m === 'string' ? m : (m?.image as string) || (m?.imageUrl as string) || (m?.url as string) || (m?.value as string) || '';
+        return !img;
+      })
+      .map(d => d?.id as string);
+    
+    if (emptyMapIds.length === 0) {
+      console.log('[GameState] ✅ No empty maps to clean up');
+      return;
+    }
+    
+    console.log('[GameState] 🧹 Cleaning up', emptyMapIds.length, 'empty maps...');
+    
+    for (const id of emptyMapIds) {
+      try {
+        await deleteItem('maps', id);
+        console.log('[GameState] ✅ Deleted empty map:', id);
+      } catch (err) {
+        console.error('[GameState] ❌ Failed to delete empty map:', id, err);
+      }
+    }
+    
+    console.log('[GameState] ✅ Cleanup complete');
   };
 
   const updateCrawler = (id: string, updates: Partial<Crawler>) => {
@@ -216,6 +332,7 @@ export const useGameState = () => {
     setMobs,
     maps,
     setMaps,
+    cleanupEmptyMaps,
     episodes,
     addEpisode,
     updateEpisode,

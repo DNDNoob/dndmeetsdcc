@@ -65,6 +65,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
         // Set up real-time listeners for each collection
         for (const collectionName of collections) {
           const collectionRef = getCollectionRef(collectionName, roomId || undefined);
+          const collectionPath = roomId ? `rooms/${roomId}/${collectionName}` : collectionName;
 
           const unsubscribe = onSnapshot(
             collectionRef,
@@ -74,7 +75,14 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
                 ...doc.data()
               }));
 
-              console.log(`[FirebaseStore] 🔄 Real-time update: ${collectionName}`, items.length);
+              console.log(`[FirebaseStore] 🔄 Real-time update: ${collectionPath}`, {
+                count: items.length,
+                ids: items.map(i => (i.id as string).substring(0, 8)).join(', '),
+                items: collectionName === 'maps' ? items.map(i => ({
+                  id: i.id,
+                  imageLength: typeof (i as Record<string, unknown>).image === 'string' ? ((i as Record<string, unknown>).image as string).length : 0
+                })) : undefined
+              });
 
               setData(prevData => ({
                 ...prevData,
@@ -82,7 +90,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
               }));
             },
             (err) => {
-              console.error(`[FirebaseStore] ❌ Listener error for ${collectionName}:`, err);
+              console.error(`[FirebaseStore] ❌ Listener error for ${collectionPath}:`, err);
               setError(err.message);
             }
           );
@@ -130,7 +138,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
     return obj;
   };
 
-  const MAX_IMAGE_LENGTH = 1_000_000; // ~750 KB of raw image data once base64 is decoded
+  const MAX_IMAGE_LENGTH = 5_000_000; // ~3.75 MB of raw image data once base64 is decoded
 
   const addItem = useCallback(async (collection: CollectionName, item: Record<string, unknown>) => {
     try {
@@ -145,8 +153,20 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
       if (itemWithId.image === undefined || itemWithId.image === null) {
         delete itemWithId.image;
       } else if (typeof itemWithId.image === 'string' && itemWithId.image.length > MAX_IMAGE_LENGTH) {
-        console.warn('[FirebaseStore] ⚠️ Image too large; stripping before save');
+        console.warn('[FirebaseStore] ⚠️ Image too large; stripping before save', {
+          collection,
+          itemId,
+          imageSize: (itemWithId.image as string).length,
+          maxSize: MAX_IMAGE_LENGTH,
+          sizeInMB: ((itemWithId.image as string).length / 1_000_000).toFixed(2)
+        });
         delete itemWithId.image;
+      } else if (typeof itemWithId.image === 'string' && collection === 'maps') {
+        console.log('[FirebaseStore] ✅ Storing map image', {
+          itemId,
+          imageSize: (itemWithId.image as string).length,
+          sizeInMB: ((itemWithId.image as string).length / 1_000_000).toFixed(2)
+        });
       }
 
       const collectionRef = getCollectionRef(collection, roomId || undefined);
@@ -172,7 +192,13 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
       if (updatesCopy.image === undefined || updatesCopy.image === null) {
         delete updatesCopy.image;
       } else if (typeof updatesCopy.image === 'string' && updatesCopy.image.length > MAX_IMAGE_LENGTH) {
-        console.warn('[FirebaseStore] ⚠️ Image too large; stripping before update');
+        console.warn('[FirebaseStore] ⚠️ Image too large; stripping before update', {
+          collection,
+          id,
+          imageSize: (updatesCopy.image as string).length,
+          maxSize: MAX_IMAGE_LENGTH,
+          sizeInMB: ((updatesCopy.image as string).length / 1_000_000).toFixed(2)
+        });
         delete updatesCopy.image;
       }
 

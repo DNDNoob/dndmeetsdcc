@@ -4,19 +4,20 @@ import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import MapMobPlacementEditor from "@/components/ui/MapMobPlacementEditor";
 import { Mob, Episode, EpisodeMobPlacement } from "@/lib/gameData";
-import { Brain, Upload, Plus, Trash2, Map, Skull, Image as ImageIcon, Save, Edit2, X, Layers } from "lucide-react";
+import { Brain, Upload, Plus, Trash2, Map, Skull, Image as ImageIcon, Save, Edit2, X, Layers, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface DungeonAIViewProps {
   mobs: Mob[];
   onUpdateMobs: (mobs: Mob[]) => void;
   maps: string[];
-  onUpdateMaps: (maps: string[]) => void;
+  onUpdateMaps: (maps: string[]) => Promise<void> | void;
   mapNames?: string[];
   onUpdateMapName?: (index: number, name: string) => void;
   episodes: Episode[];
   onAddEpisode: (episode: Episode) => void;
   onUpdateEpisode: (id: string, updates: Partial<Episode>) => void;
   onDeleteEpisode: (id: string) => void;
+  onCleanupEmptyMaps?: () => Promise<void>;
 }
 
 const DungeonAIView: React.FC<DungeonAIViewProps> = ({
@@ -30,6 +31,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   onAddEpisode,
   onUpdateEpisode,
   onDeleteEpisode,
+  onCleanupEmptyMaps,
 }) => {
   const [activeTab, setActiveTab] = useState<"mobs" | "maps" | "episodes">("mobs");
   const [newMob, setNewMob] = useState<Partial<Mob>>({
@@ -54,7 +56,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   const [selectedMapsForEpisode, setSelectedMapsForEpisode] = useState<string[]>([]);
   const [selectedMobsForEpisode, setSelectedMobsForEpisode] = useState<{ mobId: string; x: number; y: number }[]>([]);
   const [editingEpisodeId, setEditingEpisodeId] = useState<string | null>(null);
-  const [editingEpisode, setEditingEpisode] = useState<Episode | null>(null);
+  const [currentMapIndexForEditor, setCurrentMapIndexForEditor] = useState(0);
 
   const handleAddMob = async () => {
     if (!newMob.name?.trim()) return;
@@ -118,8 +120,13 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
       });
 
     const dataUrl = await readAsDataUrl(file);
-    // If already reasonably small, keep as is
-    if (dataUrl.length < 700_000) return dataUrl;
+    // If already reasonably small, keep as is (under 800KB to be safe for Firestore's 1MB limit)
+    if (dataUrl.length < 800_000) {
+      console.log('[DungeonAI] ✅ Image size acceptable, no compression needed:', (dataUrl.length / 1_000_000).toFixed(2) + 'MB');
+      return dataUrl;
+    }
+
+    console.log('[DungeonAI] 📦 Original image size:', (dataUrl.length / 1_000_000).toFixed(2) + 'MB, compressing...');
 
     const img = new window.Image();
     const loaded: Promise<void> = new Promise((resolve, reject) => {
@@ -140,12 +147,25 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
     if (!ctx) return null;
     ctx.drawImage(img, 0, 0, targetW, targetH);
 
-    const compressed = canvas.toDataURL('image/jpeg', quality);
-    // Final guard against oversize
-    if (compressed.length >= 700_000) {
-      console.warn('[DungeonAI] ⚠️ Image still too large after resize; skipping image');
+    let compressed = canvas.toDataURL('image/jpeg', quality);
+    let currentQuality = quality;
+    
+    // Iteratively reduce quality until under 800KB
+    while (compressed.length > 800_000 && currentQuality > 0.1) {
+      currentQuality -= 0.1;
+      compressed = canvas.toDataURL('image/jpeg', currentQuality);
+      console.log('[DungeonAI] 📉 Reduced quality to', currentQuality.toFixed(1), ', size:', (compressed.length / 1_000_000).toFixed(2) + 'MB');
+    }
+    
+    if (compressed.length >= 800_000) {
+      console.warn('[DungeonAI] ⚠️ Image still too large even at minimum quality; skipping image', {
+        finalSize: (compressed.length / 1_000_000).toFixed(2) + 'MB',
+        finalQuality: currentQuality.toFixed(1)
+      });
       return null;
     }
+    
+    console.log('[DungeonAI] ✅ Compressed image to:', (compressed.length / 1_000_000).toFixed(2) + 'MB');
     return compressed;
   };
 
@@ -184,31 +204,51 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
         } else {
           setNewMob({ ...newMob, image: base64 });
         }
-      }).catch((err) => console.error('[DungeonAI] Image resize failed', err));
+      }).catch((err) => console.error('[DungeonAI] Image resize failed', err)).finally(() => {
+        // Reset the file input so the same file can be selected again
+        if (e.target) {
+          e.target.value = '';
+        }
+      });
     }
   };
 
-  const handleMapUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleMapUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       console.log('[DungeonAI] 📤 Uploading map...');
-      const reader = new FileReader();
-      reader.onload = () => {
-        const base64 = reader.result as string;
+      try {
+        const base64 = await resizeImage(file);
+        if (!base64) {
+          console.error('[DungeonAI] ❌ Map image too large even after compression');
+          return;
+        }
         console.log('[DungeonAI] ✅ Map loaded, size:', base64.length);
         const updatedMaps = [...maps, base64];
-        onUpdateMaps(updatedMaps);
-        console.log('[DungeonAI] 📊 Total maps:', updatedMaps.length);
-      };
-      reader.onerror = (err) => {
-        console.error('[DungeonAI] ❌ Failed to read map file', err);
-      };
-      reader.readAsDataURL(file);
+        console.log('[DungeonAI] 📊 Calling onUpdateMaps with', updatedMaps.length, 'maps');
+        const result = onUpdateMaps(updatedMaps);
+        if (result instanceof Promise) {
+          await result;
+        }
+        console.log('[DungeonAI] ✅ Map upload completed successfully');
+      } catch (err) {
+        console.error('[DungeonAI] ❌ Failed to process map file', err);
+      } finally {
+        // Reset the file input so the same file can be selected again
+        if (mapImageRef.current) {
+          mapImageRef.current.value = '';
+        }
+      }
     }
   };
 
   const handleDeleteMap = (index: number) => {
-    onUpdateMaps(maps.filter((_, i) => i !== index));
+    const result = onUpdateMaps(maps.filter((_, i) => i !== index));
+    // If onUpdateMaps returns a Promise, we could await it here if needed
+    // For now, just call it and let it handle async internally
+    if (result instanceof Promise) {
+      result.catch(err => console.error('[DungeonAI] ❌ Failed to delete map:', err));
+    }
   };
 
   const startEditingMapName = (index: number) => {
@@ -239,34 +279,50 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
       scale: 1
     }));
 
-    const episode: Episode = {
-      id: crypto.randomUUID(),
-      name: newEpisodeName,
-      description: newEpisodeDescription,
-      mapIds: selectedMapsForEpisode,
-      mobPlacements: mobPlacements
-    };
-
-    onAddEpisode(episode);
+    if (editingEpisodeId) {
+      // Update existing episode
+      onUpdateEpisode(editingEpisodeId, {
+        name: newEpisodeName,
+        description: newEpisodeDescription,
+        mapIds: selectedMapsForEpisode,
+        mobPlacements: mobPlacements
+      });
+      setEditingEpisodeId(null);
+    } else {
+      // Create new episode
+      const episode: Episode = {
+        id: crypto.randomUUID(),
+        name: newEpisodeName,
+        description: newEpisodeDescription,
+        mapIds: selectedMapsForEpisode,
+        mobPlacements: mobPlacements
+      };
+      onAddEpisode(episode);
+    }
     
     // Reset form
     setNewEpisodeName("");
     setNewEpisodeDescription("");
     setSelectedMapsForEpisode([]);
     setSelectedMobsForEpisode([]);
+    setCurrentMapIndexForEditor(0);
   };
 
   const handleToggleMapForEpisode = (mapIndex: number) => {
     const mapIdStr = mapIndex.toString();
-    setSelectedMapsForEpisode(prev =>
-      prev.includes(mapIdStr) ? prev.filter(i => i !== mapIdStr) : [...prev, mapIdStr]
-    );
+    setSelectedMapsForEpisode(prev => {
+      const newMaps = prev.includes(mapIdStr) ? prev.filter(i => i !== mapIdStr) : [...prev, mapIdStr];
+      // Reset to first map if current index is out of bounds
+      if (currentMapIndexForEditor >= newMaps.length) {
+        setCurrentMapIndexForEditor(Math.max(0, newMaps.length - 1));
+      }
+      return newMaps;
+    });
   };
 
   const handleAddMobToEpisode = (mobId: string) => {
-    if (!selectedMobsForEpisode.find(m => m.mobId === mobId)) {
-      setSelectedMobsForEpisode([...selectedMobsForEpisode, { mobId, x: 50, y: 50 }]);
-    }
+    // Allow duplicate mobs - each placement is independent
+    setSelectedMobsForEpisode([...selectedMobsForEpisode, { mobId, x: 50, y: 50 }]);
   };
 
   const handleRemoveMobFromEpisode = (mobId: string) => {
@@ -280,15 +336,19 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   };
 
   const handleStartEditEpisode = (episode: Episode) => {
+    // Load episode data into create form
     setEditingEpisodeId(episode.id);
-    setEditingEpisode(episode);
-  };
-
-  const handleSaveEditEpisode = () => {
-    if (!editingEpisode || !editingEpisodeId) return;
-    onUpdateEpisode(editingEpisodeId, editingEpisode);
-    setEditingEpisodeId(null);
-    setEditingEpisode(null);
+    setNewEpisodeName(episode.name);
+    setNewEpisodeDescription(episode.description || "");
+    setSelectedMapsForEpisode(episode.mapIds);
+    setSelectedMobsForEpisode(episode.mobPlacements.map(p => ({
+      mobId: p.mobId,
+      x: p.x,
+      y: p.y
+    })));
+    setCurrentMapIndexForEditor(0);
+    // Scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDeleteEpisode = (id: string) => {
@@ -692,25 +752,90 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
         {activeTab === "maps" && (
           <div className="space-y-6">
             {/* Upload map */}
-            <div className="bg-muted/30 border border-border p-4">
-              <h3 className="font-display text-primary text-lg mb-4">Upload Map</h3>
-              <input
-                ref={mapImageRef}
-                type="file"
-                accept="image/*"
-                onChange={handleMapUpload}
-                className="hidden"
-              />
-              <DungeonButton variant="admin" onClick={() => mapImageRef.current?.click()}>
-                <Upload className="w-4 h-4 mr-2" /> Upload Map Image
-              </DungeonButton>
+            <div className="bg-muted/30 border border-border p-4 space-y-4">
+              <div>
+                <h3 className="font-display text-primary text-lg mb-4">Upload Map</h3>
+                <input
+                  ref={mapImageRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleMapUpload}
+                  className="hidden"
+                />
+                <DungeonButton variant="admin" onClick={() => mapImageRef.current?.click()}>
+                  <Upload className="w-4 h-4 mr-2" /> Upload Map Image
+                </DungeonButton>
+              </div>
+              {onCleanupEmptyMaps && (
+                <DungeonButton 
+                  variant="default" 
+                  onClick={() => {
+                    if (confirm('Delete all empty/corrupted maps from Firestore? This cannot be undone.')) {
+                      onCleanupEmptyMaps().catch(err => console.error('[DungeonAI] ❌ Cleanup failed:', err));
+                    }
+                  }}
+                >
+                  🧹 Cleanup Empty Maps
+                </DungeonButton>
+              )}
             </div>
 
             {/* Maps grid */}
             <div className="grid sm:grid-cols-1 md:grid-cols-2 gap-4">
               {maps.map((map, index) => (
-                <div key={index} className="border border-border p-2 relative group w-full">
+                <div key={index} className="border border-border p-2 relative group w-full bg-muted/20">
+                  {/* Map image */}
                   <img src={map} alt={`Map ${index + 1}`} className="w-full h-auto object-contain max-h-[40vh]" />
+                  
+                  {/* Map name display/edit */}
+                  <div className="mt-2 p-2 bg-background border-t border-border">
+                    {editingMapIndex === index ? (
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={editingMapName}
+                          onChange={(e) => setEditingMapName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') saveEditingMapName(index);
+                            if (e.key === 'Escape') setEditingMapIndex(null);
+                          }}
+                          autoFocus
+                          className="flex-1 bg-muted border border-border px-2 py-1 text-sm"
+                          placeholder="Map name..."
+                        />
+                        <DungeonButton
+                          variant="admin"
+                          size="sm"
+                          onClick={() => saveEditingMapName(index)}
+                        >
+                          <Save className="w-3 h-3" />
+                        </DungeonButton>
+                        <DungeonButton
+                          variant="default"
+                          size="sm"
+                          onClick={() => setEditingMapIndex(null)}
+                        >
+                          <X className="w-3 h-3" />
+                        </DungeonButton>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">
+                          {mapNames?.[index] || `Map ${index + 1}`}
+                        </span>
+                        <DungeonButton
+                          variant="default"
+                          size="sm"
+                          onClick={() => startEditingMapName(index)}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <Edit2 className="w-3 h-3" />
+                        </DungeonButton>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Delete button */}
                   <DungeonButton
                     variant="danger"
                     size="sm"
@@ -734,7 +859,9 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
           <div className="space-y-6">
             {/* Create new episode form */}
             <div className="bg-muted/30 border border-border p-4">
-              <h3 className="font-display text-primary text-lg mb-4">Create Episode</h3>
+              <h3 className="font-display text-primary text-lg mb-4">
+                {editingEpisodeId ? "Edit Episode" : "Create Episode"}
+              </h3>
               
               <div className="space-y-4">
                 <div>
@@ -791,11 +918,38 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                 {/* Visual mob placement - only show if at least one map is selected */}
                 {selectedMapsForEpisode.length > 0 && (
                   <div>
-                    <label className="text-xs text-muted-foreground mb-2 block font-semibold">
-                      Place Mobs on Map (Drag & Drop)
-                    </label>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-xs text-muted-foreground font-semibold">
+                        Place Mobs on Map (Drag & Drop)
+                      </label>
+                      {selectedMapsForEpisode.length > 1 && (
+                        <div className="flex items-center gap-2">
+                          <DungeonButton 
+                            variant="default" 
+                            size="sm"
+                            onClick={() => setCurrentMapIndexForEditor(prev => 
+                              prev > 0 ? prev - 1 : selectedMapsForEpisode.length - 1
+                            )}
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                          </DungeonButton>
+                          <span className="text-xs text-muted-foreground">
+                            Map {currentMapIndexForEditor + 1} of {selectedMapsForEpisode.length}
+                          </span>
+                          <DungeonButton 
+                            variant="default" 
+                            size="sm"
+                            onClick={() => setCurrentMapIndexForEditor(prev => 
+                              prev < selectedMapsForEpisode.length - 1 ? prev + 1 : 0
+                            )}
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </DungeonButton>
+                        </div>
+                      )}
+                    </div>
                     <MapMobPlacementEditor
-                      mapUrl={maps[parseInt(selectedMapsForEpisode[0], 10)]}
+                      mapUrl={maps[parseInt(selectedMapsForEpisode[currentMapIndexForEditor], 10)]}
                       mobs={mobs}
                       placements={selectedMobsForEpisode}
                       onPlacementsChange={setSelectedMobsForEpisode}
@@ -806,8 +960,28 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                 )}
 
                 <div className="flex gap-2 pt-4">
+                  {editingEpisodeId && (
+                    <DungeonButton 
+                      variant="default" 
+                      onClick={() => {
+                        setEditingEpisodeId(null);
+                        setNewEpisodeName("");
+                        setNewEpisodeDescription("");
+                        setSelectedMapsForEpisode([]);
+                        setSelectedMobsForEpisode([]);
+                        setCurrentMapIndexForEditor(0);
+                      }} 
+                      className="flex-1"
+                    >
+                      <X className="w-4 h-4 mr-2" /> Cancel
+                    </DungeonButton>
+                  )}
                   <DungeonButton variant="admin" onClick={handleCreateEpisode} className="flex-1">
-                    <Plus className="w-4 h-4 mr-2" /> Create Episode
+                    {editingEpisodeId ? (
+                      <><Save className="w-4 h-4 mr-2" /> Update Episode</>
+                    ) : (
+                      <><Plus className="w-4 h-4 mr-2" /> Create Episode</>
+                    )}
                   </DungeonButton>
                 </div>
               </div>
@@ -821,79 +995,37 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
               ) : (
                 episodes.map(episode => (
                   <div key={episode.id} className="border border-primary bg-muted/20 p-4">
-                    {editingEpisodeId === episode.id && editingEpisode ? (
-                      /* Edit mode */
-                      <div className="space-y-3">
-                        <div>
-                          <label className="text-xs text-muted-foreground mb-1 block">Name</label>
-                          <input
-                            type="text"
-                            value={editingEpisode.name}
-                            onChange={(e) => setEditingEpisode({ ...editingEpisode, name: e.target.value })}
-                            className="w-full bg-muted border border-border px-3 py-2"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-muted-foreground mb-1 block">Description</label>
-                          <textarea
-                            value={editingEpisode.description}
-                            onChange={(e) => setEditingEpisode({ ...editingEpisode, description: e.target.value })}
-                            className="w-full bg-muted border border-border px-3 py-2 min-h-[60px]"
-                          />
-                        </div>
-
-                        <div className="flex gap-2">
-                          <DungeonButton variant="admin" size="sm" onClick={handleSaveEditEpisode}>
-                            <Save className="w-4 h-4 mr-1" /> Save
-                          </DungeonButton>
-                          <DungeonButton
-                            variant="default"
-                            size="sm"
-                            onClick={() => {
-                              setEditingEpisodeId(null);
-                              setEditingEpisode(null);
-                            }}
-                          >
-                            <X className="w-4 h-4 mr-1" /> Cancel
-                          </DungeonButton>
-                        </div>
+                    <div className="mb-3">
+                      <h4 className="font-display text-foreground mb-1">{episode.name}</h4>
+                      {episode.description && (
+                        <p className="text-sm text-muted-foreground mb-2">{episode.description}</p>
+                      )}
+                      <div className="flex flex-wrap gap-4 text-xs">
+                        <span className="text-muted-foreground">
+                          📍 {episode.mapIds.length} map{episode.mapIds.length !== 1 ? "s" : ""}
+                        </span>
+                        <span className="text-muted-foreground">
+                          👹 {episode.mobPlacements.length} mob{episode.mobPlacements.length !== 1 ? "s" : ""}
+                        </span>
                       </div>
-                    ) : (
-                      /* View mode */
-                      <div>
-                        <div className="mb-3">
-                          <h4 className="font-display text-foreground mb-1">{episode.name}</h4>
-                          {episode.description && (
-                            <p className="text-sm text-muted-foreground mb-2">{episode.description}</p>
-                          )}
-                          <div className="flex flex-wrap gap-4 text-xs">
-                            <span className="text-muted-foreground">
-                              📍 {episode.mapIds.length} map{episode.mapIds.length !== 1 ? "s" : ""}
-                            </span>
-                            <span className="text-muted-foreground">
-                              👹 {episode.mobPlacements.length} mob{episode.mobPlacements.length !== 1 ? "s" : ""}
-                            </span>
-                          </div>
-                        </div>
+                    </div>
 
-                        <div className="flex flex-wrap gap-2">
-                          <DungeonButton
-                            variant="default"
-                            size="sm"
-                            onClick={() => handleStartEditEpisode(episode)}
-                          >
-                            <Edit2 className="w-4 h-4 mr-1" /> Edit
-                          </DungeonButton>
-                          <DungeonButton
-                            variant="danger"
-                            size="sm"
-                            onClick={() => handleDeleteEpisode(episode.id)}
-                          >
-                            <Trash2 className="w-4 h-4 mr-1" /> Delete
-                          </DungeonButton>
-                        </div>
-                      </div>
-                    )}
+                    <div className="flex flex-wrap gap-2">
+                      <DungeonButton
+                        variant="default"
+                        size="sm"
+                        onClick={() => handleStartEditEpisode(episode)}
+                      >
+                        <Edit2 className="w-4 h-4 mr-1" /> Edit
+                      </DungeonButton>
+                      <DungeonButton
+                        variant="danger"
+                        size="sm"
+                        onClick={() => handleDeleteEpisode(episode.id)}
+                      >
+                        <Trash2 className="w-4 h-4 mr-1" /> Delete
+                      </DungeonButton>
+                    </div>
                   </div>
                 ))
               )}

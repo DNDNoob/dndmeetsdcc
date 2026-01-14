@@ -51,6 +51,7 @@ const Index = () => {
     setMobs,
     maps,
     setMaps,
+    cleanupEmptyMaps,
     episodes,
     addEpisode,
     updateEpisode,
@@ -266,14 +267,17 @@ const Index = () => {
                 onAddEpisode={addEpisode}
                 onUpdateEpisode={updateEpisode}
                 onDeleteEpisode={deleteEpisode}
+                onCleanupEmptyMaps={cleanupEmptyMaps}
               />
             )}
             {currentView === "showtime" && (
               <ShowTimeView
                 maps={maps}
+                mapNames={mapNames}
                 episodes={episodes}
                 mobs={mobs}
                 isAdmin={isAdmin}
+                onUpdateEpisode={updateEpisode}
               />
             )}
             {currentView === "sounds" && <SoundEffectsView />}

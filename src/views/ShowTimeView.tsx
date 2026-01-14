@@ -1,25 +1,46 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import { ResizableMobDisplay } from "@/components/ui/ResizableMobDisplay";
 import { GridOverlay } from "@/components/ui/GridOverlay";
+import { MobIcon } from "@/components/ui/MobIcon";
 import { Episode, Mob } from "@/lib/gameData";
 import { Map, X, Eye, Layers, ChevronLeft, ChevronRight, PlayCircle, Grid3x3 } from "lucide-react";
 
 interface ShowTimeViewProps {
   maps: string[];
+  mapNames?: string[];
   episodes: Episode[];
   mobs: Mob[];
   isAdmin: boolean;
+  onUpdateEpisode?: (id: string, updates: Partial<Episode>) => void;
 }
 
-const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, episodes, mobs, isAdmin }) => {
+const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, isAdmin, onUpdateEpisode }) => {
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
   const [currentMapIndex, setCurrentMapIndex] = useState(0);
   const [displayedMobIds, setDisplayedMobIds] = useState<string[]>([]);
   const [selectedMap, setSelectedMap] = useState<string | null>(null);
   const [showGrid, setShowGrid] = useState(false);
+  const [gridSize, setGridSize] = useState(50);
+  const [draggingMobId, setDraggingMobId] = useState<string | null>(null);
+  const mapImageRef = useRef<HTMLImageElement>(null);
+  const hasAutoLoaded = useRef(false);
+
+  // Auto-select first episode and first map when episodes load (only once)
+  useEffect(() => {
+    if (episodes.length > 0 && !selectedEpisode && !hasAutoLoaded.current) {
+      const firstEpisode = episodes[0];
+      setSelectedEpisode(firstEpisode);
+      if (firstEpisode.mapIds.length > 0) {
+        const mapIndex = parseInt(firstEpisode.mapIds[0], 10);
+        setSelectedMap(maps[mapIndex] || null);
+        setCurrentMapIndex(0);
+      }
+      hasAutoLoaded.current = true;
+    }
+  }, [episodes, maps]);
 
   // Debug logging
   console.log('[ShowTime] Rendering with:', { 
@@ -72,6 +93,44 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, episodes, mobs, isAdm
     setSelectedMap(null);
     setCurrentMapIndex(0);
     setDisplayedMobIds([]);
+  };
+
+  const handleMobMouseDown = (placementKey: string) => {
+    if (isAdmin) {
+      setDraggingMobId(placementKey);
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!draggingMobId || !isAdmin || !mapImageRef.current || !selectedEpisode) return;
+
+    const rect = mapImageRef.current.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+
+    // Extract index from placement key (format: "mobId-index")
+    const index = parseInt(draggingMobId.split('-').pop() || '0', 10);
+
+    // Update mob placement in local state
+    setSelectedEpisode(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        mobPlacements: prev.mobPlacements.map((p, i) =>
+          i === index ? { ...p, x, y } : p
+        ),
+      };
+    });
+  };
+
+  const handleMouseUp = () => {
+    if (draggingMobId && selectedEpisode && onUpdateEpisode) {
+      // Persist the updated mob placements
+      onUpdateEpisode(selectedEpisode.id, {
+        mobPlacements: selectedEpisode.mobPlacements,
+      });
+    }
+    setDraggingMobId(null);
   };
 
   // Main view when no episode is selected
@@ -189,6 +248,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, episodes, mobs, isAdm
                   const mapIndex = parseInt(mapIndexStr, 10);
                   const mapUrl = maps[mapIndex];
                   if (!mapUrl) return null;
+                  const mapName = mapNames?.[mapIndex] || `Map ${mapIndex + 1}`;
 
                   return (
                     <motion.div
@@ -202,12 +262,12 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, episodes, mobs, isAdm
                     >
                       <img
                         src={mapUrl}
-                        alt={`Map ${idx + 1}`}
+                        alt={mapName}
                         className="w-full h-32 object-cover rounded mb-2"
                       />
                       <DungeonButton variant="admin" size="sm" className="w-full">
                         <Eye className="w-4 h-4 mr-2" />
-                        Display Map {idx + 1}
+                        {mapName}
                       </DungeonButton>
                     </motion.div>
                   );
@@ -251,53 +311,60 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, episodes, mobs, isAdm
       className="min-h-screen bg-background relative flex flex-col"
     >
       {/* Map display */}
-      <div className="flex-1 flex items-center justify-center p-4 relative">
+      <div 
+        className="flex-1 flex items-center justify-center p-4 relative"
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+      >
         <img
+          ref={mapImageRef}
           src={selectedMap}
           alt="Current Map"
           className="max-w-full max-h-[90vh] object-contain"
         />
 
         {/* Grid overlay */}
-        {isAdmin && <GridOverlay isVisible={showGrid} cellSize={50} opacity={0.15} />}
+        {isAdmin && <GridOverlay isVisible={showGrid} cellSize={gridSize} opacity={0.3} />}
 
         {/* Displayed mobs on the map */}
-        {displayedMobIds.map(mobId => {
-          const mob = mobs.find(m => m.id === mobId);
-          const placement = selectedEpisode?.mobPlacements.find(p => p.mobId === mobId);
+        {selectedEpisode?.mobPlacements.map((placement, index) => {
+          const mob = mobs.find(m => m.id === placement.mobId);
+          if (!mob) return null;
 
-          if (!mob || !placement) return null;
+          // Count how many times this mob appears before this index
+          const sameIdBefore = selectedEpisode.mobPlacements
+            .slice(0, index)
+            .filter(p => p.mobId === placement.mobId).length;
+          const letter = sameIdBefore > 0 ? String.fromCharCode(65 + sameIdBefore) : '';
 
           return (
-            <div
-              key={mobId}
+            <motion.div
+              key={`${placement.mobId}-${index}`}
               style={{
                 position: "absolute",
                 left: `${placement.x}%`,
                 top: `${placement.y}%`,
                 transform: "translate(-50%, -50%)",
               }}
+              onMouseDown={() => isAdmin && handleMobMouseDown(`${placement.mobId}-${index}`)}
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: "spring", stiffness: 260, damping: 20 }}
             >
-              <motion.div
-                initial={{ scale: 0, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ type: "spring", stiffness: 260, damping: 20 }}
-                className="relative"
-              >
-                {mob.image && (
-                  <img
-                    src={mob.image}
-                    alt={mob.name}
-                    className="w-16 h-16 object-cover rounded-lg shadow-lg border-2 border-primary"
-                  />
-                )}
-                {!mob.image && (
-                  <div className="w-16 h-16 bg-destructive/20 border-2 border-destructive rounded-lg flex items-center justify-center shadow-lg">
-                    <span className="text-xs font-bold text-center px-1">{mob.name}</span>
+              <div className="relative">
+                <MobIcon
+                  mob={mob}
+                  size={64}
+                  isDragging={draggingMobId === `${placement.mobId}-${index}`}
+                />
+                {letter && (
+                  <div className="absolute -top-1 -right-1 w-6 h-6 bg-accent text-background rounded-full flex items-center justify-center text-sm font-bold shadow-lg">
+                    {letter}
                   </div>
                 )}
-              </motion.div>
-            </div>
+              </div>
+            </motion.div>
           );
         })}
 
@@ -333,6 +400,22 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, episodes, mobs, isAdm
                 <Grid3x3 className="w-4 h-4 mr-2" />
                 {showGrid ? "Grid On" : "Grid Off"}
               </DungeonButton>
+
+              {showGrid && (
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-muted-foreground">Size:</label>
+                  <input
+                    type="range"
+                    min="20"
+                    max="100"
+                    step="5"
+                    value={gridSize}
+                    onChange={(e) => setGridSize(Number(e.target.value))}
+                    className="w-24 h-2 bg-border rounded-lg appearance-none cursor-pointer"
+                  />
+                  <span className="text-xs text-muted-foreground w-8">{gridSize}</span>
+                </div>
+              )}
 
               <DungeonButton variant="default" size="sm" onClick={() => setSelectedMap(null)}>
                 <Layers className="w-4 h-4 mr-2" /> Change Map
