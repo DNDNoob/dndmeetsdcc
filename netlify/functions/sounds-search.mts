@@ -17,9 +17,9 @@ export default async (req: Request, context: Context) => {
     const page_size = Math.min(parseInt(url.searchParams.get("page_size") || "50") || 50, 150);
 
     // Check for Freesound API key from environment
-    const FREESOUND_KEY = Netlify.env.get("FREESOUND_API_KEY") ||
-                          Netlify.env.get("NETLIFY_FREESOUND_API_KEY") ||
-                          Netlify.env.get("VITE_FREESOUND_API_KEY");
+    const FREESOUND_KEY = process.env.FREESOUND_API_KEY ||
+                          process.env.NETLIFY_FREESOUND_API_KEY ||
+                          process.env.VITE_FREESOUND_API_KEY;
 
     if (!FREESOUND_KEY) {
       // Return local samples filtered by query
