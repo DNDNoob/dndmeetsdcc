@@ -53,11 +53,21 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
 
     const setupRealtimeSync = async () => {
       setLoading(true);
-      console.log('[FirebaseStore] � Initializing authentication...');
+      console.log('[FirebaseStore] 🔧 Initializing...');
 
       try {
         // Initialize authentication first
         await initAuth();
+        
+        // Check if Firebase is configured
+        if (!db) {
+          console.warn('[FirebaseStore] ⚠️ Running in OFFLINE MODE - Firebase not configured');
+          console.log('[FirebaseStore] ℹ️ To enable real-time sync, create a .env file with Firebase credentials');
+          setIsLoaded(true);
+          setLoading(false);
+          return;
+        }
+
         console.log('[FirebaseStore] ✅ Authentication ready');
         
         console.log('[FirebaseStore] 📂 Setting up real-time sync...', { roomId });

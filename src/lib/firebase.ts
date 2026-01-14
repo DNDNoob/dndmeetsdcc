@@ -13,23 +13,35 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+// Check if Firebase is configured
+const isFirebaseConfigured = firebaseConfig.apiKey && firebaseConfig.projectId;
+
+if (!isFirebaseConfigured) {
+  console.warn('[Firebase] ⚠️ Firebase not configured - running in offline mode. Create a .env file with Firebase credentials to enable real-time sync.');
+}
+
+// Initialize Firebase only if configured
+const app = isFirebaseConfigured ? initializeApp(firebaseConfig) : null;
 
 // Initialize Firestore
-export const db = getFirestore(app);
+export const db = app ? getFirestore(app) : null as any;
 
 // Initialize Storage
-export const storage = getStorage(app);
+export const storage = app ? getStorage(app) : null as any;
 
 // Initialize Auth
-export const auth = getAuth(app);
+export const auth = app ? getAuth(app) : null as any;
 
 // Sign in anonymously when the app loads
 let authInitialized = false;
 let authPromise: Promise<void> | null = null;
 
 export const initAuth = () => {
+  // If Firebase not configured, skip auth
+  if (!isFirebaseConfigured || !auth) {
+    return Promise.resolve();
+  }
+
   if (authPromise) return authPromise;
   
   authPromise = new Promise((resolve, reject) => {
@@ -65,6 +77,9 @@ export const initAuth = () => {
 
 // Collection references
 export const getCollectionRef = (collectionName: string, roomId?: string) => {
+  if (!db) {
+    throw new Error('Firebase not configured - cannot get collection reference');
+  }
   if (roomId) {
     return collection(db, `rooms/${roomId}/${collectionName}`);
   }
