@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "start:sfx-server": "node server/sound-server.js",
-    "test:firebase": "node scripts/firebase-crud-test.mjs"
+    "test:firebase": "node scripts/firebase-crud-test.mjs",
+    "deploy": "npm run build && gh-pages -d dist"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -79,6 +80,7 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "express": "^4.22.1",
+    "gh-pages": "^6.3.0",
     "globals": "^15.15.0",
     "lovable-tagger": "^1.1.13",
     "multer": "^1.4.5-lts.1",
