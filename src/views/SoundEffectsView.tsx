@@ -301,16 +301,13 @@ const SoundEffectsView: React.FC = () => {
         <h1 className="text-2xl font-bold">Sound Effects Library</h1>
       </div>
       <div className="mb-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Search sounds..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full p-3 pl-10 pr-4 border-2 border-primary/20 rounded-lg bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 text-base"
-          />
-        </div>
+        <input
+          type="text"
+          placeholder="Search sounds..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full p-2 border rounded bg-background text-foreground text-base"
+        />
       </div>
       <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="md:col-span-2">
