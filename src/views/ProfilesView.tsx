@@ -3,7 +3,8 @@ import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import { HealthBar } from "@/components/ui/HealthBar";
-import { Crawler, InventoryItem, createEmptyCrawler } from "@/lib/gameData";
+import { EquipmentSlot } from "@/components/ui/EquipmentSlot";
+import { Crawler, InventoryItem, createEmptyCrawler, EquipmentSlot as SlotType } from "@/lib/gameData";
 import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload } from "lucide-react";
 
 interface ProfilesViewProps {
@@ -155,6 +156,46 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
     }
   };
 
+  const handleEquipItem = (slot: SlotType, itemId: string) => {
+    const equippedItems = editMode
+      ? (editData.equippedItems ?? selected.equippedItems ?? {})
+      : (selected.equippedItems ?? {});
+
+    const updatedEquipped = { ...equippedItems, [slot]: itemId };
+
+    if (editMode) {
+      setEditData({ ...editData, equippedItems: updatedEquipped });
+    } else {
+      onUpdateCrawler(selected.id, { equippedItems: updatedEquipped });
+    }
+  };
+
+  const handleUnequipItem = (slot: SlotType) => {
+    const equippedItems = editMode
+      ? (editData.equippedItems ?? selected.equippedItems ?? {})
+      : (selected.equippedItems ?? {});
+
+    const updatedEquipped = { ...equippedItems };
+    delete updatedEquipped[slot];
+
+    if (editMode) {
+      setEditData({ ...editData, equippedItems: updatedEquipped });
+    } else {
+      onUpdateCrawler(selected.id, { equippedItems: updatedEquipped });
+    }
+  };
+
+  const getEquippedItem = (slot: SlotType): InventoryItem | undefined => {
+    const equippedItems = editMode
+      ? (editData.equippedItems ?? selected.equippedItems)
+      : selected.equippedItems;
+
+    const itemId = equippedItems?.[slot];
+    if (!itemId) return undefined;
+
+    return inventory.find(item => item.id === itemId);
+  };
+
   if (!selected) return null;
 
   const currentAvatar = editMode ? (editData.avatar ?? selected.avatar) : selected.avatar;
@@ -218,31 +259,97 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
       </div>
 
       <DungeonCard className="min-h-[400px]">
-        {/* Character header with avatar */}
-        <div className="flex gap-6 mb-6">
-          {/* Avatar section */}
-          <div className="flex flex-col items-center">
-            <div className="w-24 h-24 border-2 border-primary bg-muted/50 flex items-center justify-center overflow-hidden">
-              {currentAvatar ? (
-                <img src={currentAvatar} alt={selected.name} className="w-full h-full object-cover" />
-              ) : (
-                <User className="w-12 h-12 text-muted-foreground" />
-              )}
-            </div>
-            <input
-              ref={avatarInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleAvatarUpload}
-              className="hidden"
+        <div className="flex gap-6">
+          {/* Equipment Slots - Left Side */}
+          <div className="flex flex-col gap-3">
+            <h3 className="font-display text-primary text-sm mb-1">EQUIPMENT</h3>
+            <EquipmentSlot
+              slot="head"
+              label="Head"
+              equippedItem={getEquippedItem('head')}
+              onDrop={handleEquipItem}
+              onUnequip={handleUnequipItem}
+              disabled={false}
             />
-            <button
-              onClick={() => avatarInputRef.current?.click()}
-              className="text-xs text-primary mt-2 hover:underline flex items-center gap-1"
-            >
-              <Upload className="w-3 h-3" /> Upload
-            </button>
+            <EquipmentSlot
+              slot="chest"
+              label="Chest"
+              equippedItem={getEquippedItem('chest')}
+              onDrop={handleEquipItem}
+              onUnequip={handleUnequipItem}
+              disabled={false}
+            />
+            <div className="grid grid-cols-2 gap-2">
+              <EquipmentSlot
+                slot="leftHand"
+                label="Left Hand"
+                equippedItem={getEquippedItem('leftHand')}
+                onDrop={handleEquipItem}
+                onUnequip={handleUnequipItem}
+                disabled={false}
+              />
+              <EquipmentSlot
+                slot="rightHand"
+                label="Right Hand"
+                equippedItem={getEquippedItem('rightHand')}
+                onDrop={handleEquipItem}
+                onUnequip={handleUnequipItem}
+                disabled={false}
+              />
+            </div>
+            <EquipmentSlot
+              slot="ringFinger"
+              label="Ring"
+              equippedItem={getEquippedItem('ringFinger')}
+              onDrop={handleEquipItem}
+              onUnequip={handleUnequipItem}
+              disabled={false}
+            />
+            <EquipmentSlot
+              slot="legs"
+              label="Legs"
+              equippedItem={getEquippedItem('legs')}
+              onDrop={handleEquipItem}
+              onUnequip={handleUnequipItem}
+              disabled={false}
+            />
+            <EquipmentSlot
+              slot="feet"
+              label="Feet"
+              equippedItem={getEquippedItem('feet')}
+              onDrop={handleEquipItem}
+              onUnequip={handleUnequipItem}
+              disabled={false}
+            />
           </div>
+
+          {/* Character Info - Center/Right */}
+          <div className="flex-1">
+            {/* Character header with avatar */}
+            <div className="flex gap-6 mb-6">
+              {/* Avatar section */}
+              <div className="flex flex-col items-center">
+                <div className="w-24 h-24 border-2 border-primary bg-muted/50 flex items-center justify-center overflow-hidden">
+                  {currentAvatar ? (
+                    <img src={currentAvatar} alt={selected.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <User className="w-12 h-12 text-muted-foreground" />
+                  )}
+                </div>
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarUpload}
+                  className="hidden"
+                />
+                <button
+                  onClick={() => avatarInputRef.current?.click()}
+                  className="text-xs text-primary mt-2 hover:underline flex items-center gap-1"
+                >
+                  <Upload className="w-3 h-3" /> Upload
+                </button>
+              </div>
 
           {/* Name and info */}
           <div className="flex-1">
@@ -418,17 +525,38 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
               <p className="text-muted-foreground text-sm italic">No items</p>
             ) : (
               <ul className="space-y-2 text-sm">
-                {inventory.map((item) => (
-                  <li key={item.id} className="flex items-center gap-2 bg-muted/50 px-3 py-2">
-                    <Sword className="w-3 h-3 text-primary/60" />
-                    <span className="text-foreground">{item.name}</span>
-                    {item.equipped && (
-                      <span className="text-xs bg-primary/20 text-primary px-1 py-0.5 ml-auto">E</span>
-                    )}
-                  </li>
-                ))}
+                {inventory.map((item) => {
+                  const isEquipped = Object.values(selected.equippedItems || {}).includes(item.id);
+                  return (
+                    <li
+                      key={item.id}
+                      draggable={!!item.equipSlot}
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData('application/json', JSON.stringify(item));
+                        e.dataTransfer.effectAllowed = 'move';
+                      }}
+                      className={`flex items-center gap-2 bg-muted/50 px-3 py-2 ${
+                        item.equipSlot ? 'cursor-grab active:cursor-grabbing' : ''
+                      }`}
+                    >
+                      <Sword className="w-3 h-3 text-primary/60" />
+                      <span className="text-foreground">{item.name}</span>
+                      {item.equipSlot && (
+                        <span className="text-xs bg-accent/20 text-accent px-1 py-0.5 ml-auto">
+                          {item.equipSlot}
+                        </span>
+                      )}
+                      {isEquipped && (
+                        <span className="text-xs bg-primary/20 text-primary px-1 py-0.5">E</span>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             )}
+          </div>
+        </div>
+            </div>
           </div>
         </div>
       </DungeonCard>

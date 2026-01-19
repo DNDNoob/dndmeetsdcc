@@ -1,3 +1,15 @@
+export type EquipmentSlot = 'head' | 'chest' | 'legs' | 'feet' | 'leftHand' | 'rightHand' | 'ringFinger';
+
+export interface EquippedItems {
+  head?: string; // Item ID
+  chest?: string;
+  legs?: string;
+  feet?: string;
+  leftHand?: string;
+  rightHand?: string;
+  ringFinger?: string;
+}
+
 export interface Crawler {
   id: string;
   name: string;
@@ -16,13 +28,15 @@ export interface Crawler {
   achievements: string;
   gold: number;
   avatar?: string;
+  equippedItems?: EquippedItems;
 }
 
 export interface InventoryItem {
   id: string;
   name: string;
   description: string;
-  equipped?: boolean;
+  equipSlot?: EquipmentSlot; // Which slot this item can be equipped to
+  equipped?: boolean; // Deprecated - use equippedItems in Crawler instead
 }
 
 export interface Mob {
