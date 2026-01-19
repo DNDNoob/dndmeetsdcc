@@ -69,14 +69,81 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      const MAX_AVATAR_SIZE = 500_000; // 500KB in base64
+
       const reader = new FileReader();
       reader.onload = () => {
         const base64 = reader.result as string;
-        if (editMode) {
-          setEditData({ ...editData, avatar: base64 });
-        } else {
-          onUpdateCrawler(selected.id, { avatar: base64 });
+
+        // If image is small enough, use it directly
+        if (base64.length <= MAX_AVATAR_SIZE) {
+          if (editMode) {
+            setEditData({ ...editData, avatar: base64 });
+          } else {
+            onUpdateCrawler(selected.id, { avatar: base64 });
+          }
+          return;
         }
+
+        // Otherwise, resize the image
+        const img = new Image();
+        img.onload = () => {
+          // Start with reasonable dimensions and reduce until under size limit
+          let quality = 0.8;
+          let maxDimension = 512;
+
+          const resizeAndCompress = () => {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+
+            // Scale down to maxDimension
+            if (width > height && width > maxDimension) {
+              height = (height * maxDimension) / width;
+              width = maxDimension;
+            } else if (height > maxDimension) {
+              width = (width * maxDimension) / height;
+              height = maxDimension;
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(img, 0, 0, width, height);
+              return canvas.toDataURL('image/jpeg', quality);
+            }
+            return base64;
+          };
+
+          let resizedBase64 = resizeAndCompress();
+
+          // Keep reducing quality/size until under limit
+          while (resizedBase64.length > MAX_AVATAR_SIZE && quality > 0.1) {
+            quality -= 0.1;
+            if (quality <= 0.3 && maxDimension > 256) {
+              maxDimension = Math.floor(maxDimension * 0.75);
+            }
+            resizedBase64 = resizeAndCompress();
+          }
+
+          console.log('[ProfilesView] Resized avatar:', {
+            originalSize: base64.length,
+            resizedSize: resizedBase64.length,
+            finalQuality: quality,
+            finalDimension: maxDimension,
+            sizeInKB: (resizedBase64.length / 1000).toFixed(2)
+          });
+
+          if (editMode) {
+            setEditData({ ...editData, avatar: resizedBase64 });
+          } else {
+            onUpdateCrawler(selected.id, { avatar: resizedBase64 });
+          }
+        };
+
+        img.src = base64;
       };
       reader.readAsDataURL(file);
     }

@@ -139,6 +139,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
   };
 
   const MAX_IMAGE_LENGTH = 5_000_000; // ~3.75 MB of raw image data once base64 is decoded
+  const MAX_AVATAR_LENGTH = 500_000; // 500KB for avatars
 
   const addItem = useCallback(async (collection: CollectionName, item: Record<string, unknown>) => {
     try {
@@ -166,6 +167,26 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
           itemId,
           imageSize: (itemWithId.image as string).length,
           sizeInMB: ((itemWithId.image as string).length / 1_000_000).toFixed(2)
+        });
+      }
+
+      // Drop undefined/oversized avatar fields to satisfy Firestore
+      if (itemWithId.avatar === undefined || itemWithId.avatar === null) {
+        delete itemWithId.avatar;
+      } else if (typeof itemWithId.avatar === 'string' && itemWithId.avatar.length > MAX_AVATAR_LENGTH) {
+        console.warn('[FirebaseStore] ⚠️ Avatar too large; stripping before save', {
+          collection,
+          itemId,
+          avatarSize: (itemWithId.avatar as string).length,
+          maxSize: MAX_AVATAR_LENGTH,
+          sizeInKB: ((itemWithId.avatar as string).length / 1_000).toFixed(2)
+        });
+        delete itemWithId.avatar;
+      } else if (typeof itemWithId.avatar === 'string') {
+        console.log('[FirebaseStore] ✅ Storing avatar', {
+          itemId,
+          avatarSize: (itemWithId.avatar as string).length,
+          sizeInKB: ((itemWithId.avatar as string).length / 1_000).toFixed(2)
         });
       }
 
@@ -200,6 +221,26 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
           sizeInMB: ((updatesCopy.image as string).length / 1_000_000).toFixed(2)
         });
         delete updatesCopy.image;
+      }
+
+      // Drop undefined/oversized avatar fields to satisfy Firestore
+      if (updatesCopy.avatar === undefined || updatesCopy.avatar === null) {
+        delete updatesCopy.avatar;
+      } else if (typeof updatesCopy.avatar === 'string' && updatesCopy.avatar.length > MAX_AVATAR_LENGTH) {
+        console.warn('[FirebaseStore] ⚠️ Avatar too large; stripping before update', {
+          collection,
+          id,
+          avatarSize: (updatesCopy.avatar as string).length,
+          maxSize: MAX_AVATAR_LENGTH,
+          sizeInKB: ((updatesCopy.avatar as string).length / 1_000).toFixed(2)
+        });
+        delete updatesCopy.avatar;
+      } else if (typeof updatesCopy.avatar === 'string') {
+        console.log('[FirebaseStore] ✅ Updating avatar', {
+          id,
+          avatarSize: (updatesCopy.avatar as string).length,
+          sizeInKB: ((updatesCopy.avatar as string).length / 1_000).toFixed(2)
+        });
       }
 
       const cleanedFinal = cleanObject(updatesCopy);
