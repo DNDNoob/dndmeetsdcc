@@ -33,6 +33,8 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   const mapImageRef = useRef<HTMLImageElement>(null);
   const hasAutoLoaded = useRef(false);
   const mountTime = useRef(Timestamp.now());
+  const lastBroadcastTime = useRef<number>(0);
+  const BROADCAST_THROTTLE_MS = 50; // Throttle to ~20 updates per second
 
   // Auto-select first episode and first map when episodes load (only once)
   useEffect(() => {
@@ -181,7 +183,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     // Extract index from placement key (format: "mobId-index")
     const index = parseInt(draggingMobId.split('-').pop() || '0', 10);
 
-    // Update mob placement in local state
+    // Update mob placement in local state (always update for smooth dragging)
     setSelectedEpisode(prev => {
       if (!prev) return prev;
       return {
@@ -192,12 +194,23 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       };
     });
 
-    // Broadcast drag state to other players
-    broadcastDragState(index, x, y);
+    // Throttle broadcast to prevent overwhelming Firestore
+    const now = Date.now();
+    if (now - lastBroadcastTime.current >= BROADCAST_THROTTLE_MS) {
+      lastBroadcastTime.current = now;
+      broadcastDragState(index, x, y);
+    }
   };
 
   const handleMouseUp = () => {
     if (draggingMobId && selectedEpisode && onUpdateEpisode) {
+      // Extract index from placement key and broadcast final position
+      const index = parseInt(draggingMobId.split('-').pop() || '0', 10);
+      const finalPlacement = selectedEpisode.mobPlacements[index];
+      if (finalPlacement && isAdmin) {
+        broadcastDragState(index, finalPlacement.x, finalPlacement.y);
+      }
+
       // Persist the updated mob placements
       onUpdateEpisode(selectedEpisode.id, {
         mobPlacements: selectedEpisode.mobPlacements,
