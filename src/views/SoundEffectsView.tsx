@@ -196,7 +196,7 @@ const SoundEffectsView: React.FC = () => {
     // Stop any currently playing sound
     if (audioRef.current) {
       audioRef.current.pause();
-      audioRef.current = null;
+      audioRef.current.currentTime = 0;
     }
 
     setPlayingId(sound.id);
@@ -205,7 +205,9 @@ const SoundEffectsView: React.FC = () => {
     audio.play().catch((e) => console.warn("Failed to play", e));
     audio.onended = () => {
       setPlayingId(null);
-      audioRef.current = null;
+      if (audioRef.current === audio) {
+        audioRef.current = null;
+      }
     };
 
     // update recent
@@ -222,8 +224,9 @@ const SoundEffectsView: React.FC = () => {
   const stopSound = () => {
     if (audioRef.current) {
       audioRef.current.pause();
-      audioRef.current = null;
+      audioRef.current.currentTime = 0;
       setPlayingId(null);
+      audioRef.current = null;
     }
   };
 
