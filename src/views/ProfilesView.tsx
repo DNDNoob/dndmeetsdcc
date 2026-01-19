@@ -13,21 +13,28 @@ interface ProfilesViewProps {
   onAddCrawler: (crawler: Crawler) => void;
   onDeleteCrawler: (id: string) => void;
   getCrawlerInventory: (crawlerId: string) => InventoryItem[];
+  onUpdateCrawlerInventory: (crawlerId: string, items: InventoryItem[]) => void;
   partyGold: number;
 }
 
-const ProfilesView: React.FC<ProfilesViewProps> = ({ 
-  crawlers, 
-  onUpdateCrawler, 
+const ProfilesView: React.FC<ProfilesViewProps> = ({
+  crawlers,
+  onUpdateCrawler,
   onAddCrawler,
   onDeleteCrawler,
   getCrawlerInventory,
+  onUpdateCrawlerInventory,
   partyGold,
 }) => {
   const [selectedId, setSelectedId] = useState(crawlers[0]?.id || "");
   const [editMode, setEditMode] = useState(false);
   const [editData, setEditData] = useState<Partial<Crawler>>({});
   const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  // Inventory item editing
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [isAddingItem, setIsAddingItem] = useState(false);
+  const [itemFormData, setItemFormData] = useState<Partial<InventoryItem>>({});
 
   const selected = crawlers.find((c) => c.id === selectedId) || crawlers[0];
   const inventory = selected ? getCrawlerInventory(selected.id) : [];
@@ -194,6 +201,57 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
     if (!itemId) return undefined;
 
     return inventory.find(item => item.id === itemId);
+  };
+
+  const handleAddItem = () => {
+    setIsAddingItem(true);
+    setItemFormData({
+      name: "",
+      description: "",
+      equipSlot: undefined,
+    });
+  };
+
+  const handleEditItem = (item: InventoryItem) => {
+    setEditingItemId(item.id);
+    setItemFormData({ ...item });
+  };
+
+  const handleSaveItem = () => {
+    if (!selected) return;
+
+    if (isAddingItem) {
+      const newItem: InventoryItem = {
+        id: crypto.randomUUID(),
+        name: itemFormData.name || "New Item",
+        description: itemFormData.description || "",
+        equipSlot: itemFormData.equipSlot,
+      };
+      onUpdateCrawlerInventory(selected.id, [...inventory, newItem]);
+    } else if (editingItemId) {
+      const updatedInventory = inventory.map((item) =>
+        item.id === editingItemId
+          ? { ...item, ...itemFormData }
+          : item
+      );
+      onUpdateCrawlerInventory(selected.id, updatedInventory);
+    }
+
+    setIsAddingItem(false);
+    setEditingItemId(null);
+    setItemFormData({});
+  };
+
+  const handleCancelItemEdit = () => {
+    setIsAddingItem(false);
+    setEditingItemId(null);
+    setItemFormData({});
+  };
+
+  const handleDeleteItem = (itemId: string) => {
+    if (!selected) return;
+    const updatedInventory = inventory.filter((item) => item.id !== itemId);
+    onUpdateCrawlerInventory(selected.id, updatedInventory);
   };
 
   if (!selected) return null;
@@ -518,37 +576,103 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
 
           {/* Inventory section */}
           <div>
-            <h3 className="font-display text-primary text-lg mb-4 flex items-center gap-2">
-              <Sword className="w-5 h-5" /> INVENTORY
-            </h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display text-primary text-lg flex items-center gap-2">
+                <Sword className="w-5 h-5" /> INVENTORY
+              </h3>
+              <DungeonButton variant="default" size="sm" onClick={handleAddItem}>
+                <Plus className="w-4 h-4 mr-1" /> Add Item
+              </DungeonButton>
+            </div>
+
+            {/* Item Form */}
+            {(isAddingItem || editingItemId) && (
+              <div className="mb-4 p-4 border border-accent bg-accent/10">
+                <h4 className="text-sm font-bold text-accent mb-2">
+                  {isAddingItem ? "New Item" : "Edit Item"}
+                </h4>
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    placeholder="Item Name"
+                    value={itemFormData.name || ""}
+                    onChange={(e) => setItemFormData({ ...itemFormData, name: e.target.value })}
+                    className="w-full bg-muted border border-border px-2 py-1 text-sm"
+                  />
+                  <textarea
+                    placeholder="Description"
+                    value={itemFormData.description || ""}
+                    onChange={(e) => setItemFormData({ ...itemFormData, description: e.target.value })}
+                    className="w-full bg-muted border border-border px-2 py-1 text-sm min-h-[60px]"
+                  />
+                  <select
+                    value={itemFormData.equipSlot || ""}
+                    onChange={(e) => setItemFormData({ ...itemFormData, equipSlot: e.target.value as SlotType || undefined })}
+                    className="w-full bg-muted border border-border px-2 py-1 text-sm"
+                  >
+                    <option value="">No Equipment Slot</option>
+                    <option value="head">Head</option>
+                    <option value="chest">Chest</option>
+                    <option value="legs">Legs</option>
+                    <option value="feet">Feet</option>
+                    <option value="leftHand">Left Hand</option>
+                    <option value="rightHand">Right Hand</option>
+                    <option value="ringFinger">Ring Finger</option>
+                  </select>
+                  <div className="flex gap-2">
+                    <DungeonButton variant="admin" size="sm" onClick={handleSaveItem}>
+                      <Save className="w-3 h-3 mr-1" /> Save
+                    </DungeonButton>
+                    <DungeonButton variant="default" size="sm" onClick={handleCancelItemEdit}>
+                      Cancel
+                    </DungeonButton>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {inventory.length === 0 ? (
               <p className="text-muted-foreground text-sm italic">No items</p>
             ) : (
               <ul className="space-y-2 text-sm">
                 {inventory.map((item) => {
                   const isEquipped = Object.values(selected.equippedItems || {}).includes(item.id);
+                  const isEditing = editingItemId === item.id;
+
                   return (
                     <li
                       key={item.id}
-                      draggable={!!item.equipSlot}
+                      draggable={!!item.equipSlot && !isEditing}
                       onDragStart={(e) => {
                         e.dataTransfer.setData('application/json', JSON.stringify(item));
                         e.dataTransfer.effectAllowed = 'move';
                       }}
                       className={`flex items-center gap-2 bg-muted/50 px-3 py-2 ${
-                        item.equipSlot ? 'cursor-grab active:cursor-grabbing' : ''
-                      }`}
+                        item.equipSlot && !isEditing ? 'cursor-grab active:cursor-grabbing' : ''
+                      } ${isEditing ? 'border-2 border-accent' : ''}`}
                     >
                       <Sword className="w-3 h-3 text-primary/60" />
-                      <span className="text-foreground">{item.name}</span>
+                      <span className="text-foreground flex-1">{item.name}</span>
                       {item.equipSlot && (
-                        <span className="text-xs bg-accent/20 text-accent px-1 py-0.5 ml-auto">
+                        <span className="text-xs bg-accent/20 text-accent px-1 py-0.5">
                           {item.equipSlot}
                         </span>
                       )}
                       {isEquipped && (
                         <span className="text-xs bg-primary/20 text-primary px-1 py-0.5">E</span>
                       )}
+                      <button
+                        onClick={() => handleEditItem(item)}
+                        className="text-xs text-primary hover:underline"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeleteItem(item.id)}
+                        className="text-xs text-danger hover:underline"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
                     </li>
                   );
                 })}

@@ -232,6 +232,7 @@ const Index = () => {
                 onAddCrawler={addCrawler}
                 onDeleteCrawler={deleteCrawler}
                 getCrawlerInventory={getCrawlerInventory}
+                onUpdateCrawlerInventory={updateCrawlerInventory}
                 partyGold={partyGold}
               />
             )}

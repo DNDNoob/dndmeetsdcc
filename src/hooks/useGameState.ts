@@ -92,10 +92,6 @@ export const useGameState = () => {
     setCollection('crawlers', newCrawlers);
   };
 
-  const setInventory = (newInventory: InventoryEntry[]) => {
-    setCollection('inventory', newInventory);
-  };
-
   // Remove undefined fields before sending to Firestore
   const stripUndefinedDeep = (obj: unknown): unknown => {
     if (obj === null || obj === undefined) return obj;
@@ -295,13 +291,14 @@ export const useGameState = () => {
 
   const updateCrawlerInventory = (crawlerId: string, items: InventoryItem[]) => {
     const existing = inventory.find((i) => i.crawlerId === crawlerId);
+    const cleaned = stripUndefinedDeep(items) as InventoryItem[];
+
     if (existing) {
-      const newInventory = inventory.map((i) => 
-        i.crawlerId === crawlerId ? { ...i, items } : i
-      );
-      setInventory(newInventory);
+      // Update existing inventory in Firebase
+      updateItem('inventory', crawlerId, { crawlerId, items: cleaned });
     } else {
-      setInventory([...inventory, { crawlerId, items }]);
+      // Add new inventory entry to Firebase
+      addItem('inventory', { crawlerId, items: cleaned });
     }
   };
 
