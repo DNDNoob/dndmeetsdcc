@@ -458,14 +458,23 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
               key={`${placement.mobId}-${index}`}
               style={{
                 position: "absolute",
-                left: `${placement.x}%`,
-                top: `${placement.y}%`,
                 transform: "translate(-50%, -50%)",
               }}
               onMouseDown={() => isAdmin && handleMobMouseDown(`${placement.mobId}-${index}`)}
-              initial={{ scale: 0, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ type: "spring", stiffness: 260, damping: 20 }}
+              initial={{ scale: 0, opacity: 0, left: `${placement.x}%`, top: `${placement.y}%` }}
+              animate={{
+                scale: 1,
+                opacity: 1,
+                left: `${placement.x}%`,
+                top: `${placement.y}%`
+              }}
+              transition={{
+                type: "spring",
+                stiffness: 260,
+                damping: 20,
+                left: { type: "tween", duration: 0.1 },
+                top: { type: "tween", duration: 0.1 }
+              }}
             >
               <div className="relative">
                 <MobIcon
