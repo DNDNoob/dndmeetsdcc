@@ -122,15 +122,14 @@ const SoundEffectsView: React.FC = () => {
         return;
       }
 
-      // Try custom API base first (for dev/local/proxy)
+      // Try Firebase Cloud Function proxy first
       const base = (import.meta.env.VITE_SOUND_API_BASE as string) || (import.meta.env.VITE_SOUND_SERVER_BASE as string) || '';
       if (base) {
-        const url = `${base}/api/sounds/search?q=${encodeURIComponent(q)}&page=1&page_size=60`;
+        const url = `${base}/freesoundSearch?q=${encodeURIComponent(q)}&page_size=60`;
         try {
           const res = await fetch(url);
           if (!res.ok) {
-            console.warn('search proxy failed', await res.text());
-            // fallback to Freesound or local
+            console.warn('[SoundEffects] Proxy failed:', res.status, await res.text());
             throw new Error('Proxy search failed');
           }
           const json = await res.json();
@@ -142,40 +141,34 @@ const SoundEffectsView: React.FC = () => {
             tags: r.tags || [],
             source: r.source || json.source || 'proxy'
           }));
+          console.log('[SoundEffects] Got', mapped.length, 'results from proxy');
           setResults([...uploaded, ...mapped]);
           return;
         } catch (e) {
-          // fall through to Freesound
+          console.warn('[SoundEffects] Proxy error:', e);
+          // fall through to local filtering
         }
       }
 
-      // If no custom API, use Freesound directly (browser fetch)
-      if (FREESOUND_KEY) {
-        const freesoundUrl = `https://freesound.org/apiv2/search/text/?query=${encodeURIComponent(q)}&fields=id,name,previews,tags&token=${FREESOUND_KEY}`;
-        try {
-          const res = await fetch(freesoundUrl);
-          if (!res.ok) {
-            console.warn('Freesound search failed', await res.text());
-            throw new Error('Freesound search failed');
-          }
-          const json = await res.json();
-          if (!active) return;
-          const mapped: SoundEffect[] = (json.results || []).map((r: any) => ({
-            id: r.id,
-            name: r.name,
-            url: r.previews ? (r.previews['preview-hq-mp3'] || r.previews['preview-lq-mp3'] || r.previews['preview-hq-ogg'] || r.previews['preview-lq-ogg']) : '',
-            tags: r.tags || [],
-            source: 'freesound'
-          })).filter(s => s.url);
-          setResults([...uploaded, ...mapped]);
-          return;
-        } catch (e) {
-          console.error('Freesound search failed', e);
-        }
-      }
+      // Freesound API is disabled - API key exposed in client causes rate limiting
+      // To enable search, set up a backend proxy and configure VITE_SOUND_API_BASE
+      // For now, filter local and uploaded sounds only
 
-      // fallback to local
-      if (active) setResults([...uploaded, ...LOCAL_SOUNDS]);
+      if (active) {
+        // Filter local sounds by search query
+        const localFiltered = LOCAL_SOUNDS.filter(s =>
+          s.name.toLowerCase().includes(q.toLowerCase()) ||
+          s.tags.some(t => t.toLowerCase().includes(q.toLowerCase()))
+        );
+
+        // Filter uploaded sounds by search query
+        const uploadedFiltered = uploaded.filter(s =>
+          s.name.toLowerCase().includes(q.toLowerCase()) ||
+          (s.tags && s.tags.some(t => t.toLowerCase().includes(q.toLowerCase())))
+        );
+
+        setResults([...uploadedFiltered, ...localFiltered]);
+      }
     };
 
     // debounce user input
