@@ -267,11 +267,11 @@ export const useGameState = () => {
   };
 
   const updateCrawler = (id: string, updates: Partial<Crawler>) => {
-    updateItem('crawlers', id, updates);
+    updateItem('crawlers', id, stripUndefinedDeep(updates));
   };
 
   const addCrawler = (crawler: Crawler) => {
-    addItem('crawlers', crawler);
+    addItem('crawlers', stripUndefinedDeep(crawler));
     addItem('inventory', { crawlerId: crawler.id, items: [] });
   };
 
