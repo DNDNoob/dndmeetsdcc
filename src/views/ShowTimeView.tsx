@@ -433,6 +433,68 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       animate={{ opacity: 1 }}
       className="min-h-screen bg-background relative flex flex-col"
     >
+      {/* DM controls - above the map */}
+      {isAdmin && (
+        <div className="p-4 pb-0">
+          <div className="flex items-center justify-between bg-background/80 border border-border p-3 rounded-lg">
+            <div>
+              <h3 className="font-display text-accent text-glow-gold">
+                {selectedEpisode.name}
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Map {currentMapIndex + 1} of {selectedEpisode.mapIds.length}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {selectedEpisode.mapIds.length > 1 && (
+                <>
+                  <DungeonButton variant="default" size="sm" onClick={handlePreviousMap}>
+                    <ChevronLeft className="w-4 h-4" />
+                  </DungeonButton>
+                  <DungeonButton variant="default" size="sm" onClick={handleNextMap}>
+                    <ChevronRight className="w-4 h-4" />
+                  </DungeonButton>
+                </>
+              )}
+
+              <DungeonButton
+                variant={showGrid ? "admin" : "default"}
+                size="sm"
+                onClick={() => setShowGrid(!showGrid)}
+              >
+                <Grid3x3 className="w-4 h-4 mr-2" />
+                {showGrid ? "Grid On" : "Grid Off"}
+              </DungeonButton>
+
+              {showGrid && (
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-muted-foreground">Size:</label>
+                  <input
+                    type="range"
+                    min="20"
+                    max="100"
+                    step="5"
+                    value={gridSize}
+                    onChange={(e) => setGridSize(Number(e.target.value))}
+                    className="w-24 h-2 bg-border rounded-lg appearance-none cursor-pointer"
+                  />
+                  <span className="text-xs text-muted-foreground w-8">{gridSize}</span>
+                </div>
+              )}
+
+              <DungeonButton variant="default" size="sm" onClick={() => setSelectedMap(null)}>
+                <Layers className="w-4 h-4 mr-2" /> Change Map
+              </DungeonButton>
+
+              <DungeonButton variant="danger" size="sm" onClick={handleEndEpisode}>
+                <X className="w-4 h-4 mr-2" /> End Episode
+              </DungeonButton>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Map display */}
       <div
         className="flex-1 flex items-center justify-center p-4 select-none"
@@ -514,66 +576,6 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             </motion.div>
           );
         })}
-
-        {/* DM controls overlay */}
-        {isAdmin && (
-          <div className="absolute top-4 left-4 right-4 flex items-center justify-between bg-background/80 border border-border p-3 rounded-lg">
-            <div>
-              <h3 className="font-display text-accent text-glow-gold">
-                {selectedEpisode.name}
-              </h3>
-              <p className="text-xs text-muted-foreground">
-                Map {currentMapIndex + 1} of {selectedEpisode.mapIds.length}
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              {selectedEpisode.mapIds.length > 1 && (
-                <>
-                  <DungeonButton variant="default" size="sm" onClick={handlePreviousMap}>
-                    <ChevronLeft className="w-4 h-4" />
-                  </DungeonButton>
-                  <DungeonButton variant="default" size="sm" onClick={handleNextMap}>
-                    <ChevronRight className="w-4 h-4" />
-                  </DungeonButton>
-                </>
-              )}
-
-              <DungeonButton 
-                variant={showGrid ? "admin" : "default"} 
-                size="sm" 
-                onClick={() => setShowGrid(!showGrid)}
-              >
-                <Grid3x3 className="w-4 h-4 mr-2" />
-                {showGrid ? "Grid On" : "Grid Off"}
-              </DungeonButton>
-
-              {showGrid && (
-                <div className="flex items-center gap-2">
-                  <label className="text-xs text-muted-foreground">Size:</label>
-                  <input
-                    type="range"
-                    min="20"
-                    max="100"
-                    step="5"
-                    value={gridSize}
-                    onChange={(e) => setGridSize(Number(e.target.value))}
-                    className="w-24 h-2 bg-border rounded-lg appearance-none cursor-pointer"
-                  />
-                  <span className="text-xs text-muted-foreground w-8">{gridSize}</span>
-                </div>
-              )}
-
-              <DungeonButton variant="default" size="sm" onClick={() => setSelectedMap(null)}>
-                <Layers className="w-4 h-4 mr-2" /> Change Map
-              </DungeonButton>
-
-              <DungeonButton variant="danger" size="sm" onClick={handleEndEpisode}>
-                <X className="w-4 h-4 mr-2" /> End Episode
-              </DungeonButton>
-            </div>
-          </div>
-        )}
         </div>
 
         {/* Display mobs in bottom-right corner */}
