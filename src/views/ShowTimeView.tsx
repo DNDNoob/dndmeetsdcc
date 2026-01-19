@@ -7,6 +7,9 @@ import { GridOverlay } from "@/components/ui/GridOverlay";
 import { MobIcon } from "@/components/ui/MobIcon";
 import { Episode, Mob } from "@/lib/gameData";
 import { Map, X, Eye, Layers, ChevronLeft, ChevronRight, PlayCircle, Grid3x3 } from "lucide-react";
+import { db } from "@/lib/firebase";
+import { collection, addDoc, query, where, onSnapshot, serverTimestamp, Timestamp, deleteDoc, getDocs } from "firebase/firestore";
+import { useFirebaseStore } from "@/hooks/useFirebaseStore";
 
 interface ShowTimeViewProps {
   maps: string[];
@@ -18,6 +21,7 @@ interface ShowTimeViewProps {
 }
 
 const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, isAdmin, onUpdateEpisode }) => {
+  const { roomId } = useFirebaseStore();
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
   const [currentMapIndex, setCurrentMapIndex] = useState(0);
   const [displayedMobIds, setDisplayedMobIds] = useState<string[]>([]);
@@ -25,8 +29,10 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   const [showGrid, setShowGrid] = useState(false);
   const [gridSize, setGridSize] = useState(50);
   const [draggingMobId, setDraggingMobId] = useState<string | null>(null);
+  const [remoteDragState, setRemoteDragState] = useState<{placementIndex: number; x: number; y: number} | null>(null);
   const mapImageRef = useRef<HTMLImageElement>(null);
   const hasAutoLoaded = useRef(false);
+  const mountTime = useRef(Timestamp.now());
 
   // Auto-select first episode and first map when episodes load (only once)
   useEffect(() => {
@@ -43,13 +49,77 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   }, [episodes, maps]);
 
   // Debug logging
-  console.log('[ShowTime] Rendering with:', { 
-    episodeCount: episodes.length, 
-    mapCount: maps.length, 
+  console.log('[ShowTime] Rendering with:', {
+    episodeCount: episodes.length,
+    mapCount: maps.length,
     mobCount: mobs.length,
     isAdmin,
-    selectedEpisode: selectedEpisode?.name 
+    selectedEpisode: selectedEpisode?.name
   });
+
+  // Listen for real-time drag updates from other players
+  useEffect(() => {
+    if (!selectedEpisode) return;
+
+    const dragCollectionName = roomId ? `rooms/${roomId}/mob-drag-state` : 'mob-drag-state';
+    const q = query(
+      collection(db, dragCollectionName),
+      where('episodeId', '==', selectedEpisode.id),
+      where('createdAt', '>', mountTime.current)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === "added") {
+          const dragData = change.doc.data();
+          console.log('[ShowTime] Received drag update:', dragData);
+
+          // Only apply if we're not the one dragging
+          if (!isAdmin || !draggingMobId) {
+            setRemoteDragState({
+              placementIndex: dragData.placementIndex,
+              x: dragData.x,
+              y: dragData.y
+            });
+
+            // Update local episode state with remote drag position
+            setSelectedEpisode(prev => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                mobPlacements: prev.mobPlacements.map((p, i) =>
+                  i === dragData.placementIndex ? { ...p, x: dragData.x, y: dragData.y } : p
+                ),
+              };
+            });
+          }
+
+          // Clean up old drag state documents
+          deleteDoc(change.doc.ref).catch(console.error);
+        }
+      });
+    });
+
+    return () => unsubscribe();
+  }, [selectedEpisode, isAdmin, draggingMobId, roomId]);
+
+  // Broadcast drag state to other players
+  const broadcastDragState = async (placementIndex: number, x: number, y: number) => {
+    if (!selectedEpisode || !isAdmin) return;
+
+    const dragCollectionName = roomId ? `rooms/${roomId}/mob-drag-state` : 'mob-drag-state';
+    try {
+      await addDoc(collection(db, dragCollectionName), {
+        episodeId: selectedEpisode.id,
+        placementIndex,
+        x,
+        y,
+        createdAt: serverTimestamp()
+      });
+    } catch (error) {
+      console.error('[ShowTime] Failed to broadcast drag state:', error);
+    }
+  };
 
   // Get all mobs for the current episode
   const episodeMobs = useMemo(() => {
@@ -121,6 +191,9 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
         ),
       };
     });
+
+    // Broadcast drag state to other players
+    broadcastDragState(index, x, y);
   };
 
   const handleMouseUp = () => {
