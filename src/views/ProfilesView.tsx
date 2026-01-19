@@ -40,7 +40,9 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
 
   const handleSave = () => {
     if (selected && editData) {
-      onUpdateCrawler(selected.id, editData);
+      // Remove id from editData since it's already passed as first parameter
+      const { id, ...updates } = editData;
+      onUpdateCrawler(selected.id, updates);
       setEditMode(false);
     }
   };
