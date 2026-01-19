@@ -2,7 +2,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
-import { Crawler, InventoryItem } from "@/lib/gameData";
+import { Crawler, InventoryItem, EquipmentSlot as SlotType } from "@/lib/gameData";
 import { Coins, Package, Sword, Shield, Plus, Trash2, Edit2, Save } from "lucide-react";
 
 interface InventoryViewProps {
@@ -21,36 +21,29 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   onUpdateCrawler,
 }) => {
   const [editMode, setEditMode] = useState(false);
-  const [newItem, setNewItem] = useState<{ crawlerId: string; name: string; description: string }>({
+  const [newItem, setNewItem] = useState<{ crawlerId: string; name: string; description: string; equipSlot?: SlotType }>({
     crawlerId: "",
     name: "",
     description: "",
+    equipSlot: undefined,
   });
 
   const handleAddItem = (crawlerId: string) => {
     if (!newItem.name.trim()) return;
     const items = getCrawlerInventory(crawlerId);
     const item: InventoryItem = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       name: newItem.name,
       description: newItem.description,
-      equipped: false,
+      equipSlot: newItem.equipSlot,
     };
     onUpdateInventory(crawlerId, [...items, item]);
-    setNewItem({ crawlerId: "", name: "", description: "" });
+    setNewItem({ crawlerId: "", name: "", description: "", equipSlot: undefined });
   };
 
   const handleRemoveItem = (crawlerId: string, itemId: string) => {
     const items = getCrawlerInventory(crawlerId);
     onUpdateInventory(crawlerId, items.filter((i) => i.id !== itemId));
-  };
-
-  const handleToggleEquip = (crawlerId: string, itemId: string) => {
-    const items = getCrawlerInventory(crawlerId);
-    onUpdateInventory(
-      crawlerId,
-      items.map((i) => (i.id === itemId ? { ...i, equipped: !i.equipped } : i))
-    );
   };
 
   const handleGoldChange = (crawlerId: string, delta: number) => {
@@ -151,35 +144,29 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                         className="flex items-center gap-3 text-sm py-2 border-b border-border/50 last:border-0"
                       >
                         <Sword className="w-4 h-4 text-primary/60" />
-                        <span className="text-foreground">{item.name}</span>
-                        {item.description && (
-                          <span className="text-muted-foreground text-xs">({item.description})</span>
-                        )}
-                        {editMode ? (
-                          <div className="ml-auto flex items-center gap-2">
-                            <button
-                              onClick={() => handleToggleEquip(crawler.id, item.id)}
-                              className={`text-xs px-2 py-0.5 ${
-                                item.equipped
-                                  ? "bg-primary/20 text-primary"
-                                  : "bg-muted text-muted-foreground"
-                              }`}
-                            >
-                              {item.equipped ? "EQUIPPED" : "EQUIP"}
-                            </button>
-                            <button
-                              onClick={() => handleRemoveItem(crawler.id, item.id)}
-                              className="text-destructive hover:text-destructive/80"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                        <div className="flex flex-col flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-foreground">{item.name}</span>
+                            {item.equipSlot && (
+                              <span className="text-xs bg-accent/20 text-accent px-2 py-0.5 rounded">
+                                {item.equipSlot === 'leftHand' ? 'Left Hand' :
+                                 item.equipSlot === 'rightHand' ? 'Right Hand' :
+                                 item.equipSlot === 'ringFinger' ? 'Ring' :
+                                 item.equipSlot.charAt(0).toUpperCase() + item.equipSlot.slice(1)}
+                              </span>
+                            )}
                           </div>
-                        ) : (
-                          item.equipped && (
-                            <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 ml-auto">
-                              EQUIPPED
-                            </span>
-                          )
+                          {item.description && (
+                            <span className="text-muted-foreground text-xs">({item.description})</span>
+                          )}
+                        </div>
+                        {editMode && (
+                          <button
+                            onClick={() => handleRemoveItem(crawler.id, item.id)}
+                            className="text-destructive hover:text-destructive/80"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         )}
                       </li>
                     ))}
@@ -188,32 +175,52 @@ const InventoryView: React.FC<InventoryViewProps> = ({
 
                 {/* Add new item form */}
                 {editMode && (
-                  <div className="flex gap-2 mt-3 pt-3 border-t border-border/50">
-                    <input
-                      type="text"
-                      placeholder="Item name"
-                      value={newItem.crawlerId === crawler.id ? newItem.name : ""}
-                      onChange={(e) =>
-                        setNewItem({ crawlerId: crawler.id, name: e.target.value, description: newItem.crawlerId === crawler.id ? newItem.description : "" })
-                      }
-                      className="bg-muted border border-border px-2 py-1 text-sm flex-1"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Description"
-                      value={newItem.crawlerId === crawler.id ? newItem.description : ""}
-                      onChange={(e) =>
-                        setNewItem({ ...newItem, crawlerId: crawler.id, description: e.target.value })
-                      }
-                      className="bg-muted border border-border px-2 py-1 text-sm flex-1"
-                    />
-                    <DungeonButton
-                      variant="default"
-                      size="sm"
-                      onClick={() => handleAddItem(crawler.id)}
-                    >
-                      <Plus className="w-4 h-4" />
-                    </DungeonButton>
+                  <div className="space-y-2 mt-3 pt-3 border-t border-border/50">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Item name"
+                        value={newItem.crawlerId === crawler.id ? newItem.name : ""}
+                        onChange={(e) =>
+                          setNewItem({ crawlerId: crawler.id, name: e.target.value, description: newItem.crawlerId === crawler.id ? newItem.description : "", equipSlot: newItem.crawlerId === crawler.id ? newItem.equipSlot : undefined })
+                        }
+                        className="bg-muted border border-border px-2 py-1 text-sm flex-1"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Description"
+                        value={newItem.crawlerId === crawler.id ? newItem.description : ""}
+                        onChange={(e) =>
+                          setNewItem({ ...newItem, crawlerId: crawler.id, description: e.target.value })
+                        }
+                        className="bg-muted border border-border px-2 py-1 text-sm flex-1"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <select
+                        value={newItem.crawlerId === crawler.id ? newItem.equipSlot || "" : ""}
+                        onChange={(e) =>
+                          setNewItem({ ...newItem, crawlerId: crawler.id, equipSlot: e.target.value as SlotType || undefined })
+                        }
+                        className="bg-muted border border-border px-2 py-1 text-sm flex-1"
+                      >
+                        <option value="">No Equipment Slot</option>
+                        <option value="head">Head</option>
+                        <option value="chest">Chest</option>
+                        <option value="legs">Legs</option>
+                        <option value="feet">Feet</option>
+                        <option value="leftHand">Left Hand</option>
+                        <option value="rightHand">Right Hand</option>
+                        <option value="ringFinger">Ring Finger</option>
+                      </select>
+                      <DungeonButton
+                        variant="default"
+                        size="sm"
+                        onClick={() => handleAddItem(crawler.id)}
+                      >
+                        <Plus className="w-4 h-4" />
+                      </DungeonButton>
+                    </div>
                   </div>
                 )}
               </div>

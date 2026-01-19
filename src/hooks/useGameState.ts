@@ -11,6 +11,7 @@ import {
 import { useGame } from "@/contexts/GameContext";
 
 interface InventoryEntry {
+  id?: string;
   crawlerId: string;
   items: InventoryItem[];
 }
@@ -279,9 +280,9 @@ export const useGameState = () => {
 
   const deleteCrawler = (id: string) => {
     deleteItem('crawlers', id);
-    const invToDelete = inventory.find((i) => i.crawlerId === id);
-    if (invToDelete) {
-      deleteItem('inventory', id);
+    const invToDelete = inventory.find((i) => i.crawlerId === id) as InventoryEntry | undefined;
+    if (invToDelete && invToDelete.id) {
+      deleteItem('inventory', invToDelete.id);
     }
   };
 
@@ -290,12 +291,12 @@ export const useGameState = () => {
   };
 
   const updateCrawlerInventory = (crawlerId: string, items: InventoryItem[]) => {
-    const existing = inventory.find((i) => i.crawlerId === crawlerId);
+    const existing = inventory.find((i) => i.crawlerId === crawlerId) as InventoryEntry | undefined;
     const cleaned = stripUndefinedDeep(items) as InventoryItem[];
 
-    if (existing) {
-      // Update existing inventory in Firebase
-      updateItem('inventory', crawlerId, { crawlerId, items: cleaned });
+    if (existing && existing.id) {
+      // Update existing inventory in Firebase using the document ID
+      updateItem('inventory', existing.id, { crawlerId, items: cleaned });
     } else {
       // Add new inventory entry to Firebase
       addItem('inventory', { crawlerId, items: cleaned });

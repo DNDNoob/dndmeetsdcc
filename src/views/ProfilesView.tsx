@@ -576,12 +576,12 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
 
           {/* Inventory section */}
           <div>
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-4 gap-2">
               <h3 className="font-display text-primary text-lg flex items-center gap-2">
                 <Sword className="w-5 h-5" /> INVENTORY
               </h3>
-              <DungeonButton variant="default" size="sm" onClick={handleAddItem}>
-                <Plus className="w-4 h-4 mr-1" /> Add Item
+              <DungeonButton variant="default" size="sm" onClick={handleAddItem} className="shrink-0">
+                <Plus className="w-4 h-4" />
               </DungeonButton>
             </div>
 
