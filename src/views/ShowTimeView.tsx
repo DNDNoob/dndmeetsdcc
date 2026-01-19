@@ -435,24 +435,27 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     >
       {/* Map display */}
       <div
-        className="flex-1 flex items-center justify-center p-4 relative select-none"
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
+        className="flex-1 flex items-center justify-center p-4 select-none"
       >
-        <img
-          ref={mapImageRef}
-          src={selectedMap}
-          alt="Current Map"
-          className="max-w-full max-h-[90vh] object-contain pointer-events-none"
-          draggable={false}
-        />
+        <div
+          className="relative"
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+        >
+          <img
+            ref={mapImageRef}
+            src={selectedMap}
+            alt="Current Map"
+            className="max-w-full max-h-[90vh] object-contain pointer-events-none"
+            draggable={false}
+          />
 
-        {/* Grid overlay */}
-        {isAdmin && <GridOverlay isVisible={showGrid} cellSize={gridSize} opacity={0.3} />}
+          {/* Grid overlay */}
+          {isAdmin && <GridOverlay isVisible={showGrid} cellSize={gridSize} opacity={0.3} />}
 
-        {/* Displayed mobs on the map */}
-        {selectedEpisode?.mobPlacements.map((placement, index) => {
+          {/* Displayed mobs on the map */}
+          {selectedEpisode?.mobPlacements.map((placement, index) => {
           const mob = mobs.find(m => m.id === placement.mobId);
           if (!mob) return null;
 
@@ -571,6 +574,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             </div>
           </div>
         )}
+        </div>
 
         {/* Display mobs in bottom-right corner */}
         {displayedMobIds.map(mobId => {
