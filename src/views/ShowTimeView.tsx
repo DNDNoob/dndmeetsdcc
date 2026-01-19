@@ -464,20 +464,30 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
           console.log(`[ShowTime] Rendering mob ${index}:`, { x: placement.x, y: placement.y, mobId: placement.mobId });
 
+          const isDragging = draggingMobId === `${placement.mobId}-${index}`;
+
           return (
             <motion.div
               key={`${placement.mobId}-${index}`}
               style={{
                 position: "absolute",
                 transform: "translate(-50%, -50%)",
+                // When dragging, position updates instantly; when not dragging, use animated values
+                ...(isDragging ? {
+                  left: `${placement.x}%`,
+                  top: `${placement.y}%`,
+                } : {}),
               }}
               onMouseDown={() => isAdmin && handleMobMouseDown(`${placement.mobId}-${index}`)}
               initial={{ scale: 0, opacity: 0 }}
               animate={{
                 scale: 1,
                 opacity: 1,
-                left: `${placement.x}%`,
-                top: `${placement.y}%`
+                // Only animate position when NOT dragging
+                ...(!isDragging ? {
+                  left: `${placement.x}%`,
+                  top: `${placement.y}%`
+                } : {}),
               }}
               transition={{
                 scale: { type: "spring", stiffness: 260, damping: 20 },
@@ -490,7 +500,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                 <MobIcon
                   mob={mob}
                   size={64}
-                  isDragging={draggingMobId === `${placement.mobId}-${index}`}
+                  isDragging={isDragging}
                 />
                 {letter && (
                   <div className="absolute -top-1 -right-1 w-6 h-6 bg-accent text-background rounded-full flex items-center justify-center text-sm font-bold shadow-lg">
