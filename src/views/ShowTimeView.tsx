@@ -8,7 +8,7 @@ import { MobIcon } from "@/components/ui/MobIcon";
 import { Episode, Mob } from "@/lib/gameData";
 import { Map, X, Eye, Layers, ChevronLeft, ChevronRight, PlayCircle, Grid3x3 } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, query, where, onSnapshot, serverTimestamp, Timestamp, deleteDoc, getDocs } from "firebase/firestore";
+import { collection, doc, setDoc, onSnapshot, serverTimestamp, Timestamp } from "firebase/firestore";
 import { useFirebaseStore } from "@/hooks/useFirebaseStore";
 
 interface ShowTimeViewProps {
@@ -63,43 +63,44 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   useEffect(() => {
     if (!selectedEpisode) return;
 
-    const dragCollectionName = roomId ? `rooms/${roomId}/mob-drag-state` : 'mob-drag-state';
-    const q = query(
-      collection(db, dragCollectionName),
-      where('episodeId', '==', selectedEpisode.id),
-      where('createdAt', '>', mountTime.current)
-    );
+    // Use a single document per episode for drag state
+    const dragDocPath = roomId
+      ? `rooms/${roomId}/mob-drag-state/${selectedEpisode.id}`
+      : `mob-drag-state/${selectedEpisode.id}`;
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      snapshot.docChanges().forEach((change) => {
-        if (change.type === "added") {
-          const dragData = change.doc.data();
-          console.log('[ShowTime] Received drag update:', dragData);
+    const dragDocRef = doc(db, dragDocPath);
 
-          // Only apply if we're not the one dragging
-          if (!isAdmin || !draggingMobId) {
-            setRemoteDragState({
-              placementIndex: dragData.placementIndex,
-              x: dragData.x,
-              y: dragData.y
-            });
+    const unsubscribe = onSnapshot(dragDocRef, (snapshot) => {
+      if (!snapshot.exists()) return;
 
-            // Update local episode state with remote drag position
-            setSelectedEpisode(prev => {
-              if (!prev) return prev;
-              return {
-                ...prev,
-                mobPlacements: prev.mobPlacements.map((p, i) =>
-                  i === dragData.placementIndex ? { ...p, x: dragData.x, y: dragData.y } : p
-                ),
-              };
-            });
-          }
+      const dragData = snapshot.data();
+      console.log('[ShowTime] Received drag update:', dragData);
 
-          // Clean up old drag state documents
-          deleteDoc(change.doc.ref).catch(console.error);
+      // Only apply if we're not the one dragging and data is recent
+      if ((!isAdmin || !draggingMobId) && dragData.updatedAt) {
+        const updateTime = dragData.updatedAt.toMillis ? dragData.updatedAt.toMillis() : 0;
+        const mountTimeMs = mountTime.current.toMillis();
+
+        // Only apply updates that happened after component mounted
+        if (updateTime > mountTimeMs) {
+          setRemoteDragState({
+            placementIndex: dragData.placementIndex,
+            x: dragData.x,
+            y: dragData.y
+          });
+
+          // Update local episode state with remote drag position
+          setSelectedEpisode(prev => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              mobPlacements: prev.mobPlacements.map((p, i) =>
+                i === dragData.placementIndex ? { ...p, x: dragData.x, y: dragData.y } : p
+              ),
+            };
+          });
         }
-      });
+      }
     });
 
     return () => unsubscribe();
@@ -109,14 +110,18 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   const broadcastDragState = async (placementIndex: number, x: number, y: number) => {
     if (!selectedEpisode || !isAdmin) return;
 
-    const dragCollectionName = roomId ? `rooms/${roomId}/mob-drag-state` : 'mob-drag-state';
+    // Use a single document per episode for drag state
+    const dragDocPath = roomId
+      ? `rooms/${roomId}/mob-drag-state/${selectedEpisode.id}`
+      : `mob-drag-state/${selectedEpisode.id}`;
+
     try {
-      await addDoc(collection(db, dragCollectionName), {
+      await setDoc(doc(db, dragDocPath), {
         episodeId: selectedEpisode.id,
         placementIndex,
         x,
         y,
-        createdAt: serverTimestamp()
+        updatedAt: serverTimestamp()
       });
     } catch (error) {
       console.error('[ShowTime] Failed to broadcast drag state:', error);
