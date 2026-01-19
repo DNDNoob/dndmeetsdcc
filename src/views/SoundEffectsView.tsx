@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
-import { Volume2, Search, Play, Star, Upload } from "lucide-react";
+import { Volume2, Search, Play, Star, Upload, Square } from "lucide-react";
 import { useFirebaseStore } from "@/hooks/useFirebaseStore";
 import { storage, db } from "@/lib/firebase";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -62,6 +62,7 @@ const SoundEffectsView: React.FC = () => {
     try { return JSON.parse(localStorage.getItem(RECENT_KEY) || "[]"); } catch { return []; }
   });
   const mountTime = useRef(Timestamp.now());
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Get favorites and uploaded from Firebase
   const allSoundEffects = getCollection<SoundEffect>('soundEffects');
@@ -192,10 +193,20 @@ const SoundEffectsView: React.FC = () => {
   }, []);
 
   const playSoundLocal = (sound: SoundEffect, broadcast = true) => {
+    // Stop any currently playing sound
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+
     setPlayingId(sound.id);
     const audio = new Audio(sound.url);
+    audioRef.current = audio;
     audio.play().catch((e) => console.warn("Failed to play", e));
-    audio.onended = () => setPlayingId(null);
+    audio.onended = () => {
+      setPlayingId(null);
+      audioRef.current = null;
+    };
 
     // update recent
     setRecent((prev) => {
@@ -205,6 +216,14 @@ const SoundEffectsView: React.FC = () => {
 
     if (broadcast) {
       broadcastSound(sound);
+    }
+  };
+
+  const stopSound = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+      setPlayingId(null);
     }
   };
 
@@ -282,13 +301,16 @@ const SoundEffectsView: React.FC = () => {
         <h1 className="text-2xl font-bold">Sound Effects Library</h1>
       </div>
       <div className="mb-4">
-        <input
-          type="text"
-          placeholder="Search sounds..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full p-2 border rounded"
-        />
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Search sounds..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full p-3 pl-10 pr-4 border-2 border-primary/20 rounded-lg bg-card text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 text-base"
+          />
+        </div>
       </div>
       <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="md:col-span-2">
@@ -305,10 +327,17 @@ const SoundEffectsView: React.FC = () => {
                   ))}
                 </div>
                 <div className="flex gap-2">
-                  <DungeonButton variant={playingId === sound.id ? "admin" : "default"} size="sm" className="flex-1" onClick={() => handlePlayClick(sound)} disabled={playingId === sound.id}>
-                    <Play className="w-4 h-4 mr-2" />
-                    {playingId === sound.id ? "Playing..." : "Play"}
-                  </DungeonButton>
+                  {playingId === sound.id ? (
+                    <DungeonButton variant="admin" size="sm" className="flex-1" onClick={stopSound}>
+                      <Square className="w-4 h-4 mr-2" />
+                      Stop
+                    </DungeonButton>
+                  ) : (
+                    <DungeonButton variant="default" size="sm" className="flex-1" onClick={() => handlePlayClick(sound)}>
+                      <Play className="w-4 h-4 mr-2" />
+                      Play
+                    </DungeonButton>
+                  )}
                   <DungeonButton variant={favorites.find(f => f.url === sound.url) ? "default" : "nav"} size="sm" onClick={() => toggleFavorite(sound)}>
                     <Star className="w-4 h-4" />
                   </DungeonButton>
@@ -338,9 +367,15 @@ const SoundEffectsView: React.FC = () => {
                     <span className="font-display text-primary">{cleanSoundName(r.name)}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <DungeonButton size="sm" variant="default" onClick={() => handlePlayClick(r)}>
-                      <Play className="w-4 h-4" />
-                    </DungeonButton>
+                    {playingId === r.id ? (
+                      <DungeonButton size="sm" variant="admin" onClick={stopSound}>
+                        <Square className="w-4 h-4" />
+                      </DungeonButton>
+                    ) : (
+                      <DungeonButton size="sm" variant="default" onClick={() => handlePlayClick(r)}>
+                        <Play className="w-4 h-4" />
+                      </DungeonButton>
+                    )}
                     <DungeonButton size="sm" variant={favorites.find(f => f.url === r.url) ? "default" : "nav"} onClick={() => toggleFavorite(r)}>
                       <Star className="w-4 h-4" />
                     </DungeonButton>
@@ -359,9 +394,15 @@ const SoundEffectsView: React.FC = () => {
                     <span className="font-display text-primary">{cleanSoundName(f.name)}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <DungeonButton size="sm" variant="default" onClick={() => handlePlayClick(f)}>
-                      <Play className="w-4 h-4" />
-                    </DungeonButton>
+                    {playingId === f.id ? (
+                      <DungeonButton size="sm" variant="admin" onClick={stopSound}>
+                        <Square className="w-4 h-4" />
+                      </DungeonButton>
+                    ) : (
+                      <DungeonButton size="sm" variant="default" onClick={() => handlePlayClick(f)}>
+                        <Play className="w-4 h-4" />
+                      </DungeonButton>
+                    )}
                     <DungeonButton size="sm" variant="danger" onClick={() => toggleFavorite(f)}>
                       Remove
                     </DungeonButton>
