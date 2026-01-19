@@ -214,8 +214,12 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     if (!draggingMobId || !isAdmin || !mapImageRef.current || !selectedEpisode) return;
 
     const rect = mapImageRef.current.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    const rawX = ((e.clientX - rect.left) / rect.width) * 100;
+    const rawY = ((e.clientY - rect.top) / rect.height) * 100;
+
+    // Clamp coordinates to keep mob icons within the map boundaries (0-100%)
+    const x = Math.max(0, Math.min(100, rawX));
+    const y = Math.max(0, Math.min(100, rawY));
 
     // Extract index from placement key (format: "mobId-index")
     const index = parseInt(draggingMobId.split('-').pop() || '0', 10);
