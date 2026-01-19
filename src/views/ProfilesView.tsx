@@ -556,7 +556,6 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             )}
           </div>
         </div>
-            </div>
           </div>
         </div>
       </DungeonCard>
