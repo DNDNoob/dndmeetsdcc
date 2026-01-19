@@ -434,8 +434,8 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       className="min-h-screen bg-background relative flex flex-col"
     >
       {/* Map display */}
-      <div 
-        className="flex-1 flex items-center justify-center p-4 relative"
+      <div
+        className="flex-1 flex items-center justify-center p-4 relative select-none"
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
@@ -444,7 +444,8 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
           ref={mapImageRef}
           src={selectedMap}
           alt="Current Map"
-          className="max-w-full max-h-[90vh] object-contain"
+          className="max-w-full max-h-[90vh] object-contain pointer-events-none"
+          draggable={false}
         />
 
         {/* Grid overlay */}
