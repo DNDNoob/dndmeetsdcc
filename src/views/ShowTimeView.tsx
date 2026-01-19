@@ -453,6 +453,8 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             .filter(p => p.mobId === placement.mobId).length;
           const letter = sameIdBefore > 0 ? String.fromCharCode(65 + sameIdBefore) : '';
 
+          console.log(`[ShowTime] Rendering mob ${index}:`, { x: placement.x, y: placement.y, mobId: placement.mobId });
+
           return (
             <motion.div
               key={`${placement.mobId}-${index}`}
@@ -461,7 +463,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                 transform: "translate(-50%, -50%)",
               }}
               onMouseDown={() => isAdmin && handleMobMouseDown(`${placement.mobId}-${index}`)}
-              initial={{ scale: 0, opacity: 0, left: `${placement.x}%`, top: `${placement.y}%` }}
+              initial={{ scale: 0, opacity: 0 }}
               animate={{
                 scale: 1,
                 opacity: 1,
@@ -469,11 +471,10 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                 top: `${placement.y}%`
               }}
               transition={{
-                type: "spring",
-                stiffness: 260,
-                damping: 20,
-                left: { type: "tween", duration: 0.1 },
-                top: { type: "tween", duration: 0.1 }
+                scale: { type: "spring", stiffness: 260, damping: 20 },
+                opacity: { type: "spring", stiffness: 260, damping: 20 },
+                left: { type: "tween", duration: 0.15, ease: "linear" },
+                top: { type: "tween", duration: 0.15, ease: "linear" }
               }}
             >
               <div className="relative">
