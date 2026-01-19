@@ -3,12 +3,16 @@ import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import { Volume2, Search, Play, Star, Upload } from "lucide-react";
+import { useFirebaseStore } from "@/hooks/useFirebaseStore";
+import { storage } from "@/lib/firebase";
+import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 
-interface SoundEffect {
+interface SoundEffect extends Record<string, unknown> {
   id: string;
   name: string;
   url: string;
   tags: string[];
+  isFavorite?: boolean;
   source?: string;
 }
 
@@ -26,18 +30,54 @@ const FREESOUND_KEY = (import.meta.env.VITE_FREESOUND_API_KEY as string) || "";
 const RECENT_KEY = "sfx_recent";
 const FAV_KEY = "sfx_favs";
 
+function cleanSoundName(name: string): string {
+  // Remove common prefixes like numbers, underscores, hyphens at the start
+  let cleaned = name.replace(/^[\d_\-\s]+/, '');
+  
+  // Remove file extensions
+  cleaned = cleaned.replace(/\.(wav|mp3|ogg|flac)$/i, '');
+  
+  // Replace underscores and hyphens with spaces
+  cleaned = cleaned.replace(/[_\-]/g, ' ');
+  
+  // Capitalize first letter of each word
+  cleaned = cleaned.replace(/\b\w/g, (char) => char.toUpperCase());
+  
+  // Trim any extra whitespace
+  cleaned = cleaned.trim();
+  
+  return cleaned || name; // Fallback to original if cleaning results in empty string
+}
+
 const SoundEffectsView: React.FC = () => {
+  const { getCollection, addItem, deleteItem, isLoaded } = useFirebaseStore();
   const [searchQuery, setSearchQuery] = useState("");
   const [results, setResults] = useState<SoundEffect[]>(LOCAL_SOUNDS);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [recent, setRecent] = useState<SoundEffect[]>(() => {
     try { return JSON.parse(localStorage.getItem(RECENT_KEY) || "[]"); } catch { return []; }
   });
-  const [favorites, setFavorites] = useState<SoundEffect[]>(() => {
-    try { return JSON.parse(localStorage.getItem(FAV_KEY) || "[]"); } catch { return []; }
-  });
-  const [uploaded, setUploaded] = useState<SoundEffect[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
+
+  // Get favorites and uploaded from Firebase
+  const allSoundEffects = getCollection<SoundEffect>('soundEffects');
+  const favorites = allSoundEffects.filter(s => s.isFavorite);
+  const uploaded = allSoundEffects.filter(s => s.source === 'uploaded');
+
+  // Debug logging
+  useEffect(() => {
+    console.log('Sound effects from Firebase:', allSoundEffects.length);
+    console.log('Uploaded sounds:', uploaded);
+    console.log('Favorites:', favorites.length);
+  }, [allSoundEffects.length, uploaded.length, favorites.length]);
+
+  // Ensure uploaded sounds are included when they change
+  useEffect(() => {
+    if (uploaded.length > 0 && !searchQuery.trim()) {
+      // If search is empty and we have uploaded sounds, show them with recent or local
+      setResults([...uploaded, ...(recent.length > 0 ? recent : LOCAL_SOUNDS)]);
+    }
+  }, [uploaded.length]);
 
   useEffect(() => {
     // Connect to sound broadcast websocket if available (use /ws on same origin when not configured)
@@ -69,14 +109,17 @@ const SoundEffectsView: React.FC = () => {
   }, [recent]);
 
   useEffect(() => {
-    localStorage.setItem(FAV_KEY, JSON.stringify(favorites));
-  }, [favorites]);
-
-  useEffect(() => {
     let active = true;
     let timer: any = null;
     const doSearch = async () => {
       const q = searchQuery.trim();
+      
+      // Show recent sounds when search is empty
+      if (!q) {
+        if (active) setResults(recent.length > 0 ? recent : [...uploaded, ...LOCAL_SOUNDS]);
+        return;
+      }
+      
       const base = (import.meta.env.VITE_SOUND_API_BASE as string) || (import.meta.env.VITE_SOUND_SERVER_BASE as string) || '';
       const url = `${base}/api/sounds/search?q=${encodeURIComponent(q)}&page=1&page_size=60`;
 
@@ -109,7 +152,7 @@ const SoundEffectsView: React.FC = () => {
     clearTimeout(timer);
     timer = setTimeout(() => doSearch(), 250);
     return () => { active = false; clearTimeout(timer); };
-  }, [searchQuery, uploaded]);
+  }, [searchQuery, uploaded, recent]);
 
   // Auto-load on mount (populate results when tab opened)
   useEffect(() => {
@@ -146,12 +189,16 @@ const SoundEffectsView: React.FC = () => {
     }
   };
 
-  const toggleFavorite = (sound: SoundEffect) => {
-    setFavorites((prev) => {
-      const exists = prev.find((p) => p.url === sound.url);
-      if (exists) return prev.filter((p) => p.url !== sound.url);
-      return [sound, ...prev];
-    });
+  const toggleFavorite = async (sound: SoundEffect) => {
+    const exists = favorites.find((f) => f.url === sound.url);
+    if (exists) {
+      // Remove from favorites
+      await deleteItem('soundEffects', exists.id);
+    } else {
+      // Add to favorites
+      const newFavorite = { ...sound, isFavorite: true, id: sound.id || crypto.randomUUID() };
+      await addItem('soundEffects', newFavorite);
+    }
   };
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -161,142 +208,134 @@ const SoundEffectsView: React.FC = () => {
     const f = file || (fileInputRef.current && fileInputRef.current.files && fileInputRef.current.files[0]);
     if (!f) return;
     setUploading(true);
-    const form = new FormData();
-    form.append("file", f);
-    form.append("name", f.name);
     try {
-      const base = (import.meta.env.VITE_SOUND_SERVER_BASE as string) || "";
-      const res = await fetch(`${base}/upload`, { method: "POST", body: form });
-      const json = await res.json();
-      if (json.url) {
-        const s: SoundEffect = { id: json.id, name: json.name || f.name, url: json.url, tags: [], source: 'uploaded' };
-        setUploaded((prev) => [s, ...prev]);
-        setResults((prev) => [s, ...prev]);
-      }
+      // Upload to Firebase Storage
+      const fileRef = storageRef(storage, `sound-effects/${Date.now()}-${f.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`);
+      await uploadBytes(fileRef, f);
+      const url = await getDownloadURL(fileRef);
+      const s: SoundEffect = {
+        id: crypto.randomUUID(),
+        name: f.name,
+        url,
+        tags: [],
+        source: 'uploaded',
+        isFavorite: true
+      };
+      await addItem('soundEffects', s);
     } catch (e) {
       console.error("Upload failed", e);
     }
     setUploading(false);
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
+  // Deduplicate only for sound card rendering
+  const soundCardResults = Array.from(
+    new Map(results.map(item => [item.id, item])).values()
+  );
+
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="max-w-5xl mx-auto p-4 md:p-6"
-    >
-      <DungeonCard>
-        <h2 className="font-display text-2xl text-primary text-glow-cyan mb-6 flex items-center gap-3">
-          <Volume2 className="w-6 h-6" />
-          SOUND EFFECTS
-        </h2>
-
-        <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="md:col-span-2">
-            <div className="mb-4 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="Search sounds (supports Freesound if API key set)..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-muted border border-border pl-10 pr-4 py-3"
-              />
-            </div>
-
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-              {results.map((sound) => (
-                <div key={sound.id} className="border border-border bg-muted/20 p-4 hover:bg-primary/5 transition-colors">
-                  <div className="flex items-start justify-between mb-2">
-                    <h3 className="font-display text-foreground">{sound.name}</h3>
-                    <div className="text-xs text-muted-foreground">{sound.source}</div>
+    <div className="p-4">
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-2xl font-bold">Sound Effects Library</h1>
+      </div>
+      <div className="mb-4">
+        <input
+          type="text"
+          placeholder="Search sounds..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full p-2 border rounded"
+        />
+      </div>
+      <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="md:col-span-2">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+            {soundCardResults.map((sound) => (
+              <div key={sound.id} className="border border-border bg-muted/20 p-4 hover:bg-primary/5 transition-colors">
+                <div className="flex items-start justify-between mb-2">
+                  <h3 className="font-display text-foreground">{cleanSoundName(sound.name)}</h3>
+                  <div className="text-xs text-muted-foreground">{sound.source}</div>
+                </div>
+                <div className="flex flex-wrap gap-1 mb-3">
+                  {sound.tags.map((tag, index) => (
+                    <span key={index} className="text-xs bg-primary/10 text-primary px-2 py-0.5">{tag}</span>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <DungeonButton variant={playingId === sound.id ? "admin" : "default"} size="sm" className="flex-1" onClick={() => handlePlayClick(sound)} disabled={playingId === sound.id}>
+                    <Play className="w-4 h-4 mr-2" />
+                    {playingId === sound.id ? "Playing..." : "Play"}
+                  </DungeonButton>
+                  <DungeonButton variant={favorites.find(f => f.url === sound.url) ? "default" : "nav"} size="sm" onClick={() => toggleFavorite(sound)}>
+                    <Star className="w-4 h-4" />
+                  </DungeonButton>
+                </div>
+              </div>
+            ))}
+            {soundCardResults.length === 0 && (
+              <div className="col-span-full text-center py-12 text-muted-foreground">No results</div>
+            )}
+          </div>
+          {/* Upload button */}
+          <div className="flex items-center gap-3">
+            <input ref={fileInputRef} type="file" accept="audio/*" className="hidden" onChange={(e) => handleUpload(e.target.files?.[0] || undefined)} />
+            <DungeonButton variant="menu" className="flex items-center gap-2" onClick={() => fileInputRef.current?.click()}>
+              <Upload className="w-4 h-4" /> Upload Sound
+            </DungeonButton>
+            <span className="text-xs text-muted-foreground">Upload will store files on Firebase Storage.</span>
+          </div>
+        </div>
+        <div>
+          <div className="mb-4">
+            <h3 className="font-display text-sm text-primary mb-2">Recently Used</h3>
+            <div className="space-y-2 bg-muted/10 p-2 max-h-56 overflow-y-auto">
+              {recent.map((r) => (
+                <div key={r.url} className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="font-display text-primary">{cleanSoundName(r.name)}</span>
                   </div>
-
-                  <div className="flex flex-wrap gap-1 mb-3">
-                    {sound.tags.map((tag, index) => (
-                      <span key={index} className="text-xs bg-primary/10 text-primary px-2 py-0.5">{tag}</span>
-                    ))}
-                  </div>
-
-                  <div className="flex gap-2">
-                    <DungeonButton variant={playingId === sound.id ? "admin" : "default"} size="sm" className="flex-1" onClick={() => handlePlayClick(sound)} disabled={playingId === sound.id}>
-                      <Play className="w-4 h-4 mr-2" />
-                      {playingId === sound.id ? "Playing..." : "Play"}
+                  <div className="flex items-center gap-2">
+                    <DungeonButton size="sm" variant="default" onClick={() => handlePlayClick(r)}>
+                      <Play className="w-4 h-4" />
                     </DungeonButton>
-                    <DungeonButton variant={favorites.find(f => f.url === sound.url) ? "default" : "nav"} size="sm" onClick={() => toggleFavorite(sound)}>
+                    <DungeonButton size="sm" variant={favorites.find(f => f.url === r.url) ? "default" : "nav"} onClick={() => toggleFavorite(r)}>
                       <Star className="w-4 h-4" />
                     </DungeonButton>
                   </div>
                 </div>
               ))}
-
-              {results.length === 0 && (
-                <div className="col-span-full text-center py-12 text-muted-foreground">No results</div>
-              )}
-            </div>
-
-            <div className="flex items-center gap-3">
-              <input ref={fileInputRef} type="file" accept="audio/*" className="hidden" onChange={(e) => handleUpload(e.target.files?.[0] || undefined)} />
-              <DungeonButton variant="menu" className="flex items-center gap-2" onClick={() => fileInputRef.current?.click()}>
-                <Upload className="w-4 h-4" /> Upload Sound
-              </DungeonButton>
-              <span className="text-xs text-muted-foreground">Upload will store files on the local sound server (if running).</span>
+              {recent.length === 0 && <div className="text-xs text-muted-foreground">No recent sounds</div>}
             </div>
           </div>
-
           <div>
-            <div className="mb-4">
-              <h3 className="font-display text-sm text-primary mb-2">Recently Used</h3>
-              <div className="space-y-2 bg-muted/10 p-2 max-h-56 overflow-y-auto">
-                {recent.map((r) => (
-                  <div key={r.url} className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2">
-                      <span className="font-display text-primary">{r.name}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <DungeonButton size="sm" variant="default" onClick={() => handlePlayClick(r)}>
-                        <Play className="w-4 h-4" />
-                      </DungeonButton>
-                      <DungeonButton size="sm" variant={favorites.find(f => f.url === r.url) ? "default" : "nav"} onClick={() => toggleFavorite(r)}>
-                        <Star className="w-4 h-4" />
-                      </DungeonButton>
-                    </div>
+            <h3 className="font-display text-sm text-primary mb-2">Favorites</h3>
+            <div className="space-y-2 bg-muted/10 p-2 max-h-56 overflow-y-auto">
+              {favorites.map((f) => (
+                <div key={f.url} className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="font-display text-primary">{cleanSoundName(f.name)}</span>
                   </div>
-                ))}
-                {recent.length === 0 && <div className="text-xs text-muted-foreground">No recent sounds</div>}
-              </div>
-            </div>
-
-            <div>
-              <h3 className="font-display text-sm text-primary mb-2">Favorites</h3>
-              <div className="space-y-2 bg-muted/10 p-2 max-h-56 overflow-y-auto">
-                {favorites.map((f) => (
-                  <div key={f.url} className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2">
-                      <span className="font-display text-primary">{f.name}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <DungeonButton size="sm" variant="default" onClick={() => handlePlayClick(f)}>
-                        <Play className="w-4 h-4" />
-                      </DungeonButton>
-                      <DungeonButton size="sm" variant="danger" onClick={() => toggleFavorite(f)}>
-                        Remove
-                      </DungeonButton>
-                    </div>
+                  <div className="flex items-center gap-2">
+                    <DungeonButton size="sm" variant="default" onClick={() => handlePlayClick(f)}>
+                      <Play className="w-4 h-4" />
+                    </DungeonButton>
+                    <DungeonButton size="sm" variant="danger" onClick={() => toggleFavorite(f)}>
+                      Remove
+                    </DungeonButton>
                   </div>
-                ))}
-                {favorites.length === 0 && <div className="text-xs text-muted-foreground">No favorites</div>}
-              </div>
+                </div>
+              ))}
+              {favorites.length === 0 && <div className="text-xs text-muted-foreground">No favorites</div>}
             </div>
           </div>
         </div>
-
-        <div className="mt-6 pt-6 border-t border-border text-xs text-muted-foreground text-center">
-          Results provided by the server proxy (Freesound if configured). To enable large-scale search, set `FREESOUND_API_KEY` on the sound server and configure `VITE_SOUND_SERVER_BASE` for the frontend.
-        </div>
-      </DungeonCard>
-    </motion.div>
+      </div>
+    </div>
   );
-};
+}
 
 export default SoundEffectsView;

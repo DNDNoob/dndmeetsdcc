@@ -10,6 +10,7 @@ export type CollectionName =
   | 'maps'
   | 'inventory'
   | 'episodes'
+  | 'soundEffects'
   // Add new collections below:
   | 'quests'
   | 'npcs'

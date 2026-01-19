@@ -45,7 +45,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
   const [roomId, setRoomId] = useState<string | null>(null);
 
   // Collections to sync
-  const collections: CollectionName[] = ['crawlers', 'mobs', 'maps', 'inventory', 'episodes'];
+  const collections: CollectionName[] = ['crawlers', 'mobs', 'maps', 'inventory', 'episodes', 'soundEffects'];
 
   // Load and subscribe to real-time updates
   useEffect(() => {
