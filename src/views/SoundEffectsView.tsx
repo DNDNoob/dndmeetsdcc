@@ -4,8 +4,9 @@ import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import { Volume2, Search, Play, Star, Upload } from "lucide-react";
 import { useFirebaseStore } from "@/hooks/useFirebaseStore";
-import { storage } from "@/lib/firebase";
+import { storage, db } from "@/lib/firebase";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
+import { collection, query, where, onSnapshot, serverTimestamp, addDoc, Timestamp } from "firebase/firestore";
 
 interface SoundEffect extends Record<string, unknown> {
   id: string;
@@ -24,7 +25,6 @@ const LOCAL_SOUNDS: SoundEffect[] = [
   { id: "5", name: "Coin Drop", url: "https://assets.mixkit.co/active_storage/sfx/1997/1997.wav", tags: ["treasure", "gold", "money"], source: "local" },
 ];
 
-const SOUND_WS_URL = (import.meta.env.VITE_SOUND_WS_URL as string) || "";
 const FREESOUND_KEY = (import.meta.env.VITE_FREESOUND_API_KEY as string) || "";
 
 const RECENT_KEY = "sfx_recent";
@@ -50,14 +50,18 @@ function cleanSoundName(name: string): string {
 }
 
 const SoundEffectsView: React.FC = () => {
-  const { getCollection, addItem, deleteItem, isLoaded } = useFirebaseStore();
+  const { getCollection, addItem, deleteItem, roomId } = useFirebaseStore();
+  // Debug: Log current roomId
+  useEffect(() => {
+    console.log('[SoundEffectsView] Current roomId:', roomId);
+  }, [roomId]);
   const [searchQuery, setSearchQuery] = useState("");
   const [results, setResults] = useState<SoundEffect[]>(LOCAL_SOUNDS);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [recent, setRecent] = useState<SoundEffect[]>(() => {
     try { return JSON.parse(localStorage.getItem(RECENT_KEY) || "[]"); } catch { return []; }
   });
-  const wsRef = useRef<WebSocket | null>(null);
+  const mountTime = useRef(Timestamp.now());
 
   // Get favorites and uploaded from Firebase
   const allSoundEffects = getCollection<SoundEffect>('soundEffects');
@@ -80,29 +84,26 @@ const SoundEffectsView: React.FC = () => {
   }, [uploaded.length]);
 
   useEffect(() => {
-    // Connect to sound broadcast websocket if available (use /ws on same origin when not configured)
-    try {
-      const wsUrl =
-        SOUND_WS_URL ||
-        `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
-      const ws = new WebSocket(wsUrl);
-      ws.onopen = () => console.log("Connected to sound server");
-      ws.onmessage = (msg) => {
-        try {
-          const data = JSON.parse(msg.data);
-          if (data.type === "play") {
-            playSoundLocal({ id: data.id, name: data.name, url: data.url, tags: data.tags || [], source: data.source || "remote" }, false);
-          }
-        } catch (e) {
-          // ignore
+    // Listen for sound broadcasts
+    const broadcastCollectionName = roomId ? `rooms/${roomId}/sound-broadcast` : 'sound-broadcast';
+    const q = query(collection(db, broadcastCollectionName), where('createdAt', '>', mountTime.current));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === "added") {
+          const sound = change.doc.data() as SoundEffect;
+          console.log('[SoundEffectsView] Received sound broadcast:', sound, 'roomId:', roomId);
+          playSoundLocal(sound, false);
         }
-      };
-      wsRef.current = ws;
-      return () => ws.close();
-    } catch (e) {
-      console.warn("No sound server available at", SOUND_WS_URL || "/ws");
-    }
-  }, []);
+      });
+    },
+    (error) => {
+      console.error('[SoundEffectsView] Firestore listener error:', error);
+    });
+
+    return () => unsubscribe();
+  }, [roomId]);
+
 
   useEffect(() => {
     localStorage.setItem(RECENT_KEY, JSON.stringify(recent.slice(0, 10)));
@@ -174,19 +175,27 @@ const SoundEffectsView: React.FC = () => {
       return [sound, ...without].slice(0, 10);
     });
 
-    // broadcast to server so all clients play
-    if (broadcast && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: "play", id: sound.id, name: sound.name, url: sound.url, tags: sound.tags, source: sound.source }));
+    if (broadcast) {
+      broadcastSound(sound);
+    }
+  };
+
+  const broadcastSound = async (sound: SoundEffect) => {
+    const broadcastCollectionName = roomId ? `rooms/${roomId}/sound-broadcast` : 'sound-broadcast';
+    try {
+      console.log('[SoundEffectsView] Broadcasting sound:', sound, 'to collection:', broadcastCollectionName, 'roomId:', roomId);
+      await addDoc(collection(db, broadcastCollectionName), {
+        ...sound,
+        createdAt: serverTimestamp()
+      });
+      console.log('[SoundEffectsView] Broadcast successful');
+    } catch (error) {
+      console.error('[SoundEffectsView] Failed to broadcast sound:', error);
     }
   };
 
   const handlePlayClick = (sound: SoundEffect) => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      // send to server to broadcast
-      wsRef.current.send(JSON.stringify({ type: "play", id: sound.id, name: sound.name, url: sound.url, tags: sound.tags, source: sound.source }));
-    } else {
-      playSoundLocal(sound, false);
-    }
+    playSoundLocal(sound, true);
   };
 
   const toggleFavorite = async (sound: SoundEffect) => {
@@ -239,6 +248,8 @@ const SoundEffectsView: React.FC = () => {
 
   return (
     <div className="p-4">
+      {/* Debug: Show current roomId */}
+      <div className="mb-2 text-xs text-muted-foreground">Current roomId: {roomId ? roomId : '(none)'}</div>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold">Sound Effects Library</h1>
       </div>

@@ -11,6 +11,7 @@ export type CollectionName =
   | 'inventory'
   | 'episodes'
   | 'soundEffects'
+  | 'sound-broadcast'
   // Add new collections below:
   | 'quests'
   | 'npcs'

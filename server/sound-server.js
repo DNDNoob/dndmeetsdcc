@@ -1,7 +1,5 @@
 import express from "express";
 import http from "http";
-import { WebSocketServer } from "ws";
-import multer from "multer";
 import path from "path";
 import fs from "fs";
 import cors from "cors";
@@ -38,31 +36,10 @@ if (FREESOUND_CONFIGURED) {
   console.warn('FREESOUND_API_KEY is not configured — Freesound search will fall back to local samples. Set server/.env or provide the variable in your deployment.');
 }
 
-const UPLOAD_DIR = path.join(process.cwd(), "server", "uploads");
-if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-
-const GAME_DATA_FILE = path.join(process.cwd(), "server", "game-data.json");
-
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '50mb' })); // Increased limit for map images
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
-app.use("/uploads", express.static(UPLOAD_DIR));
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, UPLOAD_DIR),
-  filename: (req, file, cb) => {
-    const name = `${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
-    cb(null, name);
-  },
-});
-const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB limit
-
-app.post("/upload", upload.single("file"), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-  const url = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
-  res.json({ url, name: req.body.name || req.file.originalname, id: Date.now().toString() });
-});
 
 app.get("/health", (req, res) => res.json({ ok: true, freesound: FREESOUND_CONFIGURED }));
 
@@ -81,35 +58,6 @@ const LOCAL_SOUNDS = [
   { id: "mixkit-2462", name: "Footsteps", url: "https://assets.mixkit.co/active_storage/sfx/2462/2462.wav", tags: ["footsteps","movement"], source: "local" },
   { id: "mixkit-1997", name: "Coin Drop", url: "https://assets.mixkit.co/active_storage/sfx/1997/1997.wav", tags: ["coin","treasure"], source: "local" },
 ];
-
-// Game data save endpoint
-app.post('/api/game/save', (req, res) => {
-  try {
-    fs.writeFileSync(GAME_DATA_FILE, JSON.stringify(req.body, null, 2));
-    console.log('Game data saved successfully');
-    res.json({ success: true });
-  } catch (e) {
-    console.error('Failed to save game data:', e);
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// Game data load endpoint
-app.get('/api/game/load', (req, res) => {
-  try {
-    if (fs.existsSync(GAME_DATA_FILE)) {
-      const data = JSON.parse(fs.readFileSync(GAME_DATA_FILE, 'utf8'));
-      console.log('Game data loaded successfully');
-      res.json(data);
-    } else {
-      console.log('No saved game data found');
-      res.json(null);
-    }
-  } catch (e) {
-    console.error('Failed to load game data:', e);
-    res.status(500).json({ error: e.message });
-  }
-});
 
 app.get('/api/sounds/search', async (req, res) => {
   try {
@@ -170,25 +118,6 @@ app.get('/api/sounds/search', async (req, res) => {
 });
 
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
-
-wss.on("connection", (ws) => {
-  ws.on("message", (msg) => {
-    try {
-      const data = JSON.parse(msg.toString());
-      // Broadcast to all clients
-      wss.clients.forEach((client) => {
-        if (client.readyState === 1) {
-          client.send(JSON.stringify(data));
-        }
-      });
-    } catch (e) {
-      console.error("Invalid message", e);
-    }
-  });
-
-  ws.send(JSON.stringify({ type: "welcome" }));
-});
 
 const PORT = process.env.PORT || 4000;
 server.listen(PORT, () => console.log(`Sound server running on port ${PORT}`));
