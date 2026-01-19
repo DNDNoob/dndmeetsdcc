@@ -71,35 +71,59 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     const dragDocRef = doc(db, dragDocPath);
 
     const unsubscribe = onSnapshot(dragDocRef, (snapshot) => {
-      if (!snapshot.exists()) return;
+      if (!snapshot.exists()) {
+        console.log('[ShowTime] Drag doc does not exist');
+        return;
+      }
 
       const dragData = snapshot.data();
-      console.log('[ShowTime] Received drag update:', dragData);
+      console.log('[ShowTime] Received drag update:', {
+        dragData,
+        isAdmin,
+        draggingMobId,
+        shouldApply: !isAdmin || !draggingMobId
+      });
 
-      // Only apply if we're not the one dragging and data is recent
-      if ((!isAdmin || !draggingMobId) && dragData.updatedAt) {
-        const updateTime = dragData.updatedAt.toMillis ? dragData.updatedAt.toMillis() : 0;
-        const mountTimeMs = mountTime.current.toMillis();
+      // Only apply if we're not the one dragging
+      if (!isAdmin || !draggingMobId) {
+        if (dragData.updatedAt) {
+          const updateTime = dragData.updatedAt.toMillis ? dragData.updatedAt.toMillis() : 0;
+          const mountTimeMs = mountTime.current.toMillis();
 
-        // Only apply updates that happened after component mounted
-        if (updateTime > mountTimeMs) {
-          setRemoteDragState({
-            placementIndex: dragData.placementIndex,
-            x: dragData.x,
-            y: dragData.y
+          console.log('[ShowTime] Time check:', {
+            updateTime,
+            mountTimeMs,
+            shouldApply: updateTime > mountTimeMs
           });
 
-          // Update local episode state with remote drag position
-          setSelectedEpisode(prev => {
-            if (!prev) return prev;
-            return {
-              ...prev,
-              mobPlacements: prev.mobPlacements.map((p, i) =>
-                i === dragData.placementIndex ? { ...p, x: dragData.x, y: dragData.y } : p
-              ),
-            };
-          });
+          // Only apply updates that happened after component mounted
+          if (updateTime > mountTimeMs) {
+            console.log('[ShowTime] APPLYING drag update to placement', dragData.placementIndex);
+
+            setRemoteDragState({
+              placementIndex: dragData.placementIndex,
+              x: dragData.x,
+              y: dragData.y
+            });
+
+            // Update local episode state with remote drag position
+            setSelectedEpisode(prev => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                mobPlacements: prev.mobPlacements.map((p, i) =>
+                  i === dragData.placementIndex ? { ...p, x: dragData.x, y: dragData.y } : p
+                ),
+              };
+            });
+          } else {
+            console.log('[ShowTime] Skipping old update (before mount time)');
+          }
+        } else {
+          console.log('[ShowTime] No updatedAt timestamp in drag data');
         }
+      } else {
+        console.log('[ShowTime] Skipping update - we are the dragger');
       }
     });
 
