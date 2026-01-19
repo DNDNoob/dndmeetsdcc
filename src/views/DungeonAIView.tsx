@@ -907,8 +907,8 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                             onChange={() => handleToggleMapForEpisode(index)}
                             className="w-4 h-4"
                           />
-                          <img src={map} alt={`Map ${index + 1}`} className="w-12 h-12 object-cover" />
-                          <span className="text-sm">Map {index + 1}</span>
+                          <img src={map} alt={mapNames?.[index] || `Map ${index + 1}`} className="w-12 h-12 object-cover" />
+                          <span className="text-sm">{mapNames?.[index] || `Map ${index + 1}`}</span>
                         </label>
                       ))
                     )}
