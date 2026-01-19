@@ -75,13 +75,23 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
       reader.onload = () => {
         const base64 = reader.result as string;
 
+        const processAvatar = (avatarData: string) => {
+          // Always update editData - never directly update Firestore during upload
+          // User must click "Save Changes" to persist
+          setEditData({ ...editData, avatar: avatarData });
+
+          // Auto-enter edit mode if not already in it
+          if (!editMode) {
+            setEditMode(true);
+          }
+        };
+
         // If image is small enough, use it directly
         if (base64.length <= MAX_AVATAR_SIZE) {
-          if (editMode) {
-            setEditData({ ...editData, avatar: base64 });
-          } else {
-            onUpdateCrawler(selected.id, { avatar: base64 });
-          }
+          console.log('[ProfilesView] Avatar size OK:', {
+            sizeInKB: (base64.length / 1000).toFixed(2)
+          });
+          processAvatar(base64);
           return;
         }
 
@@ -136,11 +146,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             sizeInKB: (resizedBase64.length / 1000).toFixed(2)
           });
 
-          if (editMode) {
-            setEditData({ ...editData, avatar: resizedBase64 });
-          } else {
-            onUpdateCrawler(selected.id, { avatar: resizedBase64 });
-          }
+          processAvatar(resizedBase64);
         };
 
         img.src = base64;
