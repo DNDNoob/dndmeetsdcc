@@ -25,7 +25,7 @@ const LOCAL_SOUNDS: SoundEffect[] = [
   { id: "5", name: "Coin Drop", url: "https://assets.mixkit.co/active_storage/sfx/1997/1997.wav", tags: ["treasure", "gold", "money"], source: "local" },
 ];
 
-const FREESOUND_KEY = (import.meta.env.VITE_FREESOUND_API_KEY as string) || "";
+const FREESOUND_KEY = (import.meta.env.FREESOUND_API_KEY as string) || "";
 
 const RECENT_KEY = "sfx_recent";
 const FAV_KEY = "sfx_favs";
