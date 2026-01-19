@@ -63,12 +63,16 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   useEffect(() => {
     if (!selectedEpisode) return;
 
+    const episodeId = selectedEpisode.id;
+
     // Use a single document per episode for drag state
     const dragDocPath = roomId
-      ? `rooms/${roomId}/mob-drag-state/${selectedEpisode.id}`
-      : `mob-drag-state/${selectedEpisode.id}`;
+      ? `rooms/${roomId}/mob-drag-state/${episodeId}`
+      : `mob-drag-state/${episodeId}`;
 
     const dragDocRef = doc(db, dragDocPath);
+
+    console.log('[ShowTime] Setting up drag listener for episode:', episodeId);
 
     const unsubscribe = onSnapshot(dragDocRef, (snapshot) => {
       if (!snapshot.exists()) {
@@ -98,7 +102,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
           // Only apply updates that happened after component mounted
           if (updateTime > mountTimeMs) {
-            console.log('[ShowTime] APPLYING drag update to placement', dragData.placementIndex);
+            console.log('[ShowTime] APPLYING drag update to placement', dragData.placementIndex, 'with position', dragData.x, dragData.y);
 
             setRemoteDragState({
               placementIndex: dragData.placementIndex,
@@ -109,6 +113,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             // Update local episode state with remote drag position
             setSelectedEpisode(prev => {
               if (!prev) return prev;
+              console.log('[ShowTime] Updating placement', dragData.placementIndex, 'from', prev.mobPlacements[dragData.placementIndex], 'to', dragData.x, dragData.y);
               return {
                 ...prev,
                 mobPlacements: prev.mobPlacements.map((p, i) =>
@@ -127,8 +132,11 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       }
     });
 
-    return () => unsubscribe();
-  }, [selectedEpisode, isAdmin, draggingMobId, roomId]);
+    return () => {
+      console.log('[ShowTime] Cleaning up drag listener for episode:', episodeId);
+      unsubscribe();
+    };
+  }, [selectedEpisode?.id, isAdmin, draggingMobId, roomId]);
 
   // Broadcast drag state to other players
   const broadcastDragState = async (placementIndex: number, x: number, y: number) => {
