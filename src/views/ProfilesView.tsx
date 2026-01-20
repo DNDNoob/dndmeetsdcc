@@ -35,6 +35,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [isAddingItem, setIsAddingItem] = useState(false);
   const [itemFormData, setItemFormData] = useState<Partial<InventoryItem>>({});
+  const [expandedItems, setExpandedItems] = useState(false);
 
   const selected = crawlers.find((c) => c.id === selectedId) || crawlers[0];
   const inventory = selected ? getCrawlerInventory(selected.id) : [];
@@ -319,18 +320,22 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
       <DungeonCard className="min-h-[400px] overflow-hidden">
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Equipment Slots - Left Side */}
-          <div className="flex flex-col gap-3 lg:min-w-[200px]">
-            <h3 className="font-display text-primary text-sm mb-1">EQUIPMENT</h3>
+          <div className="flex flex-col gap-3 lg:min-w-[280px]">
+            <h3 className="font-display text-primary text-base mb-2">EQUIPMENT</h3>
 
-            {/* Head */}
-            <EquipmentSlot
-              slot="head"
-              label="Head"
-              equippedItem={getEquippedItem('head')}
-              onDrop={handleEquipItem}
-              onUnequip={handleUnequipItem}
-              disabled={false}
-            />
+            {/* Head (center column) */}
+            <div className="grid grid-cols-3 gap-2">
+              <div></div>
+              <EquipmentSlot
+                slot="head"
+                label="Head"
+                equippedItem={getEquippedItem('head')}
+                onDrop={handleEquipItem}
+                onUnequip={handleUnequipItem}
+                disabled={false}
+              />
+              <div></div>
+            </div>
 
             {/* Left Hand, Chest, Right Hand */}
             <div className="grid grid-cols-3 gap-2">
@@ -360,8 +365,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
               />
             </div>
 
-            {/* Ring and Legs */}
-            <div className="grid grid-cols-2 gap-2">
+            {/* Ring and Legs (ring on left, legs center) */}
+            <div className="grid grid-cols-3 gap-2">
               <EquipmentSlot
                 slot="ringFinger"
                 label="Ring"
@@ -378,17 +383,22 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 onUnequip={handleUnequipItem}
                 disabled={false}
               />
+              <div></div>
             </div>
 
-            {/* Feet */}
-            <EquipmentSlot
-              slot="feet"
-              label="Feet"
-              equippedItem={getEquippedItem('feet')}
-              onDrop={handleEquipItem}
-              onUnequip={handleUnequipItem}
-              disabled={false}
-            />
+            {/* Feet (center column) */}
+            <div className="grid grid-cols-3 gap-2">
+              <div></div>
+              <EquipmentSlot
+                slot="feet"
+                label="Feet"
+                equippedItem={getEquippedItem('feet')}
+                onDrop={handleEquipItem}
+                onUnequip={handleUnequipItem}
+                disabled={false}
+              />
+              <div></div>
+            </div>
           </div>
 
           {/* Character Info - Center/Right */}
@@ -538,8 +548,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
         {/* Stats, Achievements, and Inventory grid */}
         <div className="grid md:grid-cols-3 gap-8 overflow-hidden">
           <div className="min-w-0">
-            <h3 className="font-display text-primary text-lg mb-4 flex items-center gap-2">
-              <Shield className="w-5 h-5" /> STATS
+            <h3 className="font-display text-primary text-xl mb-4 flex items-center gap-2">
+              <Shield className="w-6 h-6" /> STATS
             </h3>
             <div className="grid grid-cols-2 gap-3 text-sm">
               {[
@@ -569,8 +579,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
           </div>
 
           <div className="min-w-0">
-            <h3 className="font-display text-accent text-lg mb-4 flex items-center gap-2 text-glow-gold">
-              <Sparkles className="w-5 h-5" /> ACHIEVEMENTS
+            <h3 className="font-display text-accent text-xl mb-4 flex items-center gap-2 text-glow-gold">
+              <Sparkles className="w-6 h-6" /> ACHIEVEMENTS
             </h3>
             {editMode ? (
               <textarea
@@ -587,12 +597,17 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
           {/* Inventory section */}
           <div className="min-w-0">
             <div className="flex items-center justify-between mb-4 gap-2">
-              <h3 className="font-display text-primary text-lg flex items-center gap-2 truncate">
-                <Sword className="w-5 h-5 shrink-0" /> INVENTORY
+              <h3 className="font-display text-primary text-xl flex items-center gap-2 truncate">
+                <Sword className="w-6 h-6 shrink-0" /> INVENTORY
               </h3>
-              <DungeonButton variant="default" size="sm" onClick={handleAddItem} className="shrink-0">
-                <Plus className="w-4 h-4" />
-              </DungeonButton>
+              <div className="flex gap-2 shrink-0">
+                <DungeonButton variant="nav" size="sm" onClick={() => setExpandedItems(!expandedItems)}>
+                  {expandedItems ? 'Collapse' : 'Expand'}
+                </DungeonButton>
+                <DungeonButton variant="default" size="sm" onClick={handleAddItem}>
+                  <Plus className="w-4 h-4" />
+                </DungeonButton>
+              </div>
             </div>
 
             {/* Item Form */}
@@ -644,7 +659,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             {inventory.length === 0 ? (
               <p className="text-muted-foreground text-sm italic">No items</p>
             ) : (
-              <ul className="space-y-2 text-sm max-h-[400px] overflow-y-auto">
+              <ul className="space-y-3 max-h-[500px] overflow-y-auto">
                 {inventory.map((item) => {
                   const isEquipped = Object.values(selected.equippedItems || {}).includes(item.id);
                   const isEditing = editingItemId === item.id;
@@ -657,37 +672,48 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                         e.dataTransfer.setData('application/json', JSON.stringify(item));
                         e.dataTransfer.effectAllowed = 'move';
                       }}
-                      className={`flex items-center gap-2 bg-muted/50 px-3 py-2 min-w-0 ${
+                      className={`bg-muted/50 px-4 py-3 min-w-0 rounded ${
                         item.equipSlot && !isEditing ? 'cursor-grab active:cursor-grabbing' : ''
-                      } ${isEditing ? 'border-2 border-accent' : ''}`}
-                      title={item.name}
+                      } ${isEditing ? 'border-2 border-accent' : 'border border-border'}`}
+                      title={expandedItems ? undefined : item.name}
                     >
-                      <Sword className="w-3 h-3 text-primary/60 shrink-0" />
-                      <span className="text-foreground flex-1 truncate min-w-0">{item.name}</span>
-                      <div className="flex items-center gap-1 shrink-0">
-                        {item.equipSlot && (
-                          <span className="text-xs bg-accent/20 text-accent px-1 py-0.5 whitespace-nowrap">
-                            {item.equipSlot === 'leftHand' ? 'LH' :
-                             item.equipSlot === 'rightHand' ? 'RH' :
-                             item.equipSlot === 'ringFinger' ? 'Ring' :
-                             item.equipSlot.slice(0, 1).toUpperCase()}
-                          </span>
-                        )}
-                        {isEquipped && (
-                          <span className="text-xs bg-primary/20 text-primary px-1 py-0.5">E</span>
-                        )}
-                        <button
-                          onClick={() => handleEditItem(item)}
-                          className="text-xs text-primary hover:underline"
-                        >
-                          <Edit2 className="w-3 h-3" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteItem(item.id)}
-                          className="text-xs text-danger hover:underline"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
+                      <div className="flex items-start gap-3">
+                        <Sword className="w-4 h-4 text-primary/60 shrink-0 mt-1" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-foreground font-semibold text-base break-words">{item.name}</span>
+                            {item.equipSlot && (
+                              <span className="text-xs bg-accent/20 text-accent px-2 py-0.5 whitespace-nowrap rounded">
+                                {item.equipSlot === 'leftHand' ? 'LH' :
+                                 item.equipSlot === 'rightHand' ? 'RH' :
+                                 item.equipSlot === 'ringFinger' ? 'Ring' :
+                                 item.equipSlot.slice(0, 1).toUpperCase()}
+                              </span>
+                            )}
+                            {isEquipped && (
+                              <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded">Equipped</span>
+                            )}
+                          </div>
+                          {expandedItems && item.description && (
+                            <p className="text-muted-foreground text-sm mt-1 break-words">{item.description}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => handleEditItem(item)}
+                            className="text-primary hover:text-primary/80"
+                            title="Edit"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteItem(item.id)}
+                            className="text-danger hover:text-danger/80"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                     </li>
                   );
