@@ -5,7 +5,7 @@ import { DungeonButton } from "@/components/ui/DungeonButton";
 import { HealthBar } from "@/components/ui/HealthBar";
 import { EquipmentSlot } from "@/components/ui/EquipmentSlot";
 import { Crawler, InventoryItem, createEmptyCrawler, EquipmentSlot as SlotType } from "@/lib/gameData";
-import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload } from "lucide-react";
+import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Edit2 } from "lucide-react";
 
 interface ProfilesViewProps {
   crawlers: Crawler[];
