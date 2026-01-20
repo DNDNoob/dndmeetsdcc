@@ -321,6 +321,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
           {/* Equipment Slots - Left Side */}
           <div className="flex flex-col gap-3 lg:min-w-[200px]">
             <h3 className="font-display text-primary text-sm mb-1">EQUIPMENT</h3>
+
+            {/* Head */}
             <EquipmentSlot
               slot="head"
               label="Head"
@@ -329,19 +331,21 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
               onUnequip={handleUnequipItem}
               disabled={false}
             />
-            <EquipmentSlot
-              slot="chest"
-              label="Chest"
-              equippedItem={getEquippedItem('chest')}
-              onDrop={handleEquipItem}
-              onUnequip={handleUnequipItem}
-              disabled={false}
-            />
-            <div className="grid grid-cols-2 gap-2">
+
+            {/* Left Hand, Chest, Right Hand */}
+            <div className="grid grid-cols-3 gap-2">
               <EquipmentSlot
                 slot="leftHand"
                 label="Left Hand"
                 equippedItem={getEquippedItem('leftHand')}
+                onDrop={handleEquipItem}
+                onUnequip={handleUnequipItem}
+                disabled={false}
+              />
+              <EquipmentSlot
+                slot="chest"
+                label="Chest"
+                equippedItem={getEquippedItem('chest')}
                 onDrop={handleEquipItem}
                 onUnequip={handleUnequipItem}
                 disabled={false}
@@ -355,22 +359,28 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 disabled={false}
               />
             </div>
-            <EquipmentSlot
-              slot="ringFinger"
-              label="Ring"
-              equippedItem={getEquippedItem('ringFinger')}
-              onDrop={handleEquipItem}
-              onUnequip={handleUnequipItem}
-              disabled={false}
-            />
-            <EquipmentSlot
-              slot="legs"
-              label="Legs"
-              equippedItem={getEquippedItem('legs')}
-              onDrop={handleEquipItem}
-              onUnequip={handleUnequipItem}
-              disabled={false}
-            />
+
+            {/* Ring and Legs */}
+            <div className="grid grid-cols-2 gap-2">
+              <EquipmentSlot
+                slot="ringFinger"
+                label="Ring"
+                equippedItem={getEquippedItem('ringFinger')}
+                onDrop={handleEquipItem}
+                onUnequip={handleUnequipItem}
+                disabled={false}
+              />
+              <EquipmentSlot
+                slot="legs"
+                label="Legs"
+                equippedItem={getEquippedItem('legs')}
+                onDrop={handleEquipItem}
+                onUnequip={handleUnequipItem}
+                disabled={false}
+              />
+            </div>
+
+            {/* Feet */}
             <EquipmentSlot
               slot="feet"
               label="Feet"
@@ -650,6 +660,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                       className={`flex items-center gap-2 bg-muted/50 px-3 py-2 min-w-0 ${
                         item.equipSlot && !isEditing ? 'cursor-grab active:cursor-grabbing' : ''
                       } ${isEditing ? 'border-2 border-accent' : ''}`}
+                      title={item.name}
                     >
                       <Sword className="w-3 h-3 text-primary/60 shrink-0" />
                       <span className="text-foreground flex-1 truncate min-w-0">{item.name}</span>

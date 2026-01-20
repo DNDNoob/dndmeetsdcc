@@ -75,8 +75,8 @@ export const EquipmentSlot: React.FC<EquipmentSlotProps> = ({
       {/* Equipped item */}
       {equippedItem ? (
         <div className="absolute inset-0 flex items-center justify-center pt-5">
-          <div className="text-center px-1">
-            <p className="text-xs font-bold text-primary truncate">{equippedItem.name}</p>
+          <div className="text-center px-1 w-full" title={equippedItem.name}>
+            <p className="text-xs font-bold text-primary line-clamp-2 break-words">{equippedItem.name}</p>
           </div>
           {!disabled && (
             <button
