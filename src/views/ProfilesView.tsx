@@ -316,10 +316,10 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
         </div>
       </div>
 
-      <DungeonCard className="min-h-[400px]">
-        <div className="flex gap-6">
+      <DungeonCard className="min-h-[400px] overflow-hidden">
+        <div className="flex flex-col lg:flex-row gap-6">
           {/* Equipment Slots - Left Side */}
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 lg:min-w-[200px]">
             <h3 className="font-display text-primary text-sm mb-1">EQUIPMENT</h3>
             <EquipmentSlot
               slot="head"
@@ -382,7 +382,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
           </div>
 
           {/* Character Info - Center/Right */}
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             {/* Character header with avatar */}
             <div className="flex gap-6 mb-6">
               {/* Avatar section */}
@@ -410,8 +410,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
               </div>
 
           {/* Name and info */}
-          <div className="flex-1">
-            <h1 className="font-display text-3xl md:text-4xl text-primary text-glow-cyan mb-1">
+          <div className="flex-1 min-w-0">
+            <h1 className="font-display text-2xl md:text-3xl text-primary text-glow-cyan mb-1 break-words">
               {editMode ? (
                 <input
                   type="text"
@@ -424,7 +424,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
               )}
             </h1>
             {editMode ? (
-              <div className="flex gap-2 mt-2">
+              <div className="flex flex-wrap gap-2 mt-2">
                 <input
                   type="text"
                   value={editData.race || ""}
@@ -448,7 +448,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 />
               </div>
             ) : (
-              <p className="text-muted-foreground">
+              <p className="text-muted-foreground text-sm break-words">
                 {selected.race} | {selected.job} | Level {selected.level}
               </p>
             )}
@@ -526,8 +526,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
         </div>
 
         {/* Stats, Achievements, and Inventory grid */}
-        <div className="grid md:grid-cols-3 gap-8">
-          <div>
+        <div className="grid md:grid-cols-3 gap-8 overflow-hidden">
+          <div className="min-w-0">
             <h3 className="font-display text-primary text-lg mb-4 flex items-center gap-2">
               <Shield className="w-5 h-5" /> STATS
             </h3>
@@ -558,7 +558,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             </div>
           </div>
 
-          <div>
+          <div className="min-w-0">
             <h3 className="font-display text-accent text-lg mb-4 flex items-center gap-2 text-glow-gold">
               <Sparkles className="w-5 h-5" /> ACHIEVEMENTS
             </h3>
@@ -570,15 +570,15 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 placeholder="Enter achievements..."
               />
             ) : (
-              <p className="text-accent text-sm leading-relaxed">{selected.achievements}</p>
+              <p className="text-accent text-sm leading-relaxed break-words whitespace-pre-wrap">{selected.achievements}</p>
             )}
           </div>
 
           {/* Inventory section */}
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center justify-between mb-4 gap-2">
-              <h3 className="font-display text-primary text-lg flex items-center gap-2">
-                <Sword className="w-5 h-5" /> INVENTORY
+              <h3 className="font-display text-primary text-lg flex items-center gap-2 truncate">
+                <Sword className="w-5 h-5 shrink-0" /> INVENTORY
               </h3>
               <DungeonButton variant="default" size="sm" onClick={handleAddItem} className="shrink-0">
                 <Plus className="w-4 h-4" />
@@ -634,7 +634,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             {inventory.length === 0 ? (
               <p className="text-muted-foreground text-sm italic">No items</p>
             ) : (
-              <ul className="space-y-2 text-sm">
+              <ul className="space-y-2 text-sm max-h-[400px] overflow-y-auto">
                 {inventory.map((item) => {
                   const isEquipped = Object.values(selected.equippedItems || {}).includes(item.id);
                   const isEditing = editingItemId === item.id;
@@ -647,32 +647,37 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                         e.dataTransfer.setData('application/json', JSON.stringify(item));
                         e.dataTransfer.effectAllowed = 'move';
                       }}
-                      className={`flex items-center gap-2 bg-muted/50 px-3 py-2 ${
+                      className={`flex items-center gap-2 bg-muted/50 px-3 py-2 min-w-0 ${
                         item.equipSlot && !isEditing ? 'cursor-grab active:cursor-grabbing' : ''
                       } ${isEditing ? 'border-2 border-accent' : ''}`}
                     >
-                      <Sword className="w-3 h-3 text-primary/60" />
-                      <span className="text-foreground flex-1">{item.name}</span>
-                      {item.equipSlot && (
-                        <span className="text-xs bg-accent/20 text-accent px-1 py-0.5">
-                          {item.equipSlot}
-                        </span>
-                      )}
-                      {isEquipped && (
-                        <span className="text-xs bg-primary/20 text-primary px-1 py-0.5">E</span>
-                      )}
-                      <button
-                        onClick={() => handleEditItem(item)}
-                        className="text-xs text-primary hover:underline"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDeleteItem(item.id)}
-                        className="text-xs text-danger hover:underline"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
+                      <Sword className="w-3 h-3 text-primary/60 shrink-0" />
+                      <span className="text-foreground flex-1 truncate min-w-0">{item.name}</span>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {item.equipSlot && (
+                          <span className="text-xs bg-accent/20 text-accent px-1 py-0.5 whitespace-nowrap">
+                            {item.equipSlot === 'leftHand' ? 'LH' :
+                             item.equipSlot === 'rightHand' ? 'RH' :
+                             item.equipSlot === 'ringFinger' ? 'Ring' :
+                             item.equipSlot.slice(0, 1).toUpperCase()}
+                          </span>
+                        )}
+                        {isEquipped && (
+                          <span className="text-xs bg-primary/20 text-primary px-1 py-0.5">E</span>
+                        )}
+                        <button
+                          onClick={() => handleEditItem(item)}
+                          className="text-xs text-primary hover:underline"
+                        >
+                          <Edit2 className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteItem(item.id)}
+                          className="text-xs text-danger hover:underline"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
                     </li>
                   );
                 })}
