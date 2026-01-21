@@ -57,6 +57,8 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   const [selectedMobsForEpisode, setSelectedMobsForEpisode] = useState<{ mobId: string; x: number; y: number }[]>([]);
   const [editingEpisodeId, setEditingEpisodeId] = useState<string | null>(null);
   const [currentMapIndexForEditor, setCurrentMapIndexForEditor] = useState(0);
+  const [defaultFogOfWar, setDefaultFogOfWar] = useState(true);
+  const [defaultMapScale, setDefaultMapScale] = useState(100);
 
   const handleAddMob = async () => {
     if (!newMob.name?.trim()) return;
@@ -279,13 +281,24 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
       scale: 1
     }));
 
+    // Create map settings with fog of war and scale
+    const mapSettings: { [mapId: string]: { fogOfWar: { enabled: boolean; revealedAreas: { x: number; y: number; radius: number }[] }; scale: number } } = {};
+    selectedMapsForEpisode.forEach(mapId => {
+      mapSettings[mapId] = {
+        fogOfWar: { enabled: defaultFogOfWar, revealedAreas: [] },
+        scale: defaultMapScale
+      };
+    });
+
     if (editingEpisodeId) {
       // Update existing episode
       onUpdateEpisode(editingEpisodeId, {
         name: newEpisodeName,
         description: newEpisodeDescription,
         mapIds: selectedMapsForEpisode,
-        mobPlacements: mobPlacements
+        mobPlacements: mobPlacements,
+        defaultFogOfWar: defaultFogOfWar,
+        mapSettings: mapSettings
       });
       setEditingEpisodeId(null);
     } else {
@@ -295,17 +308,21 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
         name: newEpisodeName,
         description: newEpisodeDescription,
         mapIds: selectedMapsForEpisode,
-        mobPlacements: mobPlacements
+        mobPlacements: mobPlacements,
+        defaultFogOfWar: defaultFogOfWar,
+        mapSettings: mapSettings
       };
       onAddEpisode(episode);
     }
-    
+
     // Reset form
     setNewEpisodeName("");
     setNewEpisodeDescription("");
     setSelectedMapsForEpisode([]);
     setSelectedMobsForEpisode([]);
     setCurrentMapIndexForEditor(0);
+    setDefaultFogOfWar(true);
+    setDefaultMapScale(100);
   };
 
   const handleToggleMapForEpisode = (mapIndex: number) => {
@@ -347,6 +364,11 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
       y: p.y
     })));
     setCurrentMapIndexForEditor(0);
+    setDefaultFogOfWar(episode.defaultFogOfWar ?? true);
+    // Get scale from first map settings if available
+    const firstMapId = episode.mapIds[0];
+    const firstMapSettings = episode.mapSettings?.[firstMapId];
+    setDefaultMapScale(firstMapSettings?.scale ?? 100);
     // Scroll to top
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -885,6 +907,37 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                   />
                 </div>
 
+                {/* Episode settings */}
+                <div className="grid sm:grid-cols-2 gap-4 p-3 bg-background/50 border border-border rounded">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      id="defaultFogOfWar"
+                      checked={defaultFogOfWar}
+                      onChange={(e) => setDefaultFogOfWar(e.target.checked)}
+                      className="w-4 h-4"
+                    />
+                    <label htmlFor="defaultFogOfWar" className="text-sm cursor-pointer">
+                      Enable Fog of War by default
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <label className="text-sm text-muted-foreground">Default Scale:</label>
+                    <select
+                      value={defaultMapScale}
+                      onChange={(e) => setDefaultMapScale(Number(e.target.value))}
+                      className="bg-muted border border-border px-2 py-1 text-sm"
+                    >
+                      <option value={50}>50%</option>
+                      <option value={75}>75%</option>
+                      <option value={100}>100%</option>
+                      <option value={125}>125%</option>
+                      <option value={150}>150%</option>
+                      <option value={200}>200%</option>
+                    </select>
+                  </div>
+                </div>
+
                 {/* Map selection */}
                 <div>
                   <label className="text-xs text-muted-foreground mb-2 block font-semibold">Select Maps for Episode *</label>
@@ -961,8 +1014,8 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
 
                 <div className="flex gap-2 pt-4">
                   {editingEpisodeId && (
-                    <DungeonButton 
-                      variant="default" 
+                    <DungeonButton
+                      variant="default"
                       onClick={() => {
                         setEditingEpisodeId(null);
                         setNewEpisodeName("");
@@ -970,7 +1023,9 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                         setSelectedMapsForEpisode([]);
                         setSelectedMobsForEpisode([]);
                         setCurrentMapIndexForEditor(0);
-                      }} 
+                        setDefaultFogOfWar(true);
+                        setDefaultMapScale(100);
+                      }}
                       className="flex-1"
                     >
                       <X className="w-4 h-4 mr-2" /> Cancel

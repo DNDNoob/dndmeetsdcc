@@ -1,26 +1,33 @@
 import { useState, useRef, useEffect } from "react";
 import { Mob } from "@/lib/gameData";
-import { ChevronUp, ChevronDown } from "lucide-react";
+import { ChevronUp, ChevronDown, Minus, Plus } from "lucide-react";
 
 interface ResizableMobDisplayProps {
   mob: Mob;
   initialScale?: number;
   onClose: () => void;
+  index?: number; // For stacking multiple cards
 }
 
 export const ResizableMobDisplay: React.FC<ResizableMobDisplayProps> = ({
   mob,
   initialScale = 1,
   onClose,
+  index = 0,
 }) => {
   const [scale, setScale] = useState(initialScale);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [hasBeenDragged, setHasBeenDragged] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
 
   const handleMouseDown = (e: React.MouseEvent) => {
+    // Only start drag from header area
+    const target = e.target as HTMLElement;
+    if (target.closest('button')) return;
+
     setIsDragging(true);
     if (containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
@@ -35,15 +42,19 @@ export const ResizableMobDisplay: React.FC<ResizableMobDisplayProps> = ({
     if (!isDragging) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      if (containerRef.current) {
-        const parentRect = containerRef.current.parentElement?.getBoundingClientRect();
-        if (parentRect) {
-          setPosition({
-            x: Math.max(0, Math.min(e.clientX - parentRect.left - dragOffset.x, parentRect.width - 100)),
-            y: Math.max(0, Math.min(e.clientY - parentRect.top - dragOffset.y, parentRect.height - 100)),
-          });
-        }
-      }
+      setHasBeenDragged(true);
+      // Use viewport for positioning
+      const newX = e.clientX - dragOffset.x;
+      const newY = e.clientY - dragOffset.y;
+
+      // Clamp to viewport
+      const maxX = window.innerWidth - 100;
+      const maxY = window.innerHeight - 100;
+
+      setPosition({
+        x: Math.max(0, Math.min(newX, maxX)),
+        y: Math.max(0, Math.min(newY, maxY)),
+      });
     };
 
     const handleMouseUp = () => {
@@ -62,15 +73,34 @@ export const ResizableMobDisplay: React.FC<ResizableMobDisplayProps> = ({
   const baseSize = 120;
   const currentSize = baseSize * scale;
 
+  // Calculate default position - to the LEFT of the dice menu (which is at bottom-right)
+  // Dice menu is roughly 80px wide, so position cards starting at 100px from right edge
+  const defaultRight = 100 + (index * (currentSize + 10));
+
+  // When expanded, show on the left side of the screen
+  const expandedLeft = 20;
+
   return (
     <div
       ref={containerRef}
       style={{
         position: "fixed",
-        bottom: isExpanded ? "20px" : position.y + 20,
-        right: isExpanded ? "20px" : position.x + 20,
+        ...(hasBeenDragged && !isExpanded
+          ? {
+              left: position.x,
+              top: position.y,
+            }
+          : isExpanded
+          ? {
+              left: expandedLeft,
+              bottom: 20,
+            }
+          : {
+              right: defaultRight,
+              bottom: 20,
+            }),
         width: isExpanded ? "350px" : currentSize,
-        transition: isExpanded ? "all 0.3s ease" : "none",
+        transition: isDragging ? "none" : "all 0.2s ease",
         zIndex: 40,
         cursor: isDragging ? "grabbing" : "grab",
       }}
@@ -93,7 +123,7 @@ export const ResizableMobDisplay: React.FC<ResizableMobDisplayProps> = ({
                 className="p-1 hover:bg-muted rounded"
                 title="Shrink"
               >
-                <ChevronDown className="w-3 h-3" />
+                <Minus className="w-3 h-3" />
               </button>
               <button
                 onClick={(e) => {
@@ -101,9 +131,9 @@ export const ResizableMobDisplay: React.FC<ResizableMobDisplayProps> = ({
                   setScale(Math.min(2, scale + 0.2));
                 }}
                 className="p-1 hover:bg-muted rounded"
-                title="Expand"
+                title="Grow"
               >
-                <ChevronUp className="w-3 h-3" />
+                <Plus className="w-3 h-3" />
               </button>
             </>
           )}

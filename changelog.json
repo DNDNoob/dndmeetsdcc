@@ -1,5 +1,75 @@
 [
   {
+    "date": "2026-01-21",
+    "changes": [
+      "🌫️ MAJOR: Added Fog of War system for maps",
+      "Fog of War overlay covers the entire map with semi-transparent darkness",
+      "DM can reveal areas by clicking/dragging with adjustable brush size",
+      "Fog of War covers mob icons on the map (mobs hidden until fog cleared)",
+      "Real-time sync - revealed areas sync instantly to all players",
+      "Clear All button to reset fog of war and re-hide the entire map",
+      "Fog of War enabled by default for new episodes (configurable in Episode settings)",
+      "🔍 Added Map Scale controls",
+      "DM can zoom in/out on maps (25% to 200% scale)",
+      "Scale setting syncs to all players in real-time",
+      "Default scale configurable per episode in DM console",
+      "🎴 Fixed Mob Card display issues",
+      "Mob cards now appear to the LEFT of the dice menu (no more overlap)",
+      "Multiple mob cards stack horizontally",
+      "Fixed card jumping when resizing - smooth transitions now",
+      "Cards can be freely dragged anywhere on screen",
+      "Expanded cards appear on left side of screen",
+      "📜 Updated changelog with all changes since January 12"
+    ]
+  },
+  {
+    "date": "2026-01-20",
+    "changes": [
+      "🎨 MAJOR: Enhanced Crawler Profile UI with equipment slot system",
+      "Added equipment slot system: Head, Chest, Left Hand, Right Hand, Ring, Legs, Feet",
+      "Equipment slots arranged anatomically (head on top, hands flanking chest, feet on bottom)",
+      "Drag-and-drop inventory items to equipment slots to equip them",
+      "Added equipment slot selector when creating/editing inventory items",
+      "Expanded inventory view with toggleable item descriptions",
+      "Larger inventory items with better spacing and readability",
+      "Item tooltips showing full names on hover",
+      "Fixed inventory Firebase persistence - items now save correctly using document IDs",
+      "Added inline inventory management on crawler profile page",
+      "🔧 Fixed Freesound API rate limiting by creating Firebase Cloud Function proxy",
+      "Disabled direct Freesound API calls from client to prevent token exposure",
+      "Added 1-hour caching to reduce API calls",
+      "Falls back to local sound filtering when proxy unavailable",
+      "🖼️ Improved avatar upload with image resizing and 500KB limit",
+      "Fixed Firestore write stream exhaustion on avatar upload",
+      "Added custom map names display in Episodes tab"
+    ]
+  },
+  {
+    "date": "2026-01-19",
+    "changes": [
+      "🎮 Real-time mob dragging synchronization in ShowTime",
+      "Mob icons follow cursor smoothly during drag operations",
+      "Throttled Firestore broadcasts to prevent rate limiting",
+      "Mob positions sync instantly across all connected players",
+      "Prevented mob icons from being dragged outside map boundaries",
+      "Moved DM controls above the map for better visibility",
+      "Made map unselectable on showtime screen",
+      "🔊 Sound Effects improvements: enhanced search bar and stop button",
+      "Stop button immediately halts sound playback",
+      "Simplified search bar styling"
+    ]
+  },
+  {
+    "date": "2026-01-14",
+    "changes": [
+      "Fixed map upload and display issues",
+      "Fixed DungeonAIView: Rebuilt component with proper state management",
+      "Simplified Episodes tab with unified create/edit form",
+      "Fixed critical bug: app stuck on loading when Firebase unavailable",
+      "Fixed critical TypeScript lint errors"
+    ]
+  },
+  {
     "date": "2026-01-13",
     "changes": [
       "🎨 MAJOR: Enhanced Episode system with visual mob placement and map management",

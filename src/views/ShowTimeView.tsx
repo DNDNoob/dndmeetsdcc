@@ -1,14 +1,15 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import { ResizableMobDisplay } from "@/components/ui/ResizableMobDisplay";
 import { GridOverlay } from "@/components/ui/GridOverlay";
 import { MobIcon } from "@/components/ui/MobIcon";
-import { Episode, Mob } from "@/lib/gameData";
-import { Map, X, Eye, Layers, ChevronLeft, ChevronRight, PlayCircle, Grid3x3 } from "lucide-react";
+import { FogOfWar } from "@/components/ui/FogOfWar";
+import { Episode, Mob, MapSettings } from "@/lib/gameData";
+import { Map, X, Eye, Layers, ChevronLeft, ChevronRight, PlayCircle, Grid3x3, CloudFog, Eraser, Trash2, ZoomIn, ZoomOut } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { collection, doc, setDoc, onSnapshot, serverTimestamp, Timestamp } from "firebase/firestore";
+import { doc, setDoc, onSnapshot, serverTimestamp, Timestamp } from "firebase/firestore";
 import { useFirebaseStore } from "@/hooks/useFirebaseStore";
 
 interface ShowTimeViewProps {
@@ -36,6 +37,14 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   const lastBroadcastTime = useRef<number>(0);
   const BROADCAST_THROTTLE_MS = 50; // Throttle to ~20 updates per second
 
+  // Fog of war state
+  const [fogOfWarEnabled, setFogOfWarEnabled] = useState(false);
+  const [fogBrushSize, setFogBrushSize] = useState(5);
+  const [revealedAreas, setRevealedAreas] = useState<{ x: number; y: number; radius: number }[]>([]);
+  const [mapScale, setMapScale] = useState(100);
+  const lastFogBroadcastTime = useRef<number>(0);
+  const FOG_BROADCAST_THROTTLE_MS = 100;
+
   // Auto-select first episode and first map when episodes load (only once)
   useEffect(() => {
     if (episodes.length > 0 && !selectedEpisode && !hasAutoLoaded.current) {
@@ -45,10 +54,33 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
         const mapIndex = parseInt(firstEpisode.mapIds[0], 10);
         setSelectedMap(maps[mapIndex] || null);
         setCurrentMapIndex(0);
+        // Load default fog of war and scale settings
+        const firstMapId = firstEpisode.mapIds[0];
+        const mapSettings = firstEpisode.mapSettings?.[firstMapId];
+        setFogOfWarEnabled(mapSettings?.fogOfWar?.enabled ?? firstEpisode.defaultFogOfWar ?? false);
+        setRevealedAreas(mapSettings?.fogOfWar?.revealedAreas ?? []);
+        setMapScale(mapSettings?.scale ?? 100);
       }
       hasAutoLoaded.current = true;
     }
   }, [episodes, maps]);
+
+  // Load fog of war and scale settings when map changes
+  useEffect(() => {
+    if (!selectedEpisode || currentMapId === null) return;
+    const mapSettings = selectedEpisode.mapSettings?.[currentMapId];
+    // Only set defaults if not already set from Firebase listener
+    if (mapSettings) {
+      setFogOfWarEnabled(mapSettings.fogOfWar?.enabled ?? selectedEpisode.defaultFogOfWar ?? false);
+      setRevealedAreas(mapSettings.fogOfWar?.revealedAreas ?? []);
+      setMapScale(mapSettings.scale ?? 100);
+    } else {
+      // Use episode defaults
+      setFogOfWarEnabled(selectedEpisode.defaultFogOfWar ?? false);
+      setRevealedAreas([]);
+      setMapScale(100);
+    }
+  }, [currentMapId]);
 
   // Debug logging
   console.log('[ShowTime] Rendering with:', {
@@ -159,6 +191,104 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       console.error('[ShowTime] Failed to broadcast drag state:', error);
     }
   };
+
+  // Get current map ID for fog of war storage
+  const currentMapId = useMemo(() => {
+    if (!selectedEpisode || selectedEpisode.mapIds.length === 0) return null;
+    return selectedEpisode.mapIds[currentMapIndex];
+  }, [selectedEpisode, currentMapIndex]);
+
+  // Listen for fog of war updates
+  useEffect(() => {
+    if (!selectedEpisode || !currentMapId) return;
+
+    const fogDocPath = roomId
+      ? `rooms/${roomId}/fog-of-war/${selectedEpisode.id}-${currentMapId}`
+      : `fog-of-war/${selectedEpisode.id}-${currentMapId}`;
+
+    const fogDocRef = doc(db, fogDocPath);
+
+    const unsubscribe = onSnapshot(fogDocRef, (snapshot) => {
+      if (!snapshot.exists()) return;
+
+      const fogData = snapshot.data();
+      if (fogData.updatedAt) {
+        const updateTime = fogData.updatedAt.toMillis ? fogData.updatedAt.toMillis() : 0;
+        const mountTimeMs = mountTime.current.toMillis();
+
+        if (updateTime > mountTimeMs || !isAdmin) {
+          setFogOfWarEnabled(fogData.enabled ?? false);
+          setRevealedAreas(fogData.revealedAreas ?? []);
+          if (fogData.scale !== undefined) {
+            setMapScale(fogData.scale);
+          }
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, [selectedEpisode?.id, currentMapId, roomId, isAdmin]);
+
+  // Broadcast fog of war state
+  const broadcastFogState = useCallback(async (
+    enabled: boolean,
+    areas: { x: number; y: number; radius: number }[],
+    scale: number
+  ) => {
+    if (!selectedEpisode || !currentMapId || !isAdmin) return;
+
+    const fogDocPath = roomId
+      ? `rooms/${roomId}/fog-of-war/${selectedEpisode.id}-${currentMapId}`
+      : `fog-of-war/${selectedEpisode.id}-${currentMapId}`;
+
+    try {
+      await setDoc(doc(db, fogDocPath), {
+        episodeId: selectedEpisode.id,
+        mapId: currentMapId,
+        enabled,
+        revealedAreas: areas,
+        scale,
+        updatedAt: serverTimestamp()
+      });
+    } catch (error) {
+      console.error('[ShowTime] Failed to broadcast fog state:', error);
+    }
+  }, [selectedEpisode?.id, currentMapId, roomId, isAdmin]);
+
+  // Handle revealing fog of war areas
+  const handleFogReveal = useCallback((x: number, y: number, radius: number) => {
+    setRevealedAreas(prev => {
+      const newAreas = [...prev, { x, y, radius }];
+
+      // Throttle broadcast
+      const now = Date.now();
+      if (now - lastFogBroadcastTime.current >= FOG_BROADCAST_THROTTLE_MS) {
+        lastFogBroadcastTime.current = now;
+        broadcastFogState(fogOfWarEnabled, newAreas, mapScale);
+      }
+
+      return newAreas;
+    });
+  }, [fogOfWarEnabled, mapScale, broadcastFogState]);
+
+  // Toggle fog of war
+  const handleToggleFogOfWar = useCallback(() => {
+    const newEnabled = !fogOfWarEnabled;
+    setFogOfWarEnabled(newEnabled);
+    broadcastFogState(newEnabled, revealedAreas, mapScale);
+  }, [fogOfWarEnabled, revealedAreas, mapScale, broadcastFogState]);
+
+  // Clear all fog of war (reset to fully fogged)
+  const handleClearFogOfWar = useCallback(() => {
+    setRevealedAreas([]);
+    broadcastFogState(fogOfWarEnabled, [], mapScale);
+  }, [fogOfWarEnabled, mapScale, broadcastFogState]);
+
+  // Handle map scale changes
+  const handleScaleChange = useCallback((newScale: number) => {
+    setMapScale(newScale);
+    broadcastFogState(fogOfWarEnabled, revealedAreas, newScale);
+  }, [fogOfWarEnabled, revealedAreas, broadcastFogState]);
 
   // Get all mobs for the current episode
   const episodeMobs = useMemo(() => {
@@ -440,17 +570,18 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       {/* DM controls - above the map */}
       {isAdmin && (
         <div className="p-4 pb-0">
-          <div className="flex items-center justify-between bg-background/80 border border-border p-3 rounded-lg">
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-background/80 border border-border p-3 rounded-lg">
             <div>
               <h3 className="font-display text-accent text-glow-gold">
                 {selectedEpisode.name}
               </h3>
               <p className="text-xs text-muted-foreground">
-                Map {currentMapIndex + 1} of {selectedEpisode.mapIds.length}
+                Map {currentMapIndex + 1} of {selectedEpisode.mapIds.length} | Scale: {mapScale}%
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Map navigation */}
               {selectedEpisode.mapIds.length > 1 && (
                 <>
                   <DungeonButton variant="default" size="sm" onClick={handlePreviousMap}>
@@ -462,18 +593,29 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                 </>
               )}
 
+              {/* Scale controls */}
+              <div className="flex items-center gap-1 border-l border-border pl-2">
+                <DungeonButton variant="default" size="sm" onClick={() => handleScaleChange(Math.max(25, mapScale - 25))}>
+                  <ZoomOut className="w-4 h-4" />
+                </DungeonButton>
+                <span className="text-xs text-muted-foreground w-12 text-center">{mapScale}%</span>
+                <DungeonButton variant="default" size="sm" onClick={() => handleScaleChange(Math.min(200, mapScale + 25))}>
+                  <ZoomIn className="w-4 h-4" />
+                </DungeonButton>
+              </div>
+
+              {/* Grid toggle */}
               <DungeonButton
                 variant={showGrid ? "admin" : "default"}
                 size="sm"
                 onClick={() => setShowGrid(!showGrid)}
               >
-                <Grid3x3 className="w-4 h-4 mr-2" />
-                {showGrid ? "Grid On" : "Grid Off"}
+                <Grid3x3 className="w-4 h-4 mr-1" />
+                Grid
               </DungeonButton>
 
               {showGrid && (
                 <div className="flex items-center gap-2">
-                  <label className="text-xs text-muted-foreground">Size:</label>
                   <input
                     type="range"
                     min="20"
@@ -481,14 +623,53 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                     step="5"
                     value={gridSize}
                     onChange={(e) => setGridSize(Number(e.target.value))}
-                    className="w-24 h-2 bg-border rounded-lg appearance-none cursor-pointer"
+                    className="w-16 h-2 bg-border rounded-lg appearance-none cursor-pointer"
                   />
-                  <span className="text-xs text-muted-foreground w-8">{gridSize}</span>
+                  <span className="text-xs text-muted-foreground w-6">{gridSize}</span>
                 </div>
               )}
 
+              {/* Fog of War controls */}
+              <div className="flex items-center gap-1 border-l border-border pl-2">
+                <DungeonButton
+                  variant={fogOfWarEnabled ? "admin" : "default"}
+                  size="sm"
+                  onClick={handleToggleFogOfWar}
+                  title="Toggle Fog of War"
+                >
+                  <CloudFog className="w-4 h-4 mr-1" />
+                  Fog
+                </DungeonButton>
+
+                {fogOfWarEnabled && (
+                  <>
+                    <div className="flex items-center gap-1">
+                      <Eraser className="w-3 h-3 text-muted-foreground" />
+                      <input
+                        type="range"
+                        min="2"
+                        max="15"
+                        step="1"
+                        value={fogBrushSize}
+                        onChange={(e) => setFogBrushSize(Number(e.target.value))}
+                        className="w-16 h-2 bg-border rounded-lg appearance-none cursor-pointer"
+                        title="Brush size"
+                      />
+                    </div>
+                    <DungeonButton
+                      variant="danger"
+                      size="sm"
+                      onClick={handleClearFogOfWar}
+                      title="Clear all revealed areas"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </DungeonButton>
+                  </>
+                )}
+              </div>
+
               <DungeonButton variant="default" size="sm" onClick={() => setSelectedMap(null)}>
-                <Layers className="w-4 h-4 mr-2" /> Change Map
+                <Layers className="w-4 h-4 mr-1" /> Map
               </DungeonButton>
 
               <DungeonButton variant="danger" size="sm" onClick={handleEndEpisode}>
@@ -501,10 +682,14 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
       {/* Map display */}
       <div
-        className="flex-1 flex items-center justify-center p-4 select-none"
+        className="flex-1 flex items-center justify-center p-4 select-none overflow-auto"
       >
         <div
           className="relative"
+          style={{
+            transform: `scale(${mapScale / 100})`,
+            transformOrigin: 'center center',
+          }}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
@@ -517,7 +702,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             draggable={false}
           />
 
-          {/* Grid overlay */}
+          {/* Grid overlay - only visible to DM */}
           {isAdmin && <GridOverlay isVisible={showGrid} cellSize={gridSize} opacity={0.3} />}
 
           {/* Displayed mobs on the map */}
@@ -580,10 +765,20 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             </motion.div>
           );
         })}
+
+          {/* Fog of War overlay - placed AFTER mobs so it covers them */}
+          <FogOfWar
+            isVisible={fogOfWarEnabled}
+            revealedAreas={revealedAreas}
+            isAdmin={isAdmin}
+            brushSize={fogBrushSize}
+            onReveal={handleFogReveal}
+            onClearAll={handleClearFogOfWar}
+          />
         </div>
 
-        {/* Display mobs in bottom-right corner */}
-        {displayedMobIds.map(mobId => {
+        {/* Display mobs - positioned to the LEFT of the dice menu */}
+        {displayedMobIds.map((mobId, index) => {
           const mob = mobs.find(m => m.id === mobId);
           if (!mob) return null;
 
@@ -592,6 +787,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
               key={mobId}
               mob={mob}
               onClose={() => handleHideMob(mobId)}
+              index={index}
             />
           );
         })}

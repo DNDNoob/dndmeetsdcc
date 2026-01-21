@@ -71,12 +71,25 @@ export interface MapData {
   updatedAt?: string;
 }
 
+export interface FogOfWarData {
+  enabled: boolean;
+  // Array of revealed areas as circles (x, y, radius in percentages)
+  revealedAreas: { x: number; y: number; radius: number }[];
+}
+
+export interface MapSettings {
+  fogOfWar: FogOfWarData;
+  scale: number; // Scale percentage (100 = normal)
+}
+
 export interface Episode {
   id: string;
   name: string;
   description: string;
   mapIds: string[]; // Indices of maps in the maps array
   mobPlacements: EpisodeMobPlacement[]; // Mobs with positions
+  mapSettings?: { [mapId: string]: MapSettings }; // Per-map settings
+  defaultFogOfWar?: boolean; // Default fog of war setting for new maps
   createdAt?: string;
   updatedAt?: string;
 }
