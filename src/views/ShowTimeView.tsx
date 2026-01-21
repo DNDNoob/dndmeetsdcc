@@ -7,7 +7,7 @@ import { GridOverlay } from "@/components/ui/GridOverlay";
 import { MobIcon } from "@/components/ui/MobIcon";
 import { FogOfWar } from "@/components/ui/FogOfWar";
 import { Episode, Mob, MapSettings } from "@/lib/gameData";
-import { Map, X, Eye, Layers, ChevronLeft, ChevronRight, PlayCircle, Grid3x3, CloudFog, Eraser, Trash2, ZoomIn, ZoomOut } from "lucide-react";
+import { Map, X, Eye, Layers, ChevronLeft, ChevronRight, PlayCircle, Grid3x3, Eraser, Trash2 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { doc, setDoc, onSnapshot, serverTimestamp, Timestamp } from "firebase/firestore";
 import { useFirebaseStore } from "@/hooks/useFirebaseStore";
@@ -39,6 +39,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
   // Fog of war state
   const [fogOfWarEnabled, setFogOfWarEnabled] = useState(false);
+  const [fogEraserActive, setFogEraserActive] = useState(false); // Separate eraser toggle
   const [fogBrushSize, setFogBrushSize] = useState(5);
   const [revealedAreas, setRevealedAreas] = useState<{ x: number; y: number; radius: number }[]>([]);
   const [mapScale, setMapScale] = useState(100);
@@ -284,19 +285,22 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     broadcastFogState(fogOfWarEnabled, [], mapScale);
   }, [fogOfWarEnabled, mapScale, broadcastFogState]);
 
-  // Handle map scale changes
-  const handleScaleChange = useCallback((newScale: number) => {
-    setMapScale(newScale);
-    broadcastFogState(fogOfWarEnabled, revealedAreas, newScale);
-  }, [fogOfWarEnabled, revealedAreas, broadcastFogState]);
-
-  // Get all mobs for the current episode
+  // Get all mobs for the current episode (unique mobs for the mob display list)
   const episodeMobs = useMemo(() => {
     if (!selectedEpisode) return [];
-    return selectedEpisode.mobPlacements
-      .map(placement => mobs.find(m => m.id === placement.mobId))
+    const uniqueMobIds = new Set(selectedEpisode.mobPlacements.map(p => p.mobId));
+    return Array.from(uniqueMobIds)
+      .map(mobId => mobs.find(m => m.id === mobId))
       .filter(Boolean) as Mob[];
   }, [selectedEpisode, mobs]);
+
+  // Get mob placements filtered by current map
+  const currentMapMobPlacements = useMemo(() => {
+    if (!selectedEpisode || !currentMapId) return [];
+    return selectedEpisode.mobPlacements.filter(p =>
+      p.mapId === currentMapId || (!p.mapId && selectedEpisode.mapIds[0] === currentMapId)
+    );
+  }, [selectedEpisode, currentMapId]);
 
   // Get the current map URL
   const currentMapUrl = useMemo(() => {
@@ -593,58 +597,48 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                 </>
               )}
 
-              {/* Scale controls */}
-              <div className="flex items-center gap-1 border-l border-border pl-2">
-                <DungeonButton variant="default" size="sm" onClick={() => handleScaleChange(Math.max(25, mapScale - 25))}>
-                  <ZoomOut className="w-4 h-4" />
-                </DungeonButton>
-                <span className="text-xs text-muted-foreground w-12 text-center">{mapScale}%</span>
-                <DungeonButton variant="default" size="sm" onClick={() => handleScaleChange(Math.min(200, mapScale + 25))}>
-                  <ZoomIn className="w-4 h-4" />
-                </DungeonButton>
-              </div>
-
               {/* Grid toggle */}
-              <DungeonButton
-                variant={showGrid ? "admin" : "default"}
-                size="sm"
-                onClick={() => setShowGrid(!showGrid)}
-              >
-                <Grid3x3 className="w-4 h-4 mr-1" />
-                Grid
-              </DungeonButton>
-
-              {showGrid && (
-                <div className="flex items-center gap-2">
-                  <input
-                    type="range"
-                    min="20"
-                    max="100"
-                    step="5"
-                    value={gridSize}
-                    onChange={(e) => setGridSize(Number(e.target.value))}
-                    className="w-16 h-2 bg-border rounded-lg appearance-none cursor-pointer"
-                  />
-                  <span className="text-xs text-muted-foreground w-6">{gridSize}</span>
-                </div>
-              )}
-
-              {/* Fog of War controls */}
               <div className="flex items-center gap-1 border-l border-border pl-2">
                 <DungeonButton
-                  variant={fogOfWarEnabled ? "admin" : "default"}
+                  variant={showGrid ? "admin" : "default"}
                   size="sm"
-                  onClick={handleToggleFogOfWar}
-                  title="Toggle Fog of War"
+                  onClick={() => setShowGrid(!showGrid)}
                 >
-                  <CloudFog className="w-4 h-4 mr-1" />
-                  Fog
+                  <Grid3x3 className="w-4 h-4 mr-1" />
+                  Grid
                 </DungeonButton>
 
-                {fogOfWarEnabled && (
-                  <>
+                {showGrid && (
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="range"
+                      min="20"
+                      max="100"
+                      step="5"
+                      value={gridSize}
+                      onChange={(e) => setGridSize(Number(e.target.value))}
+                      className="w-16 h-2 bg-border rounded-lg appearance-none cursor-pointer"
+                    />
+                    <span className="text-xs text-muted-foreground w-6">{gridSize}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Fog of War controls */}
+              {fogOfWarEnabled && (
+                <div className="flex items-center gap-1 border-l border-border pl-2">
+                  <DungeonButton
+                    variant={fogEraserActive ? "admin" : "default"}
+                    size="sm"
+                    onClick={() => setFogEraserActive(!fogEraserActive)}
+                    title="Toggle Eraser Mode"
+                  >
+                    <Eraser className="w-4 h-4 mr-1" />
+                    Eraser
+                  </DungeonButton>
+
+                  {fogEraserActive && (
                     <div className="flex items-center gap-1">
-                      <Eraser className="w-3 h-3 text-muted-foreground" />
                       <input
                         type="range"
                         min="2"
@@ -655,18 +649,20 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                         className="w-16 h-2 bg-border rounded-lg appearance-none cursor-pointer"
                         title="Brush size"
                       />
+                      <span className="text-xs text-muted-foreground w-4">{fogBrushSize}</span>
                     </div>
-                    <DungeonButton
-                      variant="danger"
-                      size="sm"
-                      onClick={handleClearFogOfWar}
-                      title="Clear all revealed areas"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </DungeonButton>
-                  </>
-                )}
-              </div>
+                  )}
+
+                  <DungeonButton
+                    variant="danger"
+                    size="sm"
+                    onClick={handleClearFogOfWar}
+                    title="Reset fog (cover entire map)"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </DungeonButton>
+                </div>
+              )}
 
               <DungeonButton variant="default" size="sm" onClick={() => setSelectedMap(null)}>
                 <Layers className="w-4 h-4 mr-1" /> Map
@@ -705,93 +701,99 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
           {/* Grid overlay - only visible to DM */}
           {isAdmin && <GridOverlay isVisible={showGrid} cellSize={gridSize} opacity={0.3} />}
 
-          {/* Displayed mobs on the map */}
-          {selectedEpisode?.mobPlacements.map((placement, index) => {
-          const mob = mobs.find(m => m.id === placement.mobId);
-          if (!mob) return null;
+          {/* Displayed mobs on the map - filtered by current map */}
+          {currentMapMobPlacements.map((placement, localIndex) => {
+            const mob = mobs.find(m => m.id === placement.mobId);
+            if (!mob) return null;
 
-          // Count how many times this mob appears before this index
-          const sameIdBefore = selectedEpisode.mobPlacements
-            .slice(0, index)
-            .filter(p => p.mobId === placement.mobId).length;
-          const letter = sameIdBefore > 0 ? String.fromCharCode(65 + sameIdBefore) : '';
+            // Find the global index in the full placements array for drag state
+            const globalIndex = selectedEpisode?.mobPlacements.findIndex(
+              (p, i) => p === placement || (p.mobId === placement.mobId && p.x === placement.x && p.y === placement.y && p.mapId === placement.mapId)
+            ) ?? localIndex;
 
-          console.log(`[ShowTime] Rendering mob ${index}:`, { x: placement.x, y: placement.y, mobId: placement.mobId });
+            // Count how many times this mob appears before this index on this map
+            const sameIdBefore = currentMapMobPlacements
+              .slice(0, localIndex)
+              .filter(p => p.mobId === placement.mobId).length;
+            const letter = sameIdBefore > 0 ? String.fromCharCode(65 + sameIdBefore) : '';
 
-          const isDragging = draggingMobId === `${placement.mobId}-${index}`;
+            const isDragging = draggingMobId === `${placement.mobId}-${globalIndex}`;
 
-          return (
-            <motion.div
-              key={`${placement.mobId}-${index}`}
-              style={{
-                position: "absolute",
-                transform: "translate(-50%, -50%)",
-                // When dragging, position updates instantly; when not dragging, use animated values
-                ...(isDragging ? {
-                  left: `${placement.x}%`,
-                  top: `${placement.y}%`,
-                } : {}),
-              }}
-              onMouseDown={() => isAdmin && handleMobMouseDown(`${placement.mobId}-${index}`)}
-              initial={{ scale: 0, opacity: 0 }}
-              animate={{
-                scale: 1,
-                opacity: 1,
-                // Only animate position when NOT dragging
-                ...(!isDragging ? {
-                  left: `${placement.x}%`,
-                  top: `${placement.y}%`
-                } : {}),
-              }}
-              transition={{
-                scale: { type: "spring", stiffness: 260, damping: 20 },
-                opacity: { type: "spring", stiffness: 260, damping: 20 },
-                left: { type: "tween", duration: 0.15, ease: "linear" },
-                top: { type: "tween", duration: 0.15, ease: "linear" }
-              }}
-            >
-              <div className="relative">
-                <MobIcon
-                  mob={mob}
-                  size={64}
-                  isDragging={isDragging}
-                />
-                {letter && (
-                  <div className="absolute -top-1 -right-1 w-6 h-6 bg-accent text-background rounded-full flex items-center justify-center text-sm font-bold shadow-lg">
-                    {letter}
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          );
-        })}
+            // Counter-scale the mob icon to maintain fixed size regardless of map scale
+            const counterScale = 100 / mapScale;
+
+            return (
+              <motion.div
+                key={`${placement.mobId}-${currentMapId}-${localIndex}`}
+                style={{
+                  position: "absolute",
+                  transform: `translate(-50%, -50%) scale(${counterScale})`,
+                  // When dragging, position updates instantly; when not dragging, use animated values
+                  ...(isDragging ? {
+                    left: `${placement.x}%`,
+                    top: `${placement.y}%`,
+                  } : {}),
+                }}
+                onMouseDown={() => isAdmin && handleMobMouseDown(`${placement.mobId}-${globalIndex}`)}
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{
+                  scale: counterScale,
+                  opacity: 1,
+                  // Only animate position when NOT dragging
+                  ...(!isDragging ? {
+                    left: `${placement.x}%`,
+                    top: `${placement.y}%`
+                  } : {}),
+                }}
+                transition={{
+                  scale: { type: "spring", stiffness: 260, damping: 20 },
+                  opacity: { type: "spring", stiffness: 260, damping: 20 },
+                  left: { type: "tween", duration: 0.15, ease: "linear" },
+                  top: { type: "tween", duration: 0.15, ease: "linear" }
+                }}
+              >
+                <div className="relative">
+                  <MobIcon
+                    mob={mob}
+                    size={64}
+                    isDragging={isDragging}
+                  />
+                  {letter && (
+                    <div className="absolute -top-1 -right-1 w-6 h-6 bg-accent text-background rounded-full flex items-center justify-center text-sm font-bold shadow-lg">
+                      {letter}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            );
+          })}
 
           {/* Fog of War overlay - placed AFTER mobs so it covers them */}
           <FogOfWar
             isVisible={fogOfWarEnabled}
             revealedAreas={revealedAreas}
-            isAdmin={isAdmin}
+            isAdmin={isAdmin && fogEraserActive}
             brushSize={fogBrushSize}
             onReveal={handleFogReveal}
             onClearAll={handleClearFogOfWar}
           />
         </div>
-
-        {/* Display mobs - positioned to the LEFT of the dice menu */}
-        {displayedMobIds.map((mobId, index) => {
-          const mob = mobs.find(m => m.id === mobId);
-          if (!mob) return null;
-
-          return (
-            <ResizableMobDisplay
-              key={mobId}
-              mob={mob}
-              onClose={() => handleHideMob(mobId)}
-              index={index}
-            />
-          );
-        })}
       </div>
+
+      {/* Display mob cards - positioned to the LEFT of the dice menu, OUTSIDE the map container */}
+      {displayedMobIds.map((mobId, index) => {
+        const mob = mobs.find(m => m.id === mobId);
+        if (!mob) return null;
+
+        return (
+          <ResizableMobDisplay
+            key={mobId}
+            mob={mob}
+            onClose={() => handleHideMob(mobId)}
+            index={index}
+          />
+        );
+      })}
 
       {/* Player view - waiting message */}
       {!isAdmin && (

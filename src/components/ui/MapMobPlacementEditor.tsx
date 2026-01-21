@@ -8,6 +8,7 @@ import { Grid3x3, Trash2, RotateCcw } from "lucide-react";
 
 interface MapMobPlacementEditorProps {
   mapUrl: string;
+  mapId: string; // The current map ID for filtering placements
   mobs: Mob[];
   placements: EpisodeMobPlacement[];
   onPlacementsChange: (placements: EpisodeMobPlacement[]) => void;
@@ -17,6 +18,7 @@ interface MapMobPlacementEditorProps {
 
 const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
   mapUrl,
+  mapId,
   mobs,
   placements,
   onPlacementsChange,
@@ -45,8 +47,12 @@ const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
     const clampedX = Math.max(0, Math.min(100, x));
     const clampedY = Math.max(0, Math.min(100, y));
 
+    // draggingIndex is a local index into currentMapPlacements, need to find full array index
+    const fullIndex = getFullArrayIndex(draggingIndex);
+    if (fullIndex === -1) return;
+
     const updatedPlacements = placements.map((p, i) =>
-      i === draggingIndex
+      i === fullIndex
         ? { ...p, x: clampedX, y: clampedY }
         : p
     );
@@ -58,24 +64,41 @@ const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
     setDraggingIndex(null);
   };
 
-  const handleRemoveMob = (index: number) => {
-    const updated = placements.filter((_, i) => i !== index);
+  const handleRemoveMob = (localIndex: number) => {
+    const fullIndex = getFullArrayIndex(localIndex);
+    if (fullIndex === -1) return;
+
+    const mobId = placements[fullIndex].mobId;
+    const updated = placements.filter((_, i) => i !== fullIndex);
     onPlacementsChange(updated);
     if (onRemoveMob) {
-      onRemoveMob(placements[index].mobId);
+      onRemoveMob(mobId);
     }
   };
 
   const handleResetPositions = () => {
-    const reset = placements.map(p => ({
-      ...p,
-      x: 50,
-      y: 50,
-    }));
+    // Only reset positions for mobs on the current map
+    const reset = placements.map(p =>
+      p.mapId === mapId ? { ...p, x: 50, y: 50 } : p
+    );
     onPlacementsChange(reset);
   };
 
-  const placedMobIds = placements.map(p => p.mobId);
+  // Filter placements to only show mobs for current map
+  const currentMapPlacements = placements.filter(p => p.mapId === mapId);
+
+  // Get indices of current map placements in the full array
+  const getFullArrayIndex = (localIndex: number): number => {
+    let count = 0;
+    for (let i = 0; i < placements.length; i++) {
+      if (placements[i].mapId === mapId) {
+        if (count === localIndex) return i;
+        count++;
+      }
+    }
+    return -1;
+  };
+
   // Show all mobs - allow adding duplicates
   const availableMobs = mobs;
 
@@ -111,7 +134,7 @@ const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
             variant="default"
             size="sm"
             onClick={handleResetPositions}
-            disabled={placements.length === 0}
+            disabled={currentMapPlacements.length === 0}
           >
             <RotateCcw className="w-4 h-4 mr-2" />
             Reset
@@ -135,18 +158,18 @@ const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
       >
         <GridOverlay isVisible={showGrid} cellSize={gridSize} opacity={0.3} />
 
-        {/* Placed mobs */}
-        {placements.map((placement, index) => {
+        {/* Placed mobs - only show mobs for current map */}
+        {currentMapPlacements.map((placement, index) => {
           const mob = mobs.find(m => m.id === placement.mobId);
           if (!mob) return null;
 
-          // Count how many times this mob appears before this index
-          const sameIdBefore = placements.slice(0, index).filter(p => p.mobId === placement.mobId).length;
+          // Count how many times this mob appears before this index on this map
+          const sameIdBefore = currentMapPlacements.slice(0, index).filter(p => p.mobId === placement.mobId).length;
           const letter = sameIdBefore > 0 ? String.fromCharCode(65 + sameIdBefore) : '';
 
           return (
             <motion.div
-              key={`${placement.mobId}-${index}`}
+              key={`${placement.mobId}-${mapId}-${index}`}
               className="absolute"
               style={{
                 left: `${placement.x}%`,
@@ -184,10 +207,10 @@ const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
         })}
 
         {/* Empty state */}
-        {placements.length === 0 && (
+        {currentMapPlacements.length === 0 && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center text-muted-foreground">
-              <p className="text-sm">No mobs placed yet</p>
+              <p className="text-sm">No mobs placed on this map yet</p>
               <p className="text-xs">Add mobs from the list below</p>
             </div>
           </div>
@@ -197,10 +220,11 @@ const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
       {/* Mob list - add mobs to placement */}
       {availableMobs.length > 0 && (
         <div className="bg-muted/30 border border-border rounded p-4">
-          <h5 className="font-display text-sm text-primary mb-3">Available Mobs (Click to Add)</h5>
+          <h5 className="font-display text-sm text-primary mb-3">Available Mobs (Click to Add to This Map)</h5>
           <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
             {availableMobs.map(mob => {
-              const count = placements.filter(p => p.mobId === mob.id).length;
+              // Count placements of this mob on current map only
+              const count = currentMapPlacements.filter(p => p.mobId === mob.id).length;
               return (
                 <DungeonButton
                   key={mob.id}
@@ -210,48 +234,49 @@ const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
                   onClick={() => {
                     const newPlacement: EpisodeMobPlacement = {
                       mobId: mob.id,
-                    x: 50,
-                    y: 50,
-                    scale: 1,
-                  };
-                  onPlacementsChange([...placements, newPlacement]);
-                  if (onAddMob) {
-                    onAddMob(mob.id);
-                  }
-                }}
-              >
-                <div className="flex items-center justify-between w-full gap-2">
-                  <span className="text-xs">{mob.name}</span>
-                  {count > 0 && (
-                    <span className="text-xs bg-accent text-background px-2 py-0.5 rounded-full font-bold">
-                      {count}
-                    </span>
-                  )}
-                </div>
-                {mob.hitPoints && <span className="text-xs text-muted-foreground">HP: {mob.hitPoints}</span>}
-              </DungeonButton>
+                      mapId: mapId,
+                      x: 50,
+                      y: 50,
+                      scale: 1,
+                    };
+                    onPlacementsChange([...placements, newPlacement]);
+                    if (onAddMob) {
+                      onAddMob(mob.id);
+                    }
+                  }}
+                >
+                  <div className="flex items-center justify-between w-full gap-2">
+                    <span className="text-xs">{mob.name}</span>
+                    {count > 0 && (
+                      <span className="text-xs bg-accent text-background px-2 py-0.5 rounded-full font-bold">
+                        {count}
+                      </span>
+                    )}
+                  </div>
+                  {mob.hitPoints && <span className="text-xs text-muted-foreground">HP: {mob.hitPoints}</span>}
+                </DungeonButton>
               );
             })}
           </div>
         </div>
       )}
 
-      {/* Placed mobs list - remove mobs */}
-      {placements.length > 0 && (
+      {/* Placed mobs list - remove mobs (only show mobs for current map) */}
+      {currentMapPlacements.length > 0 && (
         <div className="bg-muted/30 border border-border rounded p-4">
-          <h5 className="font-display text-sm text-primary mb-3">Placed Mobs</h5>
+          <h5 className="font-display text-sm text-primary mb-3">Mobs on This Map</h5>
           <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-2">
-            {placements.map((placement, index) => {
+            {currentMapPlacements.map((placement, index) => {
               const mob = mobs.find(m => m.id === placement.mobId);
               if (!mob) return null;
 
-              // Count how many times this mob appears before this index
-              const sameIdBefore = placements.slice(0, index).filter(p => p.mobId === placement.mobId).length;
+              // Count how many times this mob appears before this index on this map
+              const sameIdBefore = currentMapPlacements.slice(0, index).filter(p => p.mobId === placement.mobId).length;
               const letter = sameIdBefore > 0 ? String.fromCharCode(65 + sameIdBefore) : '';
 
               return (
                 <div
-                  key={`${placement.mobId}-${index}`}
+                  key={`${placement.mobId}-${mapId}-${index}`}
                   className="flex items-center justify-between bg-background border border-border rounded p-2"
                 >
                   <div className="flex-1 min-w-0">

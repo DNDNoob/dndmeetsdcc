@@ -58,6 +58,7 @@ export interface Mob {
 
 export interface EpisodeMobPlacement {
   mobId: string;
+  mapId: string; // The map this mob is placed on (index as string)
   x: number; // Percentage of map width (0-100)
   y: number; // Percentage of map height (0-100)
   scale?: number; // Optional scale multiplier for display (1 = normal size)
