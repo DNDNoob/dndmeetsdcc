@@ -45,6 +45,12 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   const lastFogBroadcastTime = useRef<number>(0);
   const FOG_BROADCAST_THROTTLE_MS = 100;
 
+  // Get current map ID for fog of war storage - MUST be defined before useEffects that use it
+  const currentMapId = useMemo(() => {
+    if (!selectedEpisode || selectedEpisode.mapIds.length === 0) return null;
+    return selectedEpisode.mapIds[currentMapIndex];
+  }, [selectedEpisode, currentMapIndex]);
+
   // Auto-select first episode and first map when episodes load (only once)
   useEffect(() => {
     if (episodes.length > 0 && !selectedEpisode && !hasAutoLoaded.current) {
@@ -191,12 +197,6 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       console.error('[ShowTime] Failed to broadcast drag state:', error);
     }
   };
-
-  // Get current map ID for fog of war storage
-  const currentMapId = useMemo(() => {
-    if (!selectedEpisode || selectedEpisode.mapIds.length === 0) return null;
-    return selectedEpisode.mapIds[currentMapIndex];
-  }, [selectedEpisode, currentMapIndex]);
 
   // Listen for fog of war updates
   useEffect(() => {
