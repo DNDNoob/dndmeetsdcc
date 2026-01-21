@@ -7,7 +7,7 @@ import { GridOverlay } from "@/components/ui/GridOverlay";
 import { MobIcon } from "@/components/ui/MobIcon";
 import { FogOfWar } from "@/components/ui/FogOfWar";
 import { Episode, Mob, MapSettings } from "@/lib/gameData";
-import { Map, X, Eye, Layers, ChevronLeft, ChevronRight, PlayCircle, Grid3x3, Eraser, Trash2 } from "lucide-react";
+import { Map, X, Eye, Layers, ChevronLeft, ChevronRight, PlayCircle, Grid3x3, CloudFog, Eraser, Trash2 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { doc, setDoc, onSnapshot, serverTimestamp, Timestamp } from "firebase/firestore";
 import { useFirebaseStore } from "@/hooks/useFirebaseStore";
@@ -625,44 +625,56 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
               </div>
 
               {/* Fog of War controls */}
-              {fogOfWarEnabled && (
-                <div className="flex items-center gap-1 border-l border-border pl-2">
-                  <DungeonButton
-                    variant={fogEraserActive ? "admin" : "default"}
-                    size="sm"
-                    onClick={() => setFogEraserActive(!fogEraserActive)}
-                    title="Toggle Eraser Mode"
-                  >
-                    <Eraser className="w-4 h-4 mr-1" />
-                    Eraser
-                  </DungeonButton>
+              <div className="flex items-center gap-1 border-l border-border pl-2">
+                <DungeonButton
+                  variant={fogOfWarEnabled ? "admin" : "default"}
+                  size="sm"
+                  onClick={handleToggleFogOfWar}
+                  title="Toggle Fog of War"
+                >
+                  <CloudFog className="w-4 h-4 mr-1" />
+                  Fog
+                </DungeonButton>
 
-                  {fogEraserActive && (
-                    <div className="flex items-center gap-1">
-                      <input
-                        type="range"
-                        min="2"
-                        max="15"
-                        step="1"
-                        value={fogBrushSize}
-                        onChange={(e) => setFogBrushSize(Number(e.target.value))}
-                        className="w-16 h-2 bg-border rounded-lg appearance-none cursor-pointer"
-                        title="Brush size"
-                      />
-                      <span className="text-xs text-muted-foreground w-4">{fogBrushSize}</span>
-                    </div>
-                  )}
+                {fogOfWarEnabled && (
+                  <>
+                    <DungeonButton
+                      variant={fogEraserActive ? "admin" : "default"}
+                      size="sm"
+                      onClick={() => setFogEraserActive(!fogEraserActive)}
+                      title="Toggle Eraser Mode"
+                    >
+                      <Eraser className="w-4 h-4 mr-1" />
+                      Eraser
+                    </DungeonButton>
 
-                  <DungeonButton
-                    variant="danger"
-                    size="sm"
-                    onClick={handleClearFogOfWar}
-                    title="Reset fog (cover entire map)"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </DungeonButton>
-                </div>
-              )}
+                    {fogEraserActive && (
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="range"
+                          min="2"
+                          max="15"
+                          step="1"
+                          value={fogBrushSize}
+                          onChange={(e) => setFogBrushSize(Number(e.target.value))}
+                          className="w-16 h-2 bg-border rounded-lg appearance-none cursor-pointer"
+                          title="Brush size"
+                        />
+                        <span className="text-xs text-muted-foreground w-4">{fogBrushSize}</span>
+                      </div>
+                    )}
+
+                    <DungeonButton
+                      variant="danger"
+                      size="sm"
+                      onClick={handleClearFogOfWar}
+                      title="Reset fog (cover entire map)"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </DungeonButton>
+                  </>
+                )}
+              </div>
 
               <DungeonButton variant="default" size="sm" onClick={() => setSelectedMap(null)}>
                 <Layers className="w-4 h-4 mr-1" /> Map
