@@ -28,7 +28,7 @@ const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
   const [draggingMobId, setDraggingMobId] = useState<string | null>(null);
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
   const [showGrid, setShowGrid] = useState(false);
-  const [gridSize, setGridSize] = useState(50);
+  const gridSize = 64; // Fixed size to match mob icons
   const mapContainerRef = useRef<HTMLDivElement>(null);
 
   const handleMouseDown = (e: React.MouseEvent, index: number) => {
@@ -111,25 +111,11 @@ const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
             variant={showGrid ? "admin" : "default"}
             size="sm"
             onClick={() => setShowGrid(!showGrid)}
+            title="Toggle grid (64px cells to match mob icons)"
           >
             <Grid3x3 className="w-4 h-4 mr-2" />
             {showGrid ? "Grid On" : "Grid Off"}
           </DungeonButton>
-          {showGrid && (
-            <div className="flex items-center gap-2">
-              <label className="text-xs text-muted-foreground">Size:</label>
-              <input
-                type="range"
-                min="20"
-                max="100"
-                step="5"
-                value={gridSize}
-                onChange={(e) => setGridSize(Number(e.target.value))}
-                className="w-24 h-2 bg-border rounded-lg appearance-none cursor-pointer"
-              />
-              <span className="text-xs text-muted-foreground w-8">{gridSize}</span>
-            </div>
-          )}
           <DungeonButton
             variant="default"
             size="sm"

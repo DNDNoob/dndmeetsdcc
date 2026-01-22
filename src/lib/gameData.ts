@@ -64,6 +64,13 @@ export interface EpisodeMobPlacement {
   scale?: number; // Optional scale multiplier for display (1 = normal size)
 }
 
+export interface CrawlerPlacement {
+  crawlerId: string;
+  mapId: string; // The map this crawler is placed on
+  x: number; // Percentage of map width (0-100)
+  y: number; // Percentage of map height (0-100)
+}
+
 export interface MapData {
   id: string;
   name: string;

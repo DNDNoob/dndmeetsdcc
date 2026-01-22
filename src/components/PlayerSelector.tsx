@@ -10,8 +10,8 @@ interface PlayerSelectorProps {
 }
 
 const PlayerSelector: React.FC<PlayerSelectorProps> = ({ crawlers, onSelect }) => {
-  const [selectedPlayer, setSelectedPlayer] = useState("");
-  const [selectedType, setSelectedType] = useState<"crawler" | "ai" | "npc">("crawler");
+  const [selectedPlayer, setSelectedPlayer] = useState("pc"); // Default to "Just a Boring PC"
+  const [selectedType, setSelectedType] = useState<"crawler" | "ai" | "npc" | "pc">("pc");
 
   const handleSelect = () => {
     if (!selectedPlayer) return;
@@ -25,6 +25,9 @@ const PlayerSelector: React.FC<PlayerSelectorProps> = ({ crawlers, onSelect }) =
     } else if (selectedPlayer === "npc") {
       playerName = "Just a Boring NPC";
       type = "npc";
+    } else if (selectedPlayer === "pc") {
+      playerName = "Just a Boring PC";
+      type = "npc"; // PC is treated like NPC for permissions
     } else {
       const crawler = crawlers.find(c => c.id === selectedPlayer);
       playerName = crawler?.name || "";
@@ -53,6 +56,7 @@ const PlayerSelector: React.FC<PlayerSelectorProps> = ({ crawlers, onSelect }) =
               setSelectedPlayer(e.target.value);
               if (e.target.value === "dungeon-ai") setSelectedType("ai");
               else if (e.target.value === "npc") setSelectedType("npc");
+              else if (e.target.value === "pc") setSelectedType("pc");
               else setSelectedType("crawler");
             }}
             className="w-full bg-muted border border-primary px-4 py-3 text-foreground font-mono"
@@ -65,9 +69,12 @@ const PlayerSelector: React.FC<PlayerSelectorProps> = ({ crawlers, onSelect }) =
                 </option>
               ))}
             </optgroup>
+            <optgroup label="Spectators">
+              <option value="pc">Just a Boring PC</option>
+              <option value="npc">Just a Boring NPC</option>
+            </optgroup>
             <optgroup label="System Access">
               <option value="dungeon-ai">Dungeon AI (DM Access)</option>
-              <option value="npc">Just a Boring NPC</option>
             </optgroup>
           </select>
         </div>
@@ -80,6 +87,7 @@ const PlayerSelector: React.FC<PlayerSelectorProps> = ({ crawlers, onSelect }) =
         >
           {selectedType === "ai" && <Brain className="w-5 h-5 mr-2" />}
           {selectedType === "npc" && <Users className="w-5 h-5 mr-2" />}
+          {selectedType === "pc" && <User className="w-5 h-5 mr-2" />}
           {selectedType === "crawler" && <User className="w-5 h-5 mr-2" />}
           Enter System
         </DungeonButton>

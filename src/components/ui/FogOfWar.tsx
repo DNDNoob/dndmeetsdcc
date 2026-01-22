@@ -7,6 +7,7 @@ interface FogOfWarProps {
   brushSize: number;
   onReveal?: (x: number, y: number, radius: number) => void;
   onClearAll?: () => void;
+  isViewerAdmin?: boolean; // True if the viewer is admin (for semi-transparent fog)
 }
 
 export const FogOfWar: React.FC<FogOfWarProps> = ({
@@ -16,6 +17,7 @@ export const FogOfWar: React.FC<FogOfWarProps> = ({
   brushSize,
   onReveal,
   onClearAll,
+  isViewerAdmin = false,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -108,11 +110,11 @@ export const FogOfWar: React.FC<FogOfWarProps> = ({
           </radialGradient>
         </defs>
 
-        {/* Main fog layer */}
+        {/* Main fog layer - opaque for users, semi-transparent for DM */}
         <rect
           width="100%"
           height="100%"
-          fill="rgba(20, 20, 30, 0.95)"
+          fill={isViewerAdmin ? "rgba(20, 20, 30, 0.6)" : "rgba(10, 10, 15, 1)"}
           mask={`url(#${maskId})`}
         />
       </svg>

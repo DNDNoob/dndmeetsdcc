@@ -277,6 +277,7 @@ const Index = () => {
                 mapNames={mapNames}
                 episodes={episodes}
                 mobs={mobs}
+                crawlers={crawlers}
                 isAdmin={isAdmin}
                 onUpdateEpisode={updateEpisode}
               />

@@ -6,8 +6,12 @@ import { ResizableMobDisplay } from "@/components/ui/ResizableMobDisplay";
 import { GridOverlay } from "@/components/ui/GridOverlay";
 import { MobIcon } from "@/components/ui/MobIcon";
 import { FogOfWar } from "@/components/ui/FogOfWar";
-import { Episode, Mob, MapSettings } from "@/lib/gameData";
-import { Map, X, Eye, Layers, ChevronLeft, ChevronRight, PlayCircle, Grid3x3, CloudFog, Eraser, Trash2 } from "lucide-react";
+import { Episode, Mob, MapSettings, Crawler, CrawlerPlacement, EpisodeMobPlacement } from "@/lib/gameData";
+import { Map, X, Eye, Layers, ChevronLeft, ChevronRight, PlayCircle, Grid3x3, CloudFog, Eraser, Trash2, Target } from "lucide-react";
+import { PingEffect, Ping } from "@/components/ui/PingEffect";
+import { MapBox, MapBoxData } from "@/components/ui/MapBox";
+import { MapToolsMenu } from "@/components/ui/MapToolsMenu";
+import { CrawlerIcon } from "@/components/ui/CrawlerIcon";
 import { db } from "@/lib/firebase";
 import { doc, setDoc, onSnapshot, serverTimestamp, Timestamp } from "firebase/firestore";
 import { useFirebaseStore } from "@/hooks/useFirebaseStore";
@@ -17,18 +21,19 @@ interface ShowTimeViewProps {
   mapNames?: string[];
   episodes: Episode[];
   mobs: Mob[];
+  crawlers: Crawler[];
   isAdmin: boolean;
   onUpdateEpisode?: (id: string, updates: Partial<Episode>) => void;
 }
 
-const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, isAdmin, onUpdateEpisode }) => {
+const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode }) => {
   const { roomId } = useFirebaseStore();
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
   const [currentMapIndex, setCurrentMapIndex] = useState(0);
   const [displayedMobIds, setDisplayedMobIds] = useState<string[]>([]);
   const [selectedMap, setSelectedMap] = useState<string | null>(null);
   const [showGrid, setShowGrid] = useState(false);
-  const [gridSize, setGridSize] = useState(50);
+  const [gridSize, setGridSize] = useState(64); // Default to match mob icon size
   const [draggingMobId, setDraggingMobId] = useState<string | null>(null);
   const [remoteDragState, setRemoteDragState] = useState<{placementIndex: number; x: number; y: number} | null>(null);
   const mapImageRef = useRef<HTMLImageElement>(null);
@@ -45,6 +50,22 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   const [mapScale, setMapScale] = useState(100);
   const lastFogBroadcastTime = useRef<number>(0);
   const FOG_BROADCAST_THROTTLE_MS = 100;
+
+  // Ping and Box state
+  const [pings, setPings] = useState<Ping[]>([]);
+  const [mapBoxes, setMapBoxes] = useState<MapBoxData[]>([]);
+  const [isPingMode, setIsPingMode] = useState(false);
+  const [isBoxMode, setIsBoxMode] = useState(false);
+  const [selectedColor, setSelectedColor] = useState("#ef4444"); // Default red
+  const [boxOpacity, setBoxOpacity] = useState(0.3);
+
+  // Crawler and Mob placement state (DM can add during ShowTime)
+  const [crawlerPlacements, setCrawlerPlacements] = useState<CrawlerPlacement[]>([]);
+  const [runtimeMobPlacements, setRuntimeMobPlacements] = useState<EpisodeMobPlacement[]>([]);
+  const [isAddCrawlerMode, setIsAddCrawlerMode] = useState(false);
+  const [isAddMobMode, setIsAddMobMode] = useState(false);
+  const [selectedCrawlerId, setSelectedCrawlerId] = useState<string | null>(null);
+  const [selectedMobId, setSelectedMobId] = useState<string | null>(null);
 
   // Get current map ID for fog of war storage - MUST be defined before useEffects that use it
   const currentMapId = useMemo(() => {
@@ -284,6 +305,294 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     setRevealedAreas([]);
     broadcastFogState(fogOfWarEnabled, [], mapScale);
   }, [fogOfWarEnabled, mapScale, broadcastFogState]);
+
+  // Listen for ping updates
+  useEffect(() => {
+    if (!selectedEpisode || !currentMapId) return;
+
+    const pingDocPath = roomId
+      ? `rooms/${roomId}/pings/${selectedEpisode.id}-${currentMapId}`
+      : `pings/${selectedEpisode.id}-${currentMapId}`;
+
+    const pingDocRef = doc(db, pingDocPath);
+
+    const unsubscribe = onSnapshot(pingDocRef, (snapshot) => {
+      if (!snapshot.exists()) return;
+
+      const pingData = snapshot.data();
+      if (pingData.pings) {
+        // Filter out old pings (older than 3 seconds)
+        const now = Date.now();
+        const activePings = pingData.pings.filter((p: Ping) => now - p.timestamp < 3000);
+        setPings(activePings);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [selectedEpisode?.id, currentMapId, roomId]);
+
+  // Listen for box updates
+  useEffect(() => {
+    if (!selectedEpisode || !currentMapId) return;
+
+    const boxDocPath = roomId
+      ? `rooms/${roomId}/map-boxes/${selectedEpisode.id}-${currentMapId}`
+      : `map-boxes/${selectedEpisode.id}-${currentMapId}`;
+
+    const boxDocRef = doc(db, boxDocPath);
+
+    const unsubscribe = onSnapshot(boxDocRef, (snapshot) => {
+      if (!snapshot.exists()) return;
+
+      const boxData = snapshot.data();
+      if (boxData.boxes) {
+        setMapBoxes(boxData.boxes);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [selectedEpisode?.id, currentMapId, roomId]);
+
+  // Broadcast a ping
+  const broadcastPing = useCallback(async (x: number, y: number, color: string) => {
+    if (!selectedEpisode || !currentMapId) return;
+
+    const pingDocPath = roomId
+      ? `rooms/${roomId}/pings/${selectedEpisode.id}-${currentMapId}`
+      : `pings/${selectedEpisode.id}-${currentMapId}`;
+
+    const newPing: Ping = {
+      id: `ping-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      x,
+      y,
+      color,
+      timestamp: Date.now(),
+    };
+
+    try {
+      // Get current pings and add new one
+      const currentPings = [...pings, newPing].filter(p => Date.now() - p.timestamp < 3000);
+      await setDoc(doc(db, pingDocPath), {
+        episodeId: selectedEpisode.id,
+        mapId: currentMapId,
+        pings: currentPings,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error('[ShowTime] Failed to broadcast ping:', error);
+    }
+  }, [selectedEpisode?.id, currentMapId, roomId, pings]);
+
+  // Broadcast box updates
+  const broadcastBoxes = useCallback(async (boxes: MapBoxData[]) => {
+    if (!selectedEpisode || !currentMapId) return;
+
+    const boxDocPath = roomId
+      ? `rooms/${roomId}/map-boxes/${selectedEpisode.id}-${currentMapId}`
+      : `map-boxes/${selectedEpisode.id}-${currentMapId}`;
+
+    try {
+      await setDoc(doc(db, boxDocPath), {
+        episodeId: selectedEpisode.id,
+        mapId: currentMapId,
+        boxes,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error('[ShowTime] Failed to broadcast boxes:', error);
+    }
+  }, [selectedEpisode?.id, currentMapId, roomId]);
+
+  // Handle adding a box
+  const handleAddBox = useCallback((x: number, y: number, color: string, opacity: number) => {
+    const newBox: MapBoxData = {
+      id: `box-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      x,
+      y,
+      width: 10,
+      height: 10,
+      rotation: 0,
+      color,
+      opacity,
+      createdBy: isAdmin ? 'admin' : 'user',
+    };
+    const updatedBoxes = [...mapBoxes, newBox];
+    setMapBoxes(updatedBoxes);
+    broadcastBoxes(updatedBoxes);
+  }, [mapBoxes, broadcastBoxes, isAdmin]);
+
+  // Handle updating a box
+  const handleUpdateBox = useCallback((updatedBox: MapBoxData) => {
+    const updatedBoxes = mapBoxes.map(b => b.id === updatedBox.id ? updatedBox : b);
+    setMapBoxes(updatedBoxes);
+    broadcastBoxes(updatedBoxes);
+  }, [mapBoxes, broadcastBoxes]);
+
+  // Handle deleting a box
+  const handleDeleteBox = useCallback((id: string) => {
+    const updatedBoxes = mapBoxes.filter(b => b.id !== id);
+    setMapBoxes(updatedBoxes);
+    broadcastBoxes(updatedBoxes);
+  }, [mapBoxes, broadcastBoxes]);
+
+  // Handle map click for ping/box/crawlers/mobs
+  const handleMapClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!mapImageRef.current) return;
+    if (draggingMobId) return; // Don't do anything while dragging
+
+    const rect = mapImageRef.current.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+
+    const clampedX = Math.max(0, Math.min(100, x));
+    const clampedY = Math.max(0, Math.min(100, y));
+
+    if (isPingMode) {
+      broadcastPing(clampedX, clampedY, selectedColor);
+    } else if (isBoxMode && isAdmin) {
+      handleAddBox(clampedX, clampedY, selectedColor, boxOpacity);
+    } else if (isAddCrawlerMode && isAdmin && selectedCrawlerId) {
+      handleAddCrawlerToMap(clampedX, clampedY);
+    } else if (isAddMobMode && isAdmin && selectedMobId) {
+      handleAddMobToMapRuntime(clampedX, clampedY);
+    }
+  }, [isPingMode, isBoxMode, isAddCrawlerMode, isAddMobMode, isAdmin, selectedColor, boxOpacity, selectedCrawlerId, selectedMobId, draggingMobId, broadcastPing, handleAddBox, handleAddCrawlerToMap, handleAddMobToMapRuntime]);
+
+  // Auto-clean old pings
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPings(prev => prev.filter(p => Date.now() - p.timestamp < 3000));
+    }, 500);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Listen for crawler placement updates
+  useEffect(() => {
+    if (!selectedEpisode || !currentMapId) return;
+
+    const crawlerDocPath = roomId
+      ? `rooms/${roomId}/crawler-placements/${selectedEpisode.id}-${currentMapId}`
+      : `crawler-placements/${selectedEpisode.id}-${currentMapId}`;
+
+    const crawlerDocRef = doc(db, crawlerDocPath);
+
+    const unsubscribe = onSnapshot(crawlerDocRef, (snapshot) => {
+      if (!snapshot.exists()) return;
+
+      const data = snapshot.data();
+      if (data.placements) {
+        setCrawlerPlacements(data.placements);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [selectedEpisode?.id, currentMapId, roomId]);
+
+  // Listen for runtime mob placement updates
+  useEffect(() => {
+    if (!selectedEpisode || !currentMapId) return;
+
+    const mobDocPath = roomId
+      ? `rooms/${roomId}/runtime-mob-placements/${selectedEpisode.id}-${currentMapId}`
+      : `runtime-mob-placements/${selectedEpisode.id}-${currentMapId}`;
+
+    const mobDocRef = doc(db, mobDocPath);
+
+    const unsubscribe = onSnapshot(mobDocRef, (snapshot) => {
+      if (!snapshot.exists()) return;
+
+      const data = snapshot.data();
+      if (data.placements) {
+        setRuntimeMobPlacements(data.placements);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [selectedEpisode?.id, currentMapId, roomId]);
+
+  // Broadcast crawler placements
+  const broadcastCrawlerPlacements = useCallback(async (placements: CrawlerPlacement[]) => {
+    if (!selectedEpisode || !currentMapId || !isAdmin) return;
+
+    const crawlerDocPath = roomId
+      ? `rooms/${roomId}/crawler-placements/${selectedEpisode.id}-${currentMapId}`
+      : `crawler-placements/${selectedEpisode.id}-${currentMapId}`;
+
+    try {
+      await setDoc(doc(db, crawlerDocPath), {
+        episodeId: selectedEpisode.id,
+        mapId: currentMapId,
+        placements,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error('[ShowTime] Failed to broadcast crawler placements:', error);
+    }
+  }, [selectedEpisode?.id, currentMapId, roomId, isAdmin]);
+
+  // Broadcast runtime mob placements
+  const broadcastRuntimeMobPlacements = useCallback(async (placements: EpisodeMobPlacement[]) => {
+    if (!selectedEpisode || !currentMapId || !isAdmin) return;
+
+    const mobDocPath = roomId
+      ? `rooms/${roomId}/runtime-mob-placements/${selectedEpisode.id}-${currentMapId}`
+      : `runtime-mob-placements/${selectedEpisode.id}-${currentMapId}`;
+
+    try {
+      await setDoc(doc(db, mobDocPath), {
+        episodeId: selectedEpisode.id,
+        mapId: currentMapId,
+        placements,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error('[ShowTime] Failed to broadcast runtime mob placements:', error);
+    }
+  }, [selectedEpisode?.id, currentMapId, roomId, isAdmin]);
+
+  // Handle adding a crawler to the map
+  const handleAddCrawlerToMap = useCallback((x: number, y: number) => {
+    if (!selectedCrawlerId || !currentMapId) return;
+
+    const newPlacement: CrawlerPlacement = {
+      crawlerId: selectedCrawlerId,
+      mapId: currentMapId,
+      x,
+      y,
+    };
+    const updated = [...crawlerPlacements, newPlacement];
+    setCrawlerPlacements(updated);
+    broadcastCrawlerPlacements(updated);
+  }, [selectedCrawlerId, currentMapId, crawlerPlacements, broadcastCrawlerPlacements]);
+
+  // Handle adding a mob to the map at runtime
+  const handleAddMobToMapRuntime = useCallback((x: number, y: number) => {
+    if (!selectedMobId || !currentMapId) return;
+
+    const newPlacement: EpisodeMobPlacement = {
+      mobId: selectedMobId,
+      mapId: currentMapId,
+      x,
+      y,
+    };
+    const updated = [...runtimeMobPlacements, newPlacement];
+    setRuntimeMobPlacements(updated);
+    broadcastRuntimeMobPlacements(updated);
+  }, [selectedMobId, currentMapId, runtimeMobPlacements, broadcastRuntimeMobPlacements]);
+
+  // Handle removing a crawler from the map
+  const handleRemoveCrawlerFromMap = useCallback((index: number) => {
+    const updated = crawlerPlacements.filter((_, i) => i !== index);
+    setCrawlerPlacements(updated);
+    broadcastCrawlerPlacements(updated);
+  }, [crawlerPlacements, broadcastCrawlerPlacements]);
+
+  // Handle removing a runtime mob from the map
+  const handleRemoveRuntimeMob = useCallback((index: number) => {
+    const updated = runtimeMobPlacements.filter((_, i) => i !== index);
+    setRuntimeMobPlacements(updated);
+    broadcastRuntimeMobPlacements(updated);
+  }, [runtimeMobPlacements, broadcastRuntimeMobPlacements]);
 
   // Get all mobs for the current episode (unique mobs for the mob display list)
   const episodeMobs = useMemo(() => {
@@ -597,31 +906,17 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                 </>
               )}
 
-              {/* Grid toggle */}
+              {/* Grid toggle - fixed 64px size to match mob icons */}
               <div className="flex items-center gap-1 border-l border-border pl-2">
                 <DungeonButton
                   variant={showGrid ? "admin" : "default"}
                   size="sm"
                   onClick={() => setShowGrid(!showGrid)}
+                  title="Toggle grid (64px cells to match mob icons)"
                 >
                   <Grid3x3 className="w-4 h-4 mr-1" />
                   Grid
                 </DungeonButton>
-
-                {showGrid && (
-                  <div className="flex items-center gap-1">
-                    <input
-                      type="range"
-                      min="20"
-                      max="100"
-                      step="5"
-                      value={gridSize}
-                      onChange={(e) => setGridSize(Number(e.target.value))}
-                      className="w-16 h-2 bg-border rounded-lg appearance-none cursor-pointer"
-                    />
-                    <span className="text-xs text-muted-foreground w-6">{gridSize}</span>
-                  </div>
-                )}
               </div>
 
               {/* Fog of War controls */}
@@ -688,12 +983,40 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
         </div>
       )}
 
+      {/* Map Tools Menu - available to all users */}
+      {selectedMap && (
+        <MapToolsMenu
+          onPing={(color) => {}}
+          onAddBox={(color, opacity) => {}}
+          isPingMode={isPingMode}
+          isBoxMode={isBoxMode}
+          setIsPingMode={setIsPingMode}
+          setIsBoxMode={setIsBoxMode}
+          selectedColor={selectedColor}
+          setSelectedColor={setSelectedColor}
+          boxOpacity={boxOpacity}
+          setBoxOpacity={setBoxOpacity}
+          isAdmin={isAdmin}
+          crawlers={crawlers}
+          mobs={mobs}
+          isAddCrawlerMode={isAddCrawlerMode}
+          isAddMobMode={isAddMobMode}
+          setIsAddCrawlerMode={setIsAddCrawlerMode}
+          setIsAddMobMode={setIsAddMobMode}
+          selectedCrawlerId={selectedCrawlerId}
+          selectedMobId={selectedMobId}
+          setSelectedCrawlerId={setSelectedCrawlerId}
+          setSelectedMobId={setSelectedMobId}
+        />
+      )}
+
       {/* Map display */}
       <div
-        className="flex-1 flex items-center justify-center p-4 select-none overflow-auto"
+        className="flex-1 flex items-center justify-center p-4 pt-16 select-none overflow-auto"
       >
         <div
           className="relative"
+          data-map-container
           style={{
             transform: `scale(${mapScale / 100})`,
             transformOrigin: 'center center',
@@ -701,6 +1024,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
+          onClick={handleMapClick}
         >
           <img
             ref={mapImageRef}
@@ -780,7 +1104,87 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             );
           })}
 
-          {/* Fog of War overlay - placed AFTER mobs so it covers them */}
+          {/* Crawler icons on the map */}
+          {crawlerPlacements.filter(p => p.mapId === currentMapId).map((placement, index) => {
+            const crawler = crawlers.find(c => c.id === placement.crawlerId);
+            if (!crawler) return null;
+
+            const counterScale = 100 / mapScale;
+
+            return (
+              <motion.div
+                key={`crawler-${placement.crawlerId}-${index}`}
+                className="absolute"
+                style={{
+                  left: `${placement.x}%`,
+                  top: `${placement.y}%`,
+                  transform: `translate(-50%, -50%) scale(${counterScale})`,
+                }}
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: counterScale, opacity: 1 }}
+              >
+                <div className="relative">
+                  <CrawlerIcon crawler={crawler} size={64} />
+                  {isAdmin && (
+                    <button
+                      onClick={() => handleRemoveCrawlerFromMap(index)}
+                      className="absolute -top-2 -right-2 w-5 h-5 bg-destructive text-white rounded-full flex items-center justify-center hover:bg-destructive/80 transition-colors z-10"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            );
+          })}
+
+          {/* Runtime mob icons (added during ShowTime) */}
+          {runtimeMobPlacements.filter(p => p.mapId === currentMapId).map((placement, index) => {
+            const mob = mobs.find(m => m.id === placement.mobId);
+            if (!mob) return null;
+
+            const counterScale = 100 / mapScale;
+
+            return (
+              <motion.div
+                key={`runtime-mob-${placement.mobId}-${index}`}
+                className="absolute"
+                style={{
+                  left: `${placement.x}%`,
+                  top: `${placement.y}%`,
+                  transform: `translate(-50%, -50%) scale(${counterScale})`,
+                }}
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: counterScale, opacity: 1 }}
+              >
+                <div className="relative">
+                  <MobIcon mob={mob} size={64} />
+                  {isAdmin && (
+                    <button
+                      onClick={() => handleRemoveRuntimeMob(index)}
+                      className="absolute -top-2 -right-2 w-5 h-5 bg-destructive text-white rounded-full flex items-center justify-center hover:bg-destructive/80 transition-colors z-10"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            );
+          })}
+
+          {/* Map Boxes - placed BEFORE fog so they can be covered */}
+          {mapBoxes.map((box) => (
+            <MapBox
+              key={box.id}
+              box={box}
+              isAdmin={isAdmin}
+              onUpdate={handleUpdateBox}
+              onDelete={handleDeleteBox}
+              mapScale={mapScale}
+            />
+          ))}
+
+          {/* Fog of War overlay - placed AFTER mobs and boxes so it covers them */}
           <FogOfWar
             isVisible={fogOfWarEnabled}
             revealedAreas={revealedAreas}
@@ -788,7 +1192,11 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             brushSize={fogBrushSize}
             onReveal={handleFogReveal}
             onClearAll={handleClearFogOfWar}
+            isViewerAdmin={isAdmin}
           />
+
+          {/* Ping effects - on top of everything */}
+          <PingEffect pings={pings} />
         </div>
       </div>
 
