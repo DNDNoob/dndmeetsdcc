@@ -435,81 +435,6 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     broadcastBoxes(updatedBoxes);
   }, [mapBoxes, broadcastBoxes]);
 
-  // Handle map click for ping/box/crawlers/mobs
-  const handleMapClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (!mapImageRef.current) return;
-    if (draggingMobId) return; // Don't do anything while dragging
-
-    const rect = mapImageRef.current.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
-
-    const clampedX = Math.max(0, Math.min(100, x));
-    const clampedY = Math.max(0, Math.min(100, y));
-
-    if (isPingMode) {
-      broadcastPing(clampedX, clampedY, selectedColor);
-    } else if (isBoxMode && isAdmin) {
-      handleAddBox(clampedX, clampedY, selectedColor, boxOpacity);
-    } else if (isAddCrawlerMode && isAdmin && selectedCrawlerId) {
-      handleAddCrawlerToMap(clampedX, clampedY);
-    } else if (isAddMobMode && isAdmin && selectedMobId) {
-      handleAddMobToMapRuntime(clampedX, clampedY);
-    }
-  }, [isPingMode, isBoxMode, isAddCrawlerMode, isAddMobMode, isAdmin, selectedColor, boxOpacity, selectedCrawlerId, selectedMobId, draggingMobId, broadcastPing, handleAddBox, handleAddCrawlerToMap, handleAddMobToMapRuntime]);
-
-  // Auto-clean old pings
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setPings(prev => prev.filter(p => Date.now() - p.timestamp < 3000));
-    }, 500);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Listen for crawler placement updates
-  useEffect(() => {
-    if (!selectedEpisode || !currentMapId) return;
-
-    const crawlerDocPath = roomId
-      ? `rooms/${roomId}/crawler-placements/${selectedEpisode.id}-${currentMapId}`
-      : `crawler-placements/${selectedEpisode.id}-${currentMapId}`;
-
-    const crawlerDocRef = doc(db, crawlerDocPath);
-
-    const unsubscribe = onSnapshot(crawlerDocRef, (snapshot) => {
-      if (!snapshot.exists()) return;
-
-      const data = snapshot.data();
-      if (data.placements) {
-        setCrawlerPlacements(data.placements);
-      }
-    });
-
-    return () => unsubscribe();
-  }, [selectedEpisode?.id, currentMapId, roomId]);
-
-  // Listen for runtime mob placement updates
-  useEffect(() => {
-    if (!selectedEpisode || !currentMapId) return;
-
-    const mobDocPath = roomId
-      ? `rooms/${roomId}/runtime-mob-placements/${selectedEpisode.id}-${currentMapId}`
-      : `runtime-mob-placements/${selectedEpisode.id}-${currentMapId}`;
-
-    const mobDocRef = doc(db, mobDocPath);
-
-    const unsubscribe = onSnapshot(mobDocRef, (snapshot) => {
-      if (!snapshot.exists()) return;
-
-      const data = snapshot.data();
-      if (data.placements) {
-        setRuntimeMobPlacements(data.placements);
-      }
-    });
-
-    return () => unsubscribe();
-  }, [selectedEpisode?.id, currentMapId, roomId]);
-
   // Broadcast crawler placements
   const broadcastCrawlerPlacements = useCallback(async (placements: CrawlerPlacement[]) => {
     if (!selectedEpisode || !currentMapId || !isAdmin) return;
@@ -593,6 +518,81 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     setRuntimeMobPlacements(updated);
     broadcastRuntimeMobPlacements(updated);
   }, [runtimeMobPlacements, broadcastRuntimeMobPlacements]);
+
+  // Handle map click for ping/box/crawlers/mobs
+  const handleMapClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!mapImageRef.current) return;
+    if (draggingMobId) return; // Don't do anything while dragging
+
+    const rect = mapImageRef.current.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+
+    const clampedX = Math.max(0, Math.min(100, x));
+    const clampedY = Math.max(0, Math.min(100, y));
+
+    if (isPingMode) {
+      broadcastPing(clampedX, clampedY, selectedColor);
+    } else if (isBoxMode && isAdmin) {
+      handleAddBox(clampedX, clampedY, selectedColor, boxOpacity);
+    } else if (isAddCrawlerMode && isAdmin && selectedCrawlerId) {
+      handleAddCrawlerToMap(clampedX, clampedY);
+    } else if (isAddMobMode && isAdmin && selectedMobId) {
+      handleAddMobToMapRuntime(clampedX, clampedY);
+    }
+  }, [isPingMode, isBoxMode, isAddCrawlerMode, isAddMobMode, isAdmin, selectedColor, boxOpacity, selectedCrawlerId, selectedMobId, draggingMobId, broadcastPing, handleAddBox, handleAddCrawlerToMap, handleAddMobToMapRuntime]);
+
+  // Auto-clean old pings
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPings(prev => prev.filter(p => Date.now() - p.timestamp < 3000));
+    }, 500);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Listen for crawler placement updates
+  useEffect(() => {
+    if (!selectedEpisode || !currentMapId) return;
+
+    const crawlerDocPath = roomId
+      ? `rooms/${roomId}/crawler-placements/${selectedEpisode.id}-${currentMapId}`
+      : `crawler-placements/${selectedEpisode.id}-${currentMapId}`;
+
+    const crawlerDocRef = doc(db, crawlerDocPath);
+
+    const unsubscribe = onSnapshot(crawlerDocRef, (snapshot) => {
+      if (!snapshot.exists()) return;
+
+      const data = snapshot.data();
+      if (data.placements) {
+        setCrawlerPlacements(data.placements);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [selectedEpisode?.id, currentMapId, roomId]);
+
+  // Listen for runtime mob placement updates
+  useEffect(() => {
+    if (!selectedEpisode || !currentMapId) return;
+
+    const mobDocPath = roomId
+      ? `rooms/${roomId}/runtime-mob-placements/${selectedEpisode.id}-${currentMapId}`
+      : `runtime-mob-placements/${selectedEpisode.id}-${currentMapId}`;
+
+    const mobDocRef = doc(db, mobDocPath);
+
+    const unsubscribe = onSnapshot(mobDocRef, (snapshot) => {
+      if (!snapshot.exists()) return;
+
+      const data = snapshot.data();
+      if (data.placements) {
+        setRuntimeMobPlacements(data.placements);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [selectedEpisode?.id, currentMapId, roomId]);
 
   // Get all mobs for the current episode (unique mobs for the mob display list)
   const episodeMobs = useMemo(() => {
