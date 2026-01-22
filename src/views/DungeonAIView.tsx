@@ -3,8 +3,8 @@ import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import MapMobPlacementEditor from "@/components/ui/MapMobPlacementEditor";
-import { Mob, Episode, EpisodeMobPlacement } from "@/lib/gameData";
-import { Brain, Upload, Plus, Trash2, Map, Skull, Image as ImageIcon, Save, Edit2, X, Layers, ChevronLeft, ChevronRight } from "lucide-react";
+import { Mob, Episode, EpisodeMobPlacement, Crawler, CrawlerPlacement } from "@/lib/gameData";
+import { Brain, Upload, Plus, Trash2, Map, Skull, Image as ImageIcon, Save, Edit2, X, Layers, ChevronLeft, ChevronRight, User } from "lucide-react";
 
 interface DungeonAIViewProps {
   mobs: Mob[];
@@ -13,6 +13,7 @@ interface DungeonAIViewProps {
   onUpdateMaps: (maps: string[]) => Promise<void> | void;
   mapNames?: string[];
   onUpdateMapName?: (index: number, name: string) => void;
+  crawlers: Crawler[];
   episodes: Episode[];
   onAddEpisode: (episode: Episode) => void;
   onUpdateEpisode: (id: string, updates: Partial<Episode>) => void;
@@ -27,6 +28,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   onUpdateMaps,
   mapNames,
   onUpdateMapName,
+  crawlers,
   episodes,
   onAddEpisode,
   onUpdateEpisode,
@@ -55,6 +57,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   const [newEpisodeDescription, setNewEpisodeDescription] = useState("");
   const [selectedMapsForEpisode, setSelectedMapsForEpisode] = useState<string[]>([]);
   const [selectedMobsForEpisode, setSelectedMobsForEpisode] = useState<EpisodeMobPlacement[]>([]);
+  const [selectedCrawlersForEpisode, setSelectedCrawlersForEpisode] = useState<CrawlerPlacement[]>([]);
   const [editingEpisodeId, setEditingEpisodeId] = useState<string | null>(null);
   const [currentMapIndexForEditor, setCurrentMapIndexForEditor] = useState(0);
   // Per-map settings: { [mapId]: { fogOfWar: boolean, scale: number } }
@@ -291,6 +294,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
         description: newEpisodeDescription,
         mapIds: selectedMapsForEpisode,
         mobPlacements: selectedMobsForEpisode,
+        crawlerPlacements: selectedCrawlersForEpisode,
         mapSettings: mapSettings
       });
       setEditingEpisodeId(null);
@@ -302,6 +306,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
         description: newEpisodeDescription,
         mapIds: selectedMapsForEpisode,
         mobPlacements: selectedMobsForEpisode,
+        crawlerPlacements: selectedCrawlersForEpisode,
         mapSettings: mapSettings
       };
       onAddEpisode(episode);
@@ -312,6 +317,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
     setNewEpisodeDescription("");
     setSelectedMapsForEpisode([]);
     setSelectedMobsForEpisode([]);
+    setSelectedCrawlersForEpisode([]);
     setCurrentMapIndexForEditor(0);
     setMapSettingsForEpisode({});
   };
@@ -329,12 +335,13 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
           [mapIdStr]: settings[mapIdStr] || { fogOfWar: false, scale: 100 }
         }));
       } else {
-        // Remove settings and mob placements for removed map
+        // Remove settings, mob placements, and crawler placements for removed map
         setMapSettingsForEpisode(settings => {
           const { [mapIdStr]: _, ...rest } = settings;
           return rest;
         });
         setSelectedMobsForEpisode(mobs => mobs.filter(m => m.mapId !== mapIdStr));
+        setSelectedCrawlersForEpisode(crawlers => crawlers.filter(c => c.mapId !== mapIdStr));
       }
 
       // Reset to first map if current index is out of bounds
@@ -374,6 +381,14 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
       y: p.y,
       scale: p.scale
     })));
+
+    // Load crawler placements
+    setSelectedCrawlersForEpisode(episode.crawlerPlacements?.map(p => ({
+      crawlerId: p.crawlerId,
+      mapId: p.mapId || episode.mapIds[0] || '0',
+      x: p.x,
+      y: p.y,
+    })) || []);
 
     // Load per-map settings
     const loadedMapSettings: { [mapId: string]: { fogOfWar: boolean; scale: number } } = {};
@@ -1059,6 +1074,102 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                       onAddMob={handleAddMobToEpisode}
                       onRemoveMob={handleRemoveMobFromEpisode}
                     />
+
+                    {/* Crawler placement section */}
+                    {crawlers.length > 0 && (
+                      <div className="bg-muted/30 border border-border rounded p-4 mt-4">
+                        <h5 className="font-display text-sm text-blue-400 mb-3 flex items-center gap-2">
+                          <User className="w-4 h-4" />
+                          Crawler Starting Positions (This Map)
+                        </h5>
+
+                        {/* Current map crawler placements */}
+                        {selectedCrawlersForEpisode.filter(p => p.mapId === selectedMapsForEpisode[currentMapIndexForEditor]).length > 0 && (
+                          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-2 mb-4">
+                            {selectedCrawlersForEpisode
+                              .map((placement, globalIndex) => ({ placement, globalIndex }))
+                              .filter(({ placement }) => placement.mapId === selectedMapsForEpisode[currentMapIndexForEditor])
+                              .map(({ placement, globalIndex }) => {
+                                const crawler = crawlers.find(c => c.id === placement.crawlerId);
+                                if (!crawler) return null;
+                                return (
+                                  <div
+                                    key={`crawler-${placement.crawlerId}-${globalIndex}`}
+                                    className="flex items-center justify-between bg-background border border-blue-400/30 rounded p-2"
+                                  >
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      {crawler.avatar ? (
+                                        <img src={crawler.avatar} alt={crawler.name} className="w-8 h-8 rounded-full object-cover" />
+                                      ) : (
+                                        <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center">
+                                          <User className="w-4 h-4 text-blue-400" />
+                                        </div>
+                                      )}
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-semibold truncate">{crawler.name}</p>
+                                        <p className="text-xs text-muted-foreground">
+                                          ({placement.x.toFixed(0)}%, {placement.y.toFixed(0)}%)
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <button
+                                      onClick={() => {
+                                        setSelectedCrawlersForEpisode(prev => prev.filter((_, i) => i !== globalIndex));
+                                      }}
+                                      className="ml-2 p-1 hover:bg-destructive/10 rounded transition-colors"
+                                      title="Remove crawler"
+                                    >
+                                      <Trash2 className="w-3 h-3 text-destructive" />
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        )}
+
+                        {/* Add crawler buttons */}
+                        <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                          {crawlers.map(crawler => {
+                            const currentMapId = selectedMapsForEpisode[currentMapIndexForEditor];
+                            const count = selectedCrawlersForEpisode.filter(p => p.crawlerId === crawler.id && p.mapId === currentMapId).length;
+                            return (
+                              <DungeonButton
+                                key={crawler.id}
+                                variant="default"
+                                size="sm"
+                                className="justify-start"
+                                onClick={() => {
+                                  const newPlacement: CrawlerPlacement = {
+                                    crawlerId: crawler.id,
+                                    mapId: currentMapId,
+                                    x: 50,
+                                    y: 50,
+                                  };
+                                  setSelectedCrawlersForEpisode(prev => [...prev, newPlacement]);
+                                }}
+                              >
+                                <div className="flex items-center gap-2 w-full">
+                                  {crawler.avatar ? (
+                                    <img src={crawler.avatar} alt={crawler.name} className="w-5 h-5 rounded-full object-cover" />
+                                  ) : (
+                                    <User className="w-5 h-5 text-blue-400" />
+                                  )}
+                                  <span className="text-xs truncate flex-1">{crawler.name}</span>
+                                  {count > 0 && (
+                                    <span className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded-full font-bold">
+                                      {count}
+                                    </span>
+                                  )}
+                                </div>
+                              </DungeonButton>
+                            );
+                          })}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Click a crawler to add their starting position on this map. Positions can be adjusted in ShowTime.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1072,6 +1183,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                         setNewEpisodeDescription("");
                         setSelectedMapsForEpisode([]);
                         setSelectedMobsForEpisode([]);
+                        setSelectedCrawlersForEpisode([]);
                         setCurrentMapIndexForEditor(0);
                         setMapSettingsForEpisode({});
                       }}

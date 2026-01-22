@@ -264,6 +264,7 @@ const Index = () => {
                 onUpdateMaps={setMaps}
                 mapNames={mapNames}
                 onUpdateMapName={handleUpdateMapName}
+                crawlers={crawlers}
                 episodes={episodes}
                 onAddEpisode={addEpisode}
                 onUpdateEpisode={updateEpisode}

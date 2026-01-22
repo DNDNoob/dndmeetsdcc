@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DungeonButton } from "@/components/ui/DungeonButton";
-import { Target, Square, ChevronDown, ChevronUp, Palette, User, Skull, Plus } from "lucide-react";
+import { Target, Square, ChevronDown, ChevronUp, Palette, User, Skull } from "lucide-react";
 import { Crawler, Mob } from "@/lib/gameData";
 
 interface MapToolsMenuProps {
@@ -105,15 +105,15 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
   };
 
   return (
-    <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50">
+    <div className="absolute top-4 right-4 z-40">
       <motion.div
-        className="bg-background/90 backdrop-blur-sm border border-border rounded-lg shadow-lg overflow-hidden"
-        initial={{ y: -10, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
+        className="bg-background/95 backdrop-blur-sm border border-border rounded-lg shadow-lg overflow-hidden"
+        initial={{ x: 10, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
       >
         {/* Main buttons row */}
         <div className="flex items-center gap-2 p-2">
-          {/* Ping button */}
+          {/* Ping button - available to all users */}
           <DungeonButton
             variant={isPingMode ? "admin" : "default"}
             size="sm"
@@ -124,18 +124,16 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
             Ping
           </DungeonButton>
 
-          {/* Box button - DM only */}
-          {isAdmin && (
-            <DungeonButton
-              variant={isBoxMode ? "admin" : "default"}
-              size="sm"
-              onClick={handleBoxModeToggle}
-              title="Click map to add a highlight box"
-            >
-              <Square className="w-4 h-4 mr-1" />
-              Box
-            </DungeonButton>
-          )}
+          {/* Box button - available to all users */}
+          <DungeonButton
+            variant={isBoxMode ? "admin" : "default"}
+            size="sm"
+            onClick={handleBoxModeToggle}
+            title="Click map to add a highlight box"
+          >
+            <Square className="w-4 h-4 mr-1" />
+            Box
+          </DungeonButton>
 
           {/* Add Crawler button - DM only */}
           {isAdmin && crawlers.length > 0 && (
@@ -217,7 +215,7 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
                   </div>
                 </div>
 
-                {/* Opacity slider (only for boxes) */}
+                {/* Opacity slider (for boxes) */}
                 {isBoxMode && (
                   <div>
                     <div className="flex items-center justify-between mb-2">
@@ -302,7 +300,7 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
                     <p>Click anywhere on the map to ping that location. All users will see the ping.</p>
                   )}
                   {isBoxMode && (
-                    <p>Click anywhere on the map to add a highlight box. Drag handles to move, resize, or rotate.</p>
+                    <p>Click anywhere on the map to add a highlight box.</p>
                   )}
                   {isAddCrawlerMode && selectedCrawlerId && (
                     <p>Click anywhere on the map to place the selected crawler.</p>

@@ -96,6 +96,7 @@ export interface Episode {
   description: string;
   mapIds: string[]; // Indices of maps in the maps array
   mobPlacements: EpisodeMobPlacement[]; // Mobs with positions
+  crawlerPlacements?: CrawlerPlacement[]; // Pre-placed crawlers with positions
   mapSettings?: { [mapId: string]: MapSettings }; // Per-map settings
   defaultFogOfWar?: boolean; // Default fog of war setting for new maps
   createdAt?: string;

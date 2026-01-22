@@ -7,7 +7,7 @@ import { GridOverlay } from "@/components/ui/GridOverlay";
 import { MobIcon } from "@/components/ui/MobIcon";
 import { FogOfWar } from "@/components/ui/FogOfWar";
 import { Episode, Mob, MapSettings, Crawler, CrawlerPlacement, EpisodeMobPlacement } from "@/lib/gameData";
-import { Map, X, Eye, Layers, ChevronLeft, ChevronRight, PlayCircle, Grid3x3, CloudFog, Eraser, Trash2, Target } from "lucide-react";
+import { Map, X, Eye, Layers, ChevronLeft, ChevronRight, PlayCircle, Grid3x3, CloudFog, Eraser, Trash2, Target, ZoomIn, ZoomOut } from "lucide-react";
 import { PingEffect, Ping } from "@/components/ui/PingEffect";
 import { MapBox, MapBoxData } from "@/components/ui/MapBox";
 import { MapToolsMenu } from "@/components/ui/MapToolsMenu";
@@ -66,6 +66,13 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   const [isAddMobMode, setIsAddMobMode] = useState(false);
   const [selectedCrawlerId, setSelectedCrawlerId] = useState<string | null>(null);
   const [selectedMobId, setSelectedMobId] = useState<string | null>(null);
+
+  // Cursor follower state for ping/box mode
+  const [cursorPosition, setCursorPosition] = useState<{ x: number; y: number } | null>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+
+  // Dragging state for runtime crawlers/mobs
+  const [draggingRuntimeId, setDraggingRuntimeId] = useState<string | null>(null);
 
   // Get current map ID for fog of war storage - MUST be defined before useEffects that use it
   const currentMapId = useMemo(() => {
@@ -533,7 +540,8 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
     if (isPingMode) {
       broadcastPing(clampedX, clampedY, selectedColor);
-    } else if (isBoxMode && isAdmin) {
+    } else if (isBoxMode) {
+      // All users can add boxes
       handleAddBox(clampedX, clampedY, selectedColor, boxOpacity);
     } else if (isAddCrawlerMode && isAdmin && selectedCrawlerId) {
       handleAddCrawlerToMap(clampedX, clampedY);
@@ -550,6 +558,58 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     return () => clearInterval(interval);
   }, []);
 
+  // Handle zoom for all users
+  const handleZoomIn = useCallback(() => {
+    setMapScale(prev => Math.min(prev + 25, 500));
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    setMapScale(prev => Math.max(prev - 25, 25));
+  }, []);
+
+  // Handle dragging runtime crawlers
+  const handleRuntimeCrawlerDrag = useCallback((index: number, x: number, y: number) => {
+    if (!isAdmin) return;
+    const updated = crawlerPlacements.map((p, i) =>
+      i === index ? { ...p, x, y } : p
+    );
+    setCrawlerPlacements(updated);
+  }, [isAdmin, crawlerPlacements]);
+
+  const handleRuntimeCrawlerDragEnd = useCallback((index: number) => {
+    broadcastCrawlerPlacements(crawlerPlacements);
+  }, [crawlerPlacements, broadcastCrawlerPlacements]);
+
+  // Handle dragging runtime mobs
+  const handleRuntimeMobDrag = useCallback((index: number, x: number, y: number) => {
+    if (!isAdmin) return;
+    const updated = runtimeMobPlacements.map((p, i) =>
+      i === index ? { ...p, x, y } : p
+    );
+    setRuntimeMobPlacements(updated);
+  }, [isAdmin, runtimeMobPlacements]);
+
+  const handleRuntimeMobDragEnd = useCallback((index: number) => {
+    broadcastRuntimeMobPlacements(runtimeMobPlacements);
+  }, [runtimeMobPlacements, broadcastRuntimeMobPlacements]);
+
+  // Initialize crawler placements from episode when map changes (if DM)
+  useEffect(() => {
+    if (!selectedEpisode || !currentMapId || !isAdmin) return;
+
+    // Check if episode has pre-placed crawlers for this map
+    const episodeCrawlerPlacements = selectedEpisode.crawlerPlacements?.filter(
+      p => p.mapId === currentMapId
+    ) || [];
+
+    // If there are pre-placed crawlers and no current placements, initialize them
+    if (episodeCrawlerPlacements.length > 0 && crawlerPlacements.filter(p => p.mapId === currentMapId).length === 0) {
+      setCrawlerPlacements(episodeCrawlerPlacements);
+      // Broadcast to Firebase so other players see them
+      broadcastCrawlerPlacements(episodeCrawlerPlacements);
+    }
+  }, [selectedEpisode?.id, currentMapId, isAdmin]);
+
   // Listen for crawler placement updates
   useEffect(() => {
     if (!selectedEpisode || !currentMapId) return;
@@ -561,7 +621,16 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     const crawlerDocRef = doc(db, crawlerDocPath);
 
     const unsubscribe = onSnapshot(crawlerDocRef, (snapshot) => {
-      if (!snapshot.exists()) return;
+      if (!snapshot.exists()) {
+        // If no Firebase data exists yet, check episode for pre-placed crawlers
+        const episodeCrawlerPlacements = selectedEpisode.crawlerPlacements?.filter(
+          p => p.mapId === currentMapId
+        ) || [];
+        if (episodeCrawlerPlacements.length > 0) {
+          setCrawlerPlacements(episodeCrawlerPlacements);
+        }
+        return;
+      }
 
       const data = snapshot.data();
       if (data.placements) {
@@ -654,6 +723,36 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Track cursor position for ping/box mode
+    if (mapContainerRef.current && (isPingMode || isBoxMode)) {
+      const rect = mapContainerRef.current.getBoundingClientRect();
+      setCursorPosition({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      });
+    } else {
+      setCursorPosition(null);
+    }
+
+    // Handle runtime crawler/mob dragging
+    if (draggingRuntimeId && isAdmin && mapImageRef.current) {
+      const rect = mapImageRef.current.getBoundingClientRect();
+      const rawX = ((e.clientX - rect.left) / rect.width) * 100;
+      const rawY = ((e.clientY - rect.top) / rect.height) * 100;
+      const x = Math.max(0, Math.min(100, rawX));
+      const y = Math.max(0, Math.min(100, rawY));
+
+      if (draggingRuntimeId.startsWith('crawler-')) {
+        const index = parseInt(draggingRuntimeId.split('-')[1], 10);
+        handleRuntimeCrawlerDrag(index, x, y);
+      } else if (draggingRuntimeId.startsWith('mob-')) {
+        const index = parseInt(draggingRuntimeId.split('-')[1], 10);
+        handleRuntimeMobDrag(index, x, y);
+      }
+      return;
+    }
+
+    // Handle episode mob dragging
     if (!draggingMobId || !isAdmin || !mapImageRef.current || !selectedEpisode) return;
 
     const rect = mapImageRef.current.getBoundingClientRect();
@@ -687,6 +786,20 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   };
 
   const handleMouseUp = () => {
+    // Handle runtime crawler/mob drag end
+    if (draggingRuntimeId && isAdmin) {
+      if (draggingRuntimeId.startsWith('crawler-')) {
+        const index = parseInt(draggingRuntimeId.split('-')[1], 10);
+        handleRuntimeCrawlerDragEnd(index);
+      } else if (draggingRuntimeId.startsWith('mob-')) {
+        const index = parseInt(draggingRuntimeId.split('-')[1], 10);
+        handleRuntimeMobDragEnd(index);
+      }
+      setDraggingRuntimeId(null);
+      return;
+    }
+
+    // Handle episode mob drag end
     if (draggingMobId && selectedEpisode && onUpdateEpisode) {
       // Extract index from placement key and broadcast final position
       const index = parseInt(draggingMobId.split('-').pop() || '0', 10);
@@ -1010,10 +1123,73 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
         />
       )}
 
+      {/* Zoom controls - available to all users */}
+      {selectedMap && (
+        <div className="absolute bottom-4 left-4 z-40 flex flex-col gap-2">
+          <DungeonButton
+            variant="default"
+            size="sm"
+            onClick={handleZoomIn}
+            title="Zoom in"
+          >
+            <ZoomIn className="w-4 h-4" />
+          </DungeonButton>
+          <div className="text-xs text-center text-muted-foreground bg-background/80 px-2 py-1 rounded">
+            {mapScale}%
+          </div>
+          <DungeonButton
+            variant="default"
+            size="sm"
+            onClick={handleZoomOut}
+            title="Zoom out"
+          >
+            <ZoomOut className="w-4 h-4" />
+          </DungeonButton>
+        </div>
+      )}
+
       {/* Map display */}
       <div
-        className="flex-1 flex items-center justify-center p-4 pt-16 select-none overflow-auto"
+        ref={mapContainerRef}
+        className="flex-1 flex items-center justify-center p-4 pt-16 select-none overflow-auto relative"
+        onMouseMove={handleMouseMove}
+        onMouseLeave={() => {
+          setCursorPosition(null);
+          handleMouseUp();
+        }}
       >
+        {/* Cursor follower for ping/box mode */}
+        {cursorPosition && (isPingMode || isBoxMode) && (
+          <div
+            className="pointer-events-none fixed z-50"
+            style={{
+              left: mapContainerRef.current ? mapContainerRef.current.getBoundingClientRect().left + cursorPosition.x : cursorPosition.x,
+              top: mapContainerRef.current ? mapContainerRef.current.getBoundingClientRect().top + cursorPosition.y : cursorPosition.y,
+              transform: 'translate(-50%, -50%)',
+            }}
+          >
+            {isPingMode ? (
+              <div
+                className="w-8 h-8 rounded-full border-4 animate-pulse"
+                style={{
+                  borderColor: selectedColor,
+                  boxShadow: `0 0 20px ${selectedColor}`,
+                }}
+              >
+                <Target className="w-full h-full p-1" style={{ color: selectedColor }} />
+              </div>
+            ) : (
+              <div
+                className="w-10 h-10 border-2 border-dashed"
+                style={{
+                  borderColor: selectedColor,
+                  backgroundColor: `${selectedColor}${Math.round(boxOpacity * 255).toString(16).padStart(2, '0')}`,
+                }}
+              />
+            )}
+          </div>
+        )}
+
         <div
           className="relative"
           data-map-container
@@ -1021,9 +1197,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             transform: `scale(${mapScale / 100})`,
             transformOrigin: 'center center',
           }}
-          onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
           onClick={handleMapClick}
         >
           <img
@@ -1105,16 +1279,23 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
           })}
 
           {/* Crawler icons on the map */}
-          {crawlerPlacements.filter(p => p.mapId === currentMapId).map((placement, index) => {
+          {crawlerPlacements.filter(p => p.mapId === currentMapId).map((placement, index, filteredArr) => {
             const crawler = crawlers.find(c => c.id === placement.crawlerId);
             if (!crawler) return null;
 
+            // Count how many times this crawler appears before this index
+            const sameIdBefore = filteredArr
+              .slice(0, index)
+              .filter(p => p.crawlerId === placement.crawlerId).length;
+            const letter = String.fromCharCode(65 + sameIdBefore); // A, B, C...
+
             const counterScale = 100 / mapScale;
+            const isDragging = draggingRuntimeId === `crawler-${index}`;
 
             return (
               <motion.div
                 key={`crawler-${placement.crawlerId}-${index}`}
-                className="absolute"
+                className="absolute cursor-move"
                 style={{
                   left: `${placement.x}%`,
                   top: `${placement.y}%`,
@@ -1122,12 +1303,25 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                 }}
                 initial={{ scale: 0, opacity: 0 }}
                 animate={{ scale: counterScale, opacity: 1 }}
+                onMouseDown={(e) => {
+                  if (isAdmin) {
+                    e.stopPropagation();
+                    setDraggingRuntimeId(`crawler-${index}`);
+                  }
+                }}
               >
                 <div className="relative">
-                  <CrawlerIcon crawler={crawler} size={64} />
+                  <CrawlerIcon crawler={crawler} size={64} isDragging={isDragging} />
+                  {/* Letter badge */}
+                  <div className="absolute -top-1 -left-1 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-bold shadow-lg">
+                    {letter}
+                  </div>
                   {isAdmin && (
                     <button
-                      onClick={() => handleRemoveCrawlerFromMap(index)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveCrawlerFromMap(index);
+                      }}
                       className="absolute -top-2 -right-2 w-5 h-5 bg-destructive text-white rounded-full flex items-center justify-center hover:bg-destructive/80 transition-colors z-10"
                     >
                       <X className="w-3 h-3" />
@@ -1139,16 +1333,23 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
           })}
 
           {/* Runtime mob icons (added during ShowTime) */}
-          {runtimeMobPlacements.filter(p => p.mapId === currentMapId).map((placement, index) => {
+          {runtimeMobPlacements.filter(p => p.mapId === currentMapId).map((placement, index, filteredArr) => {
             const mob = mobs.find(m => m.id === placement.mobId);
             if (!mob) return null;
 
+            // Count how many times this mob appears before this index
+            const sameIdBefore = filteredArr
+              .slice(0, index)
+              .filter(p => p.mobId === placement.mobId).length;
+            const letter = String.fromCharCode(65 + sameIdBefore); // A, B, C...
+
             const counterScale = 100 / mapScale;
+            const isDragging = draggingRuntimeId === `mob-${index}`;
 
             return (
               <motion.div
                 key={`runtime-mob-${placement.mobId}-${index}`}
-                className="absolute"
+                className="absolute cursor-move"
                 style={{
                   left: `${placement.x}%`,
                   top: `${placement.y}%`,
@@ -1156,12 +1357,25 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                 }}
                 initial={{ scale: 0, opacity: 0 }}
                 animate={{ scale: counterScale, opacity: 1 }}
+                onMouseDown={(e) => {
+                  if (isAdmin) {
+                    e.stopPropagation();
+                    setDraggingRuntimeId(`mob-${index}`);
+                  }
+                }}
               >
                 <div className="relative">
-                  <MobIcon mob={mob} size={64} />
+                  <MobIcon mob={mob} size={64} isDragging={isDragging} />
+                  {/* Letter badge */}
+                  <div className="absolute -top-1 -left-1 w-6 h-6 bg-accent text-background rounded-full flex items-center justify-center text-sm font-bold shadow-lg">
+                    {letter}
+                  </div>
                   {isAdmin && (
                     <button
-                      onClick={() => handleRemoveRuntimeMob(index)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveRuntimeMob(index);
+                      }}
                       className="absolute -top-2 -right-2 w-5 h-5 bg-destructive text-white rounded-full flex items-center justify-center hover:bg-destructive/80 transition-colors z-10"
                     >
                       <X className="w-3 h-3" />
