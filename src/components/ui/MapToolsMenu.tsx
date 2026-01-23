@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DungeonButton } from "@/components/ui/DungeonButton";
-import { Target, Square, ChevronDown, ChevronUp, Palette, User, Skull, Grid3x3, CloudFog, Eraser, Trash2 } from "lucide-react";
+import { Target, Square, ChevronDown, ChevronUp, Palette, User, Skull, Grid3x3, CloudFog, Eraser, Trash2, Layers, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { Crawler, Mob } from "@/lib/gameData";
 
 interface MapToolsMenuProps {
@@ -39,6 +39,15 @@ interface MapToolsMenuProps {
   fogBrushSize?: number;
   setFogBrushSize?: (size: number) => void;
   onClearFogOfWar?: () => void;
+  // DM Episode/Map navigation
+  episodeName?: string;
+  currentMapIndex?: number;
+  totalMaps?: number;
+  mapScale?: number;
+  onPreviousMap?: () => void;
+  onNextMap?: () => void;
+  onSelectMap?: () => void;
+  onEndEpisode?: () => void;
 }
 
 const PING_COLORS = [
@@ -85,6 +94,14 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
   fogBrushSize,
   setFogBrushSize,
   onClearFogOfWar,
+  episodeName,
+  currentMapIndex,
+  totalMaps,
+  mapScale,
+  onPreviousMap,
+  onNextMap,
+  onSelectMap,
+  onEndEpisode,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -130,6 +147,38 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
         initial={{ x: 10, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
       >
+        {/* DM Episode/Map info row - only for admins */}
+        {isAdmin && episodeName && (
+          <div className="flex items-center justify-between gap-2 p-2 border-b border-border bg-muted/30">
+            <div className="flex items-center gap-2">
+              <span className="font-display text-accent text-sm text-glow-gold truncate max-w-[150px]" title={episodeName}>
+                {episodeName}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                Map {(currentMapIndex ?? 0) + 1}/{totalMaps ?? 1} | {mapScale ?? 100}%
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              {(totalMaps ?? 1) > 1 && (
+                <>
+                  <DungeonButton variant="default" size="sm" onClick={onPreviousMap} title="Previous map">
+                    <ChevronLeft className="w-4 h-4" />
+                  </DungeonButton>
+                  <DungeonButton variant="default" size="sm" onClick={onNextMap} title="Next map">
+                    <ChevronRight className="w-4 h-4" />
+                  </DungeonButton>
+                </>
+              )}
+              <DungeonButton variant="default" size="sm" onClick={onSelectMap} title="Map selection">
+                <Layers className="w-4 h-4" />
+              </DungeonButton>
+              <DungeonButton variant="danger" size="sm" onClick={onEndEpisode} title="End episode">
+                <X className="w-4 h-4" />
+              </DungeonButton>
+            </div>
+          </div>
+        )}
+
         {/* Main buttons row */}
         <div className="flex items-center gap-2 p-2">
           {/* Ping button - available to all users */}

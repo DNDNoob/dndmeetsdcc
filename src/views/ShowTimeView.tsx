@@ -992,47 +992,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       animate={{ opacity: 1 }}
       className="min-h-screen bg-background relative flex flex-col"
     >
-      {/* DM controls - above the map */}
-      {isAdmin && (
-        <div className="p-4 pb-0 relative z-50">
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-background/80 border border-border p-3 rounded-lg">
-            <div>
-              <h3 className="font-display text-accent text-glow-gold">
-                {selectedEpisode.name}
-              </h3>
-              <p className="text-xs text-muted-foreground">
-                Map {currentMapIndex + 1} of {selectedEpisode.mapIds.length} | Scale: {mapScale}%
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Map navigation */}
-              {selectedEpisode.mapIds.length > 1 && (
-                <>
-                  <DungeonButton variant="default" size="sm" onClick={handlePreviousMap}>
-                    <ChevronLeft className="w-4 h-4" />
-                  </DungeonButton>
-                  <DungeonButton variant="default" size="sm" onClick={handleNextMap}>
-                    <ChevronRight className="w-4 h-4" />
-                  </DungeonButton>
-                </>
-              )}
-
-              {/* Grid and Fog controls moved to MapToolsMenu panel */}
-
-              <DungeonButton variant="default" size="sm" onClick={() => setSelectedMap(null)}>
-                <Layers className="w-4 h-4 mr-1" /> Map
-              </DungeonButton>
-
-              <DungeonButton variant="danger" size="sm" onClick={handleEndEpisode}>
-                <X className="w-4 h-4 mr-2" /> End Episode
-              </DungeonButton>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Map Tools Menu - available to all users */}
+      {/* Map Tools Menu - available to all users, includes DM controls when admin */}
       {selectedMap && (
         <MapToolsMenu
           onPing={(color) => {}}
@@ -1065,6 +1025,14 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
           fogBrushSize={fogBrushSize}
           setFogBrushSize={setFogBrushSize}
           onClearFogOfWar={handleClearFogOfWar}
+          episodeName={selectedEpisode.name}
+          currentMapIndex={currentMapIndex}
+          totalMaps={selectedEpisode.mapIds.length}
+          mapScale={mapScale}
+          onPreviousMap={handlePreviousMap}
+          onNextMap={handleNextMap}
+          onSelectMap={() => setSelectedMap(null)}
+          onEndEpisode={handleEndEpisode}
         />
       )}
 
@@ -1096,7 +1064,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       {/* Map display */}
       <div
         ref={mapContainerRef}
-        className="flex-1 flex items-center justify-center p-4 pt-16 select-none overflow-auto relative"
+        className="flex-1 flex items-center justify-center p-4 select-none overflow-auto relative"
         onMouseMove={handleMouseMove}
         onMouseLeave={() => {
           setCursorPosition(null);
@@ -1180,32 +1148,16 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             return (
               <motion.div
                 key={`${placement.mobId}-${currentMapId}-${localIndex}`}
+                className="absolute"
                 style={{
-                  position: "absolute",
+                  left: `${placement.x}%`,
+                  top: `${placement.y}%`,
                   transform: `translate(-50%, -50%) scale(${counterScale})`,
-                  // When dragging, position updates instantly; when not dragging, use animated values
-                  ...(isDragging ? {
-                    left: `${placement.x}%`,
-                    top: `${placement.y}%`,
-                  } : {}),
                 }}
                 onMouseDown={() => handleMobMouseDown(`${placement.mobId}-${globalIndex}`)}
-                initial={{ scale: 0, opacity: 0 }}
-                animate={{
-                  scale: counterScale,
-                  opacity: 1,
-                  // Only animate position when NOT dragging
-                  ...(!isDragging ? {
-                    left: `${placement.x}%`,
-                    top: `${placement.y}%`
-                  } : {}),
-                }}
-                transition={{
-                  scale: { type: "spring", stiffness: 260, damping: 20 },
-                  opacity: { type: "spring", stiffness: 260, damping: 20 },
-                  left: { type: "tween", duration: 0.15, ease: "linear" },
-                  top: { type: "tween", duration: 0.15, ease: "linear" }
-                }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ opacity: { duration: 0.2 } }}
               >
                 <div className="relative">
                   <MobIcon
@@ -1247,8 +1199,9 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                   top: `${placement.y}%`,
                   transform: `translate(-50%, -50%) scale(${counterScale})`,
                 }}
-                initial={{ scale: 0, opacity: 0 }}
-                animate={{ scale: counterScale, opacity: 1 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ opacity: { duration: 0.2 } }}
                 onMouseDown={(e) => {
                   // All users can move crawlers
                   e.stopPropagation();
@@ -1307,8 +1260,9 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                   top: `${placement.y}%`,
                   transform: `translate(-50%, -50%) scale(${counterScale})`,
                 }}
-                initial={{ scale: 0, opacity: 0 }}
-                animate={{ scale: counterScale, opacity: 1 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ opacity: { duration: 0.2 } }}
                 onMouseDown={(e) => {
                   // All users can move runtime mobs
                   e.stopPropagation();
