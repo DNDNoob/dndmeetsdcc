@@ -994,7 +994,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     >
       {/* DM controls - above the map */}
       {isAdmin && (
-        <div className="p-4 pb-0">
+        <div className="p-4 pb-0 relative z-50">
           <div className="flex flex-wrap items-center justify-between gap-3 bg-background/80 border border-border p-3 rounded-lg">
             <div>
               <h3 className="font-display text-accent text-glow-gold">
