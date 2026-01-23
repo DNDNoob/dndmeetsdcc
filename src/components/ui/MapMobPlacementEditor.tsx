@@ -1,7 +1,8 @@
 import React, { useState, useRef } from "react";
 import { motion } from "framer-motion";
-import { Mob, EpisodeMobPlacement } from "@/lib/gameData";
+import { Mob, EpisodeMobPlacement, Crawler, CrawlerPlacement } from "@/lib/gameData";
 import MobIcon from "@/components/ui/MobIcon";
+import { CrawlerIcon } from "@/components/ui/CrawlerIcon";
 import GridOverlay from "@/components/ui/GridOverlay";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import { Grid3x3, Trash2, RotateCcw } from "lucide-react";
@@ -14,6 +15,10 @@ interface MapMobPlacementEditorProps {
   onPlacementsChange: (placements: EpisodeMobPlacement[]) => void;
   onAddMob?: (mobId: string) => void;
   onRemoveMob?: (mobId: string) => void;
+  // Optional crawler support
+  crawlers?: Crawler[];
+  crawlerPlacements?: CrawlerPlacement[];
+  onCrawlerPlacementsChange?: (placements: CrawlerPlacement[]) => void;
 }
 
 const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
@@ -24,11 +29,14 @@ const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
   onPlacementsChange,
   onAddMob,
   onRemoveMob,
+  crawlers,
+  crawlerPlacements,
+  onCrawlerPlacementsChange,
 }) => {
-  const [draggingMobId, setDraggingMobId] = useState<string | null>(null);
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
+  const [draggingCrawlerIndex, setDraggingCrawlerIndex] = useState<number | null>(null);
   const [showGrid, setShowGrid] = useState(false);
-  const gridSize = 64; // Fixed size to match mob icons
+  const gridSize = 51; // Reduced by 20% from 64px
   const mapContainerRef = useRef<HTMLDivElement>(null);
 
   const handleMouseDown = (e: React.MouseEvent, index: number) => {
@@ -37,31 +45,40 @@ const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (draggingIndex === null || !mapContainerRef.current) return;
+    if (!mapContainerRef.current) return;
 
     const rect = mapContainerRef.current.getBoundingClientRect();
     const x = ((e.clientX - rect.left) / rect.width) * 100;
     const y = ((e.clientY - rect.top) / rect.height) * 100;
-
-    // Clamp to 0-100
     const clampedX = Math.max(0, Math.min(100, x));
     const clampedY = Math.max(0, Math.min(100, y));
 
-    // draggingIndex is a local index into currentMapPlacements, need to find full array index
-    const fullIndex = getFullArrayIndex(draggingIndex);
-    if (fullIndex === -1) return;
+    // Handle mob dragging
+    if (draggingIndex !== null) {
+      const fullIndex = getFullArrayIndex(draggingIndex);
+      if (fullIndex === -1) return;
 
-    const updatedPlacements = placements.map((p, i) =>
-      i === fullIndex
-        ? { ...p, x: clampedX, y: clampedY }
-        : p
-    );
+      const updatedPlacements = placements.map((p, i) =>
+        i === fullIndex ? { ...p, x: clampedX, y: clampedY } : p
+      );
+      onPlacementsChange(updatedPlacements);
+    }
 
-    onPlacementsChange(updatedPlacements);
+    // Handle crawler dragging
+    if (draggingCrawlerIndex !== null && crawlerPlacements && onCrawlerPlacementsChange) {
+      const fullIndex = getCrawlerFullArrayIndex(draggingCrawlerIndex);
+      if (fullIndex === -1) return;
+
+      const updatedPlacements = crawlerPlacements.map((p, i) =>
+        i === fullIndex ? { ...p, x: clampedX, y: clampedY } : p
+      );
+      onCrawlerPlacementsChange(updatedPlacements);
+    }
   };
 
   const handleMouseUp = () => {
     setDraggingIndex(null);
+    setDraggingCrawlerIndex(null);
   };
 
   const handleRemoveMob = (localIndex: number) => {
@@ -82,10 +99,21 @@ const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
       p.mapId === mapId ? { ...p, x: 50, y: 50 } : p
     );
     onPlacementsChange(reset);
+
+    // Also reset crawler positions if available
+    if (crawlerPlacements && onCrawlerPlacementsChange) {
+      const resetCrawlers = crawlerPlacements.map(p =>
+        p.mapId === mapId ? { ...p, x: 50, y: 50 } : p
+      );
+      onCrawlerPlacementsChange(resetCrawlers);
+    }
   };
 
   // Filter placements to only show mobs for current map
   const currentMapPlacements = placements.filter(p => p.mapId === mapId);
+
+  // Filter crawler placements for current map
+  const currentMapCrawlerPlacements = crawlerPlacements?.filter(p => p.mapId === mapId) || [];
 
   // Get indices of current map placements in the full array
   const getFullArrayIndex = (localIndex: number): number => {
@@ -97,6 +125,27 @@ const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
       }
     }
     return -1;
+  };
+
+  // Get indices of current map crawler placements in the full array
+  const getCrawlerFullArrayIndex = (localIndex: number): number => {
+    if (!crawlerPlacements) return -1;
+    let count = 0;
+    for (let i = 0; i < crawlerPlacements.length; i++) {
+      if (crawlerPlacements[i].mapId === mapId) {
+        if (count === localIndex) return i;
+        count++;
+      }
+    }
+    return -1;
+  };
+
+  const handleRemoveCrawler = (localIndex: number) => {
+    if (!crawlerPlacements || !onCrawlerPlacementsChange) return;
+    const fullIndex = getCrawlerFullArrayIndex(localIndex);
+    if (fullIndex === -1) return;
+    const updated = crawlerPlacements.filter((_, i) => i !== fullIndex);
+    onCrawlerPlacementsChange(updated);
   };
 
   // Show all mobs - allow adding duplicates
@@ -192,11 +241,62 @@ const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
           );
         })}
 
+        {/* Placed crawlers - only show crawlers for current map */}
+        {currentMapCrawlerPlacements.map((placement, index) => {
+          const crawler = crawlers?.find(c => c.id === placement.crawlerId);
+          if (!crawler) return null;
+
+          // Count how many times this crawler appears before this index on this map
+          const sameIdBefore = currentMapCrawlerPlacements.slice(0, index).filter(p => p.crawlerId === placement.crawlerId).length;
+          const letter = sameIdBefore > 0 ? String.fromCharCode(65 + sameIdBefore) : '';
+
+          return (
+            <motion.div
+              key={`crawler-${placement.crawlerId}-${mapId}-${index}`}
+              className="absolute"
+              style={{
+                left: `${placement.x}%`,
+                top: `${placement.y}%`,
+                transform: "translate(-50%, -50%)",
+                cursor: draggingCrawlerIndex === index ? "grabbing" : "grab",
+              }}
+              onMouseDown={e => {
+                e.preventDefault();
+                setDraggingCrawlerIndex(index);
+              }}
+              whileHover={{ scale: 1.1 }}
+              whileDrag={{ scale: 1.15 }}
+            >
+              <div className="relative">
+                <CrawlerIcon
+                  crawler={crawler}
+                  size={40}
+                  isDragging={draggingCrawlerIndex === index}
+                />
+                {letter && (
+                  <div className="absolute -top-1 -left-1 w-5 h-5 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold">
+                    {letter}
+                  </div>
+                )}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRemoveCrawler(index);
+                  }}
+                  className="absolute -top-2 -right-2 w-5 h-5 bg-destructive text-white rounded-full flex items-center justify-center hover:bg-destructive/80 transition-colors"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              </div>
+            </motion.div>
+          );
+        })}
+
         {/* Empty state */}
-        {currentMapPlacements.length === 0 && (
+        {currentMapPlacements.length === 0 && currentMapCrawlerPlacements.length === 0 && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center text-muted-foreground">
-              <p className="text-sm">No mobs placed on this map yet</p>
+              <p className="text-sm">No mobs or crawlers placed on this map yet</p>
               <p className="text-xs">Add mobs from the list below</p>
             </div>
           </div>

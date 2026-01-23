@@ -1064,7 +1064,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                       </div>
                     </div>
 
-                    {/* Mob placement editor */}
+                    {/* Mob and Crawler placement editor */}
                     <MapMobPlacementEditor
                       mapUrl={maps[parseInt(selectedMapsForEpisode[currentMapIndexForEditor], 10)]}
                       mapId={selectedMapsForEpisode[currentMapIndexForEditor]}
@@ -1073,6 +1073,9 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                       onPlacementsChange={setSelectedMobsForEpisode}
                       onAddMob={handleAddMobToEpisode}
                       onRemoveMob={handleRemoveMobFromEpisode}
+                      crawlers={crawlers}
+                      crawlerPlacements={selectedCrawlersForEpisode}
+                      onCrawlerPlacementsChange={setSelectedCrawlersForEpisode}
                     />
 
                     {/* Crawler placement section */}

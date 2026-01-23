@@ -107,9 +107,9 @@ export const MapBox: React.FC<MapBoxProps> = ({
         transform: `translate(-50%, -50%) rotate(${box.rotation}deg)`,
         width: `${box.width}%`,
         height: `${box.height}%`,
-        pointerEvents: isAdmin ? "auto" : "none",
+        pointerEvents: "auto", // All users can interact
       }}
-      onMouseEnter={() => isAdmin && setShowControls(true)}
+      onMouseEnter={() => setShowControls(true)}
       onMouseLeave={() => !isDragging && !isResizing && !isRotating && setShowControls(false)}
     >
       {/* The box itself */}
@@ -122,15 +122,15 @@ export const MapBox: React.FC<MapBoxProps> = ({
           borderColor: box.color,
         }}
         onMouseDown={(e) => {
-          if (!isAdmin) return;
+          // All users can move boxes
           e.preventDefault();
           e.stopPropagation();
           setIsDragging(true);
         }}
       />
 
-      {/* Control handles - only visible to admin */}
-      {isAdmin && showControls && (
+      {/* Control handles - visible to all users */}
+      {showControls && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

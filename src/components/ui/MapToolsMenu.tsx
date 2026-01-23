@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DungeonButton } from "@/components/ui/DungeonButton";
-import { Target, Square, ChevronDown, ChevronUp, Palette, User, Skull } from "lucide-react";
+import { Target, Square, ChevronDown, ChevronUp, Palette, User, Skull, Grid3x3, CloudFog, Eraser, Trash2 } from "lucide-react";
 import { Crawler, Mob } from "@/lib/gameData";
 
 interface MapToolsMenuProps {
@@ -29,6 +29,16 @@ interface MapToolsMenuProps {
   selectedMobId?: string | null;
   setSelectedCrawlerId?: (id: string | null) => void;
   setSelectedMobId?: (id: string | null) => void;
+  // DM Grid and Fog controls
+  showGrid?: boolean;
+  setShowGrid?: (value: boolean) => void;
+  fogOfWarEnabled?: boolean;
+  onToggleFogOfWar?: () => void;
+  fogEraserActive?: boolean;
+  setFogEraserActive?: (value: boolean) => void;
+  fogBrushSize?: number;
+  setFogBrushSize?: (size: number) => void;
+  onClearFogOfWar?: () => void;
 }
 
 const PING_COLORS = [
@@ -66,6 +76,15 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
   selectedMobId,
   setSelectedCrawlerId,
   setSelectedMobId,
+  showGrid,
+  setShowGrid,
+  fogOfWarEnabled,
+  onToggleFogOfWar,
+  fogEraserActive,
+  setFogEraserActive,
+  fogBrushSize,
+  setFogBrushSize,
+  onClearFogOfWar,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -161,6 +180,54 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
             </DungeonButton>
           )}
 
+          {/* Grid toggle - DM only */}
+          {isAdmin && setShowGrid && (
+            <DungeonButton
+              variant={showGrid ? "admin" : "default"}
+              size="sm"
+              onClick={() => setShowGrid(!showGrid)}
+              title="Toggle grid"
+            >
+              <Grid3x3 className="w-4 h-4" />
+            </DungeonButton>
+          )}
+
+          {/* Fog of War toggle - DM only */}
+          {isAdmin && onToggleFogOfWar && (
+            <DungeonButton
+              variant={fogOfWarEnabled ? "admin" : "default"}
+              size="sm"
+              onClick={onToggleFogOfWar}
+              title="Toggle Fog of War"
+            >
+              <CloudFog className="w-4 h-4" />
+            </DungeonButton>
+          )}
+
+          {/* Fog Eraser - DM only, when fog is enabled */}
+          {isAdmin && fogOfWarEnabled && setFogEraserActive && (
+            <DungeonButton
+              variant={fogEraserActive ? "admin" : "default"}
+              size="sm"
+              onClick={() => setFogEraserActive(!fogEraserActive)}
+              title="Toggle Eraser Mode"
+            >
+              <Eraser className="w-4 h-4" />
+            </DungeonButton>
+          )}
+
+          {/* Clear Fog - DM only, when fog is enabled */}
+          {isAdmin && fogOfWarEnabled && onClearFogOfWar && (
+            <DungeonButton
+              variant="danger"
+              size="sm"
+              onClick={onClearFogOfWar}
+              title="Reset fog (cover entire map)"
+            >
+              <Trash2 className="w-4 h-4" />
+            </DungeonButton>
+          )}
+
           {/* Color indicator */}
           <div
             className="w-6 h-6 rounded border-2 border-white shadow cursor-pointer"
@@ -229,6 +296,25 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
                       step="0.1"
                       value={boxOpacity}
                       onChange={(e) => setBoxOpacity(parseFloat(e.target.value))}
+                      className="w-full h-2 bg-border rounded-lg appearance-none cursor-pointer"
+                    />
+                  </div>
+                )}
+
+                {/* Fog brush size slider (for DM when eraser is active) */}
+                {isAdmin && fogOfWarEnabled && fogEraserActive && setFogBrushSize && fogBrushSize !== undefined && (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-muted-foreground">Fog Brush Size</span>
+                      <span className="text-xs text-muted-foreground">{fogBrushSize}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="2"
+                      max="15"
+                      step="1"
+                      value={fogBrushSize}
+                      onChange={(e) => setFogBrushSize(Number(e.target.value))}
                       className="w-full h-2 bg-border rounded-lg appearance-none cursor-pointer"
                     />
                   </div>
