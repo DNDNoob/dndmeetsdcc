@@ -1235,13 +1235,16 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             return (
               <motion.div
                 key={`${placement.mobId}-${currentMapId}-${localIndex}`}
-                className="absolute"
+                className="absolute cursor-move"
                 style={{
                   left: `${placement.x}%`,
                   top: `${placement.y}%`,
                   transform: 'translate(-50%, -50%)',
                 }}
-                onMouseDown={() => handleMobMouseDown(`${placement.mobId}-${globalIndex}`)}
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  handleMobMouseDown(`${placement.mobId}-${globalIndex}`);
+                }}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ opacity: { duration: 0.2 } }}
