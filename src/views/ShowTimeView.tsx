@@ -74,6 +74,78 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   // Dragging state for runtime crawlers/mobs
   const [draggingRuntimeId, setDraggingRuntimeId] = useState<string | null>(null);
 
+  // Broadcast showtime state to sync with other players
+  const broadcastShowtimeState = useCallback(async (
+    episodeId: string | null,
+    mapIdx: number,
+    mapUrl: string | null
+  ) => {
+    if (!isAdmin) return; // Only DM broadcasts
+
+    const showtimeDocPath = roomId
+      ? `rooms/${roomId}/showtime-state/current`
+      : `showtime-state/current`;
+
+    try {
+      await setDoc(doc(db, showtimeDocPath), {
+        episodeId,
+        currentMapIndex: mapIdx,
+        selectedMapUrl: mapUrl,
+        isActive: episodeId !== null && mapUrl !== null,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error('[ShowTime] Failed to broadcast showtime state:', error);
+    }
+  }, [isAdmin, roomId]);
+
+  // Listen for showtime state updates (for players)
+  useEffect(() => {
+    if (isAdmin) return; // DM doesn't need to listen - they control the state
+
+    const showtimeDocPath = roomId
+      ? `rooms/${roomId}/showtime-state/current`
+      : `showtime-state/current`;
+
+    const showtimeDocRef = doc(db, showtimeDocPath);
+
+    const unsubscribe = onSnapshot(showtimeDocRef, (snapshot) => {
+      if (!snapshot.exists()) {
+        // No showtime state - show waiting screen
+        setSelectedEpisode(null);
+        setSelectedMap(null);
+        return;
+      }
+
+      const data = snapshot.data();
+      console.log('[ShowTime] Received showtime state update:', data);
+
+      // Update episode if changed
+      if (data.episodeId) {
+        const episode = episodes.find(e => e.id === data.episodeId);
+        if (episode && episode.id !== selectedEpisode?.id) {
+          setSelectedEpisode(episode);
+        }
+      } else {
+        setSelectedEpisode(null);
+      }
+
+      // Update map index
+      if (data.currentMapIndex !== undefined) {
+        setCurrentMapIndex(data.currentMapIndex);
+      }
+
+      // Update selected map URL
+      if (data.selectedMapUrl !== undefined) {
+        setSelectedMap(data.selectedMapUrl);
+      } else if (!data.isActive) {
+        setSelectedMap(null);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [isAdmin, roomId, episodes]);
+
   // Get current map ID for fog of war storage - MUST be defined before useEffects that use it
   const currentMapId = useMemo(() => {
     if (!selectedEpisode || selectedEpisode.mapIds.length === 0) return null;
@@ -687,17 +759,29 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     return maps[mapIndex] || null;
   }, [selectedEpisode, maps, currentMapIndex]);
 
-  const handlePreviousMap = () => {
-    setCurrentMapIndex(prev =>
-      prev > 0 ? prev - 1 : (selectedEpisode?.mapIds.length ?? 1) - 1
-    );
-  };
+  const handlePreviousMap = useCallback(() => {
+    if (!selectedEpisode) return;
+    const newIndex = currentMapIndex > 0 ? currentMapIndex - 1 : selectedEpisode.mapIds.length - 1;
+    setCurrentMapIndex(newIndex);
+    // Broadcast new map index
+    const newMapIdxStr = selectedEpisode.mapIds[newIndex];
+    const newMapIdx = parseInt(newMapIdxStr, 10);
+    const newMapUrl = maps[newMapIdx] || null;
+    setSelectedMap(newMapUrl);
+    broadcastShowtimeState(selectedEpisode.id, newIndex, newMapUrl);
+  }, [selectedEpisode, currentMapIndex, maps, broadcastShowtimeState]);
 
-  const handleNextMap = () => {
-    setCurrentMapIndex(prev =>
-      prev < (selectedEpisode?.mapIds.length ?? 1) - 1 ? prev + 1 : 0
-    );
-  };
+  const handleNextMap = useCallback(() => {
+    if (!selectedEpisode) return;
+    const newIndex = currentMapIndex < selectedEpisode.mapIds.length - 1 ? currentMapIndex + 1 : 0;
+    setCurrentMapIndex(newIndex);
+    // Broadcast new map index
+    const newMapIdxStr = selectedEpisode.mapIds[newIndex];
+    const newMapIdx = parseInt(newMapIdxStr, 10);
+    const newMapUrl = maps[newMapIdx] || null;
+    setSelectedMap(newMapUrl);
+    broadcastShowtimeState(selectedEpisode.id, newIndex, newMapUrl);
+  }, [selectedEpisode, currentMapIndex, maps, broadcastShowtimeState]);
 
   const handleToggleMobDisplay = (mobId: string) => {
     setDisplayedMobIds(prev =>
@@ -709,12 +793,14 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     setDisplayedMobIds(prev => prev.filter(id => id !== mobId));
   };
 
-  const handleEndEpisode = () => {
+  const handleEndEpisode = useCallback(() => {
     setSelectedEpisode(null);
     setSelectedMap(null);
     setCurrentMapIndex(0);
     setDisplayedMobIds([]);
-  };
+    // Broadcast end of episode
+    broadcastShowtimeState(null, 0, null);
+  }, [broadcastShowtimeState]);
 
   const handleMobMouseDown = (placementKey: string) => {
     // All users can move mobs
@@ -916,7 +1002,10 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                 <p className="text-muted-foreground text-sm">{selectedEpisode.description}</p>
               )}
             </div>
-            <DungeonButton variant="default" onClick={() => setSelectedEpisode(null)}>
+            <DungeonButton variant="default" onClick={() => {
+              setSelectedEpisode(null);
+              broadcastShowtimeState(null, 0, null);
+            }}>
               <X className="w-4 h-4 mr-2" /> Back to Episodes
             </DungeonButton>
           </div>
@@ -940,6 +1029,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                       onClick={() => {
                         setCurrentMapIndex(idx);
                         setSelectedMap(mapUrl);
+                        broadcastShowtimeState(selectedEpisode.id, idx, mapUrl);
                       }}
                     >
                       <img
