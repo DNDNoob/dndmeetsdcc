@@ -545,13 +545,13 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
           )}
         </div>
 
-        {/* Stats, Achievements, and Inventory grid */}
-        <div className="grid md:grid-cols-3 gap-6 overflow-hidden">
-          <div className="min-w-0 overflow-hidden">
-            <h3 className="font-display text-primary text-lg mb-4 flex items-center gap-2">
-              <Shield className="w-5 h-5 shrink-0" /> STATS
+        {/* Stats and Achievements row */}
+        <div className="grid md:grid-cols-2 gap-8 mb-8">
+          <div>
+            <h3 className="font-display text-primary text-xl mb-4 flex items-center gap-2">
+              <Shield className="w-6 h-6 shrink-0" /> STATS
             </h3>
-            <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="grid grid-cols-2 gap-4">
               {[
                 { key: "str", label: "STR", icon: Zap },
                 { key: "dex", label: "DEX", icon: Zap },
@@ -559,8 +559,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 { key: "int", label: "INT", icon: Brain },
                 { key: "cha", label: "CHA", icon: Sparkles },
               ].map(({ key, label }) => (
-                <div key={key} className="flex items-center justify-between bg-muted/50 px-3 py-2">
-                  <span className="text-muted-foreground">{label}</span>
+                <div key={key} className="flex items-center justify-between bg-muted/50 px-4 py-3 rounded">
+                  <span className="text-muted-foreground text-base">{label}</span>
                   {editMode ? (
                     <input
                       type="number"
@@ -568,85 +568,88 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                       onChange={(e) =>
                         setEditData({ ...editData, [key]: parseInt(e.target.value) || 0 })
                       }
-                      className="bg-transparent border-b border-primary w-12 text-right"
+                      className="bg-transparent border-b border-primary w-14 text-right text-lg"
                     />
                   ) : (
-                    <span className="text-foreground font-bold">{(selected as any)[key]}</span>
+                    <span className="text-foreground font-bold text-lg">{(selected as any)[key]}</span>
                   )}
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="min-w-0 overflow-hidden">
-            <h3 className="font-display text-accent text-lg mb-4 flex items-center gap-2 text-glow-gold truncate">
-              <Sparkles className="w-5 h-5 shrink-0" /> ACHIEVEMENTS
+          <div>
+            <h3 className="font-display text-accent text-xl mb-4 flex items-center gap-2 text-glow-gold">
+              <Sparkles className="w-6 h-6 shrink-0" /> ACHIEVEMENTS
             </h3>
             {editMode ? (
               <textarea
                 value={editData.achievements || ""}
                 onChange={(e) => setEditData({ ...editData, achievements: e.target.value })}
-                className="w-full bg-muted border border-border p-3 min-h-[100px] text-sm"
+                className="w-full bg-muted border border-border p-4 min-h-[150px] text-base rounded"
                 placeholder="Enter achievements..."
               />
             ) : (
-              <p className="text-accent text-sm leading-relaxed break-words whitespace-pre-wrap">{selected.achievements}</p>
+              <div className="bg-muted/30 border border-border/50 rounded p-4 min-h-[150px]">
+                <p className="text-accent text-base leading-relaxed break-words whitespace-pre-wrap">{selected.achievements || "No achievements yet..."}</p>
+              </div>
             )}
           </div>
+        </div>
 
-          {/* Inventory section */}
-          <div className="min-w-0 overflow-hidden md:col-span-1 lg:col-span-1">
-            <div className="flex items-center justify-between mb-3 gap-2">
-              <h3 className="font-display text-primary text-lg flex items-center gap-2 truncate">
-                <Sword className="w-5 h-5 shrink-0" /> INVENTORY
-              </h3>
-              <div className="flex gap-1 shrink-0">
-                <DungeonButton variant="nav" size="sm" onClick={() => setExpandedItems(!expandedItems)}>
-                  {expandedItems ? '-' : '+'}
-                </DungeonButton>
-                <DungeonButton variant="default" size="sm" onClick={handleAddItem}>
-                  <Plus className="w-4 h-4" />
-                </DungeonButton>
-              </div>
+        {/* Inventory section - full width */}
+        <div>
+          <div className="flex items-center justify-between mb-4 gap-4">
+            <h3 className="font-display text-primary text-xl flex items-center gap-2">
+              <Sword className="w-6 h-6 shrink-0" /> INVENTORY
+            </h3>
+            <div className="flex gap-2 shrink-0">
+              <DungeonButton variant="nav" size="sm" onClick={() => setExpandedItems(!expandedItems)}>
+                {expandedItems ? 'Collapse' : 'Expand'}
+              </DungeonButton>
+              <DungeonButton variant="default" size="sm" onClick={handleAddItem}>
+                <Plus className="w-4 h-4 mr-1" /> Add Item
+              </DungeonButton>
             </div>
+          </div>
 
-            {/* Item Form */}
-            {(isAddingItem || editingItemId) && (
-              <div className="mb-3 p-3 border border-accent bg-accent/10 rounded">
-                <h4 className="text-xs font-bold text-accent mb-2">
-                  {isAddingItem ? "New Item" : "Edit Item"}
-                </h4>
-                <div className="space-y-2">
-                  <input
-                    type="text"
-                    placeholder="Item Name"
-                    value={itemFormData.name || ""}
-                    onChange={(e) => setItemFormData({ ...itemFormData, name: e.target.value })}
-                    className="w-full bg-muted border border-border px-2 py-1 text-xs rounded"
-                  />
-                  <textarea
-                    placeholder="Description"
-                    value={itemFormData.description || ""}
-                    onChange={(e) => setItemFormData({ ...itemFormData, description: e.target.value })}
-                    className="w-full bg-muted border border-border px-2 py-1 text-xs min-h-[50px] rounded"
-                  />
-                  <select
-                    value={itemFormData.equipSlot || ""}
-                    onChange={(e) => setItemFormData({ ...itemFormData, equipSlot: e.target.value as SlotType || undefined })}
-                    className="w-full bg-muted border border-border px-2 py-1 text-xs rounded"
-                  >
-                    <option value="">No Slot</option>
+          {/* Item Form */}
+          {(isAddingItem || editingItemId) && (
+            <div className="mb-4 p-4 border border-accent bg-accent/10 rounded">
+              <h4 className="text-sm font-bold text-accent mb-3">
+                {isAddingItem ? "New Item" : "Edit Item"}
+              </h4>
+              <div className="space-y-3">
+                <input
+                  type="text"
+                  placeholder="Item Name"
+                  value={itemFormData.name || ""}
+                  onChange={(e) => setItemFormData({ ...itemFormData, name: e.target.value })}
+                  className="w-full bg-muted border border-border px-3 py-2 text-sm rounded"
+                />
+                <textarea
+                  placeholder="Description"
+                  value={itemFormData.description || ""}
+                  onChange={(e) => setItemFormData({ ...itemFormData, description: e.target.value })}
+                  className="w-full bg-muted border border-border px-3 py-2 text-sm min-h-[80px] rounded"
+                />
+                <select
+                  value={itemFormData.equipSlot || ""}
+                  onChange={(e) => setItemFormData({ ...itemFormData, equipSlot: e.target.value as SlotType || undefined })}
+                  className="w-full bg-muted border border-border px-3 py-2 text-sm rounded"
+                >
+                    <option value="">No Equipment Slot</option>
                     <option value="head">Head</option>
                     <option value="chest">Chest</option>
                     <option value="legs">Legs</option>
                     <option value="feet">Feet</option>
                     <option value="leftHand">Left Hand</option>
                     <option value="rightHand">Right Hand</option>
-                    <option value="ringFinger">Ring</option>
+                    <option value="ringFinger">Ring Finger</option>
                   </select>
-                  <div className="flex gap-2">
+                  <div className="flex gap-3 mt-2">
                     <DungeonButton variant="admin" size="sm" onClick={handleSaveItem}>
-                      <Save className="w-3 h-3 mr-1" /> Save
+                      <Save className="w-4 h-4 mr-1" /> Save Item
                     </DungeonButton>
                     <DungeonButton variant="default" size="sm" onClick={handleCancelItemEdit}>
                       Cancel
@@ -656,76 +659,78 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
               </div>
             )}
 
-            {inventory.length === 0 ? (
-              <p className="text-muted-foreground text-sm italic">No items</p>
-            ) : (
-              <ul className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
-                {inventory.map((item) => {
-                  const isEquipped = Object.values(selected.equippedItems || {}).includes(item.id);
-                  const isEditing = editingItemId === item.id;
+          {inventory.length === 0 ? (
+            <div className="bg-muted/30 border border-border/50 rounded p-6 text-center">
+              <p className="text-muted-foreground text-base italic">No items in inventory</p>
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {inventory.map((item) => {
+                const isEquipped = Object.values(selected.equippedItems || {}).includes(item.id);
+                const isEditing = editingItemId === item.id;
 
-                  return (
-                    <li
-                      key={item.id}
-                      draggable={!!item.equipSlot && !isEditing}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData('application/json', JSON.stringify(item));
-                        e.dataTransfer.effectAllowed = 'move';
-                      }}
-                      className={`bg-muted/50 px-3 py-2 min-w-0 rounded ${
-                        item.equipSlot && !isEditing ? 'cursor-grab active:cursor-grabbing' : ''
-                      } ${isEditing ? 'border-2 border-accent' : 'border border-border'}`}
-                      title={expandedItems ? undefined : item.name}
-                    >
-                      <div className="flex flex-col gap-1">
-                        {/* Item header row */}
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0 flex-1">
-                            <Sword className="w-4 h-4 text-primary/60 shrink-0" />
-                            <span className="text-foreground font-semibold text-sm truncate">{item.name}</span>
-                          </div>
-                          <div className="flex items-center gap-1 shrink-0">
-                            <button
-                              onClick={() => handleEditItem(item)}
-                              className="text-primary hover:text-primary/80 p-1"
-                              title="Edit"
-                            >
-                              <Edit2 className="w-3 h-3" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteItem(item.id)}
-                              className="text-danger hover:text-danger/80 p-1"
-                              title="Delete"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
-                          </div>
-                        </div>
-                        {/* Item badges row */}
-                        <div className="flex flex-wrap items-center gap-1">
-                          {item.equipSlot && (
-                            <span className="text-xs bg-accent/20 text-accent px-1.5 py-0.5 rounded">
-                              {item.equipSlot === 'leftHand' ? 'LH' :
-                               item.equipSlot === 'rightHand' ? 'RH' :
-                               item.equipSlot === 'ringFinger' ? 'Ring' :
-                               item.equipSlot.charAt(0).toUpperCase() + item.equipSlot.slice(1)}
-                            </span>
-                          )}
-                          {isEquipped && (
-                            <span className="text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded">Equipped</span>
-                          )}
-                        </div>
-                        {/* Item description - always visible when expanded */}
-                        {expandedItems && item.description && (
-                          <p className="text-muted-foreground text-xs mt-1 break-words leading-relaxed">{item.description}</p>
-                        )}
+                return (
+                  <div
+                    key={item.id}
+                    draggable={!!item.equipSlot && !isEditing}
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData('application/json', JSON.stringify(item));
+                      e.dataTransfer.effectAllowed = 'move';
+                    }}
+                    className={`bg-muted/50 p-4 rounded-lg ${
+                      item.equipSlot && !isEditing ? 'cursor-grab active:cursor-grabbing' : ''
+                    } ${isEditing ? 'border-2 border-accent' : 'border border-border'}`}
+                  >
+                    {/* Item header */}
+                    <div className="flex items-start justify-between gap-3 mb-2">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <Sword className="w-5 h-5 text-primary/60 shrink-0" />
+                        <span className="text-foreground font-semibold text-base">{item.name}</span>
                       </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => handleEditItem(item)}
+                          className="text-primary hover:text-primary/80 p-1"
+                          title="Edit"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteItem(item.id)}
+                          className="text-danger hover:text-danger/80 p-1"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Item badges */}
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      {item.equipSlot && (
+                        <span className="text-xs bg-accent/20 text-accent px-2 py-1 rounded">
+                          {item.equipSlot === 'leftHand' ? 'Left Hand' :
+                           item.equipSlot === 'rightHand' ? 'Right Hand' :
+                           item.equipSlot === 'ringFinger' ? 'Ring' :
+                           item.equipSlot.charAt(0).toUpperCase() + item.equipSlot.slice(1)}
+                        </span>
+                      )}
+                      {isEquipped && (
+                        <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded">Equipped</span>
+                      )}
+                    </div>
+
+                    {/* Item description */}
+                    {(expandedItems || item.description) && (
+                      <p className="text-muted-foreground text-sm leading-relaxed">
+                        {item.description || "No description"}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
           </div>
         </div>

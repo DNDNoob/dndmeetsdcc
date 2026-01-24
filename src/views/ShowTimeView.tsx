@@ -1142,9 +1142,6 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
             const isDragging = draggingMobId === `${placement.mobId}-${globalIndex}`;
 
-            // Counter-scale the mob icon to maintain fixed size regardless of map scale
-            const counterScale = 100 / mapScale;
-
             return (
               <motion.div
                 key={`${placement.mobId}-${currentMapId}-${localIndex}`}
@@ -1152,7 +1149,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                 style={{
                   left: `${placement.x}%`,
                   top: `${placement.y}%`,
-                  transform: `translate(-50%, -50%) scale(${counterScale})`,
+                  transform: 'translate(-50%, -50%)',
                 }}
                 onMouseDown={() => handleMobMouseDown(`${placement.mobId}-${globalIndex}`)}
                 initial={{ opacity: 0 }}
@@ -1186,8 +1183,6 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
               .filter(p => p.crawlerId === placement.crawlerId).length;
             // Only show letter if there are duplicates (sameIdBefore > 0 means this is 2nd, 3rd, etc.)
             const letter = sameIdBefore > 0 ? String.fromCharCode(65 + sameIdBefore) : '';
-
-            const counterScale = 100 / mapScale;
             const isDragging = draggingRuntimeId === `crawler-${index}`;
 
             return (
@@ -1197,7 +1192,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                 style={{
                   left: `${placement.x}%`,
                   top: `${placement.y}%`,
-                  transform: `translate(-50%, -50%) scale(${counterScale})`,
+                  transform: 'translate(-50%, -50%)',
                 }}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -1247,8 +1242,6 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             const totalBefore = episodeMobCount + runtimeMobsBefore;
             // Only show letter if this mob has any duplicates (totalBefore > 0)
             const letter = totalBefore > 0 ? String.fromCharCode(65 + totalBefore) : '';
-
-            const counterScale = 100 / mapScale;
             const isDragging = draggingRuntimeId === `mob-${index}`;
 
             return (
@@ -1258,7 +1251,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                 style={{
                   left: `${placement.x}%`,
                   top: `${placement.y}%`,
-                  transform: `translate(-50%, -50%) scale(${counterScale})`,
+                  transform: 'translate(-50%, -50%)',
                 }}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
