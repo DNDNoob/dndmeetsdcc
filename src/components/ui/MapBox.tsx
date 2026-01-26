@@ -23,6 +23,7 @@ interface MapBoxProps {
   onUpdate: (box: MapBoxData) => void;
   onDelete: (id: string) => void;
   mapScale: number;
+  canInteract?: boolean; // Whether the box can be interacted with (visibility check)
 }
 
 export const MapBox: React.FC<MapBoxProps> = ({
@@ -31,6 +32,7 @@ export const MapBox: React.FC<MapBoxProps> = ({
   onUpdate,
   onDelete,
   mapScale,
+  canInteract = true,
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
@@ -68,11 +70,22 @@ export const MapBox: React.FC<MapBoxProps> = ({
         const dy = e.clientY - centerY;
         const newWidth = (Math.abs(dx) * 2 / rect.width) * 100;
         const newHeight = (Math.abs(dy) * 2 / rect.height) * 100;
-        onUpdate({
-          ...box,
-          width: Math.max(2, Math.min(50, newWidth)),
-          height: Math.max(2, Math.min(50, newHeight)),
-        });
+
+        // For squares and circles, enforce equal dimensions
+        if (box.shape === "square" || box.shape === "circle") {
+          const size = Math.max(newWidth, newHeight);
+          onUpdate({
+            ...box,
+            width: Math.max(2, Math.min(50, size)),
+            height: Math.max(2, Math.min(50, size)),
+          });
+        } else {
+          onUpdate({
+            ...box,
+            width: Math.max(2, Math.min(50, newWidth)),
+            height: Math.max(2, Math.min(50, newHeight)),
+          });
+        }
       } else if (isRotating) {
         const centerX = (box.x / 100) * rect.width + rect.left;
         const centerY = (box.y / 100) * rect.height + rect.top;
@@ -110,9 +123,10 @@ export const MapBox: React.FC<MapBoxProps> = ({
         transform: `translate(-50%, -50%) rotate(${box.rotation}deg)`,
         width: `${box.width}%`,
         height: `${box.height}%`,
-        pointerEvents: "auto", // All users can interact
+        pointerEvents: canInteract ? "auto" : "none",
+        opacity: canInteract ? 1 : 0.5,
       }}
-      onMouseEnter={() => setShowControls(true)}
+      onMouseEnter={() => canInteract && setShowControls(true)}
       onMouseLeave={() => !isDragging && !isResizing && !isRotating && setShowControls(false)}
     >
       {/* The shape itself */}

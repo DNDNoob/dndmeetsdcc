@@ -22,6 +22,7 @@ export const FogOfWar: React.FC<FogOfWarProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null);
+  const lastPosRef = useRef<{ x: number; y: number } | null>(null);
 
   const getPercentagePosition = useCallback((e: React.MouseEvent | MouseEvent) => {
     if (!containerRef.current) return null;
@@ -31,12 +32,33 @@ export const FogOfWar: React.FC<FogOfWarProps> = ({
     return { x: Math.max(0, Math.min(100, x)), y: Math.max(0, Math.min(100, y)) };
   }, []);
 
+  // Interpolate points between last and current position to prevent skipping
+  const interpolateAndReveal = useCallback((from: { x: number; y: number }, to: { x: number; y: number }) => {
+    if (!onReveal) return;
+
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    // Calculate step size based on brush size (smaller steps for smoother lines)
+    const stepSize = brushSize * 0.5;
+    const steps = Math.max(1, Math.ceil(distance / stepSize));
+
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const x = from.x + dx * t;
+      const y = from.y + dy * t;
+      onReveal(x, y, brushSize);
+    }
+  }, [onReveal, brushSize]);
+
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (!isAdmin || !onReveal) return;
     e.preventDefault();
     setIsDrawing(true);
     const pos = getPercentagePosition(e);
     if (pos) {
+      lastPosRef.current = pos;
       onReveal(pos.x, pos.y, brushSize);
     }
   }, [isAdmin, onReveal, brushSize, getPercentagePosition]);
@@ -45,19 +67,26 @@ export const FogOfWar: React.FC<FogOfWarProps> = ({
     const pos = getPercentagePosition(e);
     setCursorPos(pos);
 
-    if (!isDrawing || !isAdmin || !onReveal) return;
-    if (pos) {
+    if (!isDrawing || !isAdmin || !onReveal || !pos) return;
+
+    // Interpolate from last position to current position
+    if (lastPosRef.current) {
+      interpolateAndReveal(lastPosRef.current, pos);
+    } else {
       onReveal(pos.x, pos.y, brushSize);
     }
-  }, [isDrawing, isAdmin, onReveal, brushSize, getPercentagePosition]);
+    lastPosRef.current = pos;
+  }, [isDrawing, isAdmin, onReveal, brushSize, getPercentagePosition, interpolateAndReveal]);
 
   const handleMouseUp = useCallback(() => {
     setIsDrawing(false);
+    lastPosRef.current = null;
   }, []);
 
   const handleMouseLeave = useCallback(() => {
     setIsDrawing(false);
     setCursorPos(null);
+    lastPosRef.current = null;
   }, []);
 
   // Global mouseup listener
@@ -126,15 +155,16 @@ export const FogOfWar: React.FC<FogOfWarProps> = ({
         />
       </svg>
 
-      {/* Brush cursor preview for admin */}
+      {/* Brush cursor preview for admin - use vmin for perfect circle */}
       {isAdmin && cursorPos && (
         <div
           className="absolute pointer-events-none border-2 border-white/50 rounded-full"
           style={{
             left: `${cursorPos.x}%`,
             top: `${cursorPos.y}%`,
-            width: `${brushSize * 2}%`,
-            height: `${brushSize * 2}%`,
+            // Use vmin to ensure the brush is always a perfect circle
+            width: `${brushSize * 4}vmin`,
+            height: `${brushSize * 4}vmin`,
             transform: 'translate(-50%, -50%)',
             boxShadow: '0 0 10px rgba(255, 255, 255, 0.3)',
           }}

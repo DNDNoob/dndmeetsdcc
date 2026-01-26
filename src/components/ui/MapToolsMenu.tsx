@@ -128,6 +128,8 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
   const handlePingModeToggle = () => {
     if (!isPingMode) {
       clearAllModes();
+      // Auto-expand to show color options
+      setIsExpanded(true);
     }
     setIsPingMode(!isPingMode);
   };
@@ -135,6 +137,8 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
   const handleBoxModeToggle = () => {
     if (!isBoxMode) {
       clearAllModes();
+      // Auto-expand to show color and opacity options
+      setIsExpanded(true);
     }
     setIsBoxMode(!isBoxMode);
   };
@@ -142,6 +146,8 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
   const handleAddCrawlerModeToggle = () => {
     if (!isAddCrawlerMode) {
       clearAllModes();
+      // Auto-expand to show crawler selector
+      setIsExpanded(true);
     }
     setIsAddCrawlerMode?.(!isAddCrawlerMode);
   };
@@ -149,6 +155,8 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
   const handleAddMobModeToggle = () => {
     if (!isAddMobMode) {
       clearAllModes();
+      // Auto-expand to show mob selector
+      setIsExpanded(true);
     }
     setIsAddMobMode?.(!isAddMobMode);
   };
@@ -318,7 +326,14 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
             <DungeonButton
               variant={fogEraserActive ? "admin" : "default"}
               size="sm"
-              onClick={() => setFogEraserActive(!fogEraserActive)}
+              onClick={() => {
+                const newValue = !fogEraserActive;
+                setFogEraserActive(newValue);
+                // Auto-expand to show brush size options when enabling eraser
+                if (newValue) {
+                  setIsExpanded(true);
+                }
+              }}
               title="Toggle Eraser Mode"
             >
               <Eraser className="w-4 h-4" />

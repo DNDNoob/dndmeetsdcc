@@ -26,6 +26,8 @@ interface ShowTimeViewProps {
   onUpdateEpisode?: (id: string, updates: Partial<Episode>) => void;
 }
 
+const SHOWTIME_STORAGE_KEY = 'dcc_showtime_state';
+
 const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode }) => {
   const { roomId } = useFirebaseStore();
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
@@ -77,7 +79,8 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
   // Panning state for map navigation
   const [isPanning, setIsPanning] = useState(false);
-  const [panStart, setPanStart] = useState<{ x: number; y: number; scrollLeft: number; scrollTop: number } | null>(null);
+  const [panStart, setPanStart] = useState<{ x: number; y: number; panX: number; panY: number } | null>(null);
+  const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // Broadcast showtime state to sync with other players
   const broadcastShowtimeState = useCallback(async (
@@ -157,9 +160,53 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     return selectedEpisode.mapIds[currentMapIndex];
   }, [selectedEpisode, currentMapIndex]);
 
+  // Check if a point is visible (not completely obscured by fog)
+  const isPointVisible = useCallback((x: number, y: number): boolean => {
+    if (!fogOfWarEnabled) return true; // No fog = always visible
+    if (isAdmin) return true; // Admin can always interact
+
+    // Check if point is within any revealed area
+    return revealedAreas.some(area => {
+      const dx = x - area.x;
+      const dy = y - area.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      return distance <= area.radius;
+    });
+  }, [fogOfWarEnabled, isAdmin, revealedAreas]);
+
   // Auto-select first episode and first map when episodes load (only once)
+  // Or restore from localStorage if available
   useEffect(() => {
     if (episodes.length > 0 && !selectedEpisode && !hasAutoLoaded.current) {
+      // Try to restore from localStorage
+      try {
+        const savedState = localStorage.getItem(SHOWTIME_STORAGE_KEY);
+        if (savedState) {
+          const { episodeId, mapIndex } = JSON.parse(savedState);
+          const savedEpisode = episodes.find(e => e.id === episodeId);
+          if (savedEpisode) {
+            setSelectedEpisode(savedEpisode);
+            const validMapIndex = Math.min(mapIndex || 0, savedEpisode.mapIds.length - 1);
+            setCurrentMapIndex(validMapIndex);
+            if (savedEpisode.mapIds.length > 0) {
+              const mapIdxNum = parseInt(savedEpisode.mapIds[validMapIndex], 10);
+              setSelectedMap(maps[mapIdxNum] || null);
+              // Load map settings
+              const mapId = savedEpisode.mapIds[validMapIndex];
+              const mapSettings = savedEpisode.mapSettings?.[mapId];
+              setFogOfWarEnabled(mapSettings?.fogOfWar?.enabled ?? savedEpisode.defaultFogOfWar ?? false);
+              setRevealedAreas(mapSettings?.fogOfWar?.revealedAreas ?? []);
+              setMapScale(mapSettings?.scale ?? 100);
+            }
+            hasAutoLoaded.current = true;
+            return;
+          }
+        }
+      } catch (e) {
+        console.error('[ShowTime] Failed to restore state from localStorage:', e);
+      }
+
+      // Fall back to first episode
       const firstEpisode = episodes[0];
       setSelectedEpisode(firstEpisode);
       if (firstEpisode.mapIds.length > 0) {
@@ -177,6 +224,20 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     }
   }, [episodes, maps]);
 
+  // Save state to localStorage when episode or map changes
+  useEffect(() => {
+    if (selectedEpisode && selectedMap) {
+      try {
+        localStorage.setItem(SHOWTIME_STORAGE_KEY, JSON.stringify({
+          episodeId: selectedEpisode.id,
+          mapIndex: currentMapIndex,
+        }));
+      } catch (e) {
+        console.error('[ShowTime] Failed to save state to localStorage:', e);
+      }
+    }
+  }, [selectedEpisode?.id, currentMapIndex, selectedMap]);
+
   // Load fog of war and scale settings when map changes
   useEffect(() => {
     if (!selectedEpisode || currentMapId === null) return;
@@ -192,6 +253,8 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       setRevealedAreas([]);
       setMapScale(100);
     }
+    // Reset pan offset when map changes
+    setPanOffset({ x: 0, y: 0 });
   }, [currentMapId]);
 
   // Debug logging
@@ -488,12 +551,14 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
   // Handle adding a box
   const handleAddBox = useCallback((x: number, y: number, color: string, opacity: number, shape: ShapeType = "rectangle") => {
+    // Square and circle get equal width/height, rectangle is wider
+    const isEqualDimensions = shape === "square" || shape === "circle";
     const newBox: MapBoxData = {
       id: `box-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       x,
       y,
-      width: shape === "square" || shape === "circle" ? 10 : 10,
-      height: shape === "square" || shape === "circle" ? 10 : 10,
+      width: isEqualDimensions ? 10 : 15,
+      height: isEqualDimensions ? 10 : 10,
       rotation: 0,
       color,
       opacity,
@@ -649,6 +714,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   // Handle scroll wheel zoom
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     if (e.deltaY < 0) {
       // Scroll up = zoom in
       setMapScale(prev => Math.min(prev + 10, 500));
@@ -658,15 +724,45 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     }
   }, []);
 
+  // Prevent page scroll when on ShowTime page with map displayed
+  useEffect(() => {
+    if (!selectedMap) return;
+
+    const preventScroll = (e: WheelEvent) => {
+      e.preventDefault();
+    };
+
+    // Add passive: false to allow preventDefault
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('wheel', preventScroll, { passive: false });
+
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('wheel', preventScroll);
+    };
+  }, [selectedMap]);
+
+  // Refs for throttling runtime drag broadcasts
+  const lastCrawlerBroadcastTime = useRef<number>(0);
+  const lastRuntimeMobBroadcastTime = useRef<number>(0);
+
   // Handle dragging runtime crawlers (all users can drag)
   const handleRuntimeCrawlerDrag = useCallback((index: number, x: number, y: number) => {
     const updated = crawlerPlacements.map((p, i) =>
       i === index ? { ...p, x, y } : p
     );
     setCrawlerPlacements(updated);
-  }, [crawlerPlacements]);
+
+    // Throttled broadcast during drag for real-time sync
+    const now = Date.now();
+    if (now - lastCrawlerBroadcastTime.current >= BROADCAST_THROTTLE_MS) {
+      lastCrawlerBroadcastTime.current = now;
+      broadcastCrawlerPlacements(updated);
+    }
+  }, [crawlerPlacements, broadcastCrawlerPlacements]);
 
   const handleRuntimeCrawlerDragEnd = useCallback((index: number) => {
+    // Final broadcast to ensure position is synced
     broadcastCrawlerPlacements(crawlerPlacements);
   }, [crawlerPlacements, broadcastCrawlerPlacements]);
 
@@ -676,9 +772,17 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       i === index ? { ...p, x, y } : p
     );
     setRuntimeMobPlacements(updated);
-  }, [runtimeMobPlacements]);
+
+    // Throttled broadcast during drag for real-time sync
+    const now = Date.now();
+    if (now - lastRuntimeMobBroadcastTime.current >= BROADCAST_THROTTLE_MS) {
+      lastRuntimeMobBroadcastTime.current = now;
+      broadcastRuntimeMobPlacements(updated);
+    }
+  }, [runtimeMobPlacements, broadcastRuntimeMobPlacements]);
 
   const handleRuntimeMobDragEnd = useCallback((index: number) => {
+    // Final broadcast to ensure position is synced
     broadcastRuntimeMobPlacements(runtimeMobPlacements);
   }, [runtimeMobPlacements, broadcastRuntimeMobPlacements]);
 
@@ -831,26 +935,24 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     // Don't pan if clicking on an interactive element
     if ((e.target as HTMLElement).closest('button, [data-draggable]')) return;
 
-    if (mapContainerRef.current) {
-      setIsPanning(true);
-      setPanStart({
-        x: e.clientX,
-        y: e.clientY,
-        scrollLeft: mapContainerRef.current.scrollLeft,
-        scrollTop: mapContainerRef.current.scrollTop,
-      });
-      // Change cursor to grabbing
-      mapContainerRef.current.style.cursor = 'grabbing';
-    }
+    setIsPanning(true);
+    setPanStart({
+      x: e.clientX,
+      y: e.clientY,
+      panX: panOffset.x,
+      panY: panOffset.y,
+    });
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     // Handle panning
-    if (isPanning && panStart && mapContainerRef.current) {
+    if (isPanning && panStart) {
       const dx = e.clientX - panStart.x;
       const dy = e.clientY - panStart.y;
-      mapContainerRef.current.scrollLeft = panStart.scrollLeft - dx;
-      mapContainerRef.current.scrollTop = panStart.scrollTop - dy;
+      setPanOffset({
+        x: panStart.panX + dx,
+        y: panStart.panY + dy,
+      });
     }
 
     // Track cursor position for ping/box/crawler/mob mode
@@ -920,9 +1022,6 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     if (isPanning) {
       setIsPanning(false);
       setPanStart(null);
-      if (mapContainerRef.current) {
-        mapContainerRef.current.style.cursor = '';
-      }
     }
 
     // Handle runtime crawler/mob drag end (all users)
@@ -1213,7 +1312,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       {/* Map display */}
       <div
         ref={mapContainerRef}
-        className="flex-1 flex items-center justify-center p-4 select-none overflow-auto relative"
+        className="flex-1 flex items-center justify-center p-4 select-none overflow-hidden relative"
         style={{ cursor: isPanning ? 'grabbing' : (isPingMode || isBoxMode || isAddCrawlerMode || isAddMobMode) ? 'crosshair' : 'grab' }}
         onMouseDown={handlePanStart}
         onMouseMove={handleMouseMove}
@@ -1316,7 +1415,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
           className="relative"
           data-map-container
           style={{
-            transform: `scale(${mapScale / 100})`,
+            transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${mapScale / 100})`,
             transformOrigin: 'center center',
           }}
           onMouseUp={handleMouseUp}
@@ -1326,7 +1425,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             ref={mapImageRef}
             src={selectedMap}
             alt="Current Map"
-            className="max-w-full max-h-[90vh] object-contain pointer-events-none"
+            className="max-w-full max-h-[90vh] object-contain pointer-events-none border-2 border-primary shadow-[0_0_15px_rgba(0,200,255,0.5)]"
             draggable={false}
           />
 
@@ -1350,22 +1449,26 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             const letter = sameIdBefore > 0 ? String.fromCharCode(65 + sameIdBefore) : '';
 
             const isDragging = draggingMobId === `${placement.mobId}-${globalIndex}`;
+            const canInteract = isPointVisible(placement.x, placement.y);
 
             return (
               <motion.div
                 key={`${placement.mobId}-${currentMapId}-${localIndex}`}
-                className="absolute cursor-move"
+                className={canInteract ? "absolute cursor-move" : "absolute cursor-not-allowed"}
                 style={{
                   left: `${placement.x}%`,
                   top: `${placement.y}%`,
                   transform: 'translate(-50%, -50%)',
+                  pointerEvents: canInteract ? 'auto' : 'none',
+                  opacity: canInteract ? 1 : 0.5,
                 }}
                 onMouseDown={(e) => {
+                  if (!canInteract) return;
                   e.stopPropagation();
                   handleMobMouseDown(`${placement.mobId}-${globalIndex}`);
                 }}
                 initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
+                animate={{ opacity: canInteract ? 1 : 0.5 }}
                 transition={{ opacity: { duration: 0.2 } }}
               >
                 <div className="relative">
@@ -1396,21 +1499,24 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             // Only show letter if there are duplicates (sameIdBefore > 0 means this is 2nd, 3rd, etc.)
             const letter = sameIdBefore > 0 ? String.fromCharCode(65 + sameIdBefore) : '';
             const isDragging = draggingRuntimeId === `crawler-${index}`;
+            const canInteract = isPointVisible(placement.x, placement.y);
 
             return (
               <motion.div
                 key={`crawler-${placement.crawlerId}-${index}`}
-                className="absolute cursor-move"
+                className={canInteract ? "absolute cursor-move" : "absolute cursor-not-allowed"}
                 style={{
                   left: `${placement.x}%`,
                   top: `${placement.y}%`,
                   transform: 'translate(-50%, -50%)',
+                  pointerEvents: canInteract ? 'auto' : 'none',
                 }}
                 initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
+                animate={{ opacity: canInteract ? 1 : 0.5 }}
                 transition={{ opacity: { duration: 0.2 } }}
                 onMouseDown={(e) => {
-                  // All users can move crawlers
+                  // All users can move crawlers if visible
+                  if (!canInteract) return;
                   e.stopPropagation();
                   setDraggingRuntimeId(`crawler-${index}`);
                 }}
@@ -1455,21 +1561,24 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             // Only show letter if this mob has any duplicates (totalBefore > 0)
             const letter = totalBefore > 0 ? String.fromCharCode(65 + totalBefore) : '';
             const isDragging = draggingRuntimeId === `mob-${index}`;
+            const canInteract = isPointVisible(placement.x, placement.y);
 
             return (
               <motion.div
                 key={`runtime-mob-${placement.mobId}-${index}`}
-                className="absolute cursor-move"
+                className={canInteract ? "absolute cursor-move" : "absolute cursor-not-allowed"}
                 style={{
                   left: `${placement.x}%`,
                   top: `${placement.y}%`,
                   transform: 'translate(-50%, -50%)',
+                  pointerEvents: canInteract ? 'auto' : 'none',
                 }}
                 initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
+                animate={{ opacity: canInteract ? 1 : 0.5 }}
                 transition={{ opacity: { duration: 0.2 } }}
                 onMouseDown={(e) => {
-                  // All users can move runtime mobs
+                  // All users can move runtime mobs if visible
+                  if (!canInteract) return;
                   e.stopPropagation();
                   setDraggingRuntimeId(`mob-${index}`);
                 }}
@@ -1507,6 +1616,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
               onUpdate={handleUpdateBox}
               onDelete={handleDeleteBox}
               mapScale={mapScale}
+              canInteract={isPointVisible(box.x, box.y)}
             />
           ))}
 
