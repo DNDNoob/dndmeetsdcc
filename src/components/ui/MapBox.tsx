@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
-import { X, RotateCw, Move, Maximize2 } from "lucide-react";
+import { X, RotateCw, Maximize2 } from "lucide-react";
+
+export type ShapeType = "rectangle" | "square" | "circle" | "triangle";
 
 export interface MapBoxData {
   id: string;
@@ -12,6 +14,7 @@ export interface MapBoxData {
   color: string;
   opacity: number; // 0-1
   createdBy: string; // User who created it
+  shape?: ShapeType; // Shape type (defaults to rectangle for backwards compatibility)
 }
 
 interface MapBoxProps {
@@ -112,22 +115,79 @@ export const MapBox: React.FC<MapBoxProps> = ({
       onMouseEnter={() => setShowControls(true)}
       onMouseLeave={() => !isDragging && !isResizing && !isRotating && setShowControls(false)}
     >
-      {/* The box itself */}
-      <div
-        ref={boxRef}
-        className="w-full h-full rounded border-2 cursor-move"
-        style={{
-          backgroundColor: box.color,
-          opacity: box.opacity,
-          borderColor: box.color,
-        }}
-        onMouseDown={(e) => {
-          // All users can move boxes
-          e.preventDefault();
-          e.stopPropagation();
-          setIsDragging(true);
-        }}
-      />
+      {/* The shape itself */}
+      {(!box.shape || box.shape === "rectangle") && (
+        <div
+          ref={boxRef}
+          className="w-full h-full rounded border-2 cursor-move"
+          style={{
+            backgroundColor: box.color,
+            opacity: box.opacity,
+            borderColor: box.color,
+          }}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsDragging(true);
+          }}
+        />
+      )}
+      {box.shape === "square" && (
+        <div
+          ref={boxRef}
+          className="w-full h-full border-2 cursor-move"
+          style={{
+            backgroundColor: box.color,
+            opacity: box.opacity,
+            borderColor: box.color,
+            aspectRatio: "1 / 1",
+          }}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsDragging(true);
+          }}
+        />
+      )}
+      {box.shape === "circle" && (
+        <div
+          ref={boxRef}
+          className="w-full h-full rounded-full border-2 cursor-move"
+          style={{
+            backgroundColor: box.color,
+            opacity: box.opacity,
+            borderColor: box.color,
+          }}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsDragging(true);
+          }}
+        />
+      )}
+      {box.shape === "triangle" && (
+        <div
+          ref={boxRef}
+          className="w-full h-full cursor-move relative"
+          style={{
+            opacity: box.opacity,
+          }}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsDragging(true);
+          }}
+        >
+          <svg viewBox="0 0 100 100" className="w-full h-full" preserveAspectRatio="none">
+            <polygon
+              points="50,5 95,95 5,95"
+              fill={box.color}
+              stroke={box.color}
+              strokeWidth="2"
+            />
+          </svg>
+        </div>
+      )}
 
       {/* Control handles - visible to all users */}
       {showControls && (
@@ -147,18 +207,6 @@ export const MapBox: React.FC<MapBoxProps> = ({
           >
             <X className="w-3 h-3" />
           </button>
-
-          {/* Move handle */}
-          <div
-            className="absolute -top-3 -left-3 w-6 h-6 bg-primary text-white rounded-full flex items-center justify-center cursor-move pointer-events-auto"
-            onMouseDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setIsDragging(true);
-            }}
-          >
-            <Move className="w-3 h-3" />
-          </div>
 
           {/* Resize handle */}
           <div

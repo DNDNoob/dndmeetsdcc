@@ -222,6 +222,7 @@ const Index = () => {
             currentView={currentView}
             playerName={currentPlayer.name}
             playerType={currentPlayer.type}
+            autoCollapse={currentView === "showtime"}
           />
 
           <main className="pb-12">

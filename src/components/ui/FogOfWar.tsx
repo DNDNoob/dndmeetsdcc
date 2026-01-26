@@ -72,11 +72,18 @@ export const FogOfWar: React.FC<FogOfWarProps> = ({
   // Create SVG mask for revealed areas
   const maskId = `fog-mask-${Math.random().toString(36).substr(2, 9)}`;
 
+  // Only capture pointer events when admin is actively erasing fog
+  // Otherwise, allow clicks to pass through to items underneath
+  const shouldCaptureEvents = isAdmin;
+
   return (
     <div
       ref={containerRef}
-      className="absolute inset-0 pointer-events-auto"
-      style={{ zIndex: 20 }}
+      className="absolute inset-0"
+      style={{
+        zIndex: 20,
+        pointerEvents: shouldCaptureEvents ? 'auto' : 'none',
+      }}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}

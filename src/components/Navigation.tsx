@@ -1,6 +1,7 @@
-import { motion } from "framer-motion";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { DungeonButton } from "./ui/DungeonButton";
-import { Home, User, Map, Backpack, Skull, Presentation, Volume2, FileText, Brain } from "lucide-react";
+import { Home, User, Map, Backpack, Skull, Presentation, Volume2, FileText, Brain, Pin, PinOff } from "lucide-react";
 
 interface NavigationProps {
   onNavigate: (view: string) => void;
@@ -9,6 +10,7 @@ interface NavigationProps {
   currentView: string;
   playerName: string;
   playerType: "crawler" | "ai" | "npc";
+  autoCollapse?: boolean; // Whether navigation should auto-collapse
 }
 
 const navItems = [
@@ -25,19 +27,39 @@ const Navigation: React.FC<NavigationProps> = ({
   currentView,
   playerName,
   playerType,
+  autoCollapse = false,
 }) => {
+  const [isHovered, setIsHovered] = useState(false);
+  const [isPinned, setIsPinned] = useState(false);
+
   const getPlayerColor = () => {
     if (playerType === "ai") return "text-accent text-glow-gold";
     if (playerType === "npc") return "text-muted-foreground";
     return "text-primary text-glow-cyan";
   };
 
+  const shouldCollapse = autoCollapse && !isPinned && !isHovered;
+
   return (
-    <motion.nav
-      initial={{ y: -50, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b-2 border-primary px-4 py-3"
-    >
+    <>
+      {/* Hover trigger zone when collapsed */}
+      {autoCollapse && !isPinned && (
+        <div
+          className="fixed top-0 left-0 right-0 h-4 z-40"
+          onMouseEnter={() => setIsHovered(true)}
+        />
+      )}
+      <motion.nav
+        initial={{ y: -50, opacity: 0 }}
+        animate={{
+          y: shouldCollapse ? -100 : 0,
+          opacity: shouldCollapse ? 0 : 1
+        }}
+        transition={{ duration: 0.2 }}
+        className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b-2 border-primary px-4 py-3"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
@@ -47,6 +69,17 @@ const Navigation: React.FC<NavigationProps> = ({
             </span>
           </div>
           <div className="flex items-center gap-2">
+            {autoCollapse && (
+              <DungeonButton
+                variant={isPinned ? "admin" : "ghost"}
+                size="sm"
+                onClick={() => setIsPinned(!isPinned)}
+                className="flex items-center gap-1"
+                title={isPinned ? "Unpin navigation" : "Pin navigation"}
+              >
+                {isPinned ? <Pin className="w-3 h-3" /> : <PinOff className="w-3 h-3" />}
+              </DungeonButton>
+            )}
             <DungeonButton
               variant="ghost"
               size="sm"
@@ -117,6 +150,7 @@ const Navigation: React.FC<NavigationProps> = ({
         </div>
       </div>
     </motion.nav>
+    </>
   );
 };
 

@@ -9,7 +9,7 @@ import { FogOfWar } from "@/components/ui/FogOfWar";
 import { Episode, Mob, MapSettings, Crawler, CrawlerPlacement, EpisodeMobPlacement } from "@/lib/gameData";
 import { Map, X, Eye, Layers, ChevronLeft, ChevronRight, PlayCircle, Grid3x3, CloudFog, Eraser, Trash2, Target, ZoomIn, ZoomOut } from "lucide-react";
 import { PingEffect, Ping } from "@/components/ui/PingEffect";
-import { MapBox, MapBoxData } from "@/components/ui/MapBox";
+import { MapBox, MapBoxData, ShapeType } from "@/components/ui/MapBox";
 import { MapToolsMenu } from "@/components/ui/MapToolsMenu";
 import { CrawlerIcon } from "@/components/ui/CrawlerIcon";
 import { db } from "@/lib/firebase";
@@ -58,6 +58,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   const [isBoxMode, setIsBoxMode] = useState(false);
   const [selectedColor, setSelectedColor] = useState("#ef4444"); // Default red
   const [boxOpacity, setBoxOpacity] = useState(0.3);
+  const [selectedShape, setSelectedShape] = useState<ShapeType>("rectangle");
 
   // Crawler and Mob placement state (DM can add during ShowTime)
   const [crawlerPlacements, setCrawlerPlacements] = useState<CrawlerPlacement[]>([]);
@@ -73,6 +74,10 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
   // Dragging state for runtime crawlers/mobs
   const [draggingRuntimeId, setDraggingRuntimeId] = useState<string | null>(null);
+
+  // Panning state for map navigation
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState<{ x: number; y: number; scrollLeft: number; scrollTop: number } | null>(null);
 
   // Broadcast showtime state to sync with other players
   const broadcastShowtimeState = useCallback(async (
@@ -222,13 +227,12 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       const dragData = snapshot.data();
       console.log('[ShowTime] Received drag update:', {
         dragData,
-        isAdmin,
         draggingMobId,
-        shouldApply: !isAdmin || !draggingMobId
+        shouldApply: !draggingMobId
       });
 
-      // Only apply if we're not the one dragging
-      if (!isAdmin || !draggingMobId) {
+      // Only apply if we're not the one currently dragging
+      if (!draggingMobId) {
         if (dragData.updatedAt) {
           const updateTime = dragData.updatedAt.toMillis ? dragData.updatedAt.toMillis() : 0;
           const mountTimeMs = mountTime.current.toMillis();
@@ -275,11 +279,11 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       console.log('[ShowTime] Cleaning up drag listener for episode:', episodeId);
       unsubscribe();
     };
-  }, [selectedEpisode?.id, isAdmin, draggingMobId, roomId]);
+  }, [selectedEpisode?.id, draggingMobId, roomId]);
 
-  // Broadcast drag state to other players
+  // Broadcast drag state to other players (all users can broadcast)
   const broadcastDragState = async (placementIndex: number, x: number, y: number) => {
-    if (!selectedEpisode || !isAdmin) return;
+    if (!selectedEpisode) return;
 
     // Use a single document per episode for drag state
     const dragDocPath = roomId
@@ -483,17 +487,18 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   }, [selectedEpisode?.id, currentMapId, roomId]);
 
   // Handle adding a box
-  const handleAddBox = useCallback((x: number, y: number, color: string, opacity: number) => {
+  const handleAddBox = useCallback((x: number, y: number, color: string, opacity: number, shape: ShapeType = "rectangle") => {
     const newBox: MapBoxData = {
       id: `box-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       x,
       y,
-      width: 10,
-      height: 10,
+      width: shape === "square" || shape === "circle" ? 10 : 10,
+      height: shape === "square" || shape === "circle" ? 10 : 10,
       rotation: 0,
       color,
       opacity,
       createdBy: isAdmin ? 'admin' : 'user',
+      shape,
     };
     const updatedBoxes = [...mapBoxes, newBox];
     setMapBoxes(updatedBoxes);
@@ -516,9 +521,9 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     broadcastBoxes(updatedBoxes);
   }, [mapBoxes, broadcastBoxes]);
 
-  // Broadcast crawler placements
+  // Broadcast crawler placements (all users can broadcast)
   const broadcastCrawlerPlacements = useCallback(async (placements: CrawlerPlacement[]) => {
-    if (!selectedEpisode || !currentMapId || !isAdmin) return;
+    if (!selectedEpisode || !currentMapId) return;
 
     const crawlerDocPath = roomId
       ? `rooms/${roomId}/crawler-placements/${selectedEpisode.id}-${currentMapId}`
@@ -534,11 +539,11 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     } catch (error) {
       console.error('[ShowTime] Failed to broadcast crawler placements:', error);
     }
-  }, [selectedEpisode?.id, currentMapId, roomId, isAdmin]);
+  }, [selectedEpisode?.id, currentMapId, roomId]);
 
-  // Broadcast runtime mob placements
+  // Broadcast runtime mob placements (all users can broadcast)
   const broadcastRuntimeMobPlacements = useCallback(async (placements: EpisodeMobPlacement[]) => {
-    if (!selectedEpisode || !currentMapId || !isAdmin) return;
+    if (!selectedEpisode || !currentMapId) return;
 
     const mobDocPath = roomId
       ? `rooms/${roomId}/runtime-mob-placements/${selectedEpisode.id}-${currentMapId}`
@@ -554,7 +559,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     } catch (error) {
       console.error('[ShowTime] Failed to broadcast runtime mob placements:', error);
     }
-  }, [selectedEpisode?.id, currentMapId, roomId, isAdmin]);
+  }, [selectedEpisode?.id, currentMapId, roomId]);
 
   // Handle adding a crawler to the map
   const handleAddCrawlerToMap = useCallback((x: number, y: number) => {
@@ -616,7 +621,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       broadcastPing(clampedX, clampedY, selectedColor);
     } else if (isBoxMode) {
       // All users can add boxes
-      handleAddBox(clampedX, clampedY, selectedColor, boxOpacity);
+      handleAddBox(clampedX, clampedY, selectedColor, boxOpacity, selectedShape);
     } else if (isAddCrawlerMode && isAdmin && selectedCrawlerId) {
       handleAddCrawlerToMap(clampedX, clampedY);
     } else if (isAddMobMode && isAdmin && selectedMobId) {
@@ -639,6 +644,18 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
   const handleZoomOut = useCallback(() => {
     setMapScale(prev => Math.max(prev - 25, 25));
+  }, []);
+
+  // Handle scroll wheel zoom
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    if (e.deltaY < 0) {
+      // Scroll up = zoom in
+      setMapScale(prev => Math.min(prev + 10, 500));
+    } else {
+      // Scroll down = zoom out
+      setMapScale(prev => Math.max(prev - 10, 25));
+    }
   }, []);
 
   // Handle dragging runtime crawlers (all users can drag)
@@ -807,9 +824,37 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     setDraggingMobId(placementKey);
   };
 
+  // Handle panning start
+  const handlePanStart = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Don't start panning if we're in a mode that uses clicks
+    if (isPingMode || isBoxMode || isAddCrawlerMode || isAddMobMode || fogEraserActive) return;
+    // Don't pan if clicking on an interactive element
+    if ((e.target as HTMLElement).closest('button, [data-draggable]')) return;
+
+    if (mapContainerRef.current) {
+      setIsPanning(true);
+      setPanStart({
+        x: e.clientX,
+        y: e.clientY,
+        scrollLeft: mapContainerRef.current.scrollLeft,
+        scrollTop: mapContainerRef.current.scrollTop,
+      });
+      // Change cursor to grabbing
+      mapContainerRef.current.style.cursor = 'grabbing';
+    }
+  };
+
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    // Track cursor position for ping/box mode
-    if (mapContainerRef.current && (isPingMode || isBoxMode)) {
+    // Handle panning
+    if (isPanning && panStart && mapContainerRef.current) {
+      const dx = e.clientX - panStart.x;
+      const dy = e.clientY - panStart.y;
+      mapContainerRef.current.scrollLeft = panStart.scrollLeft - dx;
+      mapContainerRef.current.scrollTop = panStart.scrollTop - dy;
+    }
+
+    // Track cursor position for ping/box/crawler/mob mode
+    if (mapContainerRef.current && (isPingMode || isBoxMode || (isAddCrawlerMode && selectedCrawlerId) || (isAddMobMode && selectedMobId))) {
       const rect = mapContainerRef.current.getBoundingClientRect();
       setCursorPosition({
         x: e.clientX - rect.left,
@@ -871,6 +916,15 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   };
 
   const handleMouseUp = () => {
+    // Stop panning
+    if (isPanning) {
+      setIsPanning(false);
+      setPanStart(null);
+      if (mapContainerRef.current) {
+        mapContainerRef.current.style.cursor = '';
+      }
+    }
+
     // Handle runtime crawler/mob drag end (all users)
     if (draggingRuntimeId) {
       if (draggingRuntimeId.startsWith('crawler-')) {
@@ -885,18 +939,21 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     }
 
     // Handle episode mob drag end (all users)
-    if (draggingMobId && selectedEpisode && onUpdateEpisode) {
+    if (draggingMobId && selectedEpisode) {
       // Extract index from placement key and broadcast final position
       const index = parseInt(draggingMobId.split('-').pop() || '0', 10);
       const finalPlacement = selectedEpisode.mobPlacements[index];
-      if (finalPlacement && isAdmin) {
+      if (finalPlacement) {
+        // All users broadcast final drag position
         broadcastDragState(index, finalPlacement.x, finalPlacement.y);
       }
 
-      // Persist the updated mob placements
-      onUpdateEpisode(selectedEpisode.id, {
-        mobPlacements: selectedEpisode.mobPlacements,
-      });
+      // Only admin persists to the episode
+      if (onUpdateEpisode && isAdmin) {
+        onUpdateEpisode(selectedEpisode.id, {
+          mobPlacements: selectedEpisode.mobPlacements,
+        });
+      }
     }
     setDraggingMobId(null);
   };
@@ -1095,6 +1152,8 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
           setSelectedColor={setSelectedColor}
           boxOpacity={boxOpacity}
           setBoxOpacity={setBoxOpacity}
+          selectedShape={selectedShape}
+          setSelectedShape={setSelectedShape}
           isAdmin={isAdmin}
           crawlers={crawlers}
           mobs={mobs}
@@ -1155,14 +1214,18 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       <div
         ref={mapContainerRef}
         className="flex-1 flex items-center justify-center p-4 select-none overflow-auto relative"
+        style={{ cursor: isPanning ? 'grabbing' : (isPingMode || isBoxMode || isAddCrawlerMode || isAddMobMode) ? 'crosshair' : 'grab' }}
+        onMouseDown={handlePanStart}
         onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
         onMouseLeave={() => {
           setCursorPosition(null);
           handleMouseUp();
         }}
+        onWheel={handleWheel}
       >
-        {/* Cursor follower for ping/box mode */}
-        {cursorPosition && (isPingMode || isBoxMode) && (
+        {/* Cursor follower for ping/box/crawler/mob mode */}
+        {cursorPosition && (isPingMode || isBoxMode || (isAddCrawlerMode && selectedCrawlerId) || (isAddMobMode && selectedMobId)) && (
           <div
             className="pointer-events-none fixed z-50"
             style={{
@@ -1181,15 +1244,71 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
               >
                 <Target className="w-full h-full p-1" style={{ color: selectedColor }} />
               </div>
-            ) : (
-              <div
-                className="w-10 h-10 border-2 border-dashed"
-                style={{
-                  borderColor: selectedColor,
-                  backgroundColor: `${selectedColor}${Math.round(boxOpacity * 255).toString(16).padStart(2, '0')}`,
-                }}
-              />
-            )}
+            ) : isBoxMode ? (
+              <>
+                {selectedShape === "circle" ? (
+                  <div
+                    className="w-10 h-10 rounded-full border-2 border-dashed"
+                    style={{
+                      borderColor: selectedColor,
+                      backgroundColor: `${selectedColor}${Math.round(boxOpacity * 255).toString(16).padStart(2, '0')}`,
+                    }}
+                  />
+                ) : selectedShape === "triangle" ? (
+                  <svg width="40" height="40" viewBox="0 0 100 100" className="opacity-70">
+                    <polygon
+                      points="50,5 95,95 5,95"
+                      fill={`${selectedColor}${Math.round(boxOpacity * 255).toString(16).padStart(2, '0')}`}
+                      stroke={selectedColor}
+                      strokeWidth="3"
+                      strokeDasharray="5,5"
+                    />
+                  </svg>
+                ) : selectedShape === "square" ? (
+                  <div
+                    className="w-10 h-10 border-2 border-dashed"
+                    style={{
+                      borderColor: selectedColor,
+                      backgroundColor: `${selectedColor}${Math.round(boxOpacity * 255).toString(16).padStart(2, '0')}`,
+                    }}
+                  />
+                ) : (
+                  <div
+                    className="w-12 h-8 border-2 border-dashed rounded"
+                    style={{
+                      borderColor: selectedColor,
+                      backgroundColor: `${selectedColor}${Math.round(boxOpacity * 255).toString(16).padStart(2, '0')}`,
+                    }}
+                  />
+                )}
+              </>
+            ) : isAddCrawlerMode && selectedCrawlerId ? (
+              (() => {
+                const crawler = crawlers.find(c => c.id === selectedCrawlerId);
+                return crawler ? (
+                  <div className="w-12 h-12 rounded-full border-2 border-blue-400 bg-blue-400/30 flex items-center justify-center shadow-lg animate-pulse">
+                    {crawler.avatar ? (
+                      <img src={crawler.avatar} alt={crawler.name} className="w-10 h-10 rounded-full object-cover" />
+                    ) : (
+                      <span className="text-blue-400 text-xs font-bold">{crawler.name.charAt(0)}</span>
+                    )}
+                  </div>
+                ) : null;
+              })()
+            ) : isAddMobMode && selectedMobId ? (
+              (() => {
+                const mob = mobs.find(m => m.id === selectedMobId);
+                return mob ? (
+                  <div className="w-12 h-12 rounded-full border-2 border-red-500 bg-red-500/30 flex items-center justify-center shadow-lg animate-pulse">
+                    {mob.image ? (
+                      <img src={mob.image} alt={mob.name} className="w-10 h-10 rounded-full object-cover" />
+                    ) : (
+                      <span className="text-red-500 text-xs font-bold">{mob.name.charAt(0)}</span>
+                    )}
+                  </div>
+                ) : null;
+              })()
+            ) : null}
           </div>
         )}
 

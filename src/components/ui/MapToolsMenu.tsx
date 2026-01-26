@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DungeonButton } from "@/components/ui/DungeonButton";
-import { Target, Square, ChevronDown, ChevronUp, Palette, User, Skull, Grid3x3, CloudFog, Eraser, Trash2, Layers, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Target, Square, ChevronDown, ChevronUp, Palette, User, Skull, Grid3x3, CloudFog, Eraser, Trash2, Layers, X, ChevronLeft, ChevronRight, Circle, Triangle, RectangleHorizontal } from "lucide-react";
 import { Crawler, Mob } from "@/lib/gameData";
+import { ShapeType } from "@/components/ui/MapBox";
 
 interface MapToolsMenuProps {
   onPing: (color: string) => void;
@@ -15,6 +16,8 @@ interface MapToolsMenuProps {
   setSelectedColor: (color: string) => void;
   boxOpacity: number;
   setBoxOpacity: (opacity: number) => void;
+  selectedShape?: ShapeType;
+  setSelectedShape?: (shape: ShapeType) => void;
   // DM-only features
   isAdmin?: boolean;
   crawlers?: Crawler[];
@@ -61,6 +64,13 @@ const PING_COLORS = [
   { name: "Pink", value: "#ec4899" },
 ];
 
+const SHAPE_OPTIONS: { type: ShapeType; icon: React.ElementType; label: string }[] = [
+  { type: "rectangle", icon: RectangleHorizontal, label: "Rectangle" },
+  { type: "square", icon: Square, label: "Square" },
+  { type: "circle", icon: Circle, label: "Circle" },
+  { type: "triangle", icon: Triangle, label: "Triangle" },
+];
+
 export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
   onPing,
   onAddBox,
@@ -72,6 +82,8 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
   setSelectedColor,
   boxOpacity,
   setBoxOpacity,
+  selectedShape = "rectangle",
+  setSelectedShape,
   isAdmin = false,
   crawlers = [],
   mobs = [],
@@ -104,6 +116,7 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
   onEndEpisode,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showShapeDropdown, setShowShapeDropdown] = useState(false);
 
   const clearAllModes = () => {
     setIsPingMode(false);
@@ -192,16 +205,63 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
             Ping
           </DungeonButton>
 
-          {/* Box button - available to all users */}
-          <DungeonButton
-            variant={isBoxMode ? "admin" : "default"}
-            size="sm"
-            onClick={handleBoxModeToggle}
-            title="Click map to add a highlight box"
-          >
-            <Square className="w-4 h-4 mr-1" />
-            Box
-          </DungeonButton>
+          {/* Shape button with dropdown - available to all users */}
+          <div className="relative">
+            <div className="flex">
+              <DungeonButton
+                variant={isBoxMode ? "admin" : "default"}
+                size="sm"
+                onClick={handleBoxModeToggle}
+                title="Click map to add a shape"
+                className="rounded-r-none border-r-0"
+              >
+                {(() => {
+                  const ShapeIcon = SHAPE_OPTIONS.find(s => s.type === selectedShape)?.icon || Square;
+                  return <ShapeIcon className="w-4 h-4 mr-1" />;
+                })()}
+                Shape
+              </DungeonButton>
+              <DungeonButton
+                variant={isBoxMode ? "admin" : "default"}
+                size="sm"
+                onClick={() => setShowShapeDropdown(!showShapeDropdown)}
+                title="Select shape type"
+                className="rounded-l-none px-1"
+              >
+                <ChevronDown className="w-3 h-3" />
+              </DungeonButton>
+            </div>
+            {/* Shape dropdown */}
+            <AnimatePresence>
+              {showShapeDropdown && (
+                <motion.div
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -5 }}
+                  className="absolute top-full left-0 mt-1 bg-background/95 backdrop-blur-sm border border-border rounded-lg shadow-lg z-50 min-w-[120px]"
+                >
+                  {SHAPE_OPTIONS.map((shape) => (
+                    <button
+                      key={shape.type}
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted/50 transition-colors first:rounded-t-lg last:rounded-b-lg ${
+                        selectedShape === shape.type ? "bg-primary/20 text-primary" : ""
+                      }`}
+                      onClick={() => {
+                        setSelectedShape?.(shape.type);
+                        setShowShapeDropdown(false);
+                        if (!isBoxMode) {
+                          handleBoxModeToggle();
+                        }
+                      }}
+                    >
+                      <shape.icon className="w-4 h-4" />
+                      {shape.label}
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
 
           {/* Add Crawler button - DM only */}
           {isAdmin && crawlers.length > 0 && (
