@@ -5,7 +5,7 @@ import { DungeonButton } from "@/components/ui/DungeonButton";
 import { HealthBar } from "@/components/ui/HealthBar";
 import { EquipmentSlot } from "@/components/ui/EquipmentSlot";
 import { Crawler, InventoryItem, createEmptyCrawler, EquipmentSlot as SlotType } from "@/lib/gameData";
-import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Edit2 } from "lucide-react";
+import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Edit2, Backpack, HardHat, Package } from "lucide-react";
 
 interface ProfilesViewProps {
   crawlers: Crawler[];
@@ -210,6 +210,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
       name: "",
       description: "",
       equipSlot: undefined,
+      goldValue: undefined,
     });
   };
 
@@ -227,6 +228,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
         name: itemFormData.name || "New Item",
         description: itemFormData.description || "",
         equipSlot: itemFormData.equipSlot,
+        goldValue: itemFormData.goldValue,
       };
       onUpdateCrawlerInventory(selected.id, [...inventory, newItem]);
     } else if (editingItemId) {
@@ -359,6 +361,20 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 slot="rightHand"
                 label="Right Hand"
                 equippedItem={getEquippedItem('rightHand')}
+                onDrop={handleEquipItem}
+                onUnequip={handleUnequipItem}
+                disabled={false}
+              />
+            </div>
+
+            {/* Weapon slot (below right hand) */}
+            <div className="grid grid-cols-3 gap-2">
+              <div></div>
+              <div></div>
+              <EquipmentSlot
+                slot="weapon"
+                label="Weapon"
+                equippedItem={getEquippedItem('weapon')}
                 onDrop={handleEquipItem}
                 onUnequip={handleUnequipItem}
                 disabled={false}
@@ -601,7 +617,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
         <div>
           <div className="flex items-center justify-between mb-4 gap-4">
             <h3 className="font-display text-primary text-xl flex items-center gap-2">
-              <Sword className="w-6 h-6 shrink-0" /> INVENTORY
+              <Backpack className="w-6 h-6 shrink-0" /> INVENTORY
             </h3>
             <div className="flex gap-2 shrink-0">
               <DungeonButton variant="nav" size="sm" onClick={() => setExpandedItems(!expandedItems)}>
@@ -633,12 +649,14 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                   onChange={(e) => setItemFormData({ ...itemFormData, description: e.target.value })}
                   className="w-full bg-muted border border-border px-3 py-2 text-sm min-h-[80px] rounded"
                 />
-                <select
-                  value={itemFormData.equipSlot || ""}
-                  onChange={(e) => setItemFormData({ ...itemFormData, equipSlot: e.target.value as SlotType || undefined })}
-                  className="w-full bg-muted border border-border px-3 py-2 text-sm rounded"
-                >
+                <div className="flex gap-3">
+                  <select
+                    value={itemFormData.equipSlot || ""}
+                    onChange={(e) => setItemFormData({ ...itemFormData, equipSlot: e.target.value as SlotType || undefined })}
+                    className="flex-1 bg-muted border border-border px-3 py-2 text-sm rounded"
+                  >
                     <option value="">No Equipment Slot</option>
+                    <option value="weapon">Weapon</option>
                     <option value="head">Head</option>
                     <option value="chest">Chest</option>
                     <option value="legs">Legs</option>
@@ -647,7 +665,18 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                     <option value="rightHand">Right Hand</option>
                     <option value="ringFinger">Ring Finger</option>
                   </select>
-                  <div className="flex gap-3 mt-2">
+                  <div className="flex items-center gap-2">
+                    <Coins className="w-4 h-4 text-accent" />
+                    <input
+                      type="number"
+                      placeholder="Gold Value"
+                      value={itemFormData.goldValue ?? ""}
+                      onChange={(e) => setItemFormData({ ...itemFormData, goldValue: e.target.value ? parseInt(e.target.value) : undefined })}
+                      className="w-24 bg-muted border border-border px-3 py-2 text-sm rounded"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-3 mt-2">
                     <DungeonButton variant="admin" size="sm" onClick={handleSaveItem}>
                       <Save className="w-4 h-4 mr-1" /> Save Item
                     </DungeonButton>
@@ -681,27 +710,39 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                       item.equipSlot && !isEditing ? 'cursor-grab active:cursor-grabbing' : ''
                     } ${isEditing ? 'border-2 border-accent' : 'border border-border'}`}
                   >
-                    {/* Item header */}
-                    <div className="flex items-start justify-between gap-3 mb-2">
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <Sword className="w-5 h-5 text-primary/60 shrink-0" />
-                        <span className="text-foreground font-semibold text-base">{item.name}</span>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          onClick={() => handleEditItem(item)}
-                          className="text-primary hover:text-primary/80 p-1"
-                          title="Edit"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteItem(item.id)}
-                          className="text-danger hover:text-danger/80 p-1"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                    {/* Item header with action buttons */}
+                    <div className="flex items-start gap-2 mb-2">
+                      {/* Item type icon */}
+                      {item.equipSlot === 'weapon' ? (
+                        <Sword className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+                      ) : item.equipSlot ? (
+                        <HardHat className="w-5 h-5 text-accent shrink-0 mt-0.5" />
+                      ) : (
+                        <Package className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
+                      )}
+                      {/* Item name and actions */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-foreground font-semibold text-base truncate" title={item.name}>
+                            {item.name}
+                          </span>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              onClick={() => handleEditItem(item)}
+                              className="text-primary hover:text-primary/80 p-1"
+                              title="Edit"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteItem(item.id)}
+                              className="text-destructive hover:text-destructive/80 p-1"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </div>
 
@@ -709,7 +750,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                     <div className="flex flex-wrap items-center gap-2 mb-2">
                       {item.equipSlot && (
                         <span className="text-xs bg-accent/20 text-accent px-2 py-1 rounded">
-                          {item.equipSlot === 'leftHand' ? 'Left Hand' :
+                          {item.equipSlot === 'weapon' ? 'Weapon' :
+                           item.equipSlot === 'leftHand' ? 'Left Hand' :
                            item.equipSlot === 'rightHand' ? 'Right Hand' :
                            item.equipSlot === 'ringFinger' ? 'Ring' :
                            item.equipSlot.charAt(0).toUpperCase() + item.equipSlot.slice(1)}
@@ -717,6 +759,11 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                       )}
                       {isEquipped && (
                         <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded">Equipped</span>
+                      )}
+                      {item.goldValue !== undefined && item.goldValue > 0 && (
+                        <span className="text-xs bg-accent/10 text-accent px-2 py-1 rounded flex items-center gap-1">
+                          <Coins className="w-3 h-3" /> {item.goldValue}G
+                        </span>
                       )}
                     </div>
 

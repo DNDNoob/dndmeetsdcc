@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import { Crawler, InventoryItem, EquipmentSlot as SlotType } from "@/lib/gameData";
-import { Coins, Package, Sword, Shield, Plus, Trash2, Edit2, Save } from "lucide-react";
+import { Coins, Package, Sword, Shield, Plus, Trash2, Edit2, Save, HardHat } from "lucide-react";
 
 interface InventoryViewProps {
   crawlers: Crawler[];
@@ -21,11 +21,12 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   onUpdateCrawler,
 }) => {
   const [editMode, setEditMode] = useState(false);
-  const [newItem, setNewItem] = useState<{ crawlerId: string; name: string; description: string; equipSlot?: SlotType }>({
+  const [newItem, setNewItem] = useState<{ crawlerId: string; name: string; description: string; equipSlot?: SlotType; goldValue?: number }>({
     crawlerId: "",
     name: "",
     description: "",
     equipSlot: undefined,
+    goldValue: undefined,
   });
 
   const handleAddItem = (crawlerId: string) => {
@@ -36,9 +37,10 @@ const InventoryView: React.FC<InventoryViewProps> = ({
       name: newItem.name,
       description: newItem.description,
       equipSlot: newItem.equipSlot,
+      goldValue: newItem.goldValue,
     };
     onUpdateInventory(crawlerId, [...items, item]);
-    setNewItem({ crawlerId: "", name: "", description: "", equipSlot: undefined });
+    setNewItem({ crawlerId: "", name: "", description: "", equipSlot: undefined, goldValue: undefined });
   };
 
   const handleRemoveItem = (crawlerId: string, itemId: string) => {
@@ -143,16 +145,29 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                         key={item.id}
                         className="flex items-center gap-3 text-sm py-2 border-b border-border/50 last:border-0"
                       >
-                        <Sword className="w-4 h-4 text-primary/60" />
+                        {/* Item type icon */}
+                        {item.equipSlot === 'weapon' ? (
+                          <Sword className="w-4 h-4 text-destructive shrink-0" />
+                        ) : item.equipSlot ? (
+                          <HardHat className="w-4 h-4 text-accent shrink-0" />
+                        ) : (
+                          <Package className="w-4 h-4 text-muted-foreground shrink-0" />
+                        )}
                         <div className="flex flex-col flex-1">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-foreground">{item.name}</span>
                             {item.equipSlot && (
                               <span className="text-xs bg-accent/20 text-accent px-2 py-0.5 rounded">
-                                {item.equipSlot === 'leftHand' ? 'Left Hand' :
+                                {item.equipSlot === 'weapon' ? 'Weapon' :
+                                 item.equipSlot === 'leftHand' ? 'Left Hand' :
                                  item.equipSlot === 'rightHand' ? 'Right Hand' :
                                  item.equipSlot === 'ringFinger' ? 'Ring' :
                                  item.equipSlot.charAt(0).toUpperCase() + item.equipSlot.slice(1)}
+                              </span>
+                            )}
+                            {item.goldValue !== undefined && item.goldValue > 0 && (
+                              <span className="text-xs bg-accent/10 text-accent px-2 py-0.5 rounded flex items-center gap-1">
+                                <Coins className="w-3 h-3" /> {item.goldValue}G
                               </span>
                             )}
                           </div>
@@ -205,6 +220,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                         className="bg-muted border border-border px-2 py-1 text-sm flex-1"
                       >
                         <option value="">No Equipment Slot</option>
+                        <option value="weapon">Weapon</option>
                         <option value="head">Head</option>
                         <option value="chest">Chest</option>
                         <option value="legs">Legs</option>
@@ -213,6 +229,18 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                         <option value="rightHand">Right Hand</option>
                         <option value="ringFinger">Ring Finger</option>
                       </select>
+                      <div className="flex items-center gap-1">
+                        <Coins className="w-4 h-4 text-accent" />
+                        <input
+                          type="number"
+                          placeholder="Value"
+                          value={newItem.crawlerId === crawler.id && newItem.goldValue !== undefined ? newItem.goldValue : ""}
+                          onChange={(e) =>
+                            setNewItem({ ...newItem, crawlerId: crawler.id, goldValue: e.target.value ? parseInt(e.target.value) : undefined })
+                          }
+                          className="bg-muted border border-border px-2 py-1 text-sm w-20"
+                        />
+                      </div>
                       <DungeonButton
                         variant="default"
                         size="sm"

@@ -1,4 +1,4 @@
-export type EquipmentSlot = 'head' | 'chest' | 'legs' | 'feet' | 'leftHand' | 'rightHand' | 'ringFinger';
+export type EquipmentSlot = 'head' | 'chest' | 'legs' | 'feet' | 'leftHand' | 'rightHand' | 'ringFinger' | 'weapon';
 
 export interface EquippedItems {
   head?: string; // Item ID
@@ -8,6 +8,7 @@ export interface EquippedItems {
   leftHand?: string;
   rightHand?: string;
   ringFinger?: string;
+  weapon?: string;
 }
 
 export interface Crawler {
@@ -36,6 +37,7 @@ export interface InventoryItem {
   name: string;
   description: string;
   equipSlot?: EquipmentSlot; // Which slot this item can be equipped to
+  goldValue?: number; // Value of the item in gold
   equipped?: boolean; // Deprecated - use equippedItems in Crawler instead
 }
 
