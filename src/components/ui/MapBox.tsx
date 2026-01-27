@@ -68,18 +68,21 @@ export const MapBox: React.FC<MapBoxProps> = ({
         const centerY = (box.y / 100) * rect.height + rect.top;
         const dx = e.clientX - centerX;
         const dy = e.clientY - centerY;
-        const newWidth = (Math.abs(dx) * 2 / rect.width) * 100;
-        const newHeight = (Math.abs(dy) * 2 / rect.height) * 100;
 
-        // For squares and circles, enforce equal dimensions
+        // For squares and circles, use distance from center for uniform sizing
         if (box.shape === "square" || box.shape === "circle") {
-          const size = Math.max(newWidth, newHeight);
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          // Convert pixel distance to vmin-based size (rough approximation)
+          const vmin = Math.min(window.innerWidth, window.innerHeight) / 100;
+          const newSize = (distance / vmin);
           onUpdate({
             ...box,
-            width: Math.max(2, Math.min(50, size)),
-            height: Math.max(2, Math.min(50, size)),
+            width: Math.max(2, Math.min(30, newSize)),
+            height: Math.max(2, Math.min(30, newSize)),
           });
         } else {
+          const newWidth = (Math.abs(dx) * 2 / rect.width) * 100;
+          const newHeight = (Math.abs(dy) * 2 / rect.height) * 100;
           onUpdate({
             ...box,
             width: Math.max(2, Math.min(50, newWidth)),
@@ -113,6 +116,9 @@ export const MapBox: React.FC<MapBoxProps> = ({
     };
   }, [isDragging, isResizing, isRotating, box, onUpdate]);
 
+  // For squares and circles, use vmin-based sizing to maintain aspect ratio
+  const isSquareOrCircle = box.shape === "square" || box.shape === "circle";
+
   return (
     <div
       ref={containerRef}
@@ -121,8 +127,9 @@ export const MapBox: React.FC<MapBoxProps> = ({
         left: `${box.x}%`,
         top: `${box.y}%`,
         transform: `translate(-50%, -50%) rotate(${box.rotation}deg)`,
-        width: `${box.width}%`,
-        height: `${box.height}%`,
+        // Use vmin for square/circle to maintain aspect ratio, percentages for rectangle/triangle
+        width: isSquareOrCircle ? `${box.width * 2}vmin` : `${box.width}%`,
+        height: isSquareOrCircle ? `${box.width * 2}vmin` : `${box.height}%`,
         pointerEvents: canInteract ? "auto" : "none",
         opacity: canInteract ? 1 : 0.5,
       }}
@@ -154,7 +161,6 @@ export const MapBox: React.FC<MapBoxProps> = ({
             backgroundColor: box.color,
             opacity: box.opacity,
             borderColor: box.color,
-            aspectRatio: "1 / 1",
           }}
           onMouseDown={(e) => {
             e.preventDefault();

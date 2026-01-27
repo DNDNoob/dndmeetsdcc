@@ -42,7 +42,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   const hasAutoLoaded = useRef(false);
   const mountTime = useRef(Timestamp.now());
   const lastBroadcastTime = useRef<number>(0);
-  const BROADCAST_THROTTLE_MS = 50; // Throttle to ~20 updates per second
+  const BROADCAST_THROTTLE_MS = 80; // Throttle to ~12 updates per second (balanced for smooth sync without lag)
 
   // Fog of war state
   const [fogOfWarEnabled, setFogOfWarEnabled] = useState(false);
@@ -76,6 +76,9 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
   // Dragging state for runtime crawlers/mobs
   const [draggingRuntimeId, setDraggingRuntimeId] = useState<string | null>(null);
+
+  // Local drag position for smooth visual feedback (avoids expensive state updates during drag)
+  const [localDragPosition, setLocalDragPosition] = useState<{ index: number; x: number; y: number } | null>(null);
 
   // Panning state for map navigation
   const [isPanning, setIsPanning] = useState(false);
@@ -182,7 +185,8 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       try {
         const savedState = localStorage.getItem(SHOWTIME_STORAGE_KEY);
         if (savedState) {
-          const { episodeId, mapIndex } = JSON.parse(savedState);
+          const parsed = JSON.parse(savedState);
+          const { episodeId, mapIndex, mapScale: savedScale, fogOfWarEnabled: savedFog, revealedAreas: savedAreas } = parsed;
           const savedEpisode = episodes.find(e => e.id === episodeId);
           if (savedEpisode) {
             setSelectedEpisode(savedEpisode);
@@ -191,12 +195,10 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             if (savedEpisode.mapIds.length > 0) {
               const mapIdxNum = parseInt(savedEpisode.mapIds[validMapIndex], 10);
               setSelectedMap(maps[mapIdxNum] || null);
-              // Load map settings
-              const mapId = savedEpisode.mapIds[validMapIndex];
-              const mapSettings = savedEpisode.mapSettings?.[mapId];
-              setFogOfWarEnabled(mapSettings?.fogOfWar?.enabled ?? savedEpisode.defaultFogOfWar ?? false);
-              setRevealedAreas(mapSettings?.fogOfWar?.revealedAreas ?? []);
-              setMapScale(mapSettings?.scale ?? 100);
+              // Restore saved fog and zoom state, or fall back to episode defaults
+              setMapScale(savedScale ?? 100);
+              setFogOfWarEnabled(savedFog ?? savedEpisode.defaultFogOfWar ?? false);
+              setRevealedAreas(savedAreas ?? []);
             }
             hasAutoLoaded.current = true;
             return;
@@ -224,19 +226,22 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     }
   }, [episodes, maps]);
 
-  // Save state to localStorage when episode or map changes
+  // Save state to localStorage when episode, map, zoom, or fog changes
   useEffect(() => {
     if (selectedEpisode && selectedMap) {
       try {
         localStorage.setItem(SHOWTIME_STORAGE_KEY, JSON.stringify({
           episodeId: selectedEpisode.id,
           mapIndex: currentMapIndex,
+          mapScale: mapScale,
+          fogOfWarEnabled: fogOfWarEnabled,
+          revealedAreas: revealedAreas,
         }));
       } catch (e) {
         console.error('[ShowTime] Failed to save state to localStorage:', e);
       }
     }
-  }, [selectedEpisode?.id, currentMapIndex, selectedMap]);
+  }, [selectedEpisode?.id, currentMapIndex, selectedMap, mapScale, fogOfWarEnabled, revealedAreas]);
 
   // Load fog of war and scale settings when map changes
   useEffect(() => {
@@ -998,22 +1003,25 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     // Extract index from placement key (format: "mobId-index")
     const index = parseInt(draggingMobId.split('-').pop() || '0', 10);
 
-    // Update mob placement in local state (always update for smooth dragging)
-    setSelectedEpisode(prev => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        mobPlacements: prev.mobPlacements.map((p, i) =>
-          i === index ? { ...p, x, y } : p
-        ),
-      };
-    });
+    // Update local drag position for immediate visual feedback (lightweight, no expensive state updates)
+    setLocalDragPosition({ index, x, y });
 
-    // Throttle broadcast to prevent overwhelming Firestore
+    // Throttle broadcast and main state updates to prevent lag
     const now = Date.now();
     if (now - lastBroadcastTime.current >= BROADCAST_THROTTLE_MS) {
       lastBroadcastTime.current = now;
+      // Broadcast to other players
       broadcastDragState(index, x, y);
+      // Update main state less frequently
+      setSelectedEpisode(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          mobPlacements: prev.mobPlacements.map((p, i) =>
+            i === index ? { ...p, x, y } : p
+          ),
+        };
+      });
     }
   };
 
@@ -1039,22 +1047,39 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
     // Handle episode mob drag end (all users)
     if (draggingMobId && selectedEpisode) {
-      // Extract index from placement key and broadcast final position
+      // Extract index from placement key
       const index = parseInt(draggingMobId.split('-').pop() || '0', 10);
-      const finalPlacement = selectedEpisode.mobPlacements[index];
-      if (finalPlacement) {
-        // All users broadcast final drag position
-        broadcastDragState(index, finalPlacement.x, finalPlacement.y);
-      }
 
-      // Only admin persists to the episode
+      // Use localDragPosition if available, otherwise fall back to current placement
+      const finalX = localDragPosition?.x ?? selectedEpisode.mobPlacements[index]?.x ?? 0;
+      const finalY = localDragPosition?.y ?? selectedEpisode.mobPlacements[index]?.y ?? 0;
+
+      // Broadcast final position to all players
+      broadcastDragState(index, finalX, finalY);
+
+      // Commit final position to main state
+      setSelectedEpisode(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          mobPlacements: prev.mobPlacements.map((p, i) =>
+            i === index ? { ...p, x: finalX, y: finalY } : p
+          ),
+        };
+      });
+
+      // Only admin persists to the episode storage
       if (onUpdateEpisode && isAdmin) {
+        const updatedPlacements = selectedEpisode.mobPlacements.map((p, i) =>
+          i === index ? { ...p, x: finalX, y: finalY } : p
+        );
         onUpdateEpisode(selectedEpisode.id, {
-          mobPlacements: selectedEpisode.mobPlacements,
+          mobPlacements: updatedPlacements,
         });
       }
     }
     setDraggingMobId(null);
+    setLocalDragPosition(null);
   };
 
   // Main view when no episode is selected
@@ -1284,9 +1309,9 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
         />
       )}
 
-      {/* Zoom controls - available to all users */}
+      {/* Zoom controls - available to all users, fixed position so they stay visible */}
       {selectedMap && (
-        <div className="absolute bottom-4 left-4 z-40 flex flex-col gap-2">
+        <div className="fixed bottom-20 left-4 z-40 flex flex-col gap-2">
           <DungeonButton
             variant="default"
             size="sm"
@@ -1295,7 +1320,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
           >
             <ZoomIn className="w-4 h-4" />
           </DungeonButton>
-          <div className="text-xs text-center text-muted-foreground bg-background/80 px-2 py-1 rounded">
+          <div className="text-xs text-center text-muted-foreground bg-background/80 px-2 py-1 rounded border border-border">
             {mapScale}%
           </div>
           <DungeonButton
@@ -1449,15 +1474,19 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             const letter = sameIdBefore > 0 ? String.fromCharCode(65 + sameIdBefore) : '';
 
             const isDragging = draggingMobId === `${placement.mobId}-${globalIndex}`;
-            const canInteract = isPointVisible(placement.x, placement.y);
+
+            // Use local drag position for immediate visual feedback during drag
+            const displayX = isDragging && localDragPosition?.index === globalIndex ? localDragPosition.x : placement.x;
+            const displayY = isDragging && localDragPosition?.index === globalIndex ? localDragPosition.y : placement.y;
+            const canInteract = isPointVisible(displayX, displayY);
 
             return (
               <motion.div
                 key={`${placement.mobId}-${currentMapId}-${localIndex}`}
                 className={canInteract ? "absolute cursor-move" : "absolute cursor-not-allowed"}
                 style={{
-                  left: `${placement.x}%`,
-                  top: `${placement.y}%`,
+                  left: `${displayX}%`,
+                  top: `${displayY}%`,
                   transform: 'translate(-50%, -50%)',
                   pointerEvents: canInteract ? 'auto' : 'none',
                   opacity: canInteract ? 1 : 0.5,

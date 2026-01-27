@@ -74,8 +74,14 @@ export const ResizableMobDisplay: React.FC<ResizableMobDisplayProps> = ({
   const currentSize = baseSize * scale;
 
   // Calculate default position - to the LEFT of the dice menu (which is at bottom-right)
-  // Dice menu is roughly 80px wide, so position cards starting at 100px from right edge
-  const defaultRight = 100 + (index * (currentSize + 10));
+  // Dice menu button is at bottom-14 (56px) right-4 (16px) and is about 100px wide
+  // Position cards to the left of the dice area with enough clearance
+  const diceMenuWidth = 120; // Width of dice toggle button
+  const cardSpacing = 10;
+  const defaultRight = diceMenuWidth + cardSpacing + (index * (currentSize + cardSpacing));
+
+  // Position cards above the dice toggle button (which is at bottom-14 = 56px)
+  const defaultBottom = 80;
 
   // When expanded, show on the left side of the screen
   const expandedLeft = 20;
@@ -97,7 +103,7 @@ export const ResizableMobDisplay: React.FC<ResizableMobDisplayProps> = ({
             }
           : {
               right: defaultRight,
-              bottom: 20,
+              bottom: defaultBottom,
             }),
         width: isExpanded ? "350px" : currentSize,
         transition: isDragging ? "none" : "all 0.2s ease",
