@@ -56,7 +56,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   const lastFogBroadcastTime = useRef<number>(0);
   const FOG_BROADCAST_THROTTLE_MS = 50; // Faster fog sync for better real-time experience
   const pendingFogBroadcast = useRef<{ x: number; y: number; radius: number }[] | null>(null);
-  const MAX_FOG_CIRCLES = 500; // Limit array size to prevent performance issues
+  const CONSOLIDATION_THRESHOLD = 300; // Consolidate when array exceeds this size
 
   // Ping and Box state
   const [pings, setPings] = useState<Ping[]>([]);
@@ -390,6 +390,59 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     return () => unsubscribe();
   }, [selectedEpisode?.id, currentMapId, roomId, isAdmin]);
 
+  // Consolidate overlapping circles into fewer, larger circles
+  // This maintains coverage while reducing array size for better performance
+  const consolidateFogCircles = useCallback((areas: { x: number; y: number; radius: number }[]) => {
+    if (areas.length <= CONSOLIDATION_THRESHOLD) return areas;
+
+    // Group nearby circles and merge them
+    const consolidated: { x: number; y: number; radius: number }[] = [];
+    const used = new Set<number>();
+
+    for (let i = 0; i < areas.length; i++) {
+      if (used.has(i)) continue;
+
+      const cluster = [areas[i]];
+      used.add(i);
+
+      // Find all circles close to this one
+      for (let j = i + 1; j < areas.length; j++) {
+        if (used.has(j)) continue;
+
+        const dx = areas[j].x - areas[i].x;
+        const dy = areas[j].y - areas[i].y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        // If circles overlap significantly, add to cluster
+        if (distance < areas[i].radius + areas[j].radius * 0.5) {
+          cluster.push(areas[j]);
+          used.add(j);
+        }
+      }
+
+      if (cluster.length === 1) {
+        consolidated.push(cluster[0]);
+      } else {
+        // Merge cluster into a single larger circle
+        // Find bounding box center and radius that covers all circles
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        for (const c of cluster) {
+          minX = Math.min(minX, c.x - c.radius);
+          maxX = Math.max(maxX, c.x + c.radius);
+          minY = Math.min(minY, c.y - c.radius);
+          maxY = Math.max(maxY, c.y + c.radius);
+        }
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+        const newRadius = Math.max((maxX - minX) / 2, (maxY - minY) / 2);
+
+        consolidated.push({ x: centerX, y: centerY, radius: newRadius });
+      }
+    }
+
+    return consolidated;
+  }, []);
+
   // Broadcast fog of war state
   const broadcastFogState = useCallback(async (
     enabled: boolean,
@@ -436,11 +489,12 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
         return prev; // Skip adding redundant circle
       }
 
-      // Add new circle and trim if exceeding max limit
+      // Add new circle
       let newAreas = [...prev, { x, y, radius }];
-      if (newAreas.length > MAX_FOG_CIRCLES) {
-        // Remove oldest circles to stay within limit
-        newAreas = newAreas.slice(newAreas.length - MAX_FOG_CIRCLES);
+
+      // Consolidate if array is getting too large (preserves coverage, reduces size)
+      if (newAreas.length > CONSOLIDATION_THRESHOLD) {
+        newAreas = consolidateFogCircles(newAreas);
       }
 
       // Track pending broadcast for final sync
@@ -456,7 +510,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
       return newAreas;
     });
-  }, [fogOfWarEnabled, mapScale, broadcastFogState]);
+  }, [fogOfWarEnabled, mapScale, broadcastFogState, consolidateFogCircles]);
 
   // Handle fog drawing end - ensure final state is broadcast
   const handleFogDrawingEnd = useCallback(() => {

@@ -114,14 +114,19 @@ const FogOfWarComponent: React.FC<FogOfWarProps> = ({
   const maskId = `fog-mask-${uniqueId.replace(/:/g, '')}`;
 
   // Memoize the circles to avoid recalculating on every render
+  // Use position-based keys for more stable animations when array changes
   const circleElements = useMemo(() =>
     revealedAreas.map((area, index) => (
       <circle
-        key={index}
+        key={`${Math.round(area.x * 10)}-${Math.round(area.y * 10)}-${index}`}
         cx={`${area.x}%`}
         cy={`${area.y}%`}
         r={`${area.radius}%`}
         fill="black"
+        style={{
+          // Smooth transition for radius changes (consolidation) - instant for new circles
+          transition: 'r 0.15s ease-out',
+        }}
       />
     )), [revealedAreas]);
 
@@ -151,10 +156,16 @@ const FogOfWarComponent: React.FC<FogOfWarProps> = ({
         style={{ pointerEvents: isAdmin ? 'auto' : 'none' }}
       >
         <defs>
+          {/* Blur filter for soft fog edges */}
+          <filter id={`${maskId}-blur`} x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="0.5" />
+          </filter>
           <mask id={maskId}>
             {/* White = visible, Black = hidden */}
             <rect width="100%" height="100%" fill="white" />
-            {circleElements}
+            <g filter={`url(#${maskId}-blur)`}>
+              {circleElements}
+            </g>
           </mask>
           {/* Radial gradient for soft edges on revealed areas */}
           <radialGradient id="fog-gradient">
