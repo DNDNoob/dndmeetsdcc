@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import { Crawler, InventoryItem, EquipmentSlot as SlotType } from "@/lib/gameData";
 import { Coins, Package, Sword, Shield, Plus, Trash2, Edit2, Save, HardHat } from "lucide-react";
+import { useDebouncedCallback } from "@/hooks/useDebounce";
 
 interface InventoryViewProps {
   crawlers: Crawler[];
@@ -29,6 +30,26 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     goldValue: undefined,
   });
 
+  // Local gold state for immediate UI updates (avoids lag while typing)
+  const [localGold, setLocalGold] = useState<Record<string, number>>({});
+
+  // Initialize local gold from crawlers
+  useEffect(() => {
+    const goldMap: Record<string, number> = {};
+    crawlers.forEach(c => {
+      goldMap[c.id] = c.gold || 0;
+    });
+    setLocalGold(goldMap);
+  }, [crawlers]);
+
+  // Debounced Firebase update (300ms delay to batch rapid changes)
+  const debouncedGoldUpdate = useDebouncedCallback(
+    (crawlerId: string, value: number) => {
+      onUpdateCrawler(crawlerId, { gold: Math.max(0, Math.floor(value)) });
+    },
+    300
+  );
+
   const handleAddItem = (crawlerId: string) => {
     if (!newItem.name.trim()) return;
     const items = getCrawlerInventory(crawlerId);
@@ -49,15 +70,20 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   };
 
   const handleGoldChange = (crawlerId: string, delta: number) => {
-    const crawler = crawlers.find((c) => c.id === crawlerId);
-    if (crawler) {
-      const newGold = Math.max(0, (crawler.gold || 0) + delta);
-      onUpdateCrawler(crawlerId, { gold: newGold });
-    }
+    const currentGold = localGold[crawlerId] || 0;
+    const newGold = Math.max(0, currentGold + delta);
+    // Update local state immediately
+    setLocalGold(prev => ({ ...prev, [crawlerId]: newGold }));
+    // Debounce the Firebase update
+    debouncedGoldUpdate(crawlerId, newGold);
   };
 
   const handleGoldSet = (crawlerId: string, value: number) => {
-    onUpdateCrawler(crawlerId, { gold: Math.max(0, Math.floor(value)) });
+    const newGold = Math.max(0, Math.floor(value));
+    // Update local state immediately for responsive UI
+    setLocalGold(prev => ({ ...prev, [crawlerId]: newGold }));
+    // Debounce the Firebase update
+    debouncedGoldUpdate(crawlerId, newGold);
   };
 
   return (
@@ -122,7 +148,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                         </DungeonButton>
                         <input
                           type="number"
-                          value={crawler.gold || 0}
+                          value={localGold[crawler.id] ?? crawler.gold ?? 0}
                           onChange={(e) => handleGoldSet(crawler.id, parseInt(e.target.value) || 0)}
                           className="bg-background border border-accent px-2 py-1 w-20 text-right font-display text-accent text-sm"
                         />
@@ -131,7 +157,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                         </DungeonButton>
                       </div>
                     ) : (
-                      <span className="font-display text-accent">{Math.floor(crawler.gold || 0)}G</span>
+                      <span className="font-display text-accent">{Math.floor(localGold[crawler.id] ?? crawler.gold ?? 0)}G</span>
                     )}
                   </div>
                 </div>

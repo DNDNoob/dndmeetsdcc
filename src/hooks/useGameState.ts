@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import {
   Crawler,
   InventoryItem,
@@ -9,6 +9,7 @@ import {
   defaultMobs,
 } from "@/lib/gameData";
 import { useGame } from "@/contexts/GameContext";
+import type { BatchOperation } from "@/hooks/useFirebaseStore";
 
 interface InventoryEntry {
   id?: string;
@@ -17,71 +18,88 @@ interface InventoryEntry {
 }
 
 export const useGameState = () => {
-  const { 
-    getCollection, 
-    setCollection, 
-    addItem, 
-    updateItem, 
+  const {
+    getCollection,
+    setCollection,
+    addItem,
+    updateItem,
     deleteItem,
-    isLoaded 
+    batchWrite,
+    isLoaded
   } = useGame();
 
-  // Get collections with defaults
+  // Cache for memoization - store previous collection values
+  const collectionsCache = useRef<Record<string, unknown[]>>({});
+
+  // Helper to get stable collection reference (avoids breaking memoization)
+  const getStableCollection = <T,>(name: string): T[] => {
+    const current = getCollection(name) as T[];
+    const cached = collectionsCache.current[name] as T[] | undefined;
+
+    // If same length and same IDs, return cached to preserve reference
+    if (cached && cached.length === current.length) {
+      const currentIds = current.map((item: unknown) => (item as Record<string, unknown>)?.id);
+      const cachedIds = cached.map((item: unknown) => (item as Record<string, unknown>)?.id);
+      if (currentIds.every((id, i) => id === cachedIds[i])) {
+        // Deep check: compare stringified versions for actual changes
+        const currentStr = JSON.stringify(current);
+        const cachedStr = JSON.stringify(cached);
+        if (currentStr === cachedStr) {
+          return cached;
+        }
+      }
+    }
+
+    collectionsCache.current[name] = current;
+    return current;
+  };
+
+  // Get collections with defaults - using stable references
   const crawlers = useMemo(() => {
-    const stored = getCollection('crawlers') as Crawler[];
+    const stored = getStableCollection<Crawler>('crawlers');
     if (!isLoaded || stored.length === 0) return defaultCrawlers;
     return stored;
-  }, [getCollection('crawlers'), isLoaded]);
+  }, [getCollection, isLoaded]);
 
   const inventory = useMemo(() => {
-    const stored = getCollection('inventory') as InventoryEntry[];
+    const stored = getStableCollection<InventoryEntry>('inventory');
     if (!isLoaded || stored.length === 0) return defaultInventory;
     return stored;
-  }, [getCollection('inventory'), isLoaded]);
+  }, [getCollection, isLoaded]);
 
   const mobs = useMemo(() => {
-    const stored = getCollection('mobs') as Mob[];
+    const stored = getStableCollection<Mob>('mobs');
     if (!isLoaded || stored.length === 0) return defaultMobs;
     return stored;
-  }, [getCollection('mobs'), isLoaded]);
+  }, [getCollection, isLoaded]);
 
   // Maps are stored as Firestore documents; normalize to string[] of image data
   const maps = useMemo(() => {
-    const docs = getCollection('maps') as Record<string, unknown>[];
+    const docs = getStableCollection<Record<string, unknown>>('maps');
     // Support both raw string (legacy) and object with image/url/value
     const normalized = (docs || []).map((m) => {
       if (typeof m === 'string') return m;
       return (m?.image as string) || (m?.imageUrl as string) || (m?.url as string) || (m?.value as string) || '';
     }).filter(Boolean);
-    
+
     // Check if we have empty documents that need cleanup
     const emptyDocs = (docs || []).filter((m) => {
       const img = typeof m === 'string' ? m : (m?.image as string) || (m?.imageUrl as string) || (m?.url as string) || (m?.value as string) || '';
       return !img;
     });
-    
+
     if (emptyDocs.length > 0) {
       console.warn('[GameState] ⚠️ Found', emptyDocs.length, 'empty maps in Firestore (missing image data). These need to be deleted and re-uploaded.', {
         emptyMapIds: emptyDocs.map(d => (d?.id as string)?.substring?.(0, 8) || 'no-id')
       });
     }
-    
-    if (docs && docs.length > 0) {
-      console.log('[GameState] 🗺️ Maps from collection:', {
-        rawCount: docs.length,
-        normalizedCount: normalized.length,
-        emptyCount: emptyDocs.length,
-        rawIds: docs.map(d => (d?.id as string)?.substring?.(0, 8) || 'no-id').join(', '),
-        rawSample: docs[0] ? { id: (docs[0]?.id as string)?.substring?.(0, 8), hasImage: !!(docs[0]?.image), docKeys: Object.keys(docs[0] || {}) } : null
-      });
-    }
-    
+
     return normalized as string[];
-  }, [getCollection('maps'), isLoaded]);
+  }, [getCollection, isLoaded]);
 
   const episodes = useMemo(() => {
-    return getCollection('episodes') as Episode[];
-  }, [getCollection('episodes'), isLoaded]);
+    return getStableCollection<Episode>('episodes');
+  }, [getCollection, isLoaded]);
 
   // Calculate party gold as sum of all crawler gold
   const partyGold = useMemo(() => {
@@ -129,15 +147,29 @@ export const useGameState = () => {
       delete: toDelete.map(m => m.id),
     });
 
-    // Execute writes sequentially to surface logs deterministically
-    for (const mob of toAdd) {
-      await addItem('mobs', stripUndefinedDeep(mob));
-    }
-    for (const mob of toUpdate) {
-      await updateItem('mobs', mob.id, stripUndefinedDeep({ ...mob }));
-    }
-    for (const mob of toDelete) {
-      await deleteItem('mobs', mob.id);
+    // Use batch writes for atomic, fast updates
+    const operations: BatchOperation[] = [
+      ...toAdd.map(mob => ({
+        type: 'add' as const,
+        collection: 'mobs' as const,
+        id: mob.id,
+        data: stripUndefinedDeep(mob) as Record<string, unknown>,
+      })),
+      ...toUpdate.map(mob => ({
+        type: 'update' as const,
+        collection: 'mobs' as const,
+        id: mob.id,
+        data: stripUndefinedDeep({ ...mob }) as Record<string, unknown>,
+      })),
+      ...toDelete.map(mob => ({
+        type: 'delete' as const,
+        collection: 'mobs' as const,
+        id: mob.id,
+      })),
+    ];
+
+    if (operations.length > 0) {
+      await batchWrite(operations);
     }
   };
 
@@ -205,32 +237,35 @@ export const useGameState = () => {
       newFingerprintSample: newMapFingerprints.slice(0, 2)
     });
 
-    // Perform Firebase writes sequentially to ensure they complete
-    // Add new maps first
-    for (let i = 0; i < mapsToAddIndices.length; i++) {
-      const mapIdx = mapsToAddIndices[i];
+    // Use batch writes for fast, atomic updates
+    const operations: BatchOperation[] = [];
+
+    // Add new maps
+    for (const mapIdx of mapsToAddIndices) {
       const img = newMaps[mapIdx];
-      console.log('[GameState] ➕ Adding map', i + 1, 'of', mapsToAddIndices.length);
-      try {
-        await addItem('maps', { image: img, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
-      } catch (err) {
-        console.error('[GameState] ❌ Failed to add map:', err);
-        throw err;
-      }
+      const newId = crypto.randomUUID();
+      operations.push({
+        type: 'add',
+        collection: 'maps',
+        id: newId,
+        data: { image: img, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+      });
     }
 
     // Delete removed maps
-    for (let i = 0; i < mapsToDeleteIds.length; i++) {
-      const id = mapsToDeleteIds[i];
-      console.log('[GameState] 🗑️ Deleting map', i + 1, 'of', mapsToDeleteIds.length, 'with id:', id);
-      try {
-        await deleteItem('maps', id);
-      } catch (err) {
-        console.error('[GameState] ❌ Failed to delete map:', err);
-        throw err;
-      }
+    for (const id of mapsToDeleteIds) {
+      operations.push({
+        type: 'delete',
+        collection: 'maps',
+        id,
+      });
     }
-    
+
+    if (operations.length > 0) {
+      console.log('[GameState] 🗺️ Executing batch write for', operations.length, 'map operations');
+      await batchWrite(operations);
+    }
+
     console.log('[GameState] ✅ setMaps completed');
   };
 
@@ -243,23 +278,22 @@ export const useGameState = () => {
         return !img;
       })
       .map(d => d?.id as string);
-    
+
     if (emptyMapIds.length === 0) {
       console.log('[GameState] ✅ No empty maps to clean up');
       return;
     }
-    
+
     console.log('[GameState] 🧹 Cleaning up', emptyMapIds.length, 'empty maps...');
-    
-    for (const id of emptyMapIds) {
-      try {
-        await deleteItem('maps', id);
-        console.log('[GameState] ✅ Deleted empty map:', id);
-      } catch (err) {
-        console.error('[GameState] ❌ Failed to delete empty map:', id, err);
-      }
-    }
-    
+
+    // Use batch delete for faster cleanup
+    const operations: BatchOperation[] = emptyMapIds.map(id => ({
+      type: 'delete' as const,
+      collection: 'maps' as const,
+      id,
+    }));
+
+    await batchWrite(operations);
     console.log('[GameState] ✅ Cleanup complete');
   };
 

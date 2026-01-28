@@ -1,9 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
-import { db, getCollectionRef, getDocs, setDoc, doc, deleteDoc, updateDoc, onSnapshot, initAuth } from '../lib/firebase';
+import { db, getCollectionRef, getDocs, setDoc, doc, deleteDoc, updateDoc, onSnapshot, initAuth, writeBatch } from '../lib/firebase';
 import type { CollectionName } from '../types/collections';
 
 interface DataStore {
   [collectionName: string]: Record<string, unknown>[];
+}
+
+interface BatchOperation {
+  type: 'add' | 'update' | 'delete';
+  collection: CollectionName;
+  id: string;
+  data?: Record<string, unknown>;
 }
 
 interface UseFirebaseStoreReturn {
@@ -13,6 +20,7 @@ interface UseFirebaseStoreReturn {
   addItem: (collection: CollectionName, item: Record<string, unknown>) => Promise<void>;
   updateItem: (collection: CollectionName, id: string, updates: Record<string, unknown>) => Promise<void>;
   deleteItem: (collection: CollectionName, id: string) => Promise<void>;
+  batchWrite: (operations: BatchOperation[]) => Promise<void>;
   getCollection: <T = Record<string, unknown>>(collection: CollectionName) => T[];
   setCollection: (collection: CollectionName, items: Record<string, unknown>[]) => void;
   isLoaded: boolean;
@@ -145,10 +153,16 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
     try {
       const itemId = (item.id as string) || crypto.randomUUID();
       const itemWithId = { ...item, id: itemId };
-      
+
       if (roomId) {
         itemWithId.roomId = roomId;
       }
+
+      // Optimistic update: immediately update local state before Firebase write
+      setData(prevData => ({
+        ...prevData,
+        [collection]: [...(prevData[collection] || []), itemWithId]
+      }));
 
       // Drop undefined/oversized image fields to satisfy Firestore
       if (itemWithId.image === undefined || itemWithId.image === null) {
@@ -205,10 +219,18 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
 
   const updateItem = useCallback(async (collection: CollectionName, id: string, updates: Record<string, unknown>) => {
     try {
+      // Optimistic update: immediately update local state before Firebase write
+      setData(prevData => ({
+        ...prevData,
+        [collection]: (prevData[collection] || []).map((item: Record<string, unknown>) =>
+          item.id === id ? { ...item, ...updates } : item
+        )
+      }));
+
       const collectionRef = getCollectionRef(collection, roomId || undefined);
       const docRef = doc(collectionRef, id);
 
-        // Drop undefined/oversized image fields to satisfy Firestore
+      // Drop undefined/oversized image fields to satisfy Firestore
       const updatesCopy = { ...updates };
       if (updatesCopy.image === undefined || updatesCopy.image === null) {
         delete updatesCopy.image;
@@ -254,7 +276,16 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
   }, [roomId]); // cleanObject is stable, doesn't need to be in dependencies
 
   const deleteItem = useCallback(async (collection: CollectionName, id: string) => {
+    // Store previous state for rollback
+    const previousData = data[collection] || [];
+
     try {
+      // Optimistic update: immediately remove from local state before Firebase write
+      setData(prevData => ({
+        ...prevData,
+        [collection]: (prevData[collection] || []).filter((item: Record<string, unknown>) => item.id !== id)
+      }));
+
       const collectionRef = getCollectionRef(collection, roomId || undefined);
       const docRef = doc(collectionRef, id);
 
@@ -262,10 +293,103 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
       console.log('[FirebaseStore] ✅ Deleted item:', collection, id);
     } catch (err) {
       console.error('[FirebaseStore] ❌ Delete error:', err);
+      // Rollback optimistic update on error
+      setData(prevData => ({
+        ...prevData,
+        [collection]: previousData
+      }));
       setError(err instanceof Error ? err.message : 'Failed to delete item');
       throw err;
     }
-  }, [roomId]);
+  }, [roomId, data]);
+
+  // Batch write for multiple operations in a single atomic transaction
+  const batchWrite = useCallback(async (operations: BatchOperation[]) => {
+    if (!db || operations.length === 0) return;
+
+    // Store previous state for rollback
+    const previousData = { ...data };
+
+    try {
+      // Optimistic update: apply all operations to local state immediately
+      setData(prevData => {
+        const newData = { ...prevData };
+
+        for (const op of operations) {
+          const collection = op.collection;
+          const currentItems = newData[collection] || [];
+
+          switch (op.type) {
+            case 'add':
+              if (op.data) {
+                newData[collection] = [...currentItems, { ...op.data, id: op.id }];
+              }
+              break;
+            case 'update':
+              if (op.data) {
+                newData[collection] = currentItems.map((item: Record<string, unknown>) =>
+                  item.id === op.id ? { ...item, ...op.data } : item
+                );
+              }
+              break;
+            case 'delete':
+              newData[collection] = currentItems.filter((item: Record<string, unknown>) => item.id !== op.id);
+              break;
+          }
+        }
+
+        return newData;
+      });
+
+      const batch = writeBatch(db);
+
+      for (const op of operations) {
+        const collectionRef = getCollectionRef(op.collection, roomId || undefined);
+        const docRef = doc(collectionRef, op.id);
+
+        switch (op.type) {
+          case 'add':
+          case 'update': {
+            if (!op.data) continue;
+            let itemData = { ...op.data, id: op.id };
+            if (roomId) {
+              itemData.roomId = roomId;
+            }
+
+            // Clean and validate image/avatar data
+            if (itemData.image === undefined || itemData.image === null) {
+              delete itemData.image;
+            } else if (typeof itemData.image === 'string' && itemData.image.length > MAX_IMAGE_LENGTH) {
+              console.warn('[FirebaseStore] ⚠️ Image too large in batch; stripping', { id: op.id });
+              delete itemData.image;
+            }
+            if (itemData.avatar === undefined || itemData.avatar === null) {
+              delete itemData.avatar;
+            } else if (typeof itemData.avatar === 'string' && itemData.avatar.length > MAX_AVATAR_LENGTH) {
+              console.warn('[FirebaseStore] ⚠️ Avatar too large in batch; stripping', { id: op.id });
+              delete itemData.avatar;
+            }
+
+            const cleaned = cleanObject(itemData);
+            batch.set(docRef, cleaned as Record<string, unknown>);
+            break;
+          }
+          case 'delete':
+            batch.delete(docRef);
+            break;
+        }
+      }
+
+      await batch.commit();
+      console.log('[FirebaseStore] ✅ Batch write completed:', operations.length, 'operations');
+    } catch (err) {
+      console.error('[FirebaseStore] ❌ Batch write error:', err);
+      // Rollback optimistic update on error
+      setData(previousData);
+      setError(err instanceof Error ? err.message : 'Failed to batch write');
+      throw err;
+    }
+  }, [roomId, data]);
 
   const getCollection = useCallback(<T = Record<string, unknown>>(collection: CollectionName): T[] => {
     return (data[collection] || []) as T[];
@@ -285,6 +409,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
     addItem,
     updateItem,
     deleteItem,
+    batchWrite,
     getCollection,
     setCollection,
     isLoaded,
@@ -292,3 +417,6 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
     roomId
   };
 }
+
+// Export BatchOperation type for use in other hooks
+export type { BatchOperation };

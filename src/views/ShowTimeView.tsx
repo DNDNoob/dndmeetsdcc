@@ -15,6 +15,7 @@ import { CrawlerIcon } from "@/components/ui/CrawlerIcon";
 import { db } from "@/lib/firebase";
 import { doc, setDoc, onSnapshot, serverTimestamp, Timestamp } from "firebase/firestore";
 import { useFirebaseStore } from "@/hooks/useFirebaseStore";
+import { useThrottledCallback } from "@/hooks/useDebounce";
 
 interface ShowTimeViewProps {
   maps: string[];
@@ -37,12 +38,14 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   const [showGrid, setShowGrid] = useState(false);
   const [gridSize, setGridSize] = useState(51); // Reduced by 20% from 64px
   const [draggingMobId, setDraggingMobId] = useState<string | null>(null);
+  const draggingMobIdRef = useRef<string | null>(null); // Ref for use in listeners to avoid re-subscription
   const [remoteDragState, setRemoteDragState] = useState<{placementIndex: number; x: number; y: number} | null>(null);
   const mapImageRef = useRef<HTMLImageElement>(null);
   const hasAutoLoaded = useRef(false);
   const mountTime = useRef(Timestamp.now());
   const lastBroadcastTime = useRef<number>(0);
-  const BROADCAST_THROTTLE_MS = 80; // Throttle to ~12 updates per second (balanced for smooth sync without lag)
+  const pendingBroadcast = useRef<{ index: number; x: number; y: number } | null>(null);
+  const BROADCAST_THROTTLE_MS = 50; // Throttle to ~20 updates per second for smooth real-time sync
 
   // Fog of war state
   const [fogOfWarEnabled, setFogOfWarEnabled] = useState(false);
@@ -51,7 +54,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   const [revealedAreas, setRevealedAreas] = useState<{ x: number; y: number; radius: number }[]>([]);
   const [mapScale, setMapScale] = useState(100);
   const lastFogBroadcastTime = useRef<number>(0);
-  const FOG_BROADCAST_THROTTLE_MS = 100;
+  const FOG_BROADCAST_THROTTLE_MS = 50; // Faster fog sync for better real-time experience
 
   // Ping and Box state
   const [pings, setPings] = useState<Ping[]>([]);
@@ -84,6 +87,11 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState<{ x: number; y: number; panX: number; panY: number } | null>(null);
   const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  // Keep draggingMobId ref in sync with state (avoids listener re-subscription)
+  useEffect(() => {
+    draggingMobIdRef.current = draggingMobId;
+  }, [draggingMobId]);
 
   // Broadcast showtime state to sync with other players
   const broadcastShowtimeState = useCallback(async (
@@ -288,33 +296,19 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
     const unsubscribe = onSnapshot(dragDocRef, (snapshot) => {
       if (!snapshot.exists()) {
-        console.log('[ShowTime] Drag doc does not exist');
         return;
       }
 
       const dragData = snapshot.data();
-      console.log('[ShowTime] Received drag update:', {
-        dragData,
-        draggingMobId,
-        shouldApply: !draggingMobId
-      });
 
-      // Only apply if we're not the one currently dragging
-      if (!draggingMobId) {
+      // Only apply if we're not the one currently dragging (use ref to avoid re-subscription)
+      if (!draggingMobIdRef.current) {
         if (dragData.updatedAt) {
           const updateTime = dragData.updatedAt.toMillis ? dragData.updatedAt.toMillis() : 0;
           const mountTimeMs = mountTime.current.toMillis();
 
-          console.log('[ShowTime] Time check:', {
-            updateTime,
-            mountTimeMs,
-            shouldApply: updateTime > mountTimeMs
-          });
-
           // Only apply updates that happened after component mounted
           if (updateTime > mountTimeMs) {
-            console.log('[ShowTime] APPLYING drag update to placement', dragData.placementIndex, 'with position', dragData.x, dragData.y);
-
             setRemoteDragState({
               placementIndex: dragData.placementIndex,
               x: dragData.x,
@@ -324,7 +318,6 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             // Update local episode state with remote drag position
             setSelectedEpisode(prev => {
               if (!prev) return prev;
-              console.log('[ShowTime] Updating placement', dragData.placementIndex, 'from', prev.mobPlacements[dragData.placementIndex], 'to', dragData.x, dragData.y);
               return {
                 ...prev,
                 mobPlacements: prev.mobPlacements.map((p, i) =>
@@ -332,22 +325,15 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                 ),
               };
             });
-          } else {
-            console.log('[ShowTime] Skipping old update (before mount time)');
           }
-        } else {
-          console.log('[ShowTime] No updatedAt timestamp in drag data');
         }
-      } else {
-        console.log('[ShowTime] Skipping update - we are the dragger');
       }
     });
 
     return () => {
-      console.log('[ShowTime] Cleaning up drag listener for episode:', episodeId);
       unsubscribe();
     };
-  }, [selectedEpisode?.id, draggingMobId, roomId]);
+  }, [selectedEpisode?.id, roomId]); // Removed draggingMobId - using ref instead to avoid re-subscription
 
   // Broadcast drag state to other players (all users can broadcast)
   const broadcastDragState = async (placementIndex: number, x: number, y: number) => {
@@ -1006,10 +992,14 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     // Update local drag position for immediate visual feedback (lightweight, no expensive state updates)
     setLocalDragPosition({ index, x, y });
 
+    // Track pending broadcast for final sync on drag end
+    pendingBroadcast.current = { index, x, y };
+
     // Throttle broadcast and main state updates to prevent lag
     const now = Date.now();
     if (now - lastBroadcastTime.current >= BROADCAST_THROTTLE_MS) {
       lastBroadcastTime.current = now;
+      pendingBroadcast.current = null; // Clear pending since we're broadcasting now
       // Broadcast to other players
       broadcastDragState(index, x, y);
       // Update main state less frequently
@@ -1050,12 +1040,13 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       // Extract index from placement key
       const index = parseInt(draggingMobId.split('-').pop() || '0', 10);
 
-      // Use localDragPosition if available, otherwise fall back to current placement
-      const finalX = localDragPosition?.x ?? selectedEpisode.mobPlacements[index]?.x ?? 0;
-      const finalY = localDragPosition?.y ?? selectedEpisode.mobPlacements[index]?.y ?? 0;
+      // Use pending broadcast position, localDragPosition, or fall back to current placement
+      const finalX = pendingBroadcast.current?.x ?? localDragPosition?.x ?? selectedEpisode.mobPlacements[index]?.x ?? 0;
+      const finalY = pendingBroadcast.current?.y ?? localDragPosition?.y ?? selectedEpisode.mobPlacements[index]?.y ?? 0;
 
-      // Broadcast final position to all players
+      // Always broadcast final position to ensure sync (even if we just broadcast recently)
       broadcastDragState(index, finalX, finalY);
+      pendingBroadcast.current = null;
 
       // Commit final position to main state
       setSelectedEpisode(prev => {
