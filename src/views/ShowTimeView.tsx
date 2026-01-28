@@ -207,10 +207,8 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             if (savedEpisode.mapIds.length > 0) {
               const mapIdxNum = parseInt(savedEpisode.mapIds[validMapIndex], 10);
               setSelectedMap(maps[mapIdxNum] || null);
-              // Restore saved fog and zoom state, or fall back to episode defaults
-              setMapScale(savedScale ?? 100);
-              setFogOfWarEnabled(savedFog ?? savedEpisode.defaultFogOfWar ?? false);
-              setRevealedAreas(savedAreas ?? []);
+              // Always start at 100% zoom - fog state will be loaded from Firebase listener
+              setMapScale(100);
             }
             hasAutoLoaded.current = true;
             return;
@@ -227,51 +225,36 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
         const mapIndex = parseInt(firstEpisode.mapIds[0], 10);
         setSelectedMap(maps[mapIndex] || null);
         setCurrentMapIndex(0);
-        // Load default fog of war and scale settings
-        const firstMapId = firstEpisode.mapIds[0];
-        const mapSettings = firstEpisode.mapSettings?.[firstMapId];
-        setFogOfWarEnabled(mapSettings?.fogOfWar?.enabled ?? firstEpisode.defaultFogOfWar ?? false);
-        setRevealedAreas(mapSettings?.fogOfWar?.revealedAreas ?? []);
-        setMapScale(mapSettings?.scale ?? 100);
+        // Always start at 100% zoom - fog state will be loaded from Firebase listener
+        setMapScale(100);
       }
       hasAutoLoaded.current = true;
     }
   }, [episodes, maps]);
 
-  // Save state to localStorage when episode, map, zoom, or fog changes
+  // Save episode/map selection to localStorage (fog state is persisted in Firebase, zoom always starts at 100%)
   useEffect(() => {
     if (selectedEpisode && selectedMap) {
       try {
         localStorage.setItem(SHOWTIME_STORAGE_KEY, JSON.stringify({
           episodeId: selectedEpisode.id,
           mapIndex: currentMapIndex,
-          mapScale: mapScale,
-          fogOfWarEnabled: fogOfWarEnabled,
-          revealedAreas: revealedAreas,
         }));
       } catch (e) {
         console.error('[ShowTime] Failed to save state to localStorage:', e);
       }
     }
-  }, [selectedEpisode?.id, currentMapIndex, selectedMap, mapScale, fogOfWarEnabled, revealedAreas]);
+  }, [selectedEpisode?.id, currentMapIndex, selectedMap]);
 
-  // Load fog of war and scale settings when map changes
+  // Reset zoom and pan when map changes (fog state is loaded from Firebase listener)
   useEffect(() => {
     if (!selectedEpisode || currentMapId === null) return;
-    const mapSettings = selectedEpisode.mapSettings?.[currentMapId];
-    // Only set defaults if not already set from Firebase listener
-    if (mapSettings) {
-      setFogOfWarEnabled(mapSettings.fogOfWar?.enabled ?? selectedEpisode.defaultFogOfWar ?? false);
-      setRevealedAreas(mapSettings.fogOfWar?.revealedAreas ?? []);
-      setMapScale(mapSettings.scale ?? 100);
-    } else {
-      // Use episode defaults
-      setFogOfWarEnabled(selectedEpisode.defaultFogOfWar ?? false);
-      setRevealedAreas([]);
-      setMapScale(100);
-    }
+    // Always start at 100% zoom
+    setMapScale(100);
     // Reset pan offset when map changes
     setPanOffset({ x: 0, y: 0 });
+    // Reset fog initial load flag so Firebase listener will reload fog for new map
+    fogInitialLoadDone.current = null;
   }, [currentMapId]);
 
   // Debug logging
@@ -361,6 +344,9 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     }
   };
 
+  // Track if we've done the initial fog load for this map
+  const fogInitialLoadDone = useRef<string | null>(null);
+
   // Listen for fog of war updates
   useEffect(() => {
     if (!selectedEpisode || !currentMapId) return;
@@ -370,19 +356,32 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       : `fog-of-war/${selectedEpisode.id}-${currentMapId}`;
 
     const fogDocRef = doc(db, fogDocPath);
+    const fogKey = `${selectedEpisode.id}-${currentMapId}`;
 
     const unsubscribe = onSnapshot(fogDocRef, (snapshot) => {
-      if (!snapshot.exists()) return;
+      if (!snapshot.exists()) {
+        // No fog document exists - this is a fresh map
+        fogInitialLoadDone.current = fogKey;
+        return;
+      }
 
       const fogData = snapshot.data();
-      if (fogData.updatedAt) {
+      const isInitialLoad = fogInitialLoadDone.current !== fogKey;
+
+      // Always load on initial page load (to restore saved state)
+      // For subsequent updates, only sync if update is newer than mount time or user is not admin
+      if (isInitialLoad) {
+        // Initial load - restore saved fog state
+        setFogOfWarEnabled(fogData.enabled ?? false);
+        setRevealedAreas(fogData.revealedAreas ?? []);
+        fogInitialLoadDone.current = fogKey;
+      } else if (fogData.updatedAt) {
         const updateTime = fogData.updatedAt.toMillis ? fogData.updatedAt.toMillis() : 0;
         const mountTimeMs = mountTime.current.toMillis();
 
         if (updateTime > mountTimeMs || !isAdmin) {
           setFogOfWarEnabled(fogData.enabled ?? false);
           setRevealedAreas(fogData.revealedAreas ?? []);
-          // Don't sync scale from fog updates - let each user control their own zoom
         }
       }
     });
