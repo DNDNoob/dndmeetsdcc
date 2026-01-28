@@ -22,6 +22,7 @@ interface MapBoxProps {
   isAdmin: boolean;
   onUpdate: (box: MapBoxData) => void;
   onDelete: (id: string) => void;
+  onManipulationEnd?: () => void; // Called when drag/resize/rotate ends for final sync
   mapScale: number;
   canInteract?: boolean; // Whether the box can be interacted with (visibility check)
 }
@@ -31,6 +32,7 @@ export const MapBox: React.FC<MapBoxProps> = ({
   isAdmin,
   onUpdate,
   onDelete,
+  onManipulationEnd,
   mapScale,
   canInteract = true,
 }) => {
@@ -105,6 +107,8 @@ export const MapBox: React.FC<MapBoxProps> = ({
       setIsDragging(false);
       setIsResizing(false);
       setIsRotating(false);
+      // Call onManipulationEnd to trigger final broadcast
+      onManipulationEnd?.();
     };
 
     document.addEventListener("mousemove", handleMouseMove);
@@ -114,10 +118,13 @@ export const MapBox: React.FC<MapBoxProps> = ({
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [isDragging, isResizing, isRotating, box, onUpdate]);
+  }, [isDragging, isResizing, isRotating, box, onUpdate, onManipulationEnd]);
 
   // For squares and circles, use vmin-based sizing to maintain aspect ratio
   const isSquareOrCircle = box.shape === "square" || box.shape === "circle";
+
+  // Check if any local manipulation is happening
+  const isManipulating = isDragging || isResizing || isRotating;
 
   return (
     <div
@@ -132,6 +139,8 @@ export const MapBox: React.FC<MapBoxProps> = ({
         height: isSquareOrCircle ? `${box.width * 2}vmin` : `${box.height}%`,
         pointerEvents: canInteract ? "auto" : "none",
         opacity: canInteract ? 1 : 0.5,
+        // Smooth transition for remote updates, instant for local manipulation
+        transition: isManipulating ? 'none' : 'left 0.15s ease-out, top 0.15s ease-out, width 0.15s ease-out, height 0.15s ease-out, transform 0.15s ease-out',
       }}
       onMouseEnter={() => canInteract && setShowControls(true)}
       onMouseLeave={() => !isDragging && !isResizing && !isRotating && setShowControls(false)}

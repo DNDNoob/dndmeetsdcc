@@ -7,6 +7,7 @@ interface FogOfWarProps {
   brushSize: number;
   onReveal?: (x: number, y: number, radius: number) => void;
   onClearAll?: () => void;
+  onDrawingEnd?: () => void; // Called when fog drawing ends for final sync
   isViewerAdmin?: boolean; // True if the viewer is admin (for semi-transparent fog)
 }
 
@@ -17,6 +18,7 @@ export const FogOfWar: React.FC<FogOfWarProps> = ({
   brushSize,
   onReveal,
   onClearAll,
+  onDrawingEnd,
   isViewerAdmin = false,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -79,22 +81,33 @@ export const FogOfWar: React.FC<FogOfWarProps> = ({
   }, [isDrawing, isAdmin, onReveal, brushSize, getPercentagePosition, interpolateAndReveal]);
 
   const handleMouseUp = useCallback(() => {
+    if (isDrawing) {
+      onDrawingEnd?.();
+    }
     setIsDrawing(false);
     lastPosRef.current = null;
-  }, []);
+  }, [isDrawing, onDrawingEnd]);
 
   const handleMouseLeave = useCallback(() => {
+    if (isDrawing) {
+      onDrawingEnd?.();
+    }
     setIsDrawing(false);
     setCursorPos(null);
     lastPosRef.current = null;
-  }, []);
+  }, [isDrawing, onDrawingEnd]);
 
   // Global mouseup listener
   useEffect(() => {
-    const handleGlobalMouseUp = () => setIsDrawing(false);
+    const handleGlobalMouseUp = () => {
+      if (isDrawing) {
+        onDrawingEnd?.();
+      }
+      setIsDrawing(false);
+    };
     window.addEventListener('mouseup', handleGlobalMouseUp);
     return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
-  }, []);
+  }, [isDrawing, onDrawingEnd]);
 
   if (!isVisible) return null;
 

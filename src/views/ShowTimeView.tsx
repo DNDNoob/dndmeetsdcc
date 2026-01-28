@@ -55,6 +55,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   const [mapScale, setMapScale] = useState(100);
   const lastFogBroadcastTime = useRef<number>(0);
   const FOG_BROADCAST_THROTTLE_MS = 50; // Faster fog sync for better real-time experience
+  const pendingFogBroadcast = useRef<{ x: number; y: number; radius: number }[] | null>(null);
 
   // Ping and Box state
   const [pings, setPings] = useState<Ping[]>([]);
@@ -64,6 +65,8 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   const [selectedColor, setSelectedColor] = useState("#ef4444"); // Default red
   const [boxOpacity, setBoxOpacity] = useState(0.3);
   const [selectedShape, setSelectedShape] = useState<ShapeType>("rectangle");
+  const lastBoxBroadcastTime = useRef<number>(0);
+  const pendingBoxBroadcast = useRef<MapBoxData[] | null>(null);
 
   // Crawler and Mob placement state (DM can add during ShowTime)
   const [crawlerPlacements, setCrawlerPlacements] = useState<CrawlerPlacement[]>([]);
@@ -419,15 +422,27 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     setRevealedAreas(prev => {
       const newAreas = [...prev, { x, y, radius }];
 
+      // Track pending broadcast for final sync
+      pendingFogBroadcast.current = newAreas;
+
       // Throttle broadcast
       const now = Date.now();
       if (now - lastFogBroadcastTime.current >= FOG_BROADCAST_THROTTLE_MS) {
         lastFogBroadcastTime.current = now;
+        pendingFogBroadcast.current = null;
         broadcastFogState(fogOfWarEnabled, newAreas, mapScale);
       }
 
       return newAreas;
     });
+  }, [fogOfWarEnabled, mapScale, broadcastFogState]);
+
+  // Handle fog drawing end - ensure final state is broadcast
+  const handleFogDrawingEnd = useCallback(() => {
+    if (pendingFogBroadcast.current) {
+      broadcastFogState(fogOfWarEnabled, pendingFogBroadcast.current, mapScale);
+      pendingFogBroadcast.current = null;
+    }
   }, [fogOfWarEnabled, mapScale, broadcastFogState]);
 
   // Toggle fog of war
@@ -563,12 +578,30 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     setIsBoxMode(false);
   }, [mapBoxes, broadcastBoxes, isAdmin]);
 
-  // Handle updating a box
+  // Handle updating a box with throttled broadcast
   const handleUpdateBox = useCallback((updatedBox: MapBoxData) => {
     const updatedBoxes = mapBoxes.map(b => b.id === updatedBox.id ? updatedBox : b);
     setMapBoxes(updatedBoxes);
-    broadcastBoxes(updatedBoxes);
+
+    // Track pending broadcast for final sync
+    pendingBoxBroadcast.current = updatedBoxes;
+
+    // Throttle broadcasts to prevent lag during drag/resize/rotate
+    const now = Date.now();
+    if (now - lastBoxBroadcastTime.current >= BROADCAST_THROTTLE_MS) {
+      lastBoxBroadcastTime.current = now;
+      pendingBoxBroadcast.current = null;
+      broadcastBoxes(updatedBoxes);
+    }
   }, [mapBoxes, broadcastBoxes]);
+
+  // Handle box manipulation end - ensure final state is broadcast
+  const handleBoxManipulationEnd = useCallback(() => {
+    if (pendingBoxBroadcast.current) {
+      broadcastBoxes(pendingBoxBroadcast.current);
+      pendingBoxBroadcast.current = null;
+    }
+  }, [broadcastBoxes]);
 
   // Handle deleting a box
   const handleDeleteBox = useCallback((id: string) => {
@@ -1481,6 +1514,8 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                   transform: 'translate(-50%, -50%)',
                   pointerEvents: canInteract ? 'auto' : 'none',
                   opacity: canInteract ? 1 : 0.5,
+                  // Smooth transition for remote updates, instant for local drag
+                  transition: isDragging ? 'none' : 'left 0.15s ease-out, top 0.15s ease-out',
                 }}
                 onMouseDown={(e) => {
                   if (!canInteract) return;
@@ -1530,6 +1565,8 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                   top: `${placement.y}%`,
                   transform: 'translate(-50%, -50%)',
                   pointerEvents: canInteract ? 'auto' : 'none',
+                  // Smooth transition for remote updates, instant for local drag
+                  transition: isDragging ? 'none' : 'left 0.15s ease-out, top 0.15s ease-out',
                 }}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: canInteract ? 1 : 0.5 }}
@@ -1592,6 +1629,8 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                   top: `${placement.y}%`,
                   transform: 'translate(-50%, -50%)',
                   pointerEvents: canInteract ? 'auto' : 'none',
+                  // Smooth transition for remote updates, instant for local drag
+                  transition: isDragging ? 'none' : 'left 0.15s ease-out, top 0.15s ease-out',
                 }}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: canInteract ? 1 : 0.5 }}
@@ -1635,6 +1674,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
               isAdmin={isAdmin}
               onUpdate={handleUpdateBox}
               onDelete={handleDeleteBox}
+              onManipulationEnd={handleBoxManipulationEnd}
               mapScale={mapScale}
               canInteract={isPointVisible(box.x, box.y)}
             />
@@ -1648,6 +1688,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             brushSize={fogBrushSize}
             onReveal={handleFogReveal}
             onClearAll={handleClearFogOfWar}
+            onDrawingEnd={handleFogDrawingEnd}
             isViewerAdmin={isAdmin}
           />
 
