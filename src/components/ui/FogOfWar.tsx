@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback, useEffect } from 'react';
+import React, { useRef, useState, useCallback, useEffect, useId, useMemo, memo } from 'react';
 
 interface FogOfWarProps {
   isVisible: boolean;
@@ -11,7 +11,7 @@ interface FogOfWarProps {
   isViewerAdmin?: boolean; // True if the viewer is admin (for semi-transparent fog)
 }
 
-export const FogOfWar: React.FC<FogOfWarProps> = ({
+const FogOfWarComponent: React.FC<FogOfWarProps> = ({
   isVisible,
   revealedAreas,
   isAdmin,
@@ -109,10 +109,23 @@ export const FogOfWar: React.FC<FogOfWarProps> = ({
     return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
   }, [isDrawing, onDrawingEnd]);
 
-  if (!isVisible) return null;
+  // Generate stable mask ID once per component instance
+  const uniqueId = useId();
+  const maskId = `fog-mask-${uniqueId.replace(/:/g, '')}`;
 
-  // Create SVG mask for revealed areas
-  const maskId = `fog-mask-${Math.random().toString(36).substr(2, 9)}`;
+  // Memoize the circles to avoid recalculating on every render
+  const circleElements = useMemo(() =>
+    revealedAreas.map((area, index) => (
+      <circle
+        key={index}
+        cx={`${area.x}%`}
+        cy={`${area.y}%`}
+        r={`${area.radius}%`}
+        fill="black"
+      />
+    )), [revealedAreas]);
+
+  if (!isVisible) return null;
 
   // Only capture pointer events when admin is actively erasing fog
   // Otherwise, allow clicks to pass through to items underneath
@@ -141,15 +154,7 @@ export const FogOfWar: React.FC<FogOfWarProps> = ({
           <mask id={maskId}>
             {/* White = visible, Black = hidden */}
             <rect width="100%" height="100%" fill="white" />
-            {revealedAreas.map((area, index) => (
-              <circle
-                key={index}
-                cx={`${area.x}%`}
-                cy={`${area.y}%`}
-                r={`${area.radius}%`}
-                fill="black"
-              />
-            ))}
+            {circleElements}
           </mask>
           {/* Radial gradient for soft edges on revealed areas */}
           <radialGradient id="fog-gradient">
@@ -186,3 +191,6 @@ export const FogOfWar: React.FC<FogOfWarProps> = ({
     </div>
   );
 };
+
+// Memoize to prevent unnecessary re-renders when parent re-renders
+export const FogOfWar = memo(FogOfWarComponent);

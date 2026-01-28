@@ -56,6 +56,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   const lastFogBroadcastTime = useRef<number>(0);
   const FOG_BROADCAST_THROTTLE_MS = 50; // Faster fog sync for better real-time experience
   const pendingFogBroadcast = useRef<{ x: number; y: number; radius: number }[] | null>(null);
+  const MAX_FOG_CIRCLES = 500; // Limit array size to prevent performance issues
 
   // Ping and Box state
   const [pings, setPings] = useState<Ping[]>([]);
@@ -381,9 +382,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
         if (updateTime > mountTimeMs || !isAdmin) {
           setFogOfWarEnabled(fogData.enabled ?? false);
           setRevealedAreas(fogData.revealedAreas ?? []);
-          if (fogData.scale !== undefined) {
-            setMapScale(fogData.scale);
-          }
+          // Don't sync scale from fog updates - let each user control their own zoom
         }
       }
     });
@@ -420,7 +419,29 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   // Handle revealing fog of war areas
   const handleFogReveal = useCallback((x: number, y: number, radius: number) => {
     setRevealedAreas(prev => {
-      const newAreas = [...prev, { x, y, radius }];
+      // Optimization: Check if this point is already covered by existing circles
+      // If the new circle's center is within an existing circle (with some margin),
+      // we can skip adding it to reduce array size and improve rendering performance
+      const coverageThreshold = radius * 0.6; // Allow some overlap
+      const isAlreadyCovered = prev.some(area => {
+        const dx = area.x - x;
+        const dy = area.y - y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        // If the distance to an existing circle's center is less than its radius minus threshold,
+        // the new circle is mostly covered
+        return distance < (area.radius - coverageThreshold);
+      });
+
+      if (isAlreadyCovered) {
+        return prev; // Skip adding redundant circle
+      }
+
+      // Add new circle and trim if exceeding max limit
+      let newAreas = [...prev, { x, y, radius }];
+      if (newAreas.length > MAX_FOG_CIRCLES) {
+        // Remove oldest circles to stay within limit
+        newAreas = newAreas.slice(newAreas.length - MAX_FOG_CIRCLES);
+      }
 
       // Track pending broadcast for final sync
       pendingFogBroadcast.current = newAreas;
