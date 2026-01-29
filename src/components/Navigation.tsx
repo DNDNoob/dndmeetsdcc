@@ -49,10 +49,11 @@ const Navigation: React.FC<NavigationProps> = ({
 
   return (
     <>
-      {/* Hover trigger zone when collapsed - uses high z-index to stay above all map elements */}
-      {autoCollapse && !isPinned && (
+      {/* Hover trigger zone when collapsed - only covers left portion to avoid blocking the ping panel on the right */}
+      {autoCollapse && !isPinned && !isHovered && (
         <div
-          className="fixed top-0 left-0 right-0 h-8 z-[60]"
+          className="fixed top-0 left-0 h-8 z-[60]"
+          style={{ width: '60%' }}
           onMouseEnter={() => setIsHovered(true)}
         />
       )}

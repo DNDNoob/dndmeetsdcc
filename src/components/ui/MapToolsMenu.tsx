@@ -168,7 +168,7 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
     <div
       className="fixed right-0 z-50 max-w-[100vw]"
       style={{
-        top: isNavVisible ? '80px' : '0px',
+        top: isNavVisible ? '100px' : '0px',
         transition: 'top 0.2s ease',
       }}
     >

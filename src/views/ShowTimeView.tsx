@@ -247,13 +247,20 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     }
   }, [selectedEpisode?.id, currentMapIndex, selectedMap]);
 
-  // Reset zoom and pan when map changes (fog state is loaded from Firebase listener)
+  // Reset all per-map state when map changes (Firebase listeners will reload per-map data)
   useEffect(() => {
     if (!selectedEpisode || currentMapId === null) return;
     // Always start at 100% zoom
     setMapScale(100);
     // Reset pan offset when map changes
     setPanOffset({ x: 0, y: 0 });
+    // Reset per-map state so old map data doesn't bleed into new map
+    setPings([]);
+    setMapBoxes([]);
+    setRevealedAreas([]);
+    setFogOfWarEnabled(false);
+    setCrawlerPlacements([]);
+    setRuntimeMobPlacements([]);
     // Reset fog initial load flag so Firebase listener will reload fog for new map
     fogInitialLoadDone.current = null;
   }, [currentMapId]);
@@ -544,7 +551,10 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     const pingDocRef = doc(db, pingDocPath);
 
     const unsubscribe = onSnapshot(pingDocRef, (snapshot) => {
-      if (!snapshot.exists()) return;
+      if (!snapshot.exists()) {
+        setPings([]);
+        return;
+      }
 
       const pingData = snapshot.data();
       if (pingData.pings) {
@@ -569,12 +579,13 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     const boxDocRef = doc(db, boxDocPath);
 
     const unsubscribe = onSnapshot(boxDocRef, (snapshot) => {
-      if (!snapshot.exists()) return;
+      if (!snapshot.exists()) {
+        setMapBoxes([]);
+        return;
+      }
 
       const boxData = snapshot.data();
-      if (boxData.boxes) {
-        setMapBoxes(boxData.boxes);
-      }
+      setMapBoxes(boxData.boxes ?? []);
     });
 
     return () => unsubscribe();
@@ -913,16 +924,12 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
         const episodeCrawlerPlacements = selectedEpisode.crawlerPlacements?.filter(
           p => p.mapId === currentMapId
         ) || [];
-        if (episodeCrawlerPlacements.length > 0) {
-          setCrawlerPlacements(episodeCrawlerPlacements);
-        }
+        setCrawlerPlacements(episodeCrawlerPlacements);
         return;
       }
 
       const data = snapshot.data();
-      if (data.placements) {
-        setCrawlerPlacements(data.placements);
-      }
+      setCrawlerPlacements(data.placements ?? []);
     });
 
     return () => unsubscribe();
@@ -939,12 +946,13 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     const mobDocRef = doc(db, mobDocPath);
 
     const unsubscribe = onSnapshot(mobDocRef, (snapshot) => {
-      if (!snapshot.exists()) return;
+      if (!snapshot.exists()) {
+        setRuntimeMobPlacements([]);
+        return;
+      }
 
       const data = snapshot.data();
-      if (data.placements) {
-        setRuntimeMobPlacements(data.placements);
-      }
+      setRuntimeMobPlacements(data.placements ?? []);
     });
 
     return () => unsubscribe();
