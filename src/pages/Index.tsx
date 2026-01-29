@@ -33,6 +33,7 @@ const Index = () => {
   } | null>(null);
   const [mapVisibility, setMapVisibility] = useState<boolean[]>([]);
   const [mapNames, setMapNames] = useState<string[]>([]);
+  const [isNavVisible, setIsNavVisible] = useState(true);
   const [isDungeonAILoggedIn, setIsDungeonAILoggedIn] = useState(false);
   const [previousPlayer, setPreviousPlayer] = useState<{
     id: string;
@@ -223,6 +224,7 @@ const Index = () => {
             playerName={currentPlayer.name}
             playerType={currentPlayer.type}
             autoCollapse={currentView === "showtime"}
+            onVisibilityChange={setIsNavVisible}
           />
 
           <main className="pb-12">
@@ -282,6 +284,7 @@ const Index = () => {
                 crawlers={crawlers}
                 isAdmin={isAdmin}
                 onUpdateEpisode={updateEpisode}
+                isNavVisible={isNavVisible}
               />
             )}
             {currentView === "sounds" && <SoundEffectsView />}

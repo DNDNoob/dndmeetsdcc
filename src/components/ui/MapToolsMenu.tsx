@@ -51,6 +51,8 @@ interface MapToolsMenuProps {
   onNextMap?: () => void;
   onSelectMap?: () => void;
   onEndEpisode?: () => void;
+  // Layout
+  isNavVisible?: boolean;
 }
 
 const PING_COLORS = [
@@ -114,6 +116,7 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
   onNextMap,
   onSelectMap,
   onEndEpisode,
+  isNavVisible = false,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showShapeDropdown, setShowShapeDropdown] = useState(false);
@@ -162,7 +165,13 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
   };
 
   return (
-    <div className="fixed top-0 right-0 z-50 max-w-[100vw]">
+    <div
+      className="fixed right-0 z-50 max-w-[100vw]"
+      style={{
+        top: isNavVisible ? '80px' : '0px',
+        transition: 'top 0.2s ease',
+      }}
+    >
       <motion.div
         className="bg-background/95 backdrop-blur-sm border border-border rounded-lg shadow-lg overflow-hidden m-2"
         initial={{ x: 10, opacity: 0 }}

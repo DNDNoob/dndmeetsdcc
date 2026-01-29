@@ -25,11 +25,12 @@ interface ShowTimeViewProps {
   crawlers: Crawler[];
   isAdmin: boolean;
   onUpdateEpisode?: (id: string, updates: Partial<Episode>) => void;
+  isNavVisible?: boolean;
 }
 
 const SHOWTIME_STORAGE_KEY = 'dcc_showtime_state';
 
-const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode }) => {
+const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false }) => {
   const { roomId } = useFirebaseStore();
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
   const [currentMapIndex, setCurrentMapIndex] = useState(0);
@@ -809,34 +810,29 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     setMapScale(prev => Math.max(prev - 25, 25));
   }, []);
 
-  // Handle scroll wheel zoom
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.deltaY < 0) {
-      // Scroll up = zoom in
-      setMapScale(prev => Math.min(prev + 5, 500));
-    } else {
-      // Scroll down = zoom out
-      setMapScale(prev => Math.max(prev - 5, 25));
-    }
-  }, []);
-
-  // Prevent page scroll when on ShowTime page with map displayed
+  // Handle scroll wheel zoom - applied globally so it works regardless of cursor position
   useEffect(() => {
     if (!selectedMap) return;
 
-    const preventScroll = (e: WheelEvent) => {
+    const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
+      e.stopPropagation();
+      if (e.deltaY < 0) {
+        // Scroll up = zoom in
+        setMapScale(prev => Math.min(prev + 5, 500));
+      } else {
+        // Scroll down = zoom out
+        setMapScale(prev => Math.max(prev - 5, 25));
+      }
     };
 
-    // Add passive: false to allow preventDefault
+    // Prevent page scroll and apply zoom globally
     document.body.style.overflow = 'hidden';
-    window.addEventListener('wheel', preventScroll, { passive: false });
+    window.addEventListener('wheel', handleWheel, { passive: false });
 
     return () => {
       document.body.style.overflow = '';
-      window.removeEventListener('wheel', preventScroll);
+      window.removeEventListener('wheel', handleWheel);
     };
   }, [selectedMap]);
 
@@ -1019,6 +1015,13 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     setDisplayedMobIds([]);
     setMapScale(100);
     setPanOffset({ x: 0, y: 0 });
+    // Reset all per-episode state to prevent cross-episode bleeding
+    setPings([]);
+    setMapBoxes([]);
+    setRevealedAreas([]);
+    setFogOfWarEnabled(false);
+    setCrawlerPlacements([]);
+    setRuntimeMobPlacements([]);
     fogInitialLoadDone.current = null;
   }, []);
 
@@ -1027,6 +1030,13 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     setSelectedMap(null);
     setCurrentMapIndex(0);
     setDisplayedMobIds([]);
+    // Reset all per-episode state
+    setPings([]);
+    setMapBoxes([]);
+    setRevealedAreas([]);
+    setFogOfWarEnabled(false);
+    setCrawlerPlacements([]);
+    setRuntimeMobPlacements([]);
     // Broadcast end of episode
     broadcastShowtimeState(null, 0, null);
   }, [broadcastShowtimeState]);
@@ -1414,6 +1424,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
           onNextMap={handleNextMap}
           onSelectMap={() => setSelectedMap(null)}
           onEndEpisode={handleEndEpisode}
+          isNavVisible={isNavVisible}
         />
       )}
 
@@ -1454,7 +1465,6 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
           setCursorPosition(null);
           handleMouseUp();
         }}
-        onWheel={handleWheel}
       >
         {/* Cursor follower for ping/box/crawler/mob mode */}
         {cursorPosition && (isPingMode || isBoxMode || (isAddCrawlerMode && selectedCrawlerId) || (isAddMobMode && selectedMobId)) && (

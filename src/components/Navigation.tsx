@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DungeonButton } from "./ui/DungeonButton";
 import { Home, User, Map, Backpack, Skull, Presentation, Volume2, FileText, Brain, Pin, PinOff } from "lucide-react";
@@ -11,6 +11,7 @@ interface NavigationProps {
   playerName: string;
   playerType: "crawler" | "ai" | "npc";
   autoCollapse?: boolean; // Whether navigation should auto-collapse
+  onVisibilityChange?: (visible: boolean) => void; // Called when nav visibility changes
 }
 
 const navItems = [
@@ -28,6 +29,7 @@ const Navigation: React.FC<NavigationProps> = ({
   playerName,
   playerType,
   autoCollapse = false,
+  onVisibilityChange,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
@@ -39,6 +41,11 @@ const Navigation: React.FC<NavigationProps> = ({
   };
 
   const shouldCollapse = autoCollapse && !isPinned && !isHovered;
+
+  // Notify parent of visibility changes
+  useEffect(() => {
+    onVisibilityChange?.(!shouldCollapse);
+  }, [shouldCollapse, onVisibilityChange]);
 
   return (
     <>
