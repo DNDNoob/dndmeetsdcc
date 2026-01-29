@@ -98,8 +98,15 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   useEffect(() => {
     if (!selectedEpisode) return;
     const updated = episodes.find(e => e.id === selectedEpisode.id);
-    if (updated && updated !== selectedEpisode) {
-      setSelectedEpisode(updated);
+    if (updated) {
+      // Use JSON comparison since getStableCollection may return same reference
+      // even when nested properties (like mapSettings) have changed
+      const currentJson = JSON.stringify(selectedEpisode);
+      const updatedJson = JSON.stringify(updated);
+      if (currentJson !== updatedJson) {
+        console.log('[ShowTime] Episode data updated, syncing. mapSettings:', updated.mapSettings);
+        setSelectedEpisode(updated);
+      }
     }
   }, [episodes]);
 
@@ -284,16 +291,16 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   }, [currentMapId]);
 
   // Debug logging
-  console.log('[ShowTime] Rendering with:', {
-    episodeCount: episodes.length,
-    mapCount: maps.length,
-    mobCount: mobs.length,
-    isAdmin,
-    selectedEpisode: selectedEpisode?.name,
-    currentMapId,
-    mapBaseScale,
-    mapSettings: selectedEpisode?.mapSettings,
-  });
+  if (selectedEpisode && currentMapId) {
+    console.log('[ShowTime] Map display:', {
+      episode: selectedEpisode.name,
+      currentMapId,
+      mapBaseScale,
+      hasMapSettings: !!selectedEpisode.mapSettings,
+      mapSettingsKeys: selectedEpisode.mapSettings ? Object.keys(selectedEpisode.mapSettings) : 'none',
+      scaleForCurrentMap: selectedEpisode.mapSettings?.[currentMapId]?.scale ?? 'not set',
+    });
+  }
 
   // Listen for real-time drag updates from other players
   useEffect(() => {
