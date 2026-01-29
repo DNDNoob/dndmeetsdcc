@@ -176,6 +176,14 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     return selectedEpisode.mapIds[currentMapIndex];
   }, [selectedEpisode, currentMapIndex]);
 
+  // Get the episode's configured base scale for the current map
+  // This scales the map image itself (making it physically larger/smaller),
+  // separate from the user's viewport zoom (mapScale)
+  const mapBaseScale = useMemo(() => {
+    if (!selectedEpisode || !currentMapId) return 100;
+    return selectedEpisode.mapSettings?.[currentMapId]?.scale ?? 100;
+  }, [selectedEpisode, currentMapId]);
+
   // Check if a point is visible (not completely obscured by fog)
   const isPointVisible = useCallback((x: number, y: number): boolean => {
     if (!fogOfWarEnabled) return true; // No fog = always visible
@@ -1576,7 +1584,14 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             ref={mapImageRef}
             src={selectedMap}
             alt="Current Map"
-            className="max-w-full max-h-[90vh] object-contain pointer-events-none border-2 border-primary shadow-[0_0_15px_rgba(0,200,255,0.5)]"
+            className="object-contain pointer-events-none border-2 border-primary shadow-[0_0_15px_rgba(0,200,255,0.5)]"
+            style={{
+              // Base scale from episode settings controls the physical map size.
+              // At 100%, constrained to 90vh. At 200%, the map is twice as large (180vh),
+              // making icons/effects appear smaller relative to the map.
+              maxHeight: `${90 * mapBaseScale / 100}vh`,
+              width: 'auto',
+            }}
             draggable={false}
           />
 
