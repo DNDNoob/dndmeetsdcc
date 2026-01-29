@@ -162,9 +162,9 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
   };
 
   return (
-    <div className="absolute top-4 right-4 z-40">
+    <div className="fixed top-0 right-0 z-50 max-w-[100vw]">
       <motion.div
-        className="bg-background/95 backdrop-blur-sm border border-border rounded-lg shadow-lg overflow-hidden"
+        className="bg-background/95 backdrop-blur-sm border border-border rounded-lg shadow-lg overflow-hidden m-2"
         initial={{ x: 10, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
       >
@@ -201,7 +201,7 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
         )}
 
         {/* Main buttons row */}
-        <div className="flex items-center gap-2 p-2">
+        <div className="flex items-center gap-2 p-2 flex-wrap">
           {/* Ping button - available to all users */}
           <DungeonButton
             variant={isPingMode ? "admin" : "default"}

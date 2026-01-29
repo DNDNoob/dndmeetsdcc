@@ -42,10 +42,10 @@ const Navigation: React.FC<NavigationProps> = ({
 
   return (
     <>
-      {/* Hover trigger zone when collapsed */}
+      {/* Hover trigger zone when collapsed - uses high z-index to stay above all map elements */}
       {autoCollapse && !isPinned && (
         <div
-          className="fixed top-0 left-0 right-0 h-4 z-40"
+          className="fixed top-0 left-0 right-0 h-8 z-[60]"
           onMouseEnter={() => setIsHovered(true)}
         />
       )}
@@ -56,7 +56,7 @@ const Navigation: React.FC<NavigationProps> = ({
           opacity: shouldCollapse ? 0 : 1
         }}
         transition={{ duration: 0.2 }}
-        className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b-2 border-primary px-4 py-3"
+        className="sticky top-0 z-[55] bg-background/95 backdrop-blur border-b-2 border-primary px-4 py-3"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >

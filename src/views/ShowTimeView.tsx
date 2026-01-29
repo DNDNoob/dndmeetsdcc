@@ -815,10 +815,10 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     e.stopPropagation();
     if (e.deltaY < 0) {
       // Scroll up = zoom in
-      setMapScale(prev => Math.min(prev + 10, 500));
+      setMapScale(prev => Math.min(prev + 5, 500));
     } else {
       // Scroll down = zoom out
-      setMapScale(prev => Math.max(prev - 10, 25));
+      setMapScale(prev => Math.max(prev - 5, 25));
     }
   }, []);
 
@@ -1011,6 +1011,16 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   const handleHideMob = (mobId: string) => {
     setDisplayedMobIds(prev => prev.filter(id => id !== mobId));
   };
+
+  const handleSelectEpisode = useCallback((episode: Episode) => {
+    setSelectedEpisode(episode);
+    setSelectedMap(null);
+    setCurrentMapIndex(0);
+    setDisplayedMobIds([]);
+    setMapScale(100);
+    setPanOffset({ x: 0, y: 0 });
+    fogInitialLoadDone.current = null;
+  }, []);
 
   const handleEndEpisode = useCallback(() => {
     setSelectedEpisode(null);
@@ -1210,7 +1220,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                       key={episode.id}
                       whileHover={{ scale: 1.02 }}
                       className="border-2 border-primary bg-muted/20 p-4 rounded-lg cursor-pointer hover:bg-primary/10 transition-colors"
-                      onClick={() => setSelectedEpisode(episode)}
+                      onClick={() => handleSelectEpisode(episode)}
                     >
                       <h3 className="font-display text-lg text-primary mb-2">{episode.name}</h3>
                       {episode.description && (
@@ -1237,7 +1247,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                         variant="admin"
                         size="sm"
                         className="w-full"
-                        onClick={() => setSelectedEpisode(episode)}
+                        onClick={(e) => { e.stopPropagation(); handleSelectEpisode(episode); }}
                       >
                         <PlayCircle className="w-4 h-4 mr-2" />
                         Load Episode
