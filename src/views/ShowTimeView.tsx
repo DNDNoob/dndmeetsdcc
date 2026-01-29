@@ -93,6 +93,16 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   const [panStart, setPanStart] = useState<{ x: number; y: number; panX: number; panY: number } | null>(null);
   const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
+  // Keep selectedEpisode in sync with latest episode data from Firebase
+  // This ensures changes made in the DM console (e.g., map scale) are reflected
+  useEffect(() => {
+    if (!selectedEpisode) return;
+    const updated = episodes.find(e => e.id === selectedEpisode.id);
+    if (updated && updated !== selectedEpisode) {
+      setSelectedEpisode(updated);
+    }
+  }, [episodes]);
+
   // Keep draggingMobId ref in sync with state (avoids listener re-subscription)
   useEffect(() => {
     draggingMobIdRef.current = draggingMobId;
@@ -279,7 +289,10 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     mapCount: maps.length,
     mobCount: mobs.length,
     isAdmin,
-    selectedEpisode: selectedEpisode?.name
+    selectedEpisode: selectedEpisode?.name,
+    currentMapId,
+    mapBaseScale,
+    mapSettings: selectedEpisode?.mapSettings,
   });
 
   // Listen for real-time drag updates from other players
