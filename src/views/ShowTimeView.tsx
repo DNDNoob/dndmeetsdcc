@@ -1634,11 +1634,10 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             alt="Current Map"
             className="object-contain pointer-events-none border-2 border-primary shadow-[0_0_15px_rgba(0,200,255,0.5)]"
             style={{
-              // All maps render at a fixed base size (80vh) regardless of natural image dimensions.
-              // mapBaseScale from episode settings then scales uniformly from that base.
+              // Fixed base height with auto width preserves aspect ratio.
+              // mapBaseScale from episode settings scales uniformly from that base.
               height: `${80 * mapBaseScale / 100}vh`,
-              width: `${80 * mapBaseScale / 100}vh`,
-              objectFit: 'contain',
+              width: 'auto',
             }}
             draggable={false}
           />
