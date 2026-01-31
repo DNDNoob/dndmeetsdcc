@@ -1630,11 +1630,12 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             alt="Current Map"
             className="object-contain pointer-events-none border-2 border-primary shadow-[0_0_15px_rgba(0,200,255,0.5)]"
             style={{
-              // Base scale from episode settings controls the physical map size.
-              // At 100%, the map fills 90vh. At 200%, the map is twice as large (180vh).
-              // Using height (not maxHeight) so smaller images scale UP to match.
-              height: `${90 * mapBaseScale / 100}vh`,
+              // Base scale from episode settings scales the entire map image uniformly.
+              // At 100%, the map fits within 90vh. At 200%, it's twice as large in both dimensions.
+              maxHeight: '90vh',
               width: 'auto',
+              transform: `scale(${mapBaseScale / 100})`,
+              transformOrigin: 'center center',
             }}
             draggable={false}
           />
