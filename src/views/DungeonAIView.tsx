@@ -287,6 +287,8 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
       };
     });
 
+    console.log('[DungeonAI] Saving episode mapSettings:', JSON.stringify(mapSettings));
+
     if (editingEpisodeId) {
       // Update existing episode
       onUpdateEpisode(editingEpisodeId, {

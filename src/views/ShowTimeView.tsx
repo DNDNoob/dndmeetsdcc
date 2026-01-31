@@ -299,7 +299,10 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       mapBaseScale,
       hasMapSettings: !!selectedEpisode.mapSettings,
       mapSettingsKeys: selectedEpisode.mapSettings ? Object.keys(selectedEpisode.mapSettings) : 'none',
+      mapSettingsRaw: JSON.stringify(selectedEpisode.mapSettings),
       scaleForCurrentMap: selectedEpisode.mapSettings?.[currentMapId]?.scale ?? 'not set',
+      mapIds: selectedEpisode.mapIds,
+      allEpisodeKeys: Object.keys(selectedEpisode),
     });
   }
 
