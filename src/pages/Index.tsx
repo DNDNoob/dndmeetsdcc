@@ -173,9 +173,13 @@ const Index = () => {
   useEffect(() => {
     if (maps.length > mapVisibility.length) {
       setMapVisibility((prev) => [...prev, ...Array(maps.length - prev.length).fill(true)]);
+    } else if (maps.length < mapVisibility.length) {
+      setMapVisibility((prev) => prev.slice(0, maps.length));
     }
     if (maps.length > mapNames.length) {
       setMapNames((prev) => [...prev, ...Array(maps.length - prev.length).fill(undefined).map((_, i) => `Map ${prev.length + i + 1}`)]);
+    } else if (maps.length < mapNames.length) {
+      setMapNames((prev) => prev.slice(0, maps.length));
     }
   }, [maps.length, mapVisibility.length, mapNames.length]);
 

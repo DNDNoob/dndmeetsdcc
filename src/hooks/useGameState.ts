@@ -183,16 +183,13 @@ export const useGameState = () => {
       existingIds: existingDocs?.map((d) => d?.id)?.slice(0, 3) || []
     });
 
-    // Create a fingerprint of each image based on length and middle/end sections (avoiding data: prefix)
-    // This avoids collisions that occur with just first/last characters
+    // Create a fingerprint of each image based on length and multiple sections of the data
     const getImageFingerprint = (img: string): string => {
       const dataIndex = img.indexOf(',');
-      const actualData = dataIndex > -1 ? img.substring(dataIndex + 1) : img;
-      // Use: length + middle 30 chars + last 30 chars to create a unique fingerprint
-      const midStart = Math.floor(actualData.length / 2) - 15;
-      const mid = actualData.substring(Math.max(0, midStart), midStart + 30);
-      const end = actualData.substring(Math.max(0, actualData.length - 30));
-      return `${actualData.length}:${mid}:${end}`;
+      const d = dataIndex > -1 ? img.substring(dataIndex + 1) : img;
+      const len = d.length;
+      const slice = (pos: number) => d.substring(Math.max(0, pos), pos + 40);
+      return `${len}:${slice(Math.floor(len * 0.25))}:${slice(Math.floor(len * 0.5))}:${slice(Math.floor(len * 0.75))}:${slice(Math.max(0, len - 40))}`;
     };
 
     // Build maps by id and fingerprint for efficient lookup

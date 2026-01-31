@@ -276,16 +276,17 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
   }, [roomId]); // cleanObject is stable, doesn't need to be in dependencies
 
   const deleteItem = useCallback(async (collection: CollectionName, id: string) => {
-    // Store previous state for rollback
-    const previousData = data[collection] || [];
+    // Capture previous state via functional update to avoid stale closure
+    let previousData: Record<string, unknown>[] = [];
+    setData(prevData => {
+      previousData = prevData[collection] || [];
+      return {
+        ...prevData,
+        [collection]: previousData.filter((item: Record<string, unknown>) => item.id !== id)
+      };
+    });
 
     try {
-      // Optimistic update: immediately remove from local state before Firebase write
-      setData(prevData => ({
-        ...prevData,
-        [collection]: (prevData[collection] || []).filter((item: Record<string, unknown>) => item.id !== id)
-      }));
-
       const collectionRef = getCollectionRef(collection, roomId || undefined);
       const docRef = doc(collectionRef, id);
 
@@ -301,7 +302,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
       setError(err instanceof Error ? err.message : 'Failed to delete item');
       throw err;
     }
-  }, [roomId, data]);
+  }, [roomId]);
 
   // Batch write for multiple operations in a single atomic transaction
   const batchWrite = useCallback(async (operations: BatchOperation[]) => {

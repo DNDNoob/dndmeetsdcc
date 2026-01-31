@@ -359,10 +359,9 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   }, [selectedEpisode?.id, roomId]); // Removed draggingMobId - using ref instead to avoid re-subscription
 
   // Broadcast drag state to other players (all users can broadcast)
-  const broadcastDragState = async (placementIndex: number, x: number, y: number) => {
+  const broadcastDragState = useCallback(async (placementIndex: number, x: number, y: number) => {
     if (!selectedEpisode) return;
 
-    // Use a single document per episode for drag state
     const dragDocPath = roomId
       ? `rooms/${roomId}/mob-drag-state/${selectedEpisode.id}`
       : `mob-drag-state/${selectedEpisode.id}`;
@@ -378,7 +377,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     } catch (error) {
       console.error('[ShowTime] Failed to broadcast drag state:', error);
     }
-  };
+  }, [selectedEpisode?.id, roomId]);
 
   // Track if we've done the initial fog load for this map
   const fogInitialLoadDone = useRef<string | null>(null);

@@ -150,18 +150,37 @@ const SoundEffectsView: React.FC = () => {
         }
       }
 
-      // Freesound API is disabled - API key exposed in client causes rate limiting
-      // To enable search, set up a backend proxy and configure VITE_SOUND_API_BASE
-      // For now, filter local and uploaded sounds only
+      // Try Freesound API directly if API key is available
+      const freesoundKey = import.meta.env.VITE_FREESOUND_API_KEY as string;
+      if (freesoundKey) {
+        try {
+          const fsUrl = `https://freesound.org/apiv2/search/text/?query=${encodeURIComponent(q)}&fields=id,name,previews,tags&page_size=60&token=${freesoundKey}`;
+          const res = await fetch(fsUrl);
+          if (!res.ok) throw new Error(`Freesound API ${res.status}`);
+          const json = await res.json();
+          if (!active) return;
+          const mapped: SoundEffect[] = (json.results || []).map((r: any) => ({
+            id: `freesound-${r.id}`,
+            name: r.name,
+            url: r.previews?.['preview-hq-mp3'] || r.previews?.['preview-lq-mp3'] || '',
+            tags: r.tags || [],
+            source: 'freesound'
+          })).filter((s: SoundEffect) => s.url);
+          console.log('[SoundEffects] Got', mapped.length, 'results from Freesound API');
+          setResults([...uploaded, ...mapped]);
+          return;
+        } catch (e) {
+          console.warn('[SoundEffects] Freesound API error:', e);
+        }
+      }
 
+      // Fallback: filter local and uploaded sounds only
       if (active) {
-        // Filter local sounds by search query
         const localFiltered = LOCAL_SOUNDS.filter(s =>
           s.name.toLowerCase().includes(q.toLowerCase()) ||
           s.tags.some(t => t.toLowerCase().includes(q.toLowerCase()))
         );
 
-        // Filter uploaded sounds by search query
         const uploadedFiltered = uploaded.filter(s =>
           s.name.toLowerCase().includes(q.toLowerCase()) ||
           (s.tags && s.tags.some(t => t.toLowerCase().includes(q.toLowerCase())))
