@@ -202,17 +202,9 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     return selectedEpisode.mapSettings?.[currentMapId]?.scale ?? 100;
   }, [selectedEpisode, currentMapId]);
 
-  // Dynamic zoom limits based on base scale so users can always zoom out enough
-  const zoomMin = useMemo(() => {
-    // At 100% base scale, min zoom is 25%. At higher scales, allow zooming out further.
-    // Ensure the user can always fit the map on screen: need zoom <= 100/effectiveScale
-    const fitZoom = Math.floor(100 / (mapBaseScale * 3 / 100)) * 100; // % zoom to fit
-    return Math.max(5, Math.min(25, fitZoom));
-  }, [mapBaseScale]);
-
-  const zoomMax = useMemo(() => {
-    return Math.max(500, Math.floor(10000 / (mapBaseScale * 3 / 100)));
-  }, [mapBaseScale]);
+  // Fixed zoom limits - 1% minimum so users can always zoom out on any scale
+  const zoomMin = 1;
+  const zoomMax = 500;
 
   // Check if a point is visible (not completely obscured by fog)
   const isPointVisible = useCallback((x: number, y: number): boolean => {
@@ -878,11 +870,11 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   // Handle zoom for all users
   const handleZoomIn = useCallback(() => {
     setMapScale(prev => Math.min(prev + 25, zoomMax));
-  }, [zoomMax]);
+  }, []);
 
   const handleZoomOut = useCallback(() => {
     setMapScale(prev => Math.max(prev - 25, zoomMin));
-  }, [zoomMin]);
+  }, []);
 
   // Handle scroll wheel zoom - applied globally so it works regardless of cursor position
   useEffect(() => {
@@ -908,7 +900,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       document.body.style.overflow = '';
       window.removeEventListener('wheel', handleWheel);
     };
-  }, [selectedMap, zoomMin, zoomMax]);
+  }, [selectedMap]);
 
   // Refs for throttling runtime drag broadcasts
   const lastCrawlerBroadcastTime = useRef<number>(0);
@@ -1642,12 +1634,11 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             alt="Current Map"
             className="object-contain pointer-events-none border-2 border-primary shadow-[0_0_15px_rgba(0,200,255,0.5)]"
             style={{
-              // Base scale from episode settings scales the entire map image uniformly.
-              // Default 100% = 3x natural size so all maps start large enough.
-              maxHeight: '90vh',
-              width: 'auto',
-              transform: `scale(${mapBaseScale * 3 / 100})`,
-              transformOrigin: 'center center',
+              // All maps render at a fixed base size (80vh) regardless of natural image dimensions.
+              // mapBaseScale from episode settings then scales uniformly from that base.
+              height: `${80 * mapBaseScale / 100}vh`,
+              width: `${80 * mapBaseScale / 100}vh`,
+              objectFit: 'contain',
             }}
             draggable={false}
           />
