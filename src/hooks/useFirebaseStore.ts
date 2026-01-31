@@ -208,6 +208,14 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
       const docRef = doc(collectionRef, itemId);
 
       const cleaned = cleanObject(itemWithId);
+      if (collection === 'episodes') {
+        console.log('[FirebaseStore] 📝 Episode data being written:', {
+          id: itemId,
+          hasMapSettings: !!(cleaned as Record<string, unknown>).mapSettings,
+          mapSettings: JSON.stringify((cleaned as Record<string, unknown>).mapSettings),
+          keys: Object.keys(cleaned as Record<string, unknown>),
+        });
+      }
       await setDoc(docRef, cleaned);
       console.log('[FirebaseStore] ✅ Added item:', collection, itemId);
     } catch (err) {
