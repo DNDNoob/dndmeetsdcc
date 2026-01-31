@@ -42,6 +42,8 @@ export const MapBox: React.FC<MapBoxProps> = ({
   const [showControls, setShowControls] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const rotateStartAngle = useRef<number | null>(null); // Initial mouse angle when rotation starts
+  const rotateStartRotation = useRef<number>(0); // Shape's rotation when drag started
 
   const counterScale = 100 / mapScale;
 
@@ -91,16 +93,16 @@ export const MapBox: React.FC<MapBoxProps> = ({
           const newSize = (distance / vmin);
           onUpdate({
             ...box,
-            width: Math.max(2, Math.min(60, newSize)),
-            height: Math.max(2, Math.min(60, newSize)),
+            width: Math.max(2, Math.min(100, newSize)),
+            height: Math.max(2, Math.min(100, newSize)),
           });
         } else {
           const newWidth = (Math.abs(dx) * 2 / rect.width) * 100;
           const newHeight = (Math.abs(dy) * 2 / rect.height) * 100;
           onUpdate({
             ...box,
-            width: Math.max(2, Math.min(100, newWidth)),
-            height: Math.max(2, Math.min(100, newHeight)),
+            width: Math.max(2, Math.min(200, newWidth)),
+            height: Math.max(2, Math.min(200, newHeight)),
           });
         }
       } else if (isRotating) {
@@ -108,9 +110,16 @@ export const MapBox: React.FC<MapBoxProps> = ({
         const centerY = (box.y / 100) * rect.height + rect.top;
         const angle = Math.atan2(e.clientY - centerY, e.clientX - centerX);
         const degrees = (angle * 180 / Math.PI) + 90;
+        // On first move, capture the starting angle offset
+        if (rotateStartAngle.current === null) {
+          rotateStartAngle.current = degrees;
+          rotateStartRotation.current = box.rotation;
+          return; // Don't rotate on the initial capture
+        }
+        const delta = degrees - rotateStartAngle.current;
         onUpdate({
           ...box,
-          rotation: degrees,
+          rotation: rotateStartRotation.current + delta,
         });
       }
     };
@@ -119,6 +128,7 @@ export const MapBox: React.FC<MapBoxProps> = ({
       setIsDragging(false);
       setIsResizing(false);
       setIsRotating(false);
+      rotateStartAngle.current = null;
       // Call onManipulationEnd to trigger final broadcast
       onManipulationEnd?.();
     };

@@ -708,8 +708,8 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     const updatedBoxes = [...mapBoxes, newBox];
     setMapBoxes(updatedBoxes);
     broadcastBoxes(updatedBoxes);
-    // Keep box mode active so user can place multiple shapes
-    // User deselects by clicking the shape button again in the toolbar
+    // Deselect shape mode after placing
+    setIsBoxMode(false);
   }, [mapBoxes, broadcastBoxes, isAdmin]);
 
   // Handle updating a box with throttled broadcast
