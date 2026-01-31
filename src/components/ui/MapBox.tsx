@@ -45,6 +45,18 @@ export const MapBox: React.FC<MapBoxProps> = ({
 
   const counterScale = 100 / mapScale;
 
+  // Hide controls when clicking outside the shape
+  useEffect(() => {
+    if (!showControls) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setShowControls(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showControls]);
+
   useEffect(() => {
     if (!isDragging && !isResizing && !isRotating) return;
 
@@ -142,8 +154,7 @@ export const MapBox: React.FC<MapBoxProps> = ({
         // Smooth transition for remote updates, instant for local manipulation
         transition: isManipulating ? 'none' : 'left 0.15s ease-out, top 0.15s ease-out, width 0.15s ease-out, height 0.15s ease-out, transform 0.15s ease-out',
       }}
-      onMouseEnter={() => canInteract && setShowControls(true)}
-      onMouseLeave={() => !isDragging && !isResizing && !isRotating && setShowControls(false)}
+      onClick={(e) => { e.stopPropagation(); if (canInteract) setShowControls(true); }}
     >
       {/* The shape itself */}
       {(!box.shape || box.shape === "rectangle") && (
@@ -218,47 +229,61 @@ export const MapBox: React.FC<MapBoxProps> = ({
         </div>
       )}
 
-      {/* Control handles - visible to all users */}
+      {/* Control handles - visible to all users, stay until clicking outside */}
       {showControls && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           className="absolute inset-0 pointer-events-none"
-          style={{ transform: `scale(${counterScale})` }}
         >
-          {/* Delete button */}
+          {/* Delete button - top right */}
           <button
-            className="absolute -top-3 -right-3 w-6 h-6 bg-destructive text-white rounded-full flex items-center justify-center hover:bg-destructive/80 transition-colors pointer-events-auto z-10"
+            className="absolute bg-destructive text-white rounded-full flex items-center justify-center hover:bg-destructive/80 transition-colors pointer-events-auto z-10"
+            style={{
+              top: 0, right: 0,
+              width: `${24 * counterScale}px`, height: `${24 * counterScale}px`,
+              transform: 'translate(50%, -50%)',
+            }}
             onClick={(e) => {
               e.stopPropagation();
               onDelete(box.id);
             }}
           >
-            <X className="w-3 h-3" />
+            <X style={{ width: `${12 * counterScale}px`, height: `${12 * counterScale}px` }} />
           </button>
 
-          {/* Resize handle */}
+          {/* Resize handle - bottom right */}
           <div
-            className="absolute -bottom-3 -right-3 w-6 h-6 bg-accent text-white rounded-full flex items-center justify-center cursor-nwse-resize pointer-events-auto"
+            className="absolute bg-accent text-white rounded-full flex items-center justify-center cursor-nwse-resize pointer-events-auto"
+            style={{
+              bottom: 0, right: 0,
+              width: `${24 * counterScale}px`, height: `${24 * counterScale}px`,
+              transform: 'translate(50%, 50%)',
+            }}
             onMouseDown={(e) => {
               e.preventDefault();
               e.stopPropagation();
               setIsResizing(true);
             }}
           >
-            <Maximize2 className="w-3 h-3" />
+            <Maximize2 style={{ width: `${12 * counterScale}px`, height: `${12 * counterScale}px` }} />
           </div>
 
-          {/* Rotate handle */}
+          {/* Rotate handle - bottom left */}
           <div
-            className="absolute -bottom-3 -left-3 w-6 h-6 bg-secondary text-white rounded-full flex items-center justify-center cursor-grab pointer-events-auto"
+            className="absolute bg-secondary text-white rounded-full flex items-center justify-center cursor-grab pointer-events-auto"
+            style={{
+              bottom: 0, left: 0,
+              width: `${24 * counterScale}px`, height: `${24 * counterScale}px`,
+              transform: 'translate(-50%, 50%)',
+            }}
             onMouseDown={(e) => {
               e.preventDefault();
               e.stopPropagation();
               setIsRotating(true);
             }}
           >
-            <RotateCw className="w-3 h-3" />
+            <RotateCw style={{ width: `${12 * counterScale}px`, height: `${12 * counterScale}px` }} />
           </div>
         </motion.div>
       )}
