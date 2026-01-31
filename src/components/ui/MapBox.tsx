@@ -79,16 +79,16 @@ export const MapBox: React.FC<MapBoxProps> = ({
           const newSize = (distance / vmin);
           onUpdate({
             ...box,
-            width: Math.max(2, Math.min(30, newSize)),
-            height: Math.max(2, Math.min(30, newSize)),
+            width: Math.max(2, Math.min(60, newSize)),
+            height: Math.max(2, Math.min(60, newSize)),
           });
         } else {
           const newWidth = (Math.abs(dx) * 2 / rect.width) * 100;
           const newHeight = (Math.abs(dy) * 2 / rect.height) * 100;
           onUpdate({
             ...box,
-            width: Math.max(2, Math.min(50, newWidth)),
-            height: Math.max(2, Math.min(50, newHeight)),
+            width: Math.max(2, Math.min(100, newWidth)),
+            height: Math.max(2, Math.min(100, newHeight)),
           });
         }
       } else if (isRotating) {
@@ -153,7 +153,7 @@ export const MapBox: React.FC<MapBoxProps> = ({
           style={{
             backgroundColor: box.color,
             opacity: box.opacity,
-            borderColor: box.color,
+            borderColor: 'rgba(0,0,0,0.7)',
           }}
           onMouseDown={(e) => {
             e.preventDefault();
@@ -169,7 +169,7 @@ export const MapBox: React.FC<MapBoxProps> = ({
           style={{
             backgroundColor: box.color,
             opacity: box.opacity,
-            borderColor: box.color,
+            borderColor: 'rgba(0,0,0,0.7)',
           }}
           onMouseDown={(e) => {
             e.preventDefault();
@@ -185,7 +185,7 @@ export const MapBox: React.FC<MapBoxProps> = ({
           style={{
             backgroundColor: box.color,
             opacity: box.opacity,
-            borderColor: box.color,
+            borderColor: 'rgba(0,0,0,0.7)',
           }}
           onMouseDown={(e) => {
             e.preventDefault();
@@ -211,7 +211,7 @@ export const MapBox: React.FC<MapBoxProps> = ({
             <polygon
               points="50,5 95,95 5,95"
               fill={box.color}
-              stroke={box.color}
+              stroke="rgba(0,0,0,0.7)"
               strokeWidth="2"
             />
           </svg>

@@ -51,6 +51,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   // Fog of war state
   const [fogOfWarEnabled, setFogOfWarEnabled] = useState(false);
   const [fogEraserActive, setFogEraserActive] = useState(false); // Separate eraser toggle
+  const [fogPaintActive, setFogPaintActive] = useState(false); // Paint fog back over cleared areas
   const [fogBrushSize, setFogBrushSize] = useState(5);
   const [revealedAreas, setRevealedAreas] = useState<{ x: number; y: number; radius: number }[]>([]);
   const [mapScale, setMapScale] = useState(100);
@@ -546,6 +547,32 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     });
   }, [fogOfWarEnabled, mapScale, broadcastFogState, consolidateFogCircles]);
 
+  // Handle painting fog back over previously cleared areas
+  const handleFogPaint = useCallback((x: number, y: number, radius: number) => {
+    setRevealedAreas(prev => {
+      // Remove revealed circles whose centers fall within the paint brush radius
+      const newAreas = prev.filter(area => {
+        const dx = area.x - x;
+        const dy = area.y - y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        return distance > radius + area.radius * 0.5;
+      });
+
+      if (newAreas.length === prev.length) return prev; // Nothing changed
+
+      pendingFogBroadcast.current = newAreas;
+
+      const now = Date.now();
+      if (now - lastFogBroadcastTime.current >= FOG_BROADCAST_THROTTLE_MS) {
+        lastFogBroadcastTime.current = now;
+        pendingFogBroadcast.current = null;
+        broadcastFogState(fogOfWarEnabled, newAreas, mapScale);
+      }
+
+      return newAreas;
+    });
+  }, [fogOfWarEnabled, mapScale, broadcastFogState]);
+
   // Handle fog drawing end - ensure final state is broadcast
   const handleFogDrawingEnd = useCallback(() => {
     if (pendingFogBroadcast.current) {
@@ -560,12 +587,6 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     setFogOfWarEnabled(newEnabled);
     broadcastFogState(newEnabled, revealedAreas, mapScale);
   }, [fogOfWarEnabled, revealedAreas, mapScale, broadcastFogState]);
-
-  // Clear all fog of war (reset to fully fogged)
-  const handleClearFogOfWar = useCallback(() => {
-    setRevealedAreas([]);
-    broadcastFogState(fogOfWarEnabled, [], mapScale);
-  }, [fogOfWarEnabled, mapScale, broadcastFogState]);
 
   // Listen for ping updates
   useEffect(() => {
@@ -676,8 +697,8 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       id: `box-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       x,
       y,
-      width: isEqualDimensions ? 10 : 15,
-      height: isEqualDimensions ? 10 : 10,
+      width: isEqualDimensions ? 5 : 15,
+      height: isEqualDimensions ? 5 : 10,
       rotation: 0,
       color,
       opacity,
@@ -687,8 +708,8 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     const updatedBoxes = [...mapBoxes, newBox];
     setMapBoxes(updatedBoxes);
     broadcastBoxes(updatedBoxes);
-    // Auto-deselect box mode after placing so user can manipulate the box
-    setIsBoxMode(false);
+    // Keep box mode active so user can place multiple shapes
+    // User deselects by clicking the shape button again in the toolbar
   }, [mapBoxes, broadcastBoxes, isAdmin]);
 
   // Handle updating a box with throttled broadcast
@@ -1084,7 +1105,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   // Handle panning start
   const handlePanStart = (e: React.MouseEvent<HTMLDivElement>) => {
     // Don't start panning if we're in a mode that uses clicks
-    if (isPingMode || isBoxMode || isAddCrawlerMode || isAddMobMode || fogEraserActive) return;
+    if (isPingMode || isBoxMode || isAddCrawlerMode || isAddMobMode || fogEraserActive || fogPaintActive) return;
     // Don't pan if clicking on an interactive element
     if ((e.target as HTMLElement).closest('button, [data-draggable]')) return;
 
@@ -1450,7 +1471,8 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
           setFogEraserActive={setFogEraserActive}
           fogBrushSize={fogBrushSize}
           setFogBrushSize={setFogBrushSize}
-          onClearFogOfWar={handleClearFogOfWar}
+          fogPaintActive={fogPaintActive}
+          setFogPaintActive={setFogPaintActive}
           episodeName={selectedEpisode.name}
           currentMapIndex={currentMapIndex}
           totalMaps={selectedEpisode.mapIds.length}
@@ -1820,12 +1842,12 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
           <FogOfWar
             isVisible={fogOfWarEnabled}
             revealedAreas={revealedAreas}
-            isAdmin={isAdmin && fogEraserActive}
+            isAdmin={isAdmin && (fogEraserActive || fogPaintActive)}
             brushSize={fogBrushSize}
-            onReveal={handleFogReveal}
-            onClearAll={handleClearFogOfWar}
+            onReveal={fogPaintActive ? handleFogPaint : handleFogReveal}
             onDrawingEnd={handleFogDrawingEnd}
             isViewerAdmin={isAdmin}
+            isPaintMode={fogPaintActive}
           />
 
           {/* Ping effects - on top of everything */}

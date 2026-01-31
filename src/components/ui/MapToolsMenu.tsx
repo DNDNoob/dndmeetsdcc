@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DungeonButton } from "@/components/ui/DungeonButton";
-import { Target, Square, ChevronDown, ChevronUp, Palette, User, Skull, Grid3x3, CloudFog, Eraser, Trash2, Layers, X, ChevronLeft, ChevronRight, Circle, Triangle, RectangleHorizontal } from "lucide-react";
+import { Target, Square, ChevronDown, ChevronUp, Palette, User, Skull, Grid3x3, CloudFog, Eraser, Paintbrush, Layers, X, ChevronLeft, ChevronRight, Circle, Triangle, RectangleHorizontal } from "lucide-react";
 import { Crawler, Mob } from "@/lib/gameData";
 import { ShapeType } from "@/components/ui/MapBox";
 
@@ -41,7 +41,8 @@ interface MapToolsMenuProps {
   setFogEraserActive?: (value: boolean) => void;
   fogBrushSize?: number;
   setFogBrushSize?: (size: number) => void;
-  onClearFogOfWar?: () => void;
+  fogPaintActive?: boolean;
+  setFogPaintActive?: (value: boolean) => void;
   // DM Episode/Map navigation
   episodeName?: string;
   currentMapIndex?: number;
@@ -107,7 +108,8 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
   setFogEraserActive,
   fogBrushSize,
   setFogBrushSize,
-  onClearFogOfWar,
+  fogPaintActive,
+  setFogPaintActive,
   episodeName,
   currentMapIndex,
   totalMaps,
@@ -338,26 +340,33 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
               onClick={() => {
                 const newValue = !fogEraserActive;
                 setFogEraserActive(newValue);
-                // Auto-expand to show brush size options when enabling eraser
                 if (newValue) {
+                  setFogPaintActive?.(false);
                   setIsExpanded(true);
                 }
               }}
-              title="Toggle Eraser Mode"
+              title="Eraser - reveal fog"
             >
               <Eraser className="w-4 h-4" />
             </DungeonButton>
           )}
 
-          {/* Clear Fog - DM only, when fog is enabled */}
-          {isAdmin && fogOfWarEnabled && onClearFogOfWar && (
+          {/* Fog Paint Brush - DM only, when fog is enabled */}
+          {isAdmin && fogOfWarEnabled && setFogPaintActive && (
             <DungeonButton
-              variant="danger"
+              variant={fogPaintActive ? "admin" : "default"}
               size="sm"
-              onClick={onClearFogOfWar}
-              title="Reset fog (cover entire map)"
+              onClick={() => {
+                const newValue = !fogPaintActive;
+                setFogPaintActive(newValue);
+                if (newValue) {
+                  setFogEraserActive?.(false);
+                  setIsExpanded(true);
+                }
+              }}
+              title="Paint - re-cover fog"
             >
-              <Trash2 className="w-4 h-4" />
+              <Paintbrush className="w-4 h-4" />
             </DungeonButton>
           )}
 
@@ -434,8 +443,8 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
                   </div>
                 )}
 
-                {/* Fog brush size slider (for DM when eraser is active) */}
-                {isAdmin && fogOfWarEnabled && fogEraserActive && setFogBrushSize && fogBrushSize !== undefined && (
+                {/* Fog brush size slider (for DM when eraser or paint is active) */}
+                {isAdmin && fogOfWarEnabled && (fogEraserActive || fogPaintActive) && setFogBrushSize && fogBrushSize !== undefined && (
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs text-muted-foreground">Fog Brush Size</span>

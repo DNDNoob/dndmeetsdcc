@@ -6,9 +6,9 @@ interface FogOfWarProps {
   isAdmin: boolean;
   brushSize: number;
   onReveal?: (x: number, y: number, radius: number) => void;
-  onClearAll?: () => void;
   onDrawingEnd?: () => void; // Called when fog drawing ends for final sync
   isViewerAdmin?: boolean; // True if the viewer is admin (for semi-transparent fog)
+  isPaintMode?: boolean; // True when painting fog back (visual distinction)
 }
 
 const FogOfWarComponent: React.FC<FogOfWarProps> = ({
@@ -17,9 +17,9 @@ const FogOfWarComponent: React.FC<FogOfWarProps> = ({
   isAdmin,
   brushSize,
   onReveal,
-  onClearAll,
   onDrawingEnd,
   isViewerAdmin = false,
+  isPaintMode = false,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -187,15 +187,14 @@ const FogOfWarComponent: React.FC<FogOfWarProps> = ({
       {/* Brush cursor preview for admin - use vmin for perfect circle */}
       {isAdmin && cursorPos && (
         <div
-          className="absolute pointer-events-none border-2 border-white/50 rounded-full"
+          className={`absolute pointer-events-none border-2 rounded-full ${isPaintMode ? 'border-orange-400/70' : 'border-white/50'}`}
           style={{
             left: `${cursorPos.x}%`,
             top: `${cursorPos.y}%`,
-            // Use vmin to ensure the brush is always a perfect circle
             width: `${brushSize * 4}vmin`,
             height: `${brushSize * 4}vmin`,
             transform: 'translate(-50%, -50%)',
-            boxShadow: '0 0 10px rgba(255, 255, 255, 0.3)',
+            boxShadow: isPaintMode ? '0 0 10px rgba(255, 165, 0, 0.3)' : '0 0 10px rgba(255, 255, 255, 0.3)',
           }}
         />
       )}
