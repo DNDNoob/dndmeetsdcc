@@ -1634,10 +1634,13 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             alt="Current Map"
             className="object-contain pointer-events-none border-2 border-primary shadow-[0_0_15px_rgba(0,200,255,0.5)]"
             style={{
-              // Fixed base height with auto width preserves aspect ratio.
-              // mapBaseScale from episode settings scales uniformly from that base.
-              height: `${80 * mapBaseScale / 100}vh`,
+              // Fixed base size at 80vh with auto width to preserve aspect ratio.
+              // CSS transform handles scaling so the browser always computes width from 80vh,
+              // avoiding issues where very large vh values break auto width calculation.
+              height: '80vh',
               width: 'auto',
+              transform: `scale(${mapBaseScale / 100})`,
+              transformOrigin: 'center center',
             }}
             draggable={false}
           />
