@@ -27,6 +27,10 @@ const LOCAL_SOUNDS: SoundEffect[] = [
 
 const FREESOUND_KEY = (import.meta.env.VITE_FREESOUND_API_KEY as string) || "";
 
+// Cache Freesound results to avoid rate limiting (429 errors)
+const FREESOUND_CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
+const freesoundCache = new Map<string, { results: SoundEffect[]; timestamp: number }>();
+
 const RECENT_KEY = "sfx_recent";
 const FAV_KEY = "sfx_favs";
 
@@ -153,6 +157,14 @@ const SoundEffectsView: React.FC = () => {
       // Try Freesound API directly if API key is available
       const freesoundKey = import.meta.env.VITE_FREESOUND_API_KEY as string;
       if (freesoundKey) {
+        // Check cache first
+        const cached = freesoundCache.get(q);
+        if (cached && Date.now() - cached.timestamp < FREESOUND_CACHE_DURATION) {
+          console.log('[SoundEffects] Cache hit for:', q);
+          if (active) setResults([...uploaded, ...cached.results]);
+          return;
+        }
+
         try {
           const fsUrl = `https://freesound.org/apiv2/search/text/?query=${encodeURIComponent(q)}&fields=id,name,previews,tags&page_size=60&token=${freesoundKey}`;
           const res = await fetch(fsUrl);
@@ -167,10 +179,14 @@ const SoundEffectsView: React.FC = () => {
             source: 'freesound'
           })).filter((s: SoundEffect) => s.url);
           console.log('[SoundEffects] Got', mapped.length, 'results from Freesound API');
+          // Cache results
+          freesoundCache.set(q, { results: mapped, timestamp: Date.now() });
           setResults([...uploaded, ...mapped]);
           return;
         } catch (e) {
           console.warn('[SoundEffects] Freesound API error:', e);
+          // On rate limit or error, keep existing results instead of clearing them
+          return;
         }
       }
 
