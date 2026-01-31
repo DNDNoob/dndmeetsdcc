@@ -1,5 +1,88 @@
 [
   {
+    "date": "2026-01-31",
+    "changes": [
+      "🧹 Removed Lovable and Netlify dependencies - project now fully hosted on GitHub Pages with Firebase",
+      "🔊 Fixed Freesound sound effects search - searches now pull results directly from Freesound API",
+      "Added 10-minute client-side cache for sound searches to prevent rate limiting (429 errors)",
+      "Sound results no longer disappear when API rate limit is hit - existing results are preserved",
+      "🐛 Fixed map visibility/names arrays not shrinking when maps are deleted",
+      "🐛 Fixed weak image fingerprint hash - now uses 4 sections for more reliable duplicate detection",
+      "🐛 Fixed optimistic delete rollback using atomic state capture to prevent stale data",
+      "🐛 Fixed broadcastDragState stale closure with useCallback wrapper"
+    ]
+  },
+  {
+    "date": "2026-01-29",
+    "changes": [
+      "🗺️ Episode map scale now changes physical map size instead of viewport zoom",
+      "At 200% scale, the map image is twice as large, making icons/effects appear relatively smaller",
+      "Map scale settings sync in real-time from DM console to ShowTime view via JSON deep comparison",
+      "🔧 Reduced scroll zoom sensitivity by 50% for finer control",
+      "🐛 Fixed map persisting from previous episode when switching episodes",
+      "📌 Ping panel now snaps below navigation pane and shifts to top when nav collapses",
+      "Navigation pane hover trigger limited to left 60% of screen to avoid accidental triggers near ping panel",
+      "Fixed pin button on navigation pane appearing disabled",
+      "🐛 Fixed cross-episode state bleeding - shapes, fog, icons, and crawlers fully reset on episode switch",
+      "🐛 Fixed cross-map state bleeding - all per-map state resets when switching maps within an episode",
+      "🐛 Fixed scroll zoom causing buttons to disappear off-screen (now uses global window listener)",
+      "Firebase listeners now clear state when no document exists for a map"
+    ]
+  },
+  {
+    "date": "2026-01-28",
+    "changes": [
+      "⚡ MAJOR: Fixed real-time sync lag with Firebase batch writes, debouncing, and optimistic updates",
+      "🎨 Added smooth CSS transitions for mob/crawler icons, shapes, and fog of war",
+      "Shapes and fog of war changes now animate smoothly for all connected players",
+      "🌫️ Fixed fog of war circle consolidation - fog no longer reappears after extensive clearing",
+      "Replaced array trimming with intelligent merging algorithm that combines overlapping circles",
+      "Added Gaussian blur filter for softer fog edges",
+      "🌫️ Fog of war state now persists across sessions (enabled/disabled + revealed areas saved to Firebase)",
+      "🔍 Zoom level now always defaults to 100% on page load"
+    ]
+  },
+  {
+    "date": "2026-01-27",
+    "changes": [
+      "🎒 Inventory improvements: added weapon slot to equipment system",
+      "🔧 Fixed ShowTime UI positioning and optimized drag performance"
+    ]
+  },
+  {
+    "date": "2026-01-26",
+    "changes": [
+      "🎮 ShowTime UI improvements and interaction enhancements",
+      "Fixed various ShowTime UI issues"
+    ]
+  },
+  {
+    "date": "2026-01-24",
+    "changes": [
+      "📡 MAJOR: Real-time sync for DM episode/map selection to all players",
+      "Players automatically see the map the DM selects without manual refresh",
+      "🔧 Fixed icon scaling to maintain consistent sizes across zoom levels",
+      "🎨 Expanded character profile UI with more detail",
+      "🐛 Fixed mob icon dragging with proper cursor and event handling"
+    ]
+  },
+  {
+    "date": "2026-01-23",
+    "changes": [
+      "🎛️ Consolidated DM controls into MapToolsMenu for cleaner UI",
+      "Fixed episode tab, user controls, and naming issues",
+      "Fixed DM controls z-index to prevent overlap with tools panel"
+    ]
+  },
+  {
+    "date": "2026-01-22-late",
+    "changes": [
+      "🖱️ Added cursor follower effect on ShowTime map",
+      "🔍 Added zoom +/- button controls for map viewing",
+      "Fixed ShowTimeView initialization order bug"
+    ]
+  },
+  {
     "date": "2026-01-22",
     "changes": [
       "📍 MAJOR: Added Ping system for map communication",
