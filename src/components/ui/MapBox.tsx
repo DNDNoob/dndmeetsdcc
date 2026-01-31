@@ -24,6 +24,7 @@ interface MapBoxProps {
   onDelete: (id: string) => void;
   onManipulationEnd?: () => void; // Called when drag/resize/rotate ends for final sync
   mapScale: number;
+  mapBaseScale?: number;
   canInteract?: boolean; // Whether the box can be interacted with (visibility check)
 }
 
@@ -34,6 +35,7 @@ export const MapBox: React.FC<MapBoxProps> = ({
   onDelete,
   onManipulationEnd,
   mapScale,
+  mapBaseScale = 100,
   canInteract = true,
 }) => {
   const [isDragging, setIsDragging] = useState(false);
@@ -45,7 +47,7 @@ export const MapBox: React.FC<MapBoxProps> = ({
   const rotateStartAngle = useRef<number | null>(null); // Initial mouse angle when rotation starts
   const rotateStartRotation = useRef<number>(0); // Shape's rotation when drag started
 
-  const counterScale = 100 / mapScale;
+  const counterScale = 100 / mapScale * (100 / mapBaseScale);
 
   // Hide controls when clicking outside the shape
   useEffect(() => {

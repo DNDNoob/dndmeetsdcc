@@ -9,6 +9,7 @@ interface FogOfWarProps {
   onDrawingEnd?: () => void; // Called when fog drawing ends for final sync
   isViewerAdmin?: boolean; // True if the viewer is admin (for semi-transparent fog)
   isPaintMode?: boolean; // True when painting fog back (visual distinction)
+  mapBaseScale?: number; // Episode base scale for counter-scaling brush size
 }
 
 const FogOfWarComponent: React.FC<FogOfWarProps> = ({
@@ -20,6 +21,7 @@ const FogOfWarComponent: React.FC<FogOfWarProps> = ({
   onDrawingEnd,
   isViewerAdmin = false,
   isPaintMode = false,
+  mapBaseScale = 100,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -191,8 +193,8 @@ const FogOfWarComponent: React.FC<FogOfWarProps> = ({
           style={{
             left: `${cursorPos.x}%`,
             top: `${cursorPos.y}%`,
-            width: `${brushSize * 4}vmin`,
-            height: `${brushSize * 4}vmin`,
+            width: `${brushSize * 4 * (100 / mapBaseScale)}vmin`,
+            height: `${brushSize * 4 * (100 / mapBaseScale)}vmin`,
             transform: 'translate(-50%, -50%)',
             boxShadow: isPaintMode ? '0 0 10px rgba(255, 165, 0, 0.3)' : '0 0 10px rgba(255, 255, 255, 0.3)',
           }}

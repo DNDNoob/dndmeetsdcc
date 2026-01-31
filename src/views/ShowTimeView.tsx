@@ -37,7 +37,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   const [displayedMobIds, setDisplayedMobIds] = useState<string[]>([]);
   const [selectedMap, setSelectedMap] = useState<string | null>(null);
   const [showGrid, setShowGrid] = useState(false);
-  const [gridSize, setGridSize] = useState(51); // Reduced by 20% from 64px
+  const [gridSize, setGridSize] = useState(64); // Match mob icon size (64px)
   const [draggingMobId, setDraggingMobId] = useState<string | null>(null);
   const draggingMobIdRef = useRef<string | null>(null); // Ref for use in listeners to avoid re-subscription
   const [remoteDragState, setRemoteDragState] = useState<{placementIndex: number; x: number; y: number} | null>(null);
@@ -1654,7 +1654,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
           />
 
           {/* Grid overlay - only visible to DM */}
-          {isAdmin && <GridOverlay isVisible={showGrid} cellSize={gridSize} opacity={0.3} />}
+          {isAdmin && <GridOverlay isVisible={showGrid} cellSize={gridSize * iconCounterScale} opacity={0.3} />}
 
           {/* Displayed mobs on the map - filtered by current map */}
           {currentMapMobPlacements.map((placement, localIndex) => {
@@ -1851,6 +1851,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
               onDelete={handleDeleteBox}
               onManipulationEnd={handleBoxManipulationEnd}
               mapScale={mapScale}
+              mapBaseScale={mapBaseScale}
               canInteract={isPointVisible(box.x, box.y)}
             />
           ))}
@@ -1865,6 +1866,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             onDrawingEnd={handleFogDrawingEnd}
             isViewerAdmin={isAdmin}
             isPaintMode={fogPaintActive}
+            mapBaseScale={mapBaseScale}
           />
 
           {/* Ping effects - on top of everything */}
