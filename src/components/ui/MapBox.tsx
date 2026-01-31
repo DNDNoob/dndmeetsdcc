@@ -176,7 +176,8 @@ export const MapBox: React.FC<MapBoxProps> = ({
           style={{
             backgroundColor: box.color,
             opacity: box.opacity,
-            borderColor: 'rgba(0,0,0,0.7)',
+            borderColor: '#000000',
+            borderWidth: '1px',
           }}
           onMouseDown={(e) => {
             e.preventDefault();
@@ -192,7 +193,8 @@ export const MapBox: React.FC<MapBoxProps> = ({
           style={{
             backgroundColor: box.color,
             opacity: box.opacity,
-            borderColor: 'rgba(0,0,0,0.7)',
+            borderColor: '#000000',
+            borderWidth: '1px',
           }}
           onMouseDown={(e) => {
             e.preventDefault();
@@ -208,7 +210,8 @@ export const MapBox: React.FC<MapBoxProps> = ({
           style={{
             backgroundColor: box.color,
             opacity: box.opacity,
-            borderColor: 'rgba(0,0,0,0.7)',
+            borderColor: '#000000',
+            borderWidth: '1px',
           }}
           onMouseDown={(e) => {
             e.preventDefault();
@@ -220,22 +223,26 @@ export const MapBox: React.FC<MapBoxProps> = ({
       {box.shape === "triangle" && (
         <div
           ref={boxRef}
-          className="w-full h-full cursor-move relative"
+          className="w-full h-full relative"
           style={{
             opacity: box.opacity,
-          }}
-          onMouseDown={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setIsDragging(true);
+            pointerEvents: 'none',
           }}
         >
           <svg viewBox="0 0 100 100" className="w-full h-full" preserveAspectRatio="none">
             <polygon
               points="50,5 95,95 5,95"
               fill={box.color}
-              stroke="rgba(0,0,0,0.7)"
-              strokeWidth="2"
+              stroke="#000000"
+              strokeWidth="1"
+              className="cursor-move"
+              style={{ pointerEvents: 'auto' }}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsDragging(true);
+              }}
+              onClick={(e) => { e.stopPropagation(); if (canInteract) setShowControls(true); }}
             />
           </svg>
         </div>
@@ -248,10 +255,14 @@ export const MapBox: React.FC<MapBoxProps> = ({
           animate={{ opacity: 1 }}
           className="absolute inset-0 pointer-events-none"
         >
-          {/* Delete button - top right */}
+          {/* Delete button - top point for triangle, top right for others */}
           <button
             className="absolute bg-destructive text-white rounded-full flex items-center justify-center hover:bg-destructive/80 transition-colors pointer-events-auto z-10"
-            style={{
+            style={box.shape === "triangle" ? {
+              top: 0, left: '50%',
+              width: `${24 * counterScale}px`, height: `${24 * counterScale}px`,
+              transform: 'translate(-50%, -50%)',
+            } : {
               top: 0, right: 0,
               width: `${24 * counterScale}px`, height: `${24 * counterScale}px`,
               transform: 'translate(50%, -50%)',
@@ -281,8 +292,8 @@ export const MapBox: React.FC<MapBoxProps> = ({
             <Maximize2 style={{ width: `${12 * counterScale}px`, height: `${12 * counterScale}px` }} />
           </div>
 
-          {/* Rotate handle - bottom left */}
-          <div
+          {/* Rotate handle - bottom left (hidden for circles) */}
+          {box.shape !== "circle" && <div
             className="absolute bg-secondary text-white rounded-full flex items-center justify-center cursor-grab pointer-events-auto"
             style={{
               bottom: 0, left: 0,
@@ -296,7 +307,7 @@ export const MapBox: React.FC<MapBoxProps> = ({
             }}
           >
             <RotateCw style={{ width: `${12 * counterScale}px`, height: `${12 * counterScale}px` }} />
-          </div>
+          </div>}
         </motion.div>
       )}
     </div>

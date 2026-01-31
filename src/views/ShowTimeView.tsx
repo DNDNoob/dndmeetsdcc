@@ -593,6 +593,9 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   const handleToggleFogOfWar = useCallback(() => {
     const newEnabled = !fogOfWarEnabled;
     setFogOfWarEnabled(newEnabled);
+    // Reset brush modes when toggling fog so paint/eraser don't auto-activate
+    setFogPaintActive(false);
+    setFogEraserActive(false);
     broadcastFogState(newEnabled, revealedAreas, mapScale);
   }, [fogOfWarEnabled, revealedAreas, mapScale, broadcastFogState]);
 
