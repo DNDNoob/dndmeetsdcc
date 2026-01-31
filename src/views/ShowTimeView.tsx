@@ -202,6 +202,9 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     return selectedEpisode.mapSettings?.[currentMapId]?.scale ?? 100;
   }, [selectedEpisode, currentMapId]);
 
+  // Counter-scale for icons/shapes inside the mapBaseScale wrapper
+  const iconCounterScale = 100 / mapBaseScale;
+
   // Fixed zoom limits - 1% minimum so users can always zoom out on any scale
   const zoomMin = 1;
   const zoomMax = 500;
@@ -1628,19 +1631,24 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
           onMouseUp={handleMouseUp}
           onClick={handleMapClick}
         >
+          {/* Inner wrapper scales the map AND all overlays together via mapBaseScale.
+              The img determines the layout size at 80vh, then transform scales everything uniformly.
+              Icons counter-scale to stay physically the same size. */}
+          <div
+            className="relative"
+            style={{
+              transform: `scale(${mapBaseScale / 100})`,
+              transformOrigin: 'center center',
+            }}
+          >
           <img
             ref={mapImageRef}
             src={selectedMap}
             alt="Current Map"
             className="object-contain pointer-events-none border-2 border-primary shadow-[0_0_15px_rgba(0,200,255,0.5)]"
             style={{
-              // Fixed base size at 80vh with auto width to preserve aspect ratio.
-              // CSS transform handles scaling so the browser always computes width from 80vh,
-              // avoiding issues where very large vh values break auto width calculation.
               height: '80vh',
               width: 'auto',
-              transform: `scale(${mapBaseScale / 100})`,
-              transformOrigin: 'center center',
             }}
             draggable={false}
           />
@@ -1678,7 +1686,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                 style={{
                   left: `${displayX}%`,
                   top: `${displayY}%`,
-                  transform: 'translate(-50%, -50%)',
+                  transform: `translate(-50%, -50%) scale(${iconCounterScale})`,
                   pointerEvents: canInteract ? 'auto' : 'none',
                   opacity: canInteract ? 1 : 0.5,
                   // Smooth transition for remote updates, instant for local drag
@@ -1730,7 +1738,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                 style={{
                   left: `${placement.x}%`,
                   top: `${placement.y}%`,
-                  transform: 'translate(-50%, -50%)',
+                  transform: `translate(-50%, -50%) scale(${iconCounterScale})`,
                   pointerEvents: canInteract ? 'auto' : 'none',
                   // Smooth transition for remote updates, instant for local drag
                   transition: isDragging ? 'none' : 'left 0.15s ease-out, top 0.15s ease-out',
@@ -1794,7 +1802,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                 style={{
                   left: `${placement.x}%`,
                   top: `${placement.y}%`,
-                  transform: 'translate(-50%, -50%)',
+                  transform: `translate(-50%, -50%) scale(${iconCounterScale})`,
                   pointerEvents: canInteract ? 'auto' : 'none',
                   // Smooth transition for remote updates, instant for local drag
                   transition: isDragging ? 'none' : 'left 0.15s ease-out, top 0.15s ease-out',
@@ -1861,6 +1869,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
           {/* Ping effects - on top of everything */}
           <PingEffect pings={pings} />
+        </div>{/* end mapBaseScale wrapper */}
         </div>
       </div>
 
