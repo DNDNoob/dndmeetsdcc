@@ -126,8 +126,7 @@ const FogOfWarComponent: React.FC<FogOfWarProps> = ({
         r={`${area.radius}%`}
         fill="black"
         style={{
-          // Smooth transition for radius changes (consolidation) - instant for new circles
-          transition: 'r 0.15s ease-out',
+          transition: 'none',
         }}
       />
     )), [revealedAreas]);

@@ -58,7 +58,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   const lastFogBroadcastTime = useRef<number>(0);
   const FOG_BROADCAST_THROTTLE_MS = 50; // Faster fog sync for better real-time experience
   const pendingFogBroadcast = useRef<{ x: number; y: number; radius: number }[] | null>(null);
-  const CONSOLIDATION_THRESHOLD = 300; // Consolidate when array exceeds this size
+  const CONSOLIDATION_THRESHOLD = 1000; // Only consolidate when array gets very large
 
   // Ping and Box state
   const [pings, setPings] = useState<Ping[]>([]);
@@ -535,12 +535,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       }
 
       // Add new circle
-      let newAreas = [...prev, { x, y, radius }];
-
-      // Consolidate if array is getting too large (preserves coverage, reduces size)
-      if (newAreas.length > CONSOLIDATION_THRESHOLD) {
-        newAreas = consolidateFogCircles(newAreas);
-      }
+      const newAreas = [...prev, { x, y, radius }];
 
       // Track pending broadcast for final sync
       pendingFogBroadcast.current = newAreas;
@@ -585,11 +580,14 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
   // Handle fog drawing end - ensure final state is broadcast
   const handleFogDrawingEnd = useCallback(() => {
-    if (pendingFogBroadcast.current) {
-      broadcastFogState(fogOfWarEnabled, pendingFogBroadcast.current, mapScale);
+    // Consolidate on drawing end (not during) to avoid visible jumps
+    setRevealedAreas(prev => {
+      const areas = prev.length > CONSOLIDATION_THRESHOLD ? consolidateFogCircles(prev) : prev;
+      broadcastFogState(fogOfWarEnabled, areas, mapScale);
       pendingFogBroadcast.current = null;
-    }
-  }, [fogOfWarEnabled, mapScale, broadcastFogState]);
+      return areas;
+    });
+  }, [fogOfWarEnabled, mapScale, broadcastFogState, consolidateFogCircles]);
 
   // Toggle fog of war
   const handleToggleFogOfWar = useCallback(() => {
