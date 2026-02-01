@@ -61,6 +61,7 @@ const Index = () => {
     deleteEpisode,
     partyGold,
     addDiceRoll,
+    diceRolls,
     isLoaded
   } = useGameState();
 
@@ -324,7 +325,7 @@ const Index = () => {
             )}
           </main>
 
-          <DiceRoller crawlerName={currentPlayer.name} crawlerId={currentPlayer.id} />
+          <DiceRoller crawlerName={currentPlayer.name} crawlerId={currentPlayer.id} diceRolls={diceRolls} addDiceRoll={addDiceRoll} />
 
           <ChangelogViewer
             isOpen={showChangelog}

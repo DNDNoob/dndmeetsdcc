@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DungeonButton } from "./ui/DungeonButton";
 import { Dices, ChevronUp, ChevronDown, Plus, X } from "lucide-react";
-import { useGameState, DiceRollEntry } from "@/hooks/useGameState";
+import { DiceRollEntry } from "@/hooks/useGameState";
 
 const diceTypes = [
   { sides: 4, label: "D4" },
@@ -20,8 +20,14 @@ interface QueuedDice {
   label: string;
 }
 
-const DiceRoller: React.FC<{ crawlerName?: string; crawlerId?: string }> = ({ crawlerName = "Unknown", crawlerId = "" }) => {
-  const { diceRolls, addDiceRoll } = useGameState();
+interface DiceRollerProps {
+  crawlerName?: string;
+  crawlerId?: string;
+  diceRolls: DiceRollEntry[];
+  addDiceRoll: (entry: DiceRollEntry) => Promise<void>;
+}
+
+const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawlerId = "", diceRolls, addDiceRoll }) => {
 
   const [isExpanded, setIsExpanded] = useState(false);
   const [currentRoll, setCurrentRoll] = useState<{ dice: string; result: number; timestamp: number } | null>(null);
@@ -29,6 +35,8 @@ const DiceRoller: React.FC<{ crawlerName?: string; crawlerId?: string }> = ({ cr
   const [diceQueue, setDiceQueue] = useState<QueuedDice[]>([]);
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const lastSeenRollId = useRef<string | null>(null);
+  const addDiceRollRef = useRef(addDiceRoll);
+  addDiceRollRef.current = addDiceRoll;
 
   // Watch for new rolls (including remote) and show animation
   useEffect(() => {
@@ -99,7 +107,7 @@ const DiceRoller: React.FC<{ crawlerName?: string; crawlerId?: string }> = ({ cr
           };
 
           lastSeenRollId.current = entry.id;
-          addDiceRoll(entry);
+          addDiceRollRef.current(entry);
         }
 
         setIsRolling(false);
