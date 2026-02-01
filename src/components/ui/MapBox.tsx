@@ -26,6 +26,7 @@ interface MapBoxProps {
   mapScale: number;
   mapBaseScale?: number;
   canInteract?: boolean; // Whether the box can be interacted with (visibility check)
+  placementMode?: boolean; // When true, clicks pass through to allow placing new effects
 }
 
 export const MapBox: React.FC<MapBoxProps> = ({
@@ -37,6 +38,7 @@ export const MapBox: React.FC<MapBoxProps> = ({
   mapScale,
   mapBaseScale = 100,
   canInteract = true,
+  placementMode = false,
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
@@ -53,13 +55,26 @@ export const MapBox: React.FC<MapBoxProps> = ({
   useEffect(() => {
     if (!showControls) return;
     const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      if (!containerRef.current) return;
+      const target = e.target as HTMLElement;
+      // Click is fully outside the container
+      if (!containerRef.current.contains(target)) {
         setShowControls(false);
+        return;
+      }
+      // For triangles, also dismiss if clicking in the empty space around the polygon
+      // (inside bounding box but not on the polygon or a control button)
+      if (box.shape === "triangle") {
+        const isOnControl = target.closest('button') || target.closest('[class*="cursor-"]');
+        const isOnPolygon = target.tagName === 'polygon';
+        if (!isOnControl && !isOnPolygon) {
+          setShowControls(false);
+        }
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showControls]);
+  }, [showControls, box.shape]);
 
   useEffect(() => {
     if (!isDragging && !isResizing && !isRotating) return;
@@ -67,8 +82,8 @@ export const MapBox: React.FC<MapBoxProps> = ({
     const handleMouseMove = (e: MouseEvent) => {
       if (!containerRef.current) return;
 
-      // Get the map container (parent of this component)
-      const mapContainer = containerRef.current.closest('[data-map-container]');
+      // Get the map scale wrapper (inner container where shapes are positioned)
+      const mapContainer = containerRef.current.closest('[data-map-scale-wrapper]') || containerRef.current.closest('[data-map-container]');
       if (!mapContainer) return;
 
       const rect = mapContainer.getBoundingClientRect();
@@ -161,7 +176,7 @@ export const MapBox: React.FC<MapBoxProps> = ({
         // Use vmin for square/circle to maintain aspect ratio, percentages for rectangle/triangle
         width: isSquareOrCircle ? `${box.width * 2}vmin` : `${box.width}%`,
         height: isSquareOrCircle ? `${box.width * 2}vmin` : `${box.height}%`,
-        pointerEvents: canInteract ? "auto" : "none",
+        pointerEvents: (placementMode || !canInteract) ? "none" : "auto",
         opacity: canInteract ? 1 : 0.5,
         // Smooth transition for remote updates, instant for local manipulation
         transition: isManipulating ? 'none' : 'left 0.15s ease-out, top 0.15s ease-out, width 0.15s ease-out, height 0.15s ease-out, transform 0.15s ease-out',

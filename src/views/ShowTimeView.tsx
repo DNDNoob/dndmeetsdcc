@@ -1637,6 +1637,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
               Icons counter-scale to stay physically the same size. */}
           <div
             className="relative"
+            data-map-scale-wrapper
             style={{
               transform: `scale(${mapBaseScale / 100})`,
               transformOrigin: 'center center',
@@ -1854,6 +1855,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
               mapScale={mapScale}
               mapBaseScale={mapBaseScale}
               canInteract={isPointVisible(box.x, box.y)}
+              placementMode={isBoxMode || isPingMode || isAddCrawlerMode || isAddMobMode}
             />
           ))}
 
