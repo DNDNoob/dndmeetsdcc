@@ -116,8 +116,16 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
     }, 50);
   };
 
+  // Auto-scroll roll history to bottom when new rolls arrive
+  const rollHistoryRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (rollHistoryRef.current) {
+      rollHistoryRef.current.scrollTop = rollHistoryRef.current.scrollHeight;
+    }
+  }, [diceRolls.length]);
+
   return (
-    <div className="fixed bottom-14 right-4 z-50">
+    <div className="fixed bottom-14 right-4 z-[100]">
       <AnimatePresence>
         {isExpanded && (
           <motion.div
@@ -135,8 +143,8 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
               {diceRolls.length > 0 && (
                 <div className="border-b border-border pb-3 mb-3">
                   <span className="text-muted-foreground text-xs mb-2 block font-display">ROLL HISTORY:</span>
-                  <div className="space-y-2 max-h-[40vh] overflow-y-auto pr-2">
-                    {diceRolls.map((entry) => (
+                  <div ref={rollHistoryRef} className="space-y-2 max-h-[40vh] overflow-y-auto pr-2">
+                    {[...diceRolls].reverse().map((entry) => (
                       <div key={entry.id} className="bg-muted/50 px-2 py-2 text-xs text-muted-foreground rounded">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2 flex-wrap">
