@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
-import { Crawler, InventoryItem, EquipmentSlot as SlotType } from "@/lib/gameData";
+import { Crawler, InventoryItem, EquipmentSlot as SlotType, StatModifiers } from "@/lib/gameData";
 import { Coins, Package, Sword, Shield, Plus, Trash2, Edit2, Save, HardHat } from "lucide-react";
 import { useDebouncedCallback } from "@/hooks/useDebounce";
 
@@ -22,12 +22,13 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   onUpdateCrawler,
 }) => {
   const [editMode, setEditMode] = useState(false);
-  const [newItem, setNewItem] = useState<{ crawlerId: string; name: string; description: string; equipSlot?: SlotType; goldValue?: number }>({
+  const [newItem, setNewItem] = useState<{ crawlerId: string; name: string; description: string; equipSlot?: SlotType; goldValue?: number; statModifiers?: StatModifiers }>({
     crawlerId: "",
     name: "",
     description: "",
     equipSlot: undefined,
     goldValue: undefined,
+    statModifiers: undefined,
   });
 
   // Local gold state for immediate UI updates (avoids lag while typing)
@@ -53,15 +54,19 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   const handleAddItem = (crawlerId: string) => {
     if (!newItem.name.trim()) return;
     const items = getCrawlerInventory(crawlerId);
+    const mods = newItem.statModifiers
+      ? Object.fromEntries(Object.entries(newItem.statModifiers).filter(([, v]) => v !== 0 && v !== undefined))
+      : undefined;
     const item: InventoryItem = {
       id: crypto.randomUUID(),
       name: newItem.name,
       description: newItem.description,
       equipSlot: newItem.equipSlot,
       goldValue: newItem.goldValue,
+      ...(mods && Object.keys(mods).length > 0 ? { statModifiers: mods } : {}),
     };
     onUpdateInventory(crawlerId, [...items, item]);
-    setNewItem({ crawlerId: "", name: "", description: "", equipSlot: undefined, goldValue: undefined });
+    setNewItem({ crawlerId: "", name: "", description: "", equipSlot: undefined, goldValue: undefined, statModifiers: undefined });
   };
 
   const handleRemoveItem = (crawlerId: string, itemId: string) => {
@@ -274,6 +279,31 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                       >
                         <Plus className="w-4 h-4" />
                       </DungeonButton>
+                    </div>
+                    {/* Stat Modifiers */}
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Stat Modifiers (when equipped)</p>
+                      <div className="grid grid-cols-3 gap-1">
+                        {(['str', 'dex', 'con', 'int', 'cha', 'hp', 'maxHP', 'mana', 'maxMana'] as const).map((stat) => (
+                          <div key={stat} className="flex items-center gap-1">
+                            <label className="text-xs text-muted-foreground w-12 uppercase">{stat}</label>
+                            <input
+                              type="number"
+                              value={(newItem.crawlerId === crawler.id && newItem.statModifiers?.[stat]) ?? ""}
+                              onChange={(e) => setNewItem({
+                                ...newItem,
+                                crawlerId: crawler.id,
+                                statModifiers: {
+                                  ...newItem.statModifiers,
+                                  [stat]: e.target.value ? parseInt(e.target.value) : undefined,
+                                },
+                              })}
+                              placeholder="0"
+                              className="w-14 bg-muted border border-border px-1 py-0.5 text-xs text-center"
+                            />
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}

@@ -4,7 +4,7 @@ import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import { HealthBar } from "@/components/ui/HealthBar";
 import { EquipmentSlot } from "@/components/ui/EquipmentSlot";
-import { Crawler, InventoryItem, createEmptyCrawler, EquipmentSlot as SlotType } from "@/lib/gameData";
+import { Crawler, InventoryItem, createEmptyCrawler, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers } from "@/lib/gameData";
 import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Edit2, Backpack, HardHat, Package } from "lucide-react";
 
 interface ProfilesViewProps {
@@ -223,18 +223,30 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
     if (!selected) return;
 
     if (isAddingItem) {
+      // Strip zero-value modifiers
+      const mods = itemFormData.statModifiers
+        ? Object.fromEntries(Object.entries(itemFormData.statModifiers).filter(([, v]) => v !== 0 && v !== undefined))
+        : undefined;
       const newItem: InventoryItem = {
         id: crypto.randomUUID(),
         name: itemFormData.name || "New Item",
         description: itemFormData.description || "",
         equipSlot: itemFormData.equipSlot,
         goldValue: itemFormData.goldValue,
+        ...(mods && Object.keys(mods).length > 0 ? { statModifiers: mods } : {}),
       };
       onUpdateCrawlerInventory(selected.id, [...inventory, newItem]);
     } else if (editingItemId) {
+      const editMods = itemFormData.statModifiers
+        ? Object.fromEntries(Object.entries(itemFormData.statModifiers).filter(([, v]) => v !== 0 && v !== undefined))
+        : undefined;
+      const cleanedFormData = {
+        ...itemFormData,
+        statModifiers: editMods && Object.keys(editMods).length > 0 ? editMods : undefined,
+      };
       const updatedInventory = inventory.map((item) =>
         item.id === editingItemId
-          ? { ...item, ...itemFormData }
+          ? { ...item, ...cleanedFormData }
           : item
       );
       onUpdateCrawlerInventory(selected.id, updatedInventory);
@@ -562,6 +574,9 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
         </div>
 
         {/* Stats and Achievements row */}
+        {(() => {
+          const equippedMods = getEquippedModifiers(selected, inventory);
+          return (
         <div className="grid md:grid-cols-2 gap-8 mb-8">
           <div>
             <h3 className="font-display text-primary text-xl mb-4 flex items-center gap-2">
@@ -574,7 +589,10 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 { key: "con", label: "CON", icon: Heart },
                 { key: "int", label: "INT", icon: Brain },
                 { key: "cha", label: "CHA", icon: Sparkles },
-              ].map(({ key, label }) => (
+              ].map(({ key, label }) => {
+                const base = (selected as any)[key] as number;
+                const mod = equippedMods[key as keyof StatModifiers] ?? 0;
+                return (
                 <div key={key} className="flex items-center justify-between bg-muted/50 px-4 py-3 rounded">
                   <span className="text-muted-foreground text-base">{label}</span>
                   {editMode ? (
@@ -586,11 +604,20 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                       }
                       className="bg-transparent border-b border-primary w-14 text-right text-lg"
                     />
+                  ) : mod !== 0 ? (
+                    <span className="font-bold text-lg">
+                      <span className="text-foreground">{base}</span>
+                      <span className={mod > 0 ? "text-green-400" : "text-red-400"}>
+                        {mod > 0 ? ` +${mod}` : ` ${mod}`}
+                      </span>
+                      <span className="text-orange-400"> = {base + mod}</span>
+                    </span>
                   ) : (
-                    <span className="text-foreground font-bold text-lg">{(selected as any)[key]}</span>
+                    <span className="text-foreground font-bold text-lg">{base}</span>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -612,6 +639,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             )}
           </div>
         </div>
+          );
+        })()}
 
         {/* Inventory section - full width */}
         <div>
@@ -674,6 +703,30 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                       onChange={(e) => setItemFormData({ ...itemFormData, goldValue: e.target.value ? parseInt(e.target.value) : undefined })}
                       className="w-24 bg-muted border border-border px-3 py-2 text-sm rounded"
                     />
+                  </div>
+                </div>
+                {/* Stat Modifiers */}
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">Stat Modifiers (when equipped)</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['str', 'dex', 'con', 'int', 'cha', 'hp', 'maxHP', 'mana', 'maxMana'] as const).map((stat) => (
+                      <div key={stat} className="flex items-center gap-1">
+                        <label className="text-xs text-muted-foreground w-12 uppercase">{stat}</label>
+                        <input
+                          type="number"
+                          value={itemFormData.statModifiers?.[stat] ?? ""}
+                          onChange={(e) => setItemFormData({
+                            ...itemFormData,
+                            statModifiers: {
+                              ...itemFormData.statModifiers,
+                              [stat]: e.target.value ? parseInt(e.target.value) : undefined,
+                            },
+                          })}
+                          placeholder="0"
+                          className="w-16 bg-muted border border-border px-2 py-1 text-xs rounded text-center"
+                        />
+                      </div>
+                    ))}
                   </div>
                 </div>
                 <div className="flex gap-3 mt-2">

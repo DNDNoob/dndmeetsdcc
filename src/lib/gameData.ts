@@ -32,6 +32,8 @@ export interface Crawler {
   equippedItems?: EquippedItems;
 }
 
+export type StatModifiers = Partial<Record<'str' | 'dex' | 'con' | 'int' | 'cha' | 'hp' | 'maxHP' | 'mana' | 'maxMana', number>>;
+
 export interface InventoryItem {
   id: string;
   name: string;
@@ -39,6 +41,21 @@ export interface InventoryItem {
   equipSlot?: EquipmentSlot; // Which slot this item can be equipped to
   goldValue?: number; // Value of the item in gold
   equipped?: boolean; // Deprecated - use equippedItems in Crawler instead
+  statModifiers?: StatModifiers; // Stat adjustments when equipped
+}
+
+// Compute total stat modifiers from all equipped items on a crawler
+export function getEquippedModifiers(crawler: Crawler, inventory: InventoryItem[]): StatModifiers {
+  const equipped = crawler.equippedItems ?? {};
+  const totals: StatModifiers = {};
+  for (const itemId of Object.values(equipped)) {
+    const item = inventory.find(i => i.id === itemId);
+    if (!item?.statModifiers) continue;
+    for (const [stat, val] of Object.entries(item.statModifiers)) {
+      totals[stat as keyof StatModifiers] = (totals[stat as keyof StatModifiers] ?? 0) + (val as number);
+    }
+  }
+  return totals;
 }
 
 export interface Mob {
