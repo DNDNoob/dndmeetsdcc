@@ -15,6 +15,7 @@ interface ProfilesViewProps {
   getCrawlerInventory: (crawlerId: string) => InventoryItem[];
   onUpdateCrawlerInventory: (crawlerId: string, items: InventoryItem[]) => void;
   partyGold: number;
+  onStatRoll?: (crawlerName: string, crawlerId: string, stat: string, totalStat: number) => void;
 }
 
 const ProfilesView: React.FC<ProfilesViewProps> = ({
@@ -25,6 +26,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   getCrawlerInventory,
   onUpdateCrawlerInventory,
   partyGold,
+  onStatRoll,
 }) => {
   const [selectedId, setSelectedId] = useState(crawlers[0]?.id || "");
   const [editMode, setEditMode] = useState(false);
@@ -621,10 +623,9 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
               ].map(({ key, label }) => {
                 const base = (selected as any)[key] as number;
                 const mod = equippedMods[key as keyof StatModifiers] ?? 0;
-                return (
-                <div key={key} className="flex items-center justify-between bg-muted/50 px-4 py-3 rounded">
-                  <span className="text-muted-foreground text-base">{label}</span>
-                  {editMode ? (
+                return editMode ? (
+                  <div key={key} className="flex items-center justify-between bg-muted/50 px-4 py-3 rounded">
+                    <span className="text-muted-foreground text-base">{label}</span>
                     <input
                       type="number"
                       value={(editData as any)[key] ?? (selected as any)[key]}
@@ -633,18 +634,27 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                       }
                       className="bg-transparent border-b border-primary w-14 text-right text-lg"
                     />
-                  ) : mod !== 0 ? (
-                    <span className="font-bold text-lg">
-                      <span className="text-foreground">{base}</span>
-                      <span className={mod > 0 ? "text-green-400" : "text-red-400"}>
-                        {mod > 0 ? ` +${mod}` : ` ${mod}`}
+                  </div>
+                ) : (
+                  <button
+                    key={key}
+                    onClick={() => onStatRoll?.(selected.name, selected.id, label, base + mod)}
+                    className="flex items-center justify-between bg-muted/50 px-4 py-3 rounded hover:bg-primary/20 transition-colors cursor-pointer group text-left w-full"
+                    title={`Roll d20 + ${label} modifier`}
+                  >
+                    <span className="text-muted-foreground text-base group-hover:text-primary transition-colors">{label}</span>
+                    {mod !== 0 ? (
+                      <span className="font-bold text-lg">
+                        <span className="text-foreground">{base}</span>
+                        <span className={mod > 0 ? "text-green-400" : "text-red-400"}>
+                          {mod > 0 ? ` +${mod}` : ` ${mod}`}
+                        </span>
+                        <span className="text-orange-400"> = {base + mod}</span>
                       </span>
-                      <span className="text-orange-400"> = {base + mod}</span>
-                    </span>
-                  ) : (
-                    <span className="text-foreground font-bold text-lg">{base}</span>
-                  )}
-                </div>
+                    ) : (
+                      <span className="text-foreground font-bold text-lg">{base}</span>
+                    )}
+                  </button>
                 );
               })}
             </div>

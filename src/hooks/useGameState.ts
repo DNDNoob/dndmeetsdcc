@@ -11,6 +11,16 @@ import {
 import { useGame } from "@/contexts/GameContext";
 import type { BatchOperation } from "@/hooks/useFirebaseStore";
 
+export interface DiceRollEntry {
+  id: string;
+  crawlerName: string;
+  crawlerId: string;
+  timestamp: number;
+  results: { dice: string; result: number }[];
+  total: number;
+  statRoll?: { stat: string; modifier: number; rawRoll: number };
+}
+
 interface InventoryEntry {
   id?: string;
   crawlerId: string;
@@ -362,6 +372,37 @@ export const useGameState = () => {
     deleteItem('episodes', id);
   };
 
+  // --- Dice Rolls ---
+  const diceRolls = useMemo(() => {
+    const stored = getStableCollection<DiceRollEntry>('diceRolls');
+    return [...stored].sort((a, b) => b.timestamp - a.timestamp);
+  }, [getCollection, isLoaded]);
+
+  const addDiceRoll = async (entry: DiceRollEntry) => {
+    await addItem('diceRolls', stripUndefinedDeep(entry) as Record<string, unknown>);
+    const all = getCollection('diceRolls') as DiceRollEntry[];
+    if (all.length > 500) {
+      const sorted = [...all].sort((a, b) => a.timestamp - b.timestamp);
+      const toDelete = sorted.slice(0, all.length - 500);
+      const ops: BatchOperation[] = toDelete.map(r => ({
+        type: 'delete' as const,
+        collection: 'diceRolls' as const,
+        id: r.id,
+      }));
+      await batchWrite(ops);
+    }
+  };
+
+  const clearDiceRolls = async () => {
+    const all = getCollection('diceRolls') as DiceRollEntry[];
+    const ops: BatchOperation[] = all.map(r => ({
+      type: 'delete' as const,
+      collection: 'diceRolls' as const,
+      id: r.id,
+    }));
+    if (ops.length > 0) await batchWrite(ops);
+  };
+
   return {
     crawlers,
     setCrawlers,
@@ -383,6 +424,9 @@ export const useGameState = () => {
     updateEpisode,
     deleteEpisode,
     partyGold,
+    diceRolls,
+    addDiceRoll,
+    clearDiceRolls,
     isLoaded,
   };
 };

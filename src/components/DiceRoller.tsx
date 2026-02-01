@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DungeonButton } from "./ui/DungeonButton";
 import { Dices, ChevronUp, ChevronDown, Plus, X } from "lucide-react";
+import { useGameState, DiceRollEntry } from "@/hooks/useGameState";
 
 const diceTypes = [
   { sides: 4, label: "D4" },
@@ -13,27 +14,37 @@ const diceTypes = [
   { sides: 100, label: "D100" },
 ];
 
-interface RollEntry {
-  id: string;
-  crawlerName: string;
-  timestamp: number;
-  results: { dice: string; result: number }[];
-  total: number;
-}
-
 interface QueuedDice {
   id: string;
   sides: number;
   label: string;
 }
 
-const DiceRoller: React.FC<{ crawlerName?: string }> = ({ crawlerName = "Unknown" }) => {
+const DiceRoller: React.FC<{ crawlerName?: string; crawlerId?: string }> = ({ crawlerName = "Unknown", crawlerId = "" }) => {
+  const { diceRolls, addDiceRoll } = useGameState();
+
   const [isExpanded, setIsExpanded] = useState(false);
-  const [rollHistory, setRollHistory] = useState<RollEntry[]>([]);
   const [currentRoll, setCurrentRoll] = useState<{ dice: string; result: number; timestamp: number } | null>(null);
   const [isRolling, setIsRolling] = useState(false);
   const [diceQueue, setDiceQueue] = useState<QueuedDice[]>([]);
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
+  const lastSeenRollId = useRef<string | null>(null);
+
+  // Watch for new rolls (including remote) and show animation
+  useEffect(() => {
+    if (diceRolls.length === 0) return;
+    const newest = diceRolls[0];
+    if (newest.id !== lastSeenRollId.current) {
+      lastSeenRollId.current = newest.id;
+      if (!isRolling && newest.results.length > 0) {
+        setCurrentRoll({
+          dice: newest.statRoll ? `D20` : newest.results[0].dice,
+          result: newest.statRoll ? newest.statRoll.rawRoll : newest.results[0].result,
+          timestamp: Date.now(),
+        });
+      }
+    }
+  }, [diceRolls, isRolling]);
 
   const addDiceToQueue = (sides: number, label: string) => {
     const newDice: QueuedDice = {
@@ -60,7 +71,6 @@ const DiceRoller: React.FC<{ crawlerName?: string }> = ({ crawlerName = "Unknown
         dice: dice.label,
         result: Math.floor(Math.random() * dice.sides) + 1,
         timestamp: Date.now(),
-        crawlerName,
       }));
 
       if (randomResults.length > 0) {
@@ -73,26 +83,23 @@ const DiceRoller: React.FC<{ crawlerName?: string }> = ({ crawlerName = "Unknown
 
         const finalResults = diceQueue.map((dice) => {
           const result = Math.floor(Math.random() * dice.sides) + 1;
-          return {
-            dice: dice.label,
-            result,
-          };
+          return { dice: dice.label, result };
         });
 
         if (finalResults.length > 0) {
-          // show first result prominently
           setCurrentRoll({ dice: finalResults[0].dice, result: finalResults[0].result, timestamp: Date.now() });
 
-          // Create grouped entry for this roll
-          const entry = {
-            id: Date.now().toString() + Math.random(),
+          const entry: DiceRollEntry = {
+            id: crypto.randomUUID(),
             crawlerName,
+            crawlerId,
             timestamp: Date.now(),
             results: finalResults,
             total: finalResults.reduce((s, r) => s + r.result, 0),
           };
 
-          setRollHistory((prev) => [entry, ...prev].slice(0, 50));
+          lastSeenRollId.current = entry.id;
+          addDiceRoll(entry);
         }
 
         setIsRolling(false);
@@ -100,8 +107,6 @@ const DiceRoller: React.FC<{ crawlerName?: string }> = ({ crawlerName = "Unknown
       }
     }, 50);
   };
-
-  const total = diceQueue.length > 0 ? diceQueue.reduce((sum, d) => sum + d.sides, 0) : 0;
 
   return (
     <div className="fixed bottom-14 right-4 z-50">
@@ -119,16 +124,22 @@ const DiceRoller: React.FC<{ crawlerName?: string }> = ({ crawlerName = "Unknown
               </h3>
 
               {/* Roll history (top) */}
-              {rollHistory.length > 0 && (
+              {diceRolls.length > 0 && (
                 <div className="border-b border-border pb-3 mb-3">
                   <span className="text-muted-foreground text-xs mb-2 block font-display">ROLL HISTORY:</span>
                   <div className="space-y-2 max-h-[40vh] overflow-y-auto pr-2">
-                    {rollHistory.map((entry) => (
+                    {diceRolls.map((entry) => (
                       <div key={entry.id} className="bg-muted/50 px-2 py-2 text-xs text-muted-foreground rounded">
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-display text-primary">{entry.crawlerName}</span>
-                            <span className="text-xs text-muted-foreground">{entry.results.map(r => r.dice).join(', ')} — Total: <span className="font-bold text-primary">{entry.total}</span></span>
+                            {entry.statRoll ? (
+                              <span className="text-xs">
+                                {entry.statRoll.stat} Check: d20({entry.statRoll.rawRoll}) {entry.statRoll.modifier >= 0 ? '+' : ''}{entry.statRoll.modifier} = <span className="font-bold text-primary">{entry.total}</span>
+                              </span>
+                            ) : (
+                              <span className="text-xs">{entry.results.map(r => r.dice).join(', ')} — Total: <span className="font-bold text-primary">{entry.total}</span></span>
+                            )}
                           </div>
                           <button
                             onClick={() => setExpandedIds((prev) => ({ ...prev, [entry.id]: !prev[entry.id] }))}
@@ -145,7 +156,26 @@ const DiceRoller: React.FC<{ crawlerName?: string }> = ({ crawlerName = "Unknown
                                 <div className="font-bold text-primary">{r.result}</div>
                               </div>
                             ))}
+                            {entry.statRoll && (
+                              <div className="flex items-center justify-between border-t border-border/50 mt-1 pt-1">
+                                <div>{entry.statRoll.stat} modifier</div>
+                                <div className="font-bold text-accent">{entry.statRoll.modifier >= 0 ? '+' : ''}{entry.statRoll.modifier}</div>
+                              </div>
+                            )}
                           </div>
+                        )}
+                        {/* Critical hit/fail for d20 rolls */}
+                        {entry.results.length === 1 && entry.results[0].dice === "D20" && entry.results[0].result === 20 && (
+                          <span className="text-accent text-xs font-display">CRITICAL HIT!</span>
+                        )}
+                        {entry.results.length === 1 && entry.results[0].dice === "D20" && entry.results[0].result === 1 && (
+                          <span className="text-destructive text-xs font-display">CRITICAL FAIL!</span>
+                        )}
+                        {entry.statRoll && entry.statRoll.rawRoll === 20 && (
+                          <span className="text-accent text-xs font-display">NAT 20!</span>
+                        )}
+                        {entry.statRoll && entry.statRoll.rawRoll === 1 && (
+                          <span className="text-destructive text-xs font-display">NAT 1!</span>
                         )}
                       </div>
                     ))}

@@ -12,6 +12,7 @@ export type CollectionName =
   | 'episodes'
   | 'soundEffects'
   | 'sound-broadcast'
+  | 'diceRolls'
   // Add new collections below:
   | 'quests'
   | 'npcs'

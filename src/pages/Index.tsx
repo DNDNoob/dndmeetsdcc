@@ -13,7 +13,7 @@ import DungeonAIView from "@/views/DungeonAIView";
 import ShowTimeView from "@/views/ShowTimeView";
 import SoundEffectsView from "@/views/SoundEffectsView";
 import { RoomManager } from "@/components/RoomManager";
-import { useGameState } from "@/hooks/useGameState";
+import { useGameState, DiceRollEntry } from "@/hooks/useGameState";
 
 type AppScreen = "splash" | "menu" | "game";
 type GameView = "profiles" | "maps" | "inventory" | "mobs" | "dungeonai" | "showtime" | "sounds" | "multiplayer";
@@ -60,6 +60,7 @@ const Index = () => {
     updateEpisode,
     deleteEpisode,
     partyGold,
+    addDiceRoll,
     isLoaded
   } = useGameState();
 
@@ -154,6 +155,22 @@ const Index = () => {
     setScreen("menu");
   };
 
+  const handleStatRoll = (crawlerName: string, crawlerId: string, stat: string, totalStat: number) => {
+    const modifier = Math.floor((totalStat - 10) / 2);
+    const rawRoll = Math.floor(Math.random() * 20) + 1;
+    const total = rawRoll + modifier;
+    const entry: DiceRollEntry = {
+      id: crypto.randomUUID(),
+      crawlerName,
+      crawlerId,
+      timestamp: Date.now(),
+      results: [{ dice: 'D20', result: rawRoll }],
+      total,
+      statRoll: { stat, modifier, rawRoll },
+    };
+    addDiceRoll(entry);
+  };
+
   const handleToggleMapVisibility = (index: number) => {
     setMapVisibility((prev) => {
       const newVisibility = [...prev];
@@ -243,6 +260,7 @@ const Index = () => {
                 getCrawlerInventory={getCrawlerInventory}
                 onUpdateCrawlerInventory={updateCrawlerInventory}
                 partyGold={partyGold}
+                onStatRoll={handleStatRoll}
               />
             )}
             {currentView === "maps" && (
@@ -306,7 +324,7 @@ const Index = () => {
             )}
           </main>
 
-          <DiceRoller crawlerName={currentPlayer.name} />
+          <DiceRoller crawlerName={currentPlayer.name} crawlerId={currentPlayer.id} />
 
           <ChangelogViewer
             isOpen={showChangelog}
