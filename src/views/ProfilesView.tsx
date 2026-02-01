@@ -273,12 +273,13 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
 
   const currentAvatar = editMode ? (editData.avatar ?? selected.avatar) : selected.avatar;
   const currentGold = editMode ? (editData.gold ?? selected.gold ?? 0) : (selected.gold ?? 0);
+  const equippedMods = getEquippedModifiers(selected, inventory);
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="max-w-4xl mx-auto p-4 md:p-6"
+      className="w-full max-w-full px-4 md:px-6 py-4"
     >
       {/* Header controls */}
       <div className="flex flex-wrap gap-4 mb-6 items-center justify-between">
@@ -379,21 +380,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
               />
             </div>
 
-            {/* Weapon slot (below right hand) */}
-            <div className="grid grid-cols-3 gap-2">
-              <div></div>
-              <div></div>
-              <EquipmentSlot
-                slot="weapon"
-                label="Weapon"
-                equippedItem={getEquippedItem('weapon')}
-                onDrop={handleEquipItem}
-                onUnequip={handleUnequipItem}
-                disabled={false}
-              />
-            </div>
-
-            {/* Ring and Legs (ring on left, legs center) */}
+            {/* Ring, Legs, Weapon */}
             <div className="grid grid-cols-3 gap-2">
               <EquipmentSlot
                 slot="ringFinger"
@@ -411,7 +398,14 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 onUnequip={handleUnequipItem}
                 disabled={false}
               />
-              <div></div>
+              <EquipmentSlot
+                slot="weapon"
+                label="Weapon"
+                equippedItem={getEquippedItem('weapon')}
+                onDrop={handleEquipItem}
+                onUnequip={handleUnequipItem}
+                disabled={false}
+              />
             </div>
 
             {/* Feet (center column) */}
@@ -520,11 +514,30 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
 
         {/* HP Bar */}
         <div className="mb-4">
-          <HealthBar
-            current={editMode ? (editData.hp ?? selected.hp) : selected.hp}
-            max={editMode ? (editData.maxHP ?? selected.maxHP) : selected.maxHP}
-            label={`HP: ${editMode ? (editData.hp ?? selected.hp) : selected.hp}/${editMode ? (editData.maxHP ?? selected.maxHP) : selected.maxHP}`}
-          />
+          {(() => {
+            const baseHP = editMode ? (editData.hp ?? selected.hp) : selected.hp;
+            const baseMaxHP = editMode ? (editData.maxHP ?? selected.maxHP) : selected.maxHP;
+            const hpMod = equippedMods.hp ?? 0;
+            const maxHPMod = equippedMods.maxHP ?? 0;
+            const effectiveHP = baseHP + hpMod;
+            const effectiveMaxHP = baseMaxHP + maxHPMod;
+            return (
+              <>
+                <HealthBar
+                  current={effectiveHP}
+                  max={effectiveMaxHP}
+                  label={`HP: ${effectiveHP}/${effectiveMaxHP}`}
+                />
+                {(hpMod !== 0 || maxHPMod !== 0) && (
+                  <div className="text-xs mt-1 ml-1">
+                    <span className="text-muted-foreground">Base: {baseHP}/{baseMaxHP}</span>
+                    {hpMod !== 0 && <span className={hpMod > 0 ? "text-green-400" : "text-red-400"}> (HP {hpMod > 0 ? `+${hpMod}` : hpMod})</span>}
+                    {maxHPMod !== 0 && <span className={maxHPMod > 0 ? "text-green-400" : "text-red-400"}> (MaxHP {maxHPMod > 0 ? `+${maxHPMod}` : maxHPMod})</span>}
+                  </div>
+                )}
+              </>
+            );
+          })()}
           {editMode && (
             <div className="flex gap-4 mt-2">
               <input
@@ -547,12 +560,31 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
 
         {/* Mana Bar */}
         <div className="mb-8">
-          <HealthBar
-            current={editMode ? (editData.mana ?? selected.mana) : selected.mana}
-            max={editMode ? (editData.maxMana ?? selected.maxMana) : selected.maxMana}
-            label={`Mana: ${editMode ? (editData.mana ?? selected.mana) : selected.mana}/${editMode ? (editData.maxMana ?? selected.maxMana) : selected.maxMana}`}
-            variant="mana"
-          />
+          {(() => {
+            const baseMana = editMode ? (editData.mana ?? selected.mana) : selected.mana;
+            const baseMaxMana = editMode ? (editData.maxMana ?? selected.maxMana) : selected.maxMana;
+            const manaMod = equippedMods.mana ?? 0;
+            const maxManaMod = equippedMods.maxMana ?? 0;
+            const effectiveMana = baseMana + manaMod;
+            const effectiveMaxMana = baseMaxMana + maxManaMod;
+            return (
+              <>
+                <HealthBar
+                  current={effectiveMana}
+                  max={effectiveMaxMana}
+                  label={`Mana: ${effectiveMana}/${effectiveMaxMana}`}
+                  variant="mana"
+                />
+                {(manaMod !== 0 || maxManaMod !== 0) && (
+                  <div className="text-xs mt-1 ml-1">
+                    <span className="text-muted-foreground">Base: {baseMana}/{baseMaxMana}</span>
+                    {manaMod !== 0 && <span className={manaMod > 0 ? "text-green-400" : "text-red-400"}> (Mana {manaMod > 0 ? `+${manaMod}` : manaMod})</span>}
+                    {maxManaMod !== 0 && <span className={maxManaMod > 0 ? "text-green-400" : "text-red-400"}> (MaxMana {maxManaMod > 0 ? `+${maxManaMod}` : maxManaMod})</span>}
+                  </div>
+                )}
+              </>
+            );
+          })()}
           {editMode && (
             <div className="flex gap-4 mt-2">
               <input
@@ -574,9 +606,6 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
         </div>
 
         {/* Stats and Achievements row */}
-        {(() => {
-          const equippedMods = getEquippedModifiers(selected, inventory);
-          return (
         <div className="grid md:grid-cols-2 gap-8 mb-8">
           <div>
             <h3 className="font-display text-primary text-xl mb-4 flex items-center gap-2">
@@ -639,8 +668,6 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             )}
           </div>
         </div>
-          );
-        })()}
 
         {/* Inventory section - full width */}
         <div>
@@ -821,7 +848,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                     </div>
 
                     {/* Item description */}
-                    {(expandedItems || item.description) && (
+                    {expandedItems && (
                       <p className="text-muted-foreground text-sm leading-relaxed">
                         {item.description || "No description"}
                       </p>
