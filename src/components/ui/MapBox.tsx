@@ -181,7 +181,11 @@ export const MapBox: React.FC<MapBoxProps> = ({
         // Smooth transition for remote updates, instant for local manipulation
         transition: isManipulating ? 'none' : 'left 0.15s ease-out, top 0.15s ease-out, width 0.15s ease-out, height 0.15s ease-out, transform 0.15s ease-out',
       }}
-      onClick={(e) => { e.stopPropagation(); if (canInteract) setShowControls(true); }}
+      onClick={(e) => {
+        e.stopPropagation();
+        // For triangles, only the polygon handles click-to-select (container includes empty space)
+        if (box.shape !== "triangle" && canInteract) setShowControls(true);
+      }}
     >
       {/* The shape itself */}
       {(!box.shape || box.shape === "rectangle") && (
@@ -250,8 +254,9 @@ export const MapBox: React.FC<MapBoxProps> = ({
               fill={box.color}
               stroke="#000000"
               strokeWidth="1"
+              vectorEffect="non-scaling-stroke"
               className="cursor-move"
-              style={{ pointerEvents: 'auto' }}
+              style={{ pointerEvents: placementMode ? 'none' : 'auto' }}
               onMouseDown={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
