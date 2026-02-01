@@ -48,6 +48,8 @@ const Index = () => {
     deleteCrawler,
     getCrawlerInventory,
     updateCrawlerInventory,
+    getSharedInventory,
+    updateSharedInventory,
     mobs,
     setMobs,
     maps,
@@ -260,6 +262,8 @@ const Index = () => {
                 partyGold={partyGold}
                 onUpdateInventory={updateCrawlerInventory}
                 onUpdateCrawler={updateCrawler}
+                getSharedInventory={getSharedInventory}
+                onUpdateSharedInventory={updateSharedInventory}
               />
             )}
             {currentView === "mobs" && <MobsView mobs={mobs} />}

@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import { Crawler, InventoryItem, EquipmentSlot as SlotType, StatModifiers } from "@/lib/gameData";
-import { Coins, Package, Sword, Shield, Plus, Trash2, Edit2, Save, HardHat } from "lucide-react";
+import { Coins, Package, Sword, Shield, Plus, Trash2, Edit2, Save, HardHat, Search, BookOpen } from "lucide-react";
 import { useDebouncedCallback } from "@/hooks/useDebounce";
 
 interface InventoryViewProps {
@@ -12,6 +12,8 @@ interface InventoryViewProps {
   partyGold: number;
   onUpdateInventory: (crawlerId: string, items: InventoryItem[]) => void;
   onUpdateCrawler: (id: string, updates: Partial<Crawler>) => void;
+  getSharedInventory: () => InventoryItem[];
+  onUpdateSharedInventory: (items: InventoryItem[]) => void;
 }
 
 const InventoryView: React.FC<InventoryViewProps> = ({
@@ -20,6 +22,8 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   partyGold,
   onUpdateInventory,
   onUpdateCrawler,
+  getSharedInventory,
+  onUpdateSharedInventory,
 }) => {
   const [editMode, setEditMode] = useState(false);
   const [newItem, setNewItem] = useState<{ crawlerId: string; name: string; description: string; equipSlot?: SlotType; goldValue?: number; statModifiers?: StatModifiers }>({
@@ -30,6 +34,13 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     goldValue: undefined,
     statModifiers: undefined,
   });
+
+  // Library item form state
+  const [newLibraryItem, setNewLibraryItem] = useState<{ name: string; description: string; equipSlot?: SlotType; goldValue?: number; statModifiers?: StatModifiers }>({
+    name: "", description: "", equipSlot: undefined, goldValue: undefined, statModifiers: undefined,
+  });
+  // Per-crawler search queries
+  const [searchQueries, setSearchQueries] = useState<Record<string, string>>({});
 
   // Local gold state for immediate UI updates (avoids lag while typing)
   const [localGold, setLocalGold] = useState<Record<string, number>>({});
@@ -85,11 +96,41 @@ const InventoryView: React.FC<InventoryViewProps> = ({
 
   const handleGoldSet = (crawlerId: string, value: number) => {
     const newGold = Math.max(0, Math.floor(value));
-    // Update local state immediately for responsive UI
     setLocalGold(prev => ({ ...prev, [crawlerId]: newGold }));
-    // Debounce the Firebase update
     debouncedGoldUpdate(crawlerId, newGold);
   };
+
+  // Library item handlers
+  const handleAddLibraryItem = () => {
+    if (!newLibraryItem.name.trim()) return;
+    const items = getSharedInventory();
+    const mods = newLibraryItem.statModifiers
+      ? Object.fromEntries(Object.entries(newLibraryItem.statModifiers).filter(([, v]) => v !== 0 && v !== undefined))
+      : undefined;
+    const item: InventoryItem = {
+      id: crypto.randomUUID(),
+      name: newLibraryItem.name,
+      description: newLibraryItem.description,
+      equipSlot: newLibraryItem.equipSlot,
+      goldValue: newLibraryItem.goldValue,
+      ...(mods && Object.keys(mods).length > 0 ? { statModifiers: mods } : {}),
+    };
+    onUpdateSharedInventory([...items, item]);
+    setNewLibraryItem({ name: "", description: "", equipSlot: undefined, goldValue: undefined, statModifiers: undefined });
+  };
+
+  const handleRemoveLibraryItem = (itemId: string) => {
+    const items = getSharedInventory();
+    onUpdateSharedInventory(items.filter((i) => i.id !== itemId));
+  };
+
+  const handleAddLibraryItemToCrawler = (crawlerId: string, libraryItem: InventoryItem) => {
+    const items = getCrawlerInventory(crawlerId);
+    const copy: InventoryItem = { ...libraryItem, id: crypto.randomUUID() };
+    onUpdateInventory(crawlerId, [...items, copy]);
+  };
+
+  const libraryItems = getSharedInventory();
 
   return (
     <motion.div
@@ -132,6 +173,119 @@ const InventoryView: React.FC<InventoryViewProps> = ({
           <p className="text-xs text-muted-foreground mt-2">Sum of all crawler gold</p>
         </div>
 
+        {/* Item Library */}
+        <div className="border border-primary/30 bg-muted/20 p-4 mb-6">
+          <h3 className="font-display text-lg text-primary flex items-center gap-2 mb-4">
+            <BookOpen className="w-5 h-5" />
+            ITEM LIBRARY
+          </h3>
+          {libraryItems.length === 0 ? (
+            <p className="text-muted-foreground text-sm italic mb-3">No items in library</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-3">
+              {libraryItems.map((item) => (
+                <div key={item.id} className="flex items-start gap-2 text-sm py-2 px-3 border border-border/50 bg-background/50">
+                  {item.equipSlot === 'weapon' ? (
+                    <Sword className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+                  ) : item.equipSlot ? (
+                    <HardHat className="w-4 h-4 text-accent shrink-0 mt-0.5" />
+                  ) : (
+                    <Package className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <span className="text-foreground font-medium">{item.name}</span>
+                      {item.equipSlot && (
+                        <span className="text-xs bg-accent/20 text-accent px-1.5 py-0.5 rounded">
+                          {item.equipSlot === 'weapon' ? 'Weapon' :
+                           item.equipSlot === 'leftHand' ? 'Left Hand' :
+                           item.equipSlot === 'rightHand' ? 'Right Hand' :
+                           item.equipSlot === 'ringFinger' ? 'Ring' :
+                           item.equipSlot.charAt(0).toUpperCase() + item.equipSlot.slice(1)}
+                        </span>
+                      )}
+                      {item.goldValue !== undefined && item.goldValue > 0 && (
+                        <span className="text-xs bg-accent/10 text-accent px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                          <Coins className="w-3 h-3" /> {item.goldValue}G
+                        </span>
+                      )}
+                    </div>
+                    {item.description && (
+                      <span className="text-muted-foreground text-xs block">({item.description})</span>
+                    )}
+                    {item.statModifiers && Object.keys(item.statModifiers).length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {Object.entries(item.statModifiers).filter(([,v]) => v !== 0).map(([stat, val]) => (
+                          <span key={stat} className={`text-xs px-1 rounded ${(val as number) > 0 ? 'text-green-400 bg-green-400/10' : 'text-red-400 bg-red-400/10'}`}>
+                            {stat.toUpperCase()} {(val as number) > 0 ? '+' : ''}{val}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {editMode && (
+                    <button onClick={() => handleRemoveLibraryItem(item.id)} className="text-destructive hover:text-destructive/80 shrink-0">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          {editMode && (
+            <div className="space-y-2 pt-3 border-t border-border/50">
+              <div className="flex gap-2">
+                <input type="text" placeholder="Item name" value={newLibraryItem.name}
+                  onChange={(e) => setNewLibraryItem({ ...newLibraryItem, name: e.target.value })}
+                  className="bg-muted border border-border px-2 py-1 text-sm flex-1" />
+                <input type="text" placeholder="Description" value={newLibraryItem.description}
+                  onChange={(e) => setNewLibraryItem({ ...newLibraryItem, description: e.target.value })}
+                  className="bg-muted border border-border px-2 py-1 text-sm flex-1" />
+              </div>
+              <div className="flex gap-2">
+                <select value={newLibraryItem.equipSlot || ""}
+                  onChange={(e) => setNewLibraryItem({ ...newLibraryItem, equipSlot: e.target.value as SlotType || undefined })}
+                  className="bg-muted border border-border px-2 py-1 text-sm flex-1">
+                  <option value="">No Equipment Slot</option>
+                  <option value="weapon">Weapon</option>
+                  <option value="head">Head</option>
+                  <option value="chest">Chest</option>
+                  <option value="legs">Legs</option>
+                  <option value="feet">Feet</option>
+                  <option value="leftHand">Left Hand</option>
+                  <option value="rightHand">Right Hand</option>
+                  <option value="ringFinger">Ring Finger</option>
+                </select>
+                <div className="flex items-center gap-1">
+                  <Coins className="w-4 h-4 text-accent" />
+                  <input type="number" placeholder="Value" value={newLibraryItem.goldValue !== undefined ? newLibraryItem.goldValue : ""}
+                    onChange={(e) => setNewLibraryItem({ ...newLibraryItem, goldValue: e.target.value ? parseInt(e.target.value) : undefined })}
+                    className="bg-muted border border-border px-2 py-1 text-sm w-20" />
+                </div>
+                <DungeonButton variant="default" size="sm" onClick={handleAddLibraryItem}>
+                  <Plus className="w-4 h-4" />
+                </DungeonButton>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Stat Modifiers (when equipped)</p>
+                <div className="grid grid-cols-3 gap-1">
+                  {(['str', 'dex', 'con', 'int', 'cha', 'hp', 'maxHP', 'mana', 'maxMana'] as const).map((stat) => (
+                    <div key={stat} className="flex items-center gap-1">
+                      <label className="text-xs text-muted-foreground w-12 uppercase">{stat}</label>
+                      <input type="number" value={newLibraryItem.statModifiers?.[stat] ?? ""}
+                        onChange={(e) => setNewLibraryItem({
+                          ...newLibraryItem,
+                          statModifiers: { ...newLibraryItem.statModifiers, [stat]: e.target.value ? parseInt(e.target.value) : undefined },
+                        })}
+                        placeholder="0" className="w-14 bg-muted border border-border px-1 py-0.5 text-xs text-center" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Crawler inventories */}
         <div className="space-y-6">
           {crawlers.map((crawler) => {
@@ -166,6 +320,45 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                     )}
                   </div>
                 </div>
+
+                {/* Search library items */}
+                {editMode && libraryItems.length > 0 && (
+                  <div className="mb-3">
+                    <div className="relative">
+                      <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                      <input
+                        type="text"
+                        placeholder="Search item library..."
+                        value={searchQueries[crawler.id] || ""}
+                        onChange={(e) => setSearchQueries(prev => ({ ...prev, [crawler.id]: e.target.value }))}
+                        className="bg-muted border border-border px-2 py-1 pl-8 text-sm w-full"
+                      />
+                    </div>
+                    {searchQueries[crawler.id] && (
+                      <div className="border border-border bg-background mt-1 max-h-40 overflow-y-auto">
+                        {libraryItems
+                          .filter(li => li.name.toLowerCase().includes(searchQueries[crawler.id].toLowerCase()))
+                          .map(li => (
+                            <div key={li.id} className="flex items-center justify-between px-3 py-1.5 text-sm hover:bg-muted/50 border-b border-border/30 last:border-0">
+                              <div className="flex items-center gap-2">
+                                <span>{li.name}</span>
+                                {li.equipSlot && <span className="text-xs text-accent">({li.equipSlot})</span>}
+                              </div>
+                              <DungeonButton variant="default" size="sm" onClick={() => {
+                                handleAddLibraryItemToCrawler(crawler.id, li);
+                                setSearchQueries(prev => ({ ...prev, [crawler.id]: "" }));
+                              }}>
+                                <Plus className="w-3 h-3 mr-1" /> Add
+                              </DungeonButton>
+                            </div>
+                          ))}
+                        {libraryItems.filter(li => li.name.toLowerCase().includes(searchQueries[crawler.id].toLowerCase())).length === 0 && (
+                          <p className="text-muted-foreground text-xs italic px-3 py-2">No matching items</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {items.length === 0 ? (
                   <p className="text-muted-foreground text-sm italic mb-3">No items in inventory</p>

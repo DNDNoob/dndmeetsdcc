@@ -321,6 +321,14 @@ export const useGameState = () => {
     return inventory.find((i) => i.crawlerId === crawlerId)?.items || [];
   };
 
+  const getSharedInventory = () => {
+    return inventory.find((i) => i.crawlerId === '__shared__')?.items || [];
+  };
+
+  const updateSharedInventory = (items: InventoryItem[]) => {
+    updateCrawlerInventory('__shared__', items);
+  };
+
   const updateCrawlerInventory = (crawlerId: string, items: InventoryItem[]) => {
     const existing = inventory.find((i) => i.crawlerId === crawlerId) as InventoryEntry | undefined;
     const cleaned = stripUndefinedDeep(items) as InventoryItem[];
@@ -363,6 +371,8 @@ export const useGameState = () => {
     inventory,
     getCrawlerInventory,
     updateCrawlerInventory,
+    getSharedInventory,
+    updateSharedInventory,
     mobs,
     setMobs,
     maps,
