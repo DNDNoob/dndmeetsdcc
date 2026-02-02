@@ -97,13 +97,23 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
     }, 50);
   };
 
-  // Auto-scroll roll history to bottom when new rolls arrive
+  // Auto-scroll roll history to bottom when new rolls arrive or panel opens
   const rollHistoryRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (rollHistoryRef.current) {
       rollHistoryRef.current.scrollTop = rollHistoryRef.current.scrollHeight;
     }
-  }, [diceRolls.length]);
+  }, [diceRolls.length, isExpanded]);
+
+  const formatTimestamp = (ts: number) => {
+    const diff = Date.now() - ts;
+    const mins = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    if (mins < 1) return "just now";
+    if (mins < 60) return `${mins}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    return new Date(ts).toLocaleDateString();
+  };
 
   return (
     <div className="fixed bottom-4 right-4 z-[100] flex items-end gap-2">
@@ -152,6 +162,7 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-display text-primary">{entry.crawlerName}</span>
+                          <span className="text-[10px] text-muted-foreground/60">{formatTimestamp(entry.timestamp)}</span>
                           {entry.statRoll ? (
                             <span className="text-xs">
                               {entry.statRoll.stat} Check: d20({entry.statRoll.rawRoll}) {entry.statRoll.modifier >= 0 ? '+' : ''}{entry.statRoll.modifier} = <span className="font-bold text-primary">{entry.total}</span>
