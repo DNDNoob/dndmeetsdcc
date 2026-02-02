@@ -31,7 +31,6 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
 
   const [isExpanded, setIsExpanded] = useState(false);
   const [showDiceOptions, setShowDiceOptions] = useState(true);
-  const [currentRoll, setCurrentRoll] = useState<{ dice: string; result: number; timestamp: number } | null>(null);
   const [isRolling, setIsRolling] = useState(false);
   const [diceQueue, setDiceQueue] = useState<QueuedDice[]>([]);
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
@@ -39,21 +38,14 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
   const addDiceRollRef = useRef(addDiceRoll);
   addDiceRollRef.current = addDiceRoll;
 
-  // Watch for new rolls (including remote) and show animation
+  // Watch for new rolls (including remote)
   useEffect(() => {
     if (diceRolls.length === 0) return;
     const newest = diceRolls[0];
     if (newest.id !== lastSeenRollId.current) {
       lastSeenRollId.current = newest.id;
-      if (!isRolling && newest.results.length > 0) {
-        setCurrentRoll({
-          dice: newest.statRoll ? `D20` : newest.results[0].dice,
-          result: newest.statRoll ? newest.statRoll.rawRoll : newest.results[0].result,
-          timestamp: Date.now(),
-        });
-      }
     }
-  }, [diceRolls, isRolling]);
+  }, [diceRolls]);
 
   const addDiceToQueue = (sides: number, label: string) => {
     const newDice: QueuedDice = {
@@ -76,16 +68,6 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
     const maxIterations = 10;
 
     const interval = setInterval(() => {
-      const randomResults = diceQueue.map((dice) => ({
-        dice: dice.label,
-        result: Math.floor(Math.random() * dice.sides) + 1,
-        timestamp: Date.now(),
-      }));
-
-      if (randomResults.length > 0) {
-        setCurrentRoll(randomResults[0]);
-      }
-
       iterations++;
       if (iterations >= maxIterations) {
         clearInterval(interval);
@@ -96,8 +78,6 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
         });
 
         if (finalResults.length > 0) {
-          setCurrentRoll({ dice: finalResults[0].dice, result: finalResults[0].result, timestamp: Date.now() });
-
           const entry: DiceRollEntry = {
             id: crypto.randomUUID(),
             crawlerName,
@@ -126,25 +106,48 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
   }, [diceRolls.length]);
 
   return (
-    <div className="fixed bottom-16 right-4 z-[100]">
+    <div className="fixed bottom-4 right-4 z-[100] flex items-end gap-2">
+      {/* Toggle tab - now to the left of the panel */}
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 font-display text-sm hover:bg-primary/90 transition-colors shadow-lg mb-0"
+      >
+        <Dices className="w-4 h-4" />
+        DICE
+        {diceQueue.length > 0 && (
+          <span className="bg-accent text-accent-foreground rounded-full w-5 h-5 flex items-center justify-center text-xs">
+            {diceQueue.length}
+          </span>
+        )}
+        {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+      </button>
+
       <AnimatePresence>
         {isExpanded && (
           <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.9 }}
-            className="bg-background border-2 border-primary p-4 mb-2 w-72 shadow-lg shadow-primary/20"
+            initial={{ opacity: 0, x: 20, scale: 0.95 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: 20, scale: 0.95 }}
+            className="bg-background border-2 border-primary p-4 w-72 shadow-lg shadow-primary/20 flex flex-col"
+            style={{ height: 'calc(100vh - 2rem)' }}
           >
-            <h3 className="font-display text-primary text-glow-cyan text-lg mb-3 flex items-center gap-2">
+            <h3 className="font-display text-primary text-glow-cyan text-lg mb-3 flex items-center gap-2 shrink-0">
               <Dices className="w-5 h-5" /> DICE ROLLER
             </h3>
 
-            {/* Roll history */}
-            {diceRolls.length > 0 && (
-              <div className="border-b border-border pb-3 mb-3">
-                <span className="text-muted-foreground text-xs mb-2 block font-display">ROLL HISTORY:</span>
-                <div ref={rollHistoryRef} className="space-y-2 max-h-[25vh] overflow-y-auto pr-2">
-                  {[...diceRolls].reverse().map((entry) => (
+            {/* Roll history - fills available space */}
+            <div className="flex-1 min-h-0 flex flex-col mb-3">
+              <span className="text-muted-foreground text-xs mb-2 block font-display shrink-0">ROLL HISTORY:</span>
+              <div
+                ref={rollHistoryRef}
+                className="flex-1 min-h-0 space-y-2 overflow-y-auto"
+                style={{ scrollbarWidth: 'none' }}
+              >
+                <style>{`.dice-history::-webkit-scrollbar { display: none; }`}</style>
+                {diceRolls.length === 0 ? (
+                  <p className="text-muted-foreground text-xs italic">No rolls yet</p>
+                ) : (
+                  [...diceRolls].reverse().map((entry) => (
                     <div key={entry.id} className="bg-muted/50 px-2 py-2 text-xs text-muted-foreground rounded">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -193,45 +196,14 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
                         <span className="text-destructive text-xs font-display">NAT 1!</span>
                       )}
                     </div>
-                  ))}
-                </div>
+                  ))
+                )}
               </div>
-            )}
-
-            {/* Current roll display */}
-            <div className="bg-muted/50 border border-border p-3 mb-3 text-center min-h-[60px] flex flex-col items-center justify-center">
-              {currentRoll ? (
-                <>
-                  <span className="text-muted-foreground text-sm">{currentRoll.dice}</span>
-                  <motion.span
-                    key={currentRoll.timestamp}
-                    initial={{ scale: 1.5 }}
-                    animate={{ scale: 1 }}
-                    className={`font-display text-3xl ${
-                      currentRoll.result === 20 && currentRoll.dice === "D20"
-                        ? "text-accent text-glow-gold"
-                        : currentRoll.result === 1 && currentRoll.dice === "D20"
-                        ? "text-destructive"
-                        : "text-primary text-glow-cyan"
-                    }`}
-                  >
-                    {currentRoll.result}
-                  </motion.span>
-                  {currentRoll.dice === "D20" && currentRoll.result === 20 && !isRolling && (
-                    <span className="text-accent text-xs mt-1">CRITICAL HIT!</span>
-                  )}
-                  {currentRoll.dice === "D20" && currentRoll.result === 1 && !isRolling && (
-                    <span className="text-destructive text-xs mt-1">CRITICAL FAIL!</span>
-                  )}
-                </>
-              ) : (
-                <span className="text-muted-foreground text-sm">Configure dice to roll!</span>
-              )}
             </div>
 
             {/* Queued dice */}
             {diceQueue.length > 0 && (
-              <div className="mb-3 border border-border bg-muted/20 p-2">
+              <div className="mb-3 border border-border bg-muted/20 p-2 shrink-0">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs text-muted-foreground">QUEUED DICE:</span>
                   <button
@@ -261,61 +233,48 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
             )}
 
             {/* Collapsible dice options */}
-            <button
-              onClick={() => setShowDiceOptions(!showDiceOptions)}
-              className="flex items-center justify-between w-full text-xs text-muted-foreground font-display mb-2 hover:text-primary transition-colors"
-            >
-              <span>DICE OPTIONS</span>
-              {showDiceOptions ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-            </button>
+            <div className="shrink-0">
+              <button
+                onClick={() => setShowDiceOptions(!showDiceOptions)}
+                className="flex items-center justify-between w-full text-xs text-muted-foreground font-display mb-2 hover:text-primary transition-colors"
+              >
+                <span>DICE OPTIONS</span>
+                {showDiceOptions ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              </button>
 
-            {showDiceOptions && (
-              <>
-                <div className="grid grid-cols-4 gap-2 mb-3">
-                  {diceTypes.map((dice) => (
-                    <button
-                      key={dice.sides}
-                      onClick={() => addDiceToQueue(dice.sides, dice.label)}
-                      disabled={isRolling}
-                      className={`border border-primary bg-primary/10 hover:bg-primary/30 text-primary py-2 px-1 text-sm font-display transition-colors ${
-                        isRolling ? "opacity-50 cursor-not-allowed" : ""
-                      }`}
-                    >
-                      <Plus className="w-3 h-3 mx-auto mb-1" />
-                      {dice.label}
-                    </button>
-                  ))}
-                </div>
+              {showDiceOptions && (
+                <>
+                  <div className="grid grid-cols-4 gap-2 mb-3">
+                    {diceTypes.map((dice) => (
+                      <button
+                        key={dice.sides}
+                        onClick={() => addDiceToQueue(dice.sides, dice.label)}
+                        disabled={isRolling}
+                        className={`border border-primary bg-primary/10 hover:bg-primary/30 text-primary py-2 px-1 text-sm font-display transition-colors ${
+                          isRolling ? "opacity-50 cursor-not-allowed" : ""
+                        }`}
+                      >
+                        <Plus className="w-3 h-3 mx-auto mb-1" />
+                        {dice.label}
+                      </button>
+                    ))}
+                  </div>
 
-                <DungeonButton
-                  variant="admin"
-                  className="w-full"
-                  onClick={rollAllDice}
-                  disabled={diceQueue.length === 0 || isRolling}
-                >
-                  <Dices className="w-4 h-4 mr-2" />
-                  Roll {diceQueue.length} Dice
-                </DungeonButton>
-              </>
-            )}
+                  <DungeonButton
+                    variant="admin"
+                    className="w-full"
+                    onClick={rollAllDice}
+                    disabled={diceQueue.length === 0 || isRolling}
+                  >
+                    <Dices className="w-4 h-4 mr-2" />
+                    Roll {diceQueue.length} Dice
+                  </DungeonButton>
+                </>
+              )}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Toggle tab */}
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 font-display text-sm hover:bg-primary/90 transition-colors shadow-lg"
-      >
-        <Dices className="w-4 h-4" />
-        DICE
-        {diceQueue.length > 0 && (
-          <span className="bg-accent text-accent-foreground rounded-full w-5 h-5 flex items-center justify-center text-xs">
-            {diceQueue.length}
-          </span>
-        )}
-        {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-      </button>
     </div>
   );
 };
