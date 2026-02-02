@@ -140,6 +140,7 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
             exit={{ opacity: 0, x: 20, scale: 0.95 }}
             className="bg-background border-2 border-primary p-4 w-72 shadow-lg shadow-primary/20 flex flex-col"
             style={{ height: 'calc(100vh - 2rem)' }}
+            onWheel={(e) => e.stopPropagation()}
           >
             <h3 className="font-display text-primary text-glow-cyan text-lg mb-3 flex items-center gap-2 shrink-0">
               <Dices className="w-5 h-5" /> DICE ROLLER
