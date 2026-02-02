@@ -4,6 +4,7 @@ import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import { ResizableMobDisplay } from "@/components/ui/ResizableMobDisplay";
 import { GridOverlay } from "@/components/ui/GridOverlay";
+import RulerOverlay from "@/components/ui/RulerOverlay";
 import { MobIcon } from "@/components/ui/MobIcon";
 import { FogOfWar } from "@/components/ui/FogOfWar";
 import { Episode, Mob, MapSettings, Crawler, CrawlerPlacement, EpisodeMobPlacement } from "@/lib/gameData";
@@ -68,6 +69,13 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   const [selectedColor, setSelectedColor] = useState("#ef4444"); // Default red
   const [boxOpacity, setBoxOpacity] = useState(0.3);
   const [selectedShape, setSelectedShape] = useState<ShapeType>("rectangle");
+  const [isRulerMode, setIsRulerModeRaw] = useState(false);
+  const [rulerStart, setRulerStart] = useState<{ x: number; y: number } | null>(null);
+  const [rulerEnd, setRulerEnd] = useState<{ x: number; y: number } | null>(null);
+  const setIsRulerMode = (v: boolean) => {
+    setIsRulerModeRaw(v);
+    if (!v) { setRulerStart(null); setRulerEnd(null); }
+  };
   const lastBoxBroadcastTime = useRef<number>(0);
   const pendingBoxBroadcast = useRef<MapBoxData[] | null>(null);
 
@@ -851,7 +859,15 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     const clampedX = Math.max(0, Math.min(100, x));
     const clampedY = Math.max(0, Math.min(100, y));
 
-    if (isPingMode) {
+    if (isRulerMode) {
+      if (!rulerStart) {
+        setRulerStart({ x: clampedX, y: clampedY });
+        setRulerEnd({ x: clampedX, y: clampedY });
+      } else {
+        setRulerStart(null);
+        setRulerEnd(null);
+      }
+    } else if (isPingMode) {
       broadcastPing(clampedX, clampedY, selectedColor);
     } else if (isBoxMode) {
       // All users can add boxes
@@ -861,7 +877,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     } else if (isAddMobMode && isAdmin && selectedMobId) {
       handleAddMobToMapRuntime(clampedX, clampedY);
     }
-  }, [isPingMode, isBoxMode, isAddCrawlerMode, isAddMobMode, isAdmin, selectedColor, boxOpacity, selectedCrawlerId, selectedMobId, draggingMobId, broadcastPing, handleAddBox, handleAddCrawlerToMap, handleAddMobToMapRuntime]);
+  }, [isPingMode, isBoxMode, isRulerMode, rulerStart, isAddCrawlerMode, isAddMobMode, isAdmin, selectedColor, boxOpacity, selectedCrawlerId, selectedMobId, draggingMobId, broadcastPing, handleAddBox, handleAddCrawlerToMap, handleAddMobToMapRuntime]);
 
   // Auto-clean old pings
   useEffect(() => {
@@ -1116,7 +1132,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   // Handle panning start
   const handlePanStart = (e: React.MouseEvent<HTMLDivElement>) => {
     // Don't start panning if we're in a mode that uses clicks
-    if (isPingMode || isBoxMode || isAddCrawlerMode || isAddMobMode || fogEraserActive || fogPaintActive) return;
+    if (isPingMode || isBoxMode || isRulerMode || isAddCrawlerMode || isAddMobMode || fogEraserActive || fogPaintActive) return;
     // Don't pan if clicking on an interactive element
     if ((e.target as HTMLElement).closest('button, [data-draggable]')) return;
 
@@ -1141,7 +1157,15 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     }
 
     // Track cursor position for ping/box/crawler/mob mode
-    if (mapContainerRef.current && (isPingMode || isBoxMode || (isAddCrawlerMode && selectedCrawlerId) || (isAddMobMode && selectedMobId))) {
+    // Update ruler end point
+    if (isRulerMode && rulerStart && mapImageRef.current) {
+      const imgRect = mapImageRef.current.getBoundingClientRect();
+      const rx = ((e.clientX - imgRect.left) / imgRect.width) * 100;
+      const ry = ((e.clientY - imgRect.top) / imgRect.height) * 100;
+      setRulerEnd({ x: Math.max(0, Math.min(100, rx)), y: Math.max(0, Math.min(100, ry)) });
+    }
+
+    if (mapContainerRef.current && (isPingMode || isBoxMode || isRulerMode || (isAddCrawlerMode && selectedCrawlerId) || (isAddMobMode && selectedMobId))) {
       const rect = mapContainerRef.current.getBoundingClientRect();
       setCursorPosition({
         x: e.clientX - rect.left,
@@ -1493,6 +1517,8 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
           onSelectMap={() => setSelectedMap(null)}
           onEndEpisode={handleEndEpisode}
           isNavVisible={isNavVisible}
+          isRulerMode={isRulerMode}
+          setIsRulerMode={setIsRulerMode}
         />
       )}
 
@@ -1525,7 +1551,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       <div
         ref={mapContainerRef}
         className="flex-1 flex items-center justify-center p-4 select-none overflow-hidden relative"
-        style={{ cursor: isPanning ? 'grabbing' : (isPingMode || isBoxMode || isAddCrawlerMode || isAddMobMode) ? 'crosshair' : 'grab' }}
+        style={{ cursor: isPanning ? 'grabbing' : (isPingMode || isBoxMode || isRulerMode || isAddCrawlerMode || isAddMobMode) ? 'crosshair' : 'grab' }}
         onMouseDown={handlePanStart}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -1657,6 +1683,17 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
           {/* Grid overlay - only visible to DM */}
           {isAdmin && <GridOverlay isVisible={showGrid} cellSize={gridSize * iconCounterScale} opacity={0.3} />}
+
+          {/* Ruler overlay */}
+          {isRulerMode && rulerStart && rulerEnd && mapImageRef.current && (
+            <RulerOverlay
+              start={rulerStart}
+              end={rulerEnd}
+              imageWidth={mapImageRef.current.naturalWidth}
+              imageHeight={mapImageRef.current.naturalHeight}
+              gridSize={gridSize}
+            />
+          )}
 
           {/* Displayed mobs on the map - filtered by current map */}
           {currentMapMobPlacements.map((placement, localIndex) => {

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DungeonButton } from "@/components/ui/DungeonButton";
-import { Target, Square, ChevronDown, ChevronUp, Palette, User, Skull, Grid3x3, CloudFog, Eraser, Paintbrush, Layers, X, ChevronLeft, ChevronRight, Circle, Triangle, RectangleHorizontal } from "lucide-react";
+import { Target, Square, ChevronDown, ChevronUp, Palette, User, Skull, Grid3x3, CloudFog, Eraser, Paintbrush, Layers, X, ChevronLeft, ChevronRight, Circle, Triangle, RectangleHorizontal, Ruler } from "lucide-react";
 import { Crawler, Mob } from "@/lib/gameData";
 import { ShapeType } from "@/components/ui/MapBox";
 
@@ -52,6 +52,9 @@ interface MapToolsMenuProps {
   onNextMap?: () => void;
   onSelectMap?: () => void;
   onEndEpisode?: () => void;
+  // Ruler
+  isRulerMode?: boolean;
+  setIsRulerMode?: (value: boolean) => void;
   // Layout
   isNavVisible?: boolean;
 }
@@ -118,6 +121,8 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
   onNextMap,
   onSelectMap,
   onEndEpisode,
+  isRulerMode = false,
+  setIsRulerMode,
   isNavVisible = false,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -128,6 +133,7 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
     setIsBoxMode(false);
     setIsAddCrawlerMode?.(false);
     setIsAddMobMode?.(false);
+    setIsRulerMode?.(false);
   };
 
   const handlePingModeToggle = () => {
@@ -164,6 +170,13 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
       setIsExpanded(true);
     }
     setIsAddMobMode?.(!isAddMobMode);
+  };
+
+  const handleRulerModeToggle = () => {
+    if (!isRulerMode) {
+      clearAllModes();
+    }
+    setIsRulerMode?.(!isRulerMode);
   };
 
   return (
@@ -222,6 +235,17 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
           >
             <Target className="w-4 h-4 mr-1" />
             Ping
+          </DungeonButton>
+
+          {/* Ruler button - available to all users */}
+          <DungeonButton
+            variant={isRulerMode ? "admin" : "default"}
+            size="sm"
+            onClick={handleRulerModeToggle}
+            title="Click map to measure distance"
+          >
+            <Ruler className="w-4 h-4 mr-1" />
+            Ruler
           </DungeonButton>
 
           {/* Shape button with dropdown - available to all users */}
