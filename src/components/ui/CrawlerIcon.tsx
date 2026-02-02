@@ -36,11 +36,6 @@ export const CrawlerIcon: React.FC<CrawlerIconProps> = ({ crawler, size = 40, is
         )}
       </div>
 
-      {/* Level indicator */}
-      <div className="absolute -bottom-1 -right-1 bg-blue-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-        {crawler.level}
-      </div>
-
       {/* HP bar */}
       <div className="absolute -bottom-3 left-0 right-0 h-1 bg-gray-700 rounded-full overflow-hidden mx-1">
         <div

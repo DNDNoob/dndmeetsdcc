@@ -176,14 +176,18 @@ export const MapBox: React.FC<MapBoxProps> = ({
         // Use vmin for square/circle to maintain aspect ratio, percentages for rectangle/triangle
         width: isSquareOrCircle ? `${box.width * 2}vmin` : `${box.width}%`,
         height: isSquareOrCircle ? `${box.width * 2}vmin` : `${box.height}%`,
-        pointerEvents: (placementMode || !canInteract) ? "none" : "auto",
+        pointerEvents: (placementMode || !canInteract) ? "none" : (box.shape === "triangle" ? "none" : "auto"),
         opacity: canInteract ? 1 : 0.5,
         // Smooth transition for remote updates, instant for local manipulation
         transition: isManipulating ? 'none' : 'left 0.15s ease-out, top 0.15s ease-out, width 0.15s ease-out, height 0.15s ease-out, transform 0.15s ease-out',
       }}
       onClick={(e) => {
+        // For triangles, let clicks in the empty space around the polygon pass through to the map
+        if (box.shape === "triangle") {
+          const target = e.target as HTMLElement;
+          if (target.tagName !== 'polygon') return; // Don't stop propagation - let map handle it
+        }
         e.stopPropagation();
-        // For triangles, only the polygon handles click-to-select (container includes empty space)
         if (box.shape !== "triangle" && canInteract) setShowControls(true);
       }}
     >

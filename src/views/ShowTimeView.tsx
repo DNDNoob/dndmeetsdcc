@@ -72,9 +72,10 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   const [isRulerMode, setIsRulerModeRaw] = useState(false);
   const [rulerStart, setRulerStart] = useState<{ x: number; y: number } | null>(null);
   const [rulerEnd, setRulerEnd] = useState<{ x: number; y: number } | null>(null);
+  const [remoteRulers, setRemoteRulers] = useState<{ id: string; start: { x: number; y: number }; end: { x: number; y: number } }[]>([]);
   const setIsRulerMode = (v: boolean) => {
     setIsRulerModeRaw(v);
-    if (!v) { setRulerStart(null); setRulerEnd(null); }
+    if (!v) { setRulerStart(null); setRulerEnd(null); broadcastRulerState(null, null); }
   };
   const lastBoxBroadcastTime = useRef<number>(0);
   const pendingBoxBroadcast = useRef<MapBoxData[] | null>(null);
@@ -86,6 +87,10 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   const [isAddMobMode, setIsAddMobMode] = useState(false);
   const [selectedCrawlerId, setSelectedCrawlerId] = useState<string | null>(null);
   const [selectedMobId, setSelectedMobId] = useState<string | null>(null);
+
+  // Name overrides for crawlers/mobs (per-episode, not permanent)
+  const [nameOverrides, setNameOverrides] = useState<Record<string, string>>({});
+  const [editingNameId, setEditingNameId] = useState<string | null>(null);
 
   // Cursor follower state for ping/box mode
   const [cursorPosition, setCursorPosition] = useState<{ x: number; y: number } | null>(null);
@@ -302,6 +307,9 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     setFogOfWarEnabled(false);
     setCrawlerPlacements([]);
     setRuntimeMobPlacements([]);
+    setRemoteRulers([]);
+    setNameOverrides({});
+    setEditingNameId(null);
     // Reset fog initial load flag so Firebase listener will reload fog for new map
     fogInitialLoadDone.current = null;
   }, [currentMapId]);
@@ -708,6 +716,65 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     }
   }, [selectedEpisode?.id, currentMapId, roomId]);
 
+  // Generate a stable ruler ID for this user session
+  const rulerSessionId = useRef(`ruler-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
+
+  // Broadcast ruler state to other players
+  const broadcastRulerState = useCallback(async (start: { x: number; y: number } | null, end: { x: number; y: number } | null) => {
+    if (!selectedEpisode || !currentMapId) return;
+
+    const rulerDocPath = roomId
+      ? `rooms/${roomId}/ruler-state/${selectedEpisode.id}-${currentMapId}`
+      : `ruler-state/${selectedEpisode.id}-${currentMapId}`;
+
+    try {
+      const rulerData = start && end ? {
+        id: rulerSessionId.current,
+        start,
+        end,
+      } : null;
+
+      // Read current rulers, update ours
+      const currentRulers = remoteRulers.filter(r => r.id !== rulerSessionId.current);
+      const allRulers = rulerData ? [...currentRulers, rulerData] : currentRulers;
+
+      await setDoc(doc(db, rulerDocPath), {
+        rulers: allRulers,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error('[ShowTime] Failed to broadcast ruler state:', error);
+    }
+  }, [selectedEpisode?.id, currentMapId, roomId, remoteRulers]);
+
+  // Listen for ruler state updates
+  useEffect(() => {
+    if (!selectedEpisode || !currentMapId) return;
+
+    const rulerDocPath = roomId
+      ? `rooms/${roomId}/ruler-state/${selectedEpisode.id}-${currentMapId}`
+      : `ruler-state/${selectedEpisode.id}-${currentMapId}`;
+
+    const rulerDocRef = doc(db, rulerDocPath);
+
+    const unsubscribe = onSnapshot(rulerDocRef, (snapshot) => {
+      if (!snapshot.exists()) {
+        setRemoteRulers([]);
+        return;
+      }
+      const data = snapshot.data();
+      // Filter out our own ruler
+      const others = (data.rulers ?? []).filter((r: any) => r.id !== rulerSessionId.current);
+      setRemoteRulers(others);
+    });
+
+    return () => unsubscribe();
+  }, [selectedEpisode?.id, currentMapId, roomId]);
+
+  // Throttle ruler broadcasts
+  const lastRulerBroadcastTime = useRef<number>(0);
+  const RULER_BROADCAST_THROTTLE_MS = 50;
+
   // Handle adding a box
   const handleAddBox = useCallback((x: number, y: number, color: string, opacity: number, shape: ShapeType = "rectangle") => {
     // Square and circle get equal width/height, rectangle is wider
@@ -863,9 +930,11 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       if (!rulerStart) {
         setRulerStart({ x: clampedX, y: clampedY });
         setRulerEnd({ x: clampedX, y: clampedY });
+        broadcastRulerState({ x: clampedX, y: clampedY }, { x: clampedX, y: clampedY });
       } else {
         setRulerStart(null);
         setRulerEnd(null);
+        broadcastRulerState(null, null);
       }
     } else if (isPingMode) {
       broadcastPing(clampedX, clampedY, selectedColor);
@@ -905,10 +974,10 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       e.stopPropagation();
       if (e.deltaY < 0) {
         // Scroll up = zoom in
-        setMapScale(prev => Math.min(prev + 5, zoomMax));
+        setMapScale(prev => Math.min(prev + 2, zoomMax));
       } else {
         // Scroll down = zoom out
-        setMapScale(prev => Math.max(prev - 5, zoomMin));
+        setMapScale(prev => Math.max(prev - 2, zoomMin));
       }
     };
 
@@ -1032,6 +1101,53 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
     return () => unsubscribe();
   }, [selectedEpisode?.id, currentMapId, roomId]);
+
+  // Broadcast name overrides
+  const broadcastNameOverrides = useCallback(async (overrides: Record<string, string>) => {
+    if (!selectedEpisode || !currentMapId) return;
+
+    const nameDocPath = roomId
+      ? `rooms/${roomId}/name-overrides/${selectedEpisode.id}-${currentMapId}`
+      : `name-overrides/${selectedEpisode.id}-${currentMapId}`;
+
+    try {
+      await setDoc(doc(db, nameDocPath), {
+        overrides,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error('[ShowTime] Failed to broadcast name overrides:', error);
+    }
+  }, [selectedEpisode?.id, currentMapId, roomId]);
+
+  // Listen for name override updates
+  useEffect(() => {
+    if (!selectedEpisode || !currentMapId) return;
+
+    const nameDocPath = roomId
+      ? `rooms/${roomId}/name-overrides/${selectedEpisode.id}-${currentMapId}`
+      : `name-overrides/${selectedEpisode.id}-${currentMapId}`;
+
+    const nameDocRef = doc(db, nameDocPath);
+
+    const unsubscribe = onSnapshot(nameDocRef, (snapshot) => {
+      if (!snapshot.exists()) {
+        setNameOverrides({});
+        return;
+      }
+      const data = snapshot.data();
+      setNameOverrides(data.overrides ?? {});
+    });
+
+    return () => unsubscribe();
+  }, [selectedEpisode?.id, currentMapId, roomId]);
+
+  // Handle name override change
+  const handleNameOverride = useCallback((placementKey: string, newName: string) => {
+    const updated = { ...nameOverrides, [placementKey]: newName };
+    setNameOverrides(updated);
+    broadcastNameOverrides(updated);
+  }, [nameOverrides, broadcastNameOverrides]);
 
   // Get all mobs for the current episode (unique mobs for the mob display list)
   const episodeMobs = useMemo(() => {
@@ -1162,7 +1278,14 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       const imgRect = mapImageRef.current.getBoundingClientRect();
       const rx = ((e.clientX - imgRect.left) / imgRect.width) * 100;
       const ry = ((e.clientY - imgRect.top) / imgRect.height) * 100;
-      setRulerEnd({ x: Math.max(0, Math.min(100, rx)), y: Math.max(0, Math.min(100, ry)) });
+      const newEnd = { x: Math.max(0, Math.min(100, rx)), y: Math.max(0, Math.min(100, ry)) };
+      setRulerEnd(newEnd);
+      // Throttled broadcast of ruler position
+      const now = Date.now();
+      if (now - lastRulerBroadcastTime.current >= RULER_BROADCAST_THROTTLE_MS) {
+        lastRulerBroadcastTime.current = now;
+        broadcastRulerState(rulerStart, newEnd);
+      }
     }
 
     if (mapContainerRef.current && (isPingMode || isBoxMode || isRulerMode || (isAddCrawlerMode && selectedCrawlerId) || (isAddMobMode && selectedMobId))) {
@@ -1684,7 +1807,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
           {/* Grid overlay - only visible to DM */}
           {isAdmin && <GridOverlay isVisible={showGrid} cellSize={gridSize * iconCounterScale} opacity={0.3} />}
 
-          {/* Ruler overlay */}
+          {/* Ruler overlay - local */}
           {isRulerMode && rulerStart && rulerEnd && mapImageRef.current && (
             <RulerOverlay
               start={rulerStart}
@@ -1694,6 +1817,17 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
               gridSize={gridSize * iconCounterScale}
             />
           )}
+          {/* Ruler overlays - remote users */}
+          {remoteRulers.map((ruler) => mapImageRef.current && (
+            <RulerOverlay
+              key={ruler.id}
+              start={ruler.start}
+              end={ruler.end}
+              imageWidth={mapImageRef.current!.clientWidth}
+              imageHeight={mapImageRef.current!.clientHeight}
+              gridSize={gridSize * iconCounterScale}
+            />
+          ))}
 
           {/* Displayed mobs on the map - filtered by current map */}
           {currentMapMobPlacements.map((placement, localIndex) => {
@@ -1751,6 +1885,40 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                       {letter}
                     </div>
                   )}
+                  {/* Name label */}
+                  {(() => {
+                    const nameKey = `mob-ep-${placement.mobId}-${localIndex}`;
+                    const displayName = nameOverrides[nameKey] ?? mob.name;
+                    return editingNameId === nameKey ? (
+                      <input
+                        className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-background/90 border border-border rounded px-1 py-0.5 text-xs text-center text-foreground w-20 z-20"
+                        defaultValue={displayName}
+                        autoFocus
+                        onClick={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onBlur={(e) => {
+                          const val = e.target.value.trim();
+                          if (val && val !== mob.name) handleNameOverride(nameKey, val);
+                          else if (!val || val === mob.name) {
+                            const updated = { ...nameOverrides };
+                            delete updated[nameKey];
+                            setNameOverrides(updated);
+                            broadcastNameOverrides(updated);
+                          }
+                          setEditingNameId(null);
+                        }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                      />
+                    ) : (
+                      <div
+                        className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-background/80 border border-border rounded px-1.5 py-0.5 text-xs text-foreground whitespace-nowrap cursor-text z-10"
+                        onClick={(e) => { e.stopPropagation(); setEditingNameId(nameKey); }}
+                        onMouseDown={(e) => e.stopPropagation()}
+                      >
+                        {displayName}
+                      </div>
+                    );
+                  })()}
                 </div>
               </motion.div>
             );
@@ -1811,6 +1979,40 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                       <X className="w-3 h-3" />
                     </button>
                   )}
+                  {/* Name label */}
+                  {(() => {
+                    const nameKey = `crawler-${placement.crawlerId}-${index}`;
+                    const displayName = nameOverrides[nameKey] ?? crawler.name;
+                    return editingNameId === nameKey ? (
+                      <input
+                        className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-background/90 border border-border rounded px-1 py-0.5 text-xs text-center text-foreground w-20 z-20"
+                        defaultValue={displayName}
+                        autoFocus
+                        onClick={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onBlur={(e) => {
+                          const val = e.target.value.trim();
+                          if (val && val !== crawler.name) handleNameOverride(nameKey, val);
+                          else if (!val || val === crawler.name) {
+                            const updated = { ...nameOverrides };
+                            delete updated[nameKey];
+                            setNameOverrides(updated);
+                            broadcastNameOverrides(updated);
+                          }
+                          setEditingNameId(null);
+                        }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                      />
+                    ) : (
+                      <div
+                        className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-background/80 border border-border rounded px-1.5 py-0.5 text-xs text-foreground whitespace-nowrap cursor-text z-10"
+                        onClick={(e) => { e.stopPropagation(); setEditingNameId(nameKey); }}
+                        onMouseDown={(e) => e.stopPropagation()}
+                      >
+                        {displayName}
+                      </div>
+                    );
+                  })()}
                 </div>
               </motion.div>
             );
@@ -1875,6 +2077,40 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                       <X className="w-3 h-3" />
                     </button>
                   )}
+                  {/* Name label */}
+                  {(() => {
+                    const nameKey = `mob-rt-${placement.mobId}-${index}`;
+                    const displayName = nameOverrides[nameKey] ?? mob.name;
+                    return editingNameId === nameKey ? (
+                      <input
+                        className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-background/90 border border-border rounded px-1 py-0.5 text-xs text-center text-foreground w-20 z-20"
+                        defaultValue={displayName}
+                        autoFocus
+                        onClick={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onBlur={(e) => {
+                          const val = e.target.value.trim();
+                          if (val && val !== mob.name) handleNameOverride(nameKey, val);
+                          else if (!val || val === mob.name) {
+                            const updated = { ...nameOverrides };
+                            delete updated[nameKey];
+                            setNameOverrides(updated);
+                            broadcastNameOverrides(updated);
+                          }
+                          setEditingNameId(null);
+                        }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                      />
+                    ) : (
+                      <div
+                        className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-background/80 border border-border rounded px-1.5 py-0.5 text-xs text-foreground whitespace-nowrap cursor-text z-10"
+                        onClick={(e) => { e.stopPropagation(); setEditingNameId(nameKey); }}
+                        onMouseDown={(e) => e.stopPropagation()}
+                      >
+                        {displayName}
+                      </div>
+                    );
+                  })()}
                 </div>
               </motion.div>
             );

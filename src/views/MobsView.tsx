@@ -38,16 +38,31 @@ const MobsView: React.FC<MobsViewProps> = ({ mobs }) => {
               }`}
             >
               <div className="flex items-start gap-4">
-                {/* Mob Image */}
-                {mob.image && (
-                  <div className="flex-shrink-0">
+                {/* Mob Image with type label underneath */}
+                <div className="flex-shrink-0 flex flex-col items-center gap-1">
+                  {mob.image && (
                     <img
                       src={mob.image}
                       alt={mob.name}
                       className="w-24 h-24 object-cover border border-border"
                     />
-                  </div>
-                )}
+                  )}
+                  {mob.type === "boss" && (
+                    <span className="text-xs bg-accent/20 text-accent px-2 py-0.5 font-bold">
+                      BOSS
+                    </span>
+                  )}
+                  {mob.type === "npc" && (
+                    <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 font-bold">
+                      NPC
+                    </span>
+                  )}
+                  {mob.type === "normal" && (
+                    <span className="text-xs bg-destructive/20 text-destructive px-2 py-0.5 font-bold">
+                      NORMAL
+                    </span>
+                  )}
+                </div>
 
                 {/* Mob Info */}
                 <div className="flex-1 min-w-0">
@@ -125,24 +140,6 @@ const MobsView: React.FC<MobsViewProps> = ({ mobs }) => {
                     </div>
                   )}
 
-                  {/* Type Indicator Badge */}
-                  <div className="mt-3 flex gap-2">
-                    {mob.type === "boss" && (
-                      <span className="text-xs bg-accent/20 text-accent px-2 py-1 font-bold">
-                        ⚠ BOSS
-                      </span>
-                    )}
-                    {mob.type === "npc" && (
-                      <span className="text-xs bg-primary/20 text-primary px-2 py-1 font-bold">
-                        📋 NPC
-                      </span>
-                    )}
-                    {mob.type === "normal" && (
-                      <span className="text-xs bg-destructive/20 text-destructive px-2 py-1 font-bold">
-                        ⚔ NORMAL
-                      </span>
-                    )}
-                  </div>
                 </div>
               </div>
             </motion.div>

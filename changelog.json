@@ -1,5 +1,42 @@
 [
   {
+    "date": "2026-02-02",
+    "changes": [
+      "📏 Ruler tool now visible to all players in real-time - users can see each other's measurements",
+      "🐛 Fixed ruler dismiss click being blocked by invisible bounding box of triangle shape effects",
+      "🏷️ Added editable name labels below all crawler and mob icons on the map (per-episode, synced in real-time)",
+      "🎨 Removed blue circle level indicator from crawler icons for cleaner appearance",
+      "📋 Mob type labels (BOSS/NPC/NORMAL) now appear under the mob image on the Mobs page instead of to the side",
+      "🔍 Decreased mouse scroll zoom sensitivity on the map for finer control",
+      "📏 Added ruler tool to ShowTime map for measuring distance in feet",
+      "🐛 Fixed map zoom triggering when scrolling dice roller on showtime page"
+    ]
+  },
+  {
+    "date": "2026-02-01",
+    "changes": [
+      "🎲 Synced dice rolls across all connected players in real-time",
+      "Clickable stat rolls - click a stat to auto-roll d20 + modifier",
+      "Dice roller UI improvements: collapsible options, full-height panel, relative timestamps, auto-scroll",
+      "📦 Added shared item library with per-crawler search in inventory",
+      "⚔️ Added HP/Mana modifiers and stat modifiers to inventory items",
+      "Equipment layout improvements with expand/collapse and full-width UI",
+      "🐛 Fixed triangle shape border, click-off flash, and placement over triangles"
+    ]
+  },
+  {
+    "date": "2026-01-31",
+    "changes": [
+      "🗺️ Map base scale now uses CSS transform for proper scaling of all overlays",
+      "Fixed map rendering: consistent base size, auto width, zoom down to 1%",
+      "Icons and shapes counter-scale to maintain consistent sizes across map scales",
+      "🐛 Fixed fog consolidation causing visible jumps on large maps",
+      "🎨 Added shape borders, doubled max shape size, added fog paint brush",
+      "Shape controls now persist until clicking away, stick to shape edges",
+      "Fixed rotation jerk on first move, deselect shape after placement"
+    ]
+  },
+  {
     "date": "2026-01-31",
     "changes": [
       "🧹 Removed Lovable and Netlify dependencies - project now fully hosted on GitHub Pages with Firebase",
@@ -75,7 +112,7 @@
     ]
   },
   {
-    "date": "2026-01-22-late",
+    "date": "2026-01-22",
     "changes": [
       "🖱️ Added cursor follower effect on ShowTime map",
       "🔍 Added zoom +/- button controls for map viewing",
@@ -152,7 +189,7 @@
     ]
   },
   {
-    "date": "2026-01-21-early",
+    "date": "2026-01-21",
     "changes": [
       "🌫️ Added Fog of War system for maps",
       "Fog of War overlay covers the entire map with semi-transparent darkness",
