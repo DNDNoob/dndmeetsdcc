@@ -50,24 +50,6 @@ const RulerOverlay: React.FC<RulerOverlayProps> = ({
         strokeLinecap="round"
         strokeDasharray="8 4"
       />
-      {/* Start dot */}
-      <circle
-        cx={`${start.x}%`}
-        cy={`${start.y}%`}
-        r="5"
-        fill="white"
-        stroke="black"
-        strokeWidth="2"
-      />
-      {/* End dot */}
-      <circle
-        cx={`${end.x}%`}
-        cy={`${end.y}%`}
-        r="5"
-        fill="white"
-        stroke="black"
-        strokeWidth="2"
-      />
       {/* Distance label background */}
       <rect
         x={`${midX}%`}

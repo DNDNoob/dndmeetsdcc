@@ -1689,9 +1689,9 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             <RulerOverlay
               start={rulerStart}
               end={rulerEnd}
-              imageWidth={mapImageRef.current.naturalWidth}
-              imageHeight={mapImageRef.current.naturalHeight}
-              gridSize={gridSize}
+              imageWidth={mapImageRef.current.clientWidth}
+              imageHeight={mapImageRef.current.clientHeight}
+              gridSize={gridSize * iconCounterScale}
             />
           )}
 
