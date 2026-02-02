@@ -25,11 +25,16 @@ interface DiceRollerProps {
   crawlerId?: string;
   diceRolls: DiceRollEntry[];
   addDiceRoll: (entry: DiceRollEntry) => Promise<void>;
+  onExpandedChange?: (expanded: boolean) => void;
 }
 
-const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawlerId = "", diceRolls, addDiceRoll }) => {
+const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawlerId = "", diceRolls, addDiceRoll, onExpandedChange }) => {
 
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpandedRaw] = useState(false);
+  const setIsExpanded = (v: boolean) => {
+    setIsExpandedRaw(v);
+    onExpandedChange?.(v);
+  };
   const [showDiceOptions, setShowDiceOptions] = useState(true);
   const [isRolling, setIsRolling] = useState(false);
   const [diceQueue, setDiceQueue] = useState<QueuedDice[]>([]);

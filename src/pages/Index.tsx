@@ -34,6 +34,7 @@ const Index = () => {
   const [mapVisibility, setMapVisibility] = useState<boolean[]>([]);
   const [mapNames, setMapNames] = useState<string[]>([]);
   const [isNavVisible, setIsNavVisible] = useState(true);
+  const [isDiceExpanded, setIsDiceExpanded] = useState(false);
   const [isDungeonAILoggedIn, setIsDungeonAILoggedIn] = useState(false);
   const [previousPlayer, setPreviousPlayer] = useState<{
     id: string;
@@ -312,6 +313,7 @@ const Index = () => {
                 isAdmin={isAdmin}
                 onUpdateEpisode={updateEpisode}
                 isNavVisible={isNavVisible}
+                isDiceExpanded={isDiceExpanded}
               />
             )}
             {currentView === "sounds" && <SoundEffectsView />}
@@ -325,7 +327,7 @@ const Index = () => {
             )}
           </main>
 
-          <DiceRoller crawlerName={currentPlayer.name} crawlerId={currentPlayer.id} diceRolls={diceRolls} addDiceRoll={addDiceRoll} />
+          <DiceRoller crawlerName={currentPlayer.name} crawlerId={currentPlayer.id} diceRolls={diceRolls} addDiceRoll={addDiceRoll} onExpandedChange={setIsDiceExpanded} />
 
           <ChangelogViewer
             isOpen={showChangelog}

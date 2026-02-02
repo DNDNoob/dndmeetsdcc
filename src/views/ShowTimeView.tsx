@@ -27,11 +27,12 @@ interface ShowTimeViewProps {
   isAdmin: boolean;
   onUpdateEpisode?: (id: string, updates: Partial<Episode>) => void;
   isNavVisible?: boolean;
+  isDiceExpanded?: boolean;
 }
 
 const SHOWTIME_STORAGE_KEY = 'dcc_showtime_state';
 
-const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false }) => {
+const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false }) => {
   const { roomId } = useFirebaseStore();
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
   const [currentMapIndex, setCurrentMapIndex] = useState(0);
@@ -1102,6 +1103,46 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     return () => unsubscribe();
   }, [selectedEpisode?.id, currentMapId, roomId]);
 
+  // Broadcast displayed mob IDs so players can see mob cards
+  const broadcastDisplayedMobs = useCallback(async (mobIds: string[]) => {
+    if (!selectedEpisode || !isAdmin) return;
+
+    const displayDocPath = roomId
+      ? `rooms/${roomId}/displayed-mobs/${selectedEpisode.id}`
+      : `displayed-mobs/${selectedEpisode.id}`;
+
+    try {
+      await setDoc(doc(db, displayDocPath), {
+        mobIds,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error('[ShowTime] Failed to broadcast displayed mobs:', error);
+    }
+  }, [selectedEpisode?.id, roomId, isAdmin]);
+
+  // Listen for displayed mob updates (for players)
+  useEffect(() => {
+    if (isAdmin || !selectedEpisode) return;
+
+    const displayDocPath = roomId
+      ? `rooms/${roomId}/displayed-mobs/${selectedEpisode.id}`
+      : `displayed-mobs/${selectedEpisode.id}`;
+
+    const displayDocRef = doc(db, displayDocPath);
+
+    const unsubscribe = onSnapshot(displayDocRef, (snapshot) => {
+      if (!snapshot.exists()) {
+        setDisplayedMobIds([]);
+        return;
+      }
+      const data = snapshot.data();
+      setDisplayedMobIds(data.mobIds ?? []);
+    });
+
+    return () => unsubscribe();
+  }, [isAdmin, selectedEpisode?.id, roomId]);
+
   // Broadcast name overrides
   const broadcastNameOverrides = useCallback(async (overrides: Record<string, string>) => {
     if (!selectedEpisode || !currentMapId) return;
@@ -1198,13 +1239,19 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   }, [selectedEpisode, currentMapIndex, maps, broadcastShowtimeState]);
 
   const handleToggleMobDisplay = (mobId: string) => {
-    setDisplayedMobIds(prev =>
-      prev.includes(mobId) ? prev.filter(id => id !== mobId) : [...prev, mobId]
-    );
+    setDisplayedMobIds(prev => {
+      const updated = prev.includes(mobId) ? prev.filter(id => id !== mobId) : [...prev, mobId];
+      broadcastDisplayedMobs(updated);
+      return updated;
+    });
   };
 
   const handleHideMob = (mobId: string) => {
-    setDisplayedMobIds(prev => prev.filter(id => id !== mobId));
+    setDisplayedMobIds(prev => {
+      const updated = prev.filter(id => id !== mobId);
+      broadcastDisplayedMobs(updated);
+      return updated;
+    });
   };
 
   const handleSelectEpisode = useCallback((episode: Episode) => {
@@ -2162,6 +2209,8 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             mob={mob}
             onClose={() => handleHideMob(mobId)}
             index={index}
+            isDiceExpanded={isDiceExpanded}
+            isAdmin={isAdmin}
           />
         );
       })}
