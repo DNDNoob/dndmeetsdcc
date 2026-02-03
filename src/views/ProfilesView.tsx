@@ -4,8 +4,8 @@ import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import { HealthBar } from "@/components/ui/HealthBar";
 import { EquipmentSlot } from "@/components/ui/EquipmentSlot";
-import { Crawler, InventoryItem, createEmptyCrawler, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers } from "@/lib/gameData";
-import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Edit2, Backpack, HardHat, Package } from "lucide-react";
+import { Crawler, InventoryItem, createEmptyCrawler, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor } from "@/lib/gameData";
+import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Edit2, Backpack, HardHat, Package, Lock, Unlock, ChevronDown, ChevronUp, Check } from "lucide-react";
 
 interface ProfilesViewProps {
   crawlers: Crawler[];
@@ -16,7 +16,116 @@ interface ProfilesViewProps {
   onUpdateCrawlerInventory: (crawlerId: string, items: InventoryItem[]) => void;
   partyGold: number;
   onStatRoll?: (crawlerName: string, crawlerId: string, stat: string, totalStat: number) => void;
+  getCrawlerLootBoxes?: (crawlerId: string) => SentLootBox[];
+  claimLootBoxItems?: (lootBoxId: string, crawlerId: string, itemIds: string[]) => Promise<void>;
 }
+
+// Loot Box display section for crawler profiles
+const LootBoxSection: React.FC<{
+  boxes: SentLootBox[];
+  crawlerId: string;
+  claimLootBoxItems?: (lootBoxId: string, crawlerId: string, itemIds: string[]) => Promise<void>;
+}> = ({ boxes, crawlerId, claimLootBoxItems }) => {
+  const [expandedBoxId, setExpandedBoxId] = useState<string | null>(null);
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
+
+  return (
+    <div>
+      <h3 className="font-display text-lg text-amber-400 mb-4 flex items-center gap-2">
+        <Package className="w-5 h-5" />
+        LOOT BOXES ({boxes.length})
+      </h3>
+      <div className="space-y-2">
+        {boxes.map(box => {
+          const isExpanded = expandedBoxId === box.id;
+          return (
+            <div
+              key={box.id}
+              className="border rounded-lg overflow-hidden"
+              style={{ borderColor: getLootBoxTierColor(box.tier) }}
+            >
+              <button
+                onClick={() => {
+                  setExpandedBoxId(isExpanded ? null : box.id);
+                  setSelectedItemIds([]);
+                }}
+                className="w-full flex items-center justify-between p-3 hover:bg-muted/30 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <Package className="w-4 h-4" style={{ color: getLootBoxTierColor(box.tier) }} />
+                  <span className="font-semibold text-sm">{box.name}</span>
+                  <span className="text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: getLootBoxTierColor(box.tier) + '30', color: getLootBoxTierColor(box.tier) }}>
+                    {box.tier}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {box.locked ? (
+                    <Lock className="w-4 h-4 text-amber-500" />
+                  ) : (
+                    <Unlock className="w-4 h-4 text-green-500" />
+                  )}
+                  <span className="text-xs text-muted-foreground">{box.items.length} items</span>
+                  {!box.locked && (isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)}
+                </div>
+              </button>
+
+              {/* Locked state */}
+              {box.locked && isExpanded && (
+                <div className="px-3 pb-3 text-center text-sm text-muted-foreground">
+                  <Lock className="w-6 h-6 mx-auto mb-1 text-amber-500" />
+                  This loot box is locked. The DM will unlock it when ready.
+                </div>
+              )}
+
+              {/* Unlocked expanded state */}
+              {!box.locked && isExpanded && (
+                <div className="px-3 pb-3 space-y-2">
+                  {box.items.map(item => (
+                    <div
+                      key={item.id}
+                      className={`flex items-center gap-2 p-2 rounded border transition-colors cursor-pointer ${
+                        selectedItemIds.includes(item.id)
+                          ? 'bg-primary/10 border-primary'
+                          : 'bg-muted/20 border-border hover:bg-muted/40'
+                      }`}
+                      onClick={() => setSelectedItemIds(prev =>
+                        prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id]
+                      )}
+                    >
+                      <div className={`w-4 h-4 rounded border flex items-center justify-center ${
+                        selectedItemIds.includes(item.id) ? 'bg-primary border-primary' : 'border-muted-foreground'
+                      }`}>
+                        {selectedItemIds.includes(item.id) && <Check className="w-3 h-3 text-primary-foreground" />}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold">{item.name}</p>
+                        {item.description && <p className="text-xs text-muted-foreground">{item.description}</p>}
+                      </div>
+                    </div>
+                  ))}
+                  {claimLootBoxItems && selectedItemIds.length > 0 && (
+                    <button
+                      onClick={async () => {
+                        await claimLootBoxItems(box.id, crawlerId, selectedItemIds);
+                        setSelectedItemIds([]);
+                        if (selectedItemIds.length === box.items.length) {
+                          setExpandedBoxId(null);
+                        }
+                      }}
+                      className="w-full py-2 bg-primary text-primary-foreground rounded text-sm font-semibold hover:bg-primary/90 transition-colors"
+                    >
+                      Claim {selectedItemIds.length} item{selectedItemIds.length !== 1 ? 's' : ''} to Inventory
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 const ProfilesView: React.FC<ProfilesViewProps> = ({
   crawlers,
@@ -27,6 +136,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   onUpdateCrawlerInventory,
   partyGold,
   onStatRoll,
+  getCrawlerLootBoxes,
+  claimLootBoxItems,
 }) => {
   const [selectedId, setSelectedId] = useState(crawlers[0]?.id || "");
   const [editMode, setEditMode] = useState(false);
@@ -869,6 +980,19 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             </div>
           )}
         </div>
+
+        {/* Loot Boxes section */}
+        {getCrawlerLootBoxes && selected && (() => {
+          const boxes = getCrawlerLootBoxes(selected.id);
+          if (boxes.length === 0) return null;
+          return (
+            <LootBoxSection
+              boxes={boxes}
+              crawlerId={selected.id}
+              claimLootBoxItems={claimLootBoxItems}
+            />
+          );
+        })()}
           </div>
         </div>
       </DungeonCard>

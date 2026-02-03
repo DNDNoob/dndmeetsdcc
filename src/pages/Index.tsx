@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { AnimatePresence } from "framer-motion";
 import SplashScreen from "@/components/SplashScreen";
 import MainMenu from "@/components/MainMenu";
@@ -14,6 +14,7 @@ import ShowTimeView from "@/views/ShowTimeView";
 import SoundEffectsView from "@/views/SoundEffectsView";
 import { RoomManager } from "@/components/RoomManager";
 import { useGameState, DiceRollEntry } from "@/hooks/useGameState";
+import { toast } from "sonner";
 
 type AppScreen = "splash" | "menu" | "game";
 type GameView = "profiles" | "maps" | "inventory" | "mobs" | "dungeonai" | "showtime" | "sounds" | "multiplayer";
@@ -61,6 +62,12 @@ const Index = () => {
     updateEpisode,
     deleteEpisode,
     partyGold,
+    lootBoxes,
+    sendLootBox,
+    unlockLootBox,
+    claimLootBoxItems,
+    deleteLootBox,
+    getCrawlerLootBoxes,
     addDiceRoll,
     diceRolls,
     isLoaded
@@ -204,6 +211,42 @@ const Index = () => {
     }
   }, [maps.length, mapVisibility.length, mapNames.length]);
 
+  // Loot box notifications
+  const seenLootBoxIds = useRef<Set<string>>(new Set());
+  const prevLootBoxes = useRef(lootBoxes);
+
+  useEffect(() => {
+    if (!currentPlayer || currentPlayer.type === 'ai') return;
+
+    // Initialize seen IDs on first load
+    if (seenLootBoxIds.current.size === 0 && lootBoxes.length > 0) {
+      lootBoxes.forEach(b => seenLootBoxIds.current.add(b.id));
+      prevLootBoxes.current = lootBoxes;
+      return;
+    }
+
+    const myBoxes = lootBoxes.filter(b => b.crawlerId === currentPlayer.id);
+    const prevMyBoxes = prevLootBoxes.current.filter(b => b.crawlerId === currentPlayer.id);
+
+    // Check for new boxes
+    for (const box of myBoxes) {
+      if (!seenLootBoxIds.current.has(box.id)) {
+        seenLootBoxIds.current.add(box.id);
+        toast(`New loot box received: ${box.name}!`, { icon: '📦' });
+      }
+    }
+
+    // Check for unlocked boxes
+    for (const box of myBoxes) {
+      const prev = prevMyBoxes.find(b => b.id === box.id);
+      if (prev && prev.locked && !box.locked) {
+        toast(`Loot box unlocked: ${box.name}!`, { icon: '🔓' });
+      }
+    }
+
+    prevLootBoxes.current = lootBoxes;
+  }, [lootBoxes, currentPlayer]);
+
   if (!isLoaded) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -263,6 +306,8 @@ const Index = () => {
                 onUpdateCrawlerInventory={updateCrawlerInventory}
                 partyGold={partyGold}
                 onStatRoll={handleStatRoll}
+                getCrawlerLootBoxes={getCrawlerLootBoxes}
+                claimLootBoxItems={claimLootBoxItems}
               />
             )}
             {currentView === "maps" && (
@@ -301,6 +346,7 @@ const Index = () => {
                 onUpdateEpisode={updateEpisode}
                 onDeleteEpisode={deleteEpisode}
                 onCleanupEmptyMaps={cleanupEmptyMaps}
+                getSharedInventory={getSharedInventory}
               />
             )}
             {currentView === "showtime" && (
@@ -314,6 +360,10 @@ const Index = () => {
                 onUpdateEpisode={updateEpisode}
                 isNavVisible={isNavVisible}
                 isDiceExpanded={isDiceExpanded}
+                lootBoxes={lootBoxes}
+                sendLootBox={sendLootBox}
+                unlockLootBox={unlockLootBox}
+                deleteLootBox={deleteLootBox}
               />
             )}
             {currentView === "sounds" && <SoundEffectsView />}

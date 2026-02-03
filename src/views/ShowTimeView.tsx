@@ -7,8 +7,8 @@ import { GridOverlay } from "@/components/ui/GridOverlay";
 import RulerOverlay from "@/components/ui/RulerOverlay";
 import { MobIcon } from "@/components/ui/MobIcon";
 import { FogOfWar } from "@/components/ui/FogOfWar";
-import { Episode, Mob, MapSettings, Crawler, CrawlerPlacement, EpisodeMobPlacement } from "@/lib/gameData";
-import { Map, X, Eye, Layers, ChevronLeft, ChevronRight, PlayCircle, Grid3x3, CloudFog, Eraser, Trash2, Target, ZoomIn, ZoomOut } from "lucide-react";
+import { Episode, Mob, MapSettings, Crawler, CrawlerPlacement, EpisodeMobPlacement, SentLootBox, LootBoxTemplate, getLootBoxTierColor } from "@/lib/gameData";
+import { Map, X, Eye, Layers, ChevronLeft, ChevronRight, PlayCircle, Grid3x3, CloudFog, Eraser, Trash2, Target, ZoomIn, ZoomOut, Package, Lock, Unlock } from "lucide-react";
 import { PingEffect, Ping } from "@/components/ui/PingEffect";
 import { MapBox, MapBoxData, ShapeType } from "@/components/ui/MapBox";
 import { MapToolsMenu } from "@/components/ui/MapToolsMenu";
@@ -28,11 +28,167 @@ interface ShowTimeViewProps {
   onUpdateEpisode?: (id: string, updates: Partial<Episode>) => void;
   isNavVisible?: boolean;
   isDiceExpanded?: boolean;
+  lootBoxes?: SentLootBox[];
+  sendLootBox?: (episodeId: string, template: LootBoxTemplate, crawlerIds: string[]) => Promise<void>;
+  unlockLootBox?: (lootBoxId: string) => Promise<void>;
+  deleteLootBox?: (lootBoxId: string) => void;
 }
 
 const SHOWTIME_STORAGE_KEY = 'dcc_showtime_state';
 
-const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false }) => {
+// Loot Box Panel for DM to send/manage loot boxes
+const LootBoxPanel: React.FC<{
+  episode: Episode;
+  crawlers: Crawler[];
+  sentLootBoxes: SentLootBox[];
+  onSend: (episodeId: string, template: LootBoxTemplate, crawlerIds: string[]) => Promise<void>;
+  onUnlock?: (lootBoxId: string) => Promise<void>;
+  onDelete?: (lootBoxId: string) => void;
+}> = ({ episode, crawlers, sentLootBoxes, onSend, onUnlock, onDelete }) => {
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [selectedCrawlerIds, setSelectedCrawlerIds] = useState<string[]>([]);
+
+  const templates = episode.lootBoxes || [];
+  const episodeCrawlerIds = [...new Set((episode.crawlerPlacements || []).map(p => p.crawlerId))];
+  const episodeCrawlers = crawlers.filter(c => episodeCrawlerIds.includes(c.id));
+
+  const handleSend = async () => {
+    const template = templates.find(t => t.id === selectedTemplateId);
+    if (!template || selectedCrawlerIds.length === 0) return;
+    await onSend(episode.id, template, selectedCrawlerIds);
+    setSelectedCrawlerIds([]);
+  };
+
+  const toggleAll = () => {
+    if (selectedCrawlerIds.length === episodeCrawlers.length) {
+      setSelectedCrawlerIds([]);
+    } else {
+      setSelectedCrawlerIds(episodeCrawlers.map(c => c.id));
+    }
+  };
+
+  return (
+    <div>
+      <h3 className="font-display text-amber-400 text-lg mb-4 flex items-center gap-2">
+        <Package className="w-5 h-5" />
+        Loot Boxes
+      </h3>
+
+      {/* Template selection */}
+      <div className="grid sm:grid-cols-2 gap-2 mb-4">
+        {templates.map(template => (
+          <button
+            key={template.id}
+            onClick={() => setSelectedTemplateId(selectedTemplateId === template.id ? null : template.id)}
+            className={`text-left p-2 border rounded transition-colors ${
+              selectedTemplateId === template.id
+                ? 'bg-amber-500/20 border-amber-500'
+                : 'bg-muted/30 border-border hover:border-amber-500/50'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Package className="w-4 h-4 flex-shrink-0" style={{ color: getLootBoxTierColor(template.tier) }} />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold truncate">{template.name}</p>
+                <p className="text-xs text-muted-foreground">{template.tier} · {template.items.length} items</p>
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {/* Crawler selection - only show when a template is selected */}
+      {selectedTemplateId && (
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm text-muted-foreground">Send to:</p>
+            <button onClick={toggleAll} className="text-xs text-primary hover:underline">
+              {selectedCrawlerIds.length === episodeCrawlers.length ? 'Deselect All' : 'Select All'}
+            </button>
+          </div>
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-2">
+            {episodeCrawlers.map(crawler => (
+              <button
+                key={crawler.id}
+                onClick={() => setSelectedCrawlerIds(prev =>
+                  prev.includes(crawler.id) ? prev.filter(id => id !== crawler.id) : [...prev, crawler.id]
+                )}
+                className={`text-left p-2 border rounded text-sm transition-colors ${
+                  selectedCrawlerIds.includes(crawler.id)
+                    ? 'bg-blue-500/20 border-blue-500'
+                    : 'bg-muted/30 border-border hover:border-blue-500/50'
+                }`}
+              >
+                {crawler.name}
+                {selectedCrawlerIds.includes(crawler.id) && <span className="ml-1">✓</span>}
+              </button>
+            ))}
+          </div>
+          <DungeonButton
+            variant="admin"
+            size="sm"
+            className="mt-3"
+            disabled={selectedCrawlerIds.length === 0}
+            onClick={handleSend}
+          >
+            <Package className="w-4 h-4 mr-2" />
+            Send to {selectedCrawlerIds.length} crawler{selectedCrawlerIds.length !== 1 ? 's' : ''}
+          </DungeonButton>
+        </div>
+      )}
+
+      {/* Sent loot boxes */}
+      {sentLootBoxes.length > 0 && (
+        <div>
+          <p className="text-sm text-muted-foreground mb-2">Sent Loot Boxes:</p>
+          <div className="space-y-1">
+            {sentLootBoxes.map(box => {
+              const crawler = crawlers.find(c => c.id === box.crawlerId);
+              return (
+                <div
+                  key={box.id}
+                  className="flex items-center justify-between bg-muted/30 border border-border rounded p-2"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Package className="w-3 h-3 flex-shrink-0" style={{ color: getLootBoxTierColor(box.tier) }} />
+                    <span className="text-xs truncate">
+                      {box.name} → {crawler?.name || 'Unknown'}
+                    </span>
+                    {box.locked ? (
+                      <Lock className="w-3 h-3 text-amber-500 flex-shrink-0" />
+                    ) : (
+                      <Unlock className="w-3 h-3 text-green-500 flex-shrink-0" />
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {box.locked && onUnlock && (
+                      <button
+                        onClick={() => onUnlock(box.id)}
+                        className="text-xs px-2 py-0.5 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                      >
+                        Unlock
+                      </button>
+                    )}
+                    {onDelete && (
+                      <button
+                        onClick={() => onDelete(box.id)}
+                        className="p-0.5 hover:bg-destructive/10 rounded"
+                      >
+                        <Trash2 className="w-3 h-3 text-destructive" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], sendLootBox, unlockLootBox, deleteLootBox }) => {
   const { roomId } = useFirebaseStore();
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
   const [currentMapIndex, setCurrentMapIndex] = useState(0);
@@ -1628,6 +1784,18 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                   ))}
                 </div>
               </div>
+            )}
+
+            {/* Loot Box Panel - DM only */}
+            {isAdmin && selectedEpisode.lootBoxes && selectedEpisode.lootBoxes.length > 0 && sendLootBox && (
+              <LootBoxPanel
+                episode={selectedEpisode}
+                crawlers={crawlers}
+                sentLootBoxes={lootBoxes.filter(b => b.episodeId === selectedEpisode.id)}
+                onSend={sendLootBox}
+                onUnlock={unlockLootBox}
+                onDelete={deleteLootBox}
+              />
             )}
           </div>
         </DungeonCard>

@@ -3,8 +3,8 @@ import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import MapMobPlacementEditor from "@/components/ui/MapMobPlacementEditor";
-import { Mob, Episode, EpisodeMobPlacement, Crawler, CrawlerPlacement } from "@/lib/gameData";
-import { Brain, Upload, Plus, Trash2, Map, Skull, Image as ImageIcon, Save, Edit2, X, Layers, ChevronLeft, ChevronRight, User } from "lucide-react";
+import { Mob, Episode, EpisodeMobPlacement, Crawler, CrawlerPlacement, InventoryItem, LootBoxTemplate, LootBoxTier, getLootBoxTierColor } from "@/lib/gameData";
+import { Brain, Upload, Plus, Trash2, Map, Skull, Image as ImageIcon, Save, Edit2, X, Layers, ChevronLeft, ChevronRight, User, Package, Search } from "lucide-react";
 
 interface DungeonAIViewProps {
   mobs: Mob[];
@@ -19,6 +19,7 @@ interface DungeonAIViewProps {
   onUpdateEpisode: (id: string, updates: Partial<Episode>) => void;
   onDeleteEpisode: (id: string) => void;
   onCleanupEmptyMaps?: () => Promise<void>;
+  getSharedInventory?: () => InventoryItem[];
 }
 
 const DungeonAIView: React.FC<DungeonAIViewProps> = ({
@@ -34,6 +35,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   onUpdateEpisode,
   onDeleteEpisode,
   onCleanupEmptyMaps,
+  getSharedInventory,
 }) => {
   const [activeTab, setActiveTab] = useState<"mobs" | "maps" | "episodes">("mobs");
   const [newMob, setNewMob] = useState<Partial<Mob>>({
@@ -62,6 +64,14 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   const [currentMapIndexForEditor, setCurrentMapIndexForEditor] = useState(0);
   // Per-map settings: { [mapId]: { fogOfWar: boolean, scale: number } }
   const [mapSettingsForEpisode, setMapSettingsForEpisode] = useState<{ [mapId: string]: { fogOfWar: boolean; scale: number } }>({});
+
+  // Loot box state
+  const [lootBoxesForEpisode, setLootBoxesForEpisode] = useState<LootBoxTemplate[]>([]);
+  const [newLootBoxName, setNewLootBoxName] = useState("");
+  const [newLootBoxTier, setNewLootBoxTier] = useState<LootBoxTier>("Copper");
+  const [newLootBoxItems, setNewLootBoxItems] = useState<InventoryItem[]>([]);
+  const [lootBoxItemSearch, setLootBoxItemSearch] = useState("");
+  const [editingLootBoxId, setEditingLootBoxId] = useState<string | null>(null);
 
   const handleAddMob = async () => {
     if (!newMob.name?.trim()) return;
@@ -297,7 +307,8 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
         mapIds: selectedMapsForEpisode,
         mobPlacements: selectedMobsForEpisode,
         crawlerPlacements: selectedCrawlersForEpisode,
-        mapSettings: mapSettings
+        mapSettings: mapSettings,
+        lootBoxes: lootBoxesForEpisode.length > 0 ? lootBoxesForEpisode : undefined
       });
       setEditingEpisodeId(null);
     } else {
@@ -309,7 +320,8 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
         mapIds: selectedMapsForEpisode,
         mobPlacements: selectedMobsForEpisode,
         crawlerPlacements: selectedCrawlersForEpisode,
-        mapSettings: mapSettings
+        mapSettings: mapSettings,
+        lootBoxes: lootBoxesForEpisode.length > 0 ? lootBoxesForEpisode : undefined
       };
       onAddEpisode(episode);
     }
@@ -322,6 +334,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
     setSelectedCrawlersForEpisode([]);
     setCurrentMapIndexForEditor(0);
     setMapSettingsForEpisode({});
+    setLootBoxesForEpisode([]);
   };
 
   const handleToggleMapForEpisode = (mapIndex: number) => {
@@ -402,6 +415,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
       };
     });
     setMapSettingsForEpisode(loadedMapSettings);
+    setLootBoxesForEpisode(episode.lootBoxes || []);
 
     setCurrentMapIndexForEditor(0);
     // Scroll to top
@@ -1178,6 +1192,174 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                   </div>
                 )}
 
+                {/* Loot Boxes */}
+                <div className="bg-muted/30 border border-border rounded p-4 mt-4">
+                  <h5 className="font-display text-sm text-amber-400 mb-3 flex items-center gap-2">
+                    <Package className="w-4 h-4" />
+                    Loot Boxes
+                  </h5>
+
+                  {/* Existing loot boxes on this episode */}
+                  {lootBoxesForEpisode.length > 0 && (
+                    <div className="space-y-2 mb-4">
+                      {lootBoxesForEpisode.map(box => (
+                        <div
+                          key={box.id}
+                          className="flex items-center justify-between bg-background border rounded p-2"
+                          style={{ borderColor: getLootBoxTierColor(box.tier) }}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Package className="w-4 h-4 flex-shrink-0" style={{ color: getLootBoxTierColor(box.tier) }} />
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold truncate">{box.name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {box.tier} · {box.items.length} item{box.items.length !== 1 ? 's' : ''}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => {
+                                setEditingLootBoxId(box.id);
+                                setNewLootBoxName(box.name);
+                                setNewLootBoxTier(box.tier);
+                                setNewLootBoxItems([...box.items]);
+                              }}
+                              className="p-1 hover:bg-muted rounded transition-colors"
+                              title="Edit loot box"
+                            >
+                              <Edit2 className="w-3 h-3 text-muted-foreground" />
+                            </button>
+                            <button
+                              onClick={() => setLootBoxesForEpisode(prev => prev.filter(b => b.id !== box.id))}
+                              className="p-1 hover:bg-destructive/10 rounded transition-colors"
+                              title="Remove loot box"
+                            >
+                              <Trash2 className="w-3 h-3 text-destructive" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Add/Edit loot box form */}
+                  <div className="space-y-3 border border-border rounded p-3 bg-background/50">
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        placeholder="Loot box name"
+                        value={newLootBoxName}
+                        onChange={e => setNewLootBoxName(e.target.value)}
+                        className="bg-background border border-border rounded px-2 py-1 text-sm"
+                      />
+                      <select
+                        value={newLootBoxTier}
+                        onChange={e => setNewLootBoxTier(e.target.value as LootBoxTier)}
+                        className="bg-background border border-border rounded px-2 py-1 text-sm"
+                        style={{ color: getLootBoxTierColor(newLootBoxTier) }}
+                      >
+                        {(['Dirt', 'Copper', 'Silver', 'Gold'] as LootBoxTier[]).map(tier => (
+                          <option key={tier} value={tier} style={{ color: getLootBoxTierColor(tier) }}>
+                            {tier}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Item search from shared inventory */}
+                    <div>
+                      <div className="relative">
+                        <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                        <input
+                          type="text"
+                          placeholder="Search shared inventory to add items..."
+                          value={lootBoxItemSearch}
+                          onChange={e => setLootBoxItemSearch(e.target.value)}
+                          className="bg-background border border-border rounded pl-7 pr-2 py-1 text-sm w-full"
+                        />
+                      </div>
+                      {lootBoxItemSearch && getSharedInventory && (
+                        <div className="mt-1 max-h-32 overflow-y-auto border border-border rounded bg-background">
+                          {getSharedInventory()
+                            .filter(item => item.name.toLowerCase().includes(lootBoxItemSearch.toLowerCase()))
+                            .slice(0, 10)
+                            .map(item => (
+                              <button
+                                key={item.id}
+                                onClick={() => {
+                                  setNewLootBoxItems(prev => [...prev, { ...item, id: crypto.randomUUID() }]);
+                                  setLootBoxItemSearch("");
+                                }}
+                                className="w-full text-left px-2 py-1 text-xs hover:bg-muted/50 border-b border-border last:border-b-0"
+                              >
+                                <span className="font-semibold">{item.name}</span>
+                                {item.description && <span className="text-muted-foreground ml-1">- {item.description}</span>}
+                              </button>
+                            ))}
+                          {getSharedInventory().filter(item => item.name.toLowerCase().includes(lootBoxItemSearch.toLowerCase())).length === 0 && (
+                            <p className="text-xs text-muted-foreground p-2">No matching items found</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Selected items */}
+                    {newLootBoxItems.length > 0 && (
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground">Items in box:</p>
+                        {newLootBoxItems.map((item, idx) => (
+                          <div key={item.id} className="flex items-center justify-between bg-muted/30 rounded px-2 py-1">
+                            <span className="text-xs">{item.name}</span>
+                            <button
+                              onClick={() => setNewLootBoxItems(prev => prev.filter((_, i) => i !== idx))}
+                              className="p-0.5 hover:bg-destructive/10 rounded"
+                            >
+                              <X className="w-3 h-3 text-destructive" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <DungeonButton
+                      variant="default"
+                      size="sm"
+                      disabled={!newLootBoxName.trim() || newLootBoxItems.length === 0}
+                      onClick={() => {
+                        if (!newLootBoxName.trim() || newLootBoxItems.length === 0) return;
+                        if (editingLootBoxId) {
+                          setLootBoxesForEpisode(prev => prev.map(b =>
+                            b.id === editingLootBoxId
+                              ? { ...b, name: newLootBoxName, tier: newLootBoxTier, items: newLootBoxItems }
+                              : b
+                          ));
+                          setEditingLootBoxId(null);
+                        } else {
+                          setLootBoxesForEpisode(prev => [...prev, {
+                            id: crypto.randomUUID(),
+                            name: newLootBoxName,
+                            tier: newLootBoxTier,
+                            items: newLootBoxItems,
+                          }]);
+                        }
+                        setNewLootBoxName("");
+                        setNewLootBoxTier("Copper");
+                        setNewLootBoxItems([]);
+                      }}
+                    >
+                      <Plus className="w-3 h-3 mr-1" />
+                      {editingLootBoxId ? "Update Loot Box" : "Add Loot Box"}
+                    </DungeonButton>
+                  </div>
+
+                  {!getSharedInventory && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Add items to the Shared Inventory Library (Inventory tab) to populate loot boxes.
+                    </p>
+                  )}
+                </div>
+
                 <div className="flex gap-2 pt-4">
                   {editingEpisodeId && (
                     <DungeonButton
@@ -1191,6 +1373,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                         setSelectedCrawlersForEpisode([]);
                         setCurrentMapIndexForEditor(0);
                         setMapSettingsForEpisode({});
+                        setLootBoxesForEpisode([]);
                       }}
                       className="flex-1"
                     >

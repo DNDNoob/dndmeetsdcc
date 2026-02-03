@@ -109,6 +109,46 @@ export interface MapSettings {
   scale: number; // Scale percentage (100 = normal)
 }
 
+// Loot Box Types
+export type LootBoxTier = 'Dirt' | 'Copper' | 'Silver' | 'Gold';
+
+export interface LootBoxTemplate {
+  id: string;
+  name: string;
+  tier: LootBoxTier;
+  items: InventoryItem[];
+}
+
+export interface SentLootBox {
+  id: string;
+  episodeId: string;
+  crawlerId: string;
+  name: string;
+  tier: LootBoxTier;
+  items: InventoryItem[];
+  locked: boolean;
+  sentAt: string;
+  unlockedAt?: string;
+}
+
+export const getLootBoxTierColor = (tier: LootBoxTier): string => {
+  switch (tier) {
+    case 'Dirt': return '#8B4513';
+    case 'Copper': return '#B87333';
+    case 'Silver': return '#C0C0C0';
+    case 'Gold': return '#FFD700';
+  }
+};
+
+export const getLootBoxTierBorder = (tier: LootBoxTier): string => {
+  switch (tier) {
+    case 'Dirt': return 'border-[#8B4513]';
+    case 'Copper': return 'border-[#B87333]';
+    case 'Silver': return 'border-[#C0C0C0]';
+    case 'Gold': return 'border-[#FFD700]';
+  }
+};
+
 export interface Episode {
   id: string;
   name: string;
@@ -118,6 +158,7 @@ export interface Episode {
   crawlerPlacements?: CrawlerPlacement[]; // Pre-placed crawlers with positions
   mapSettings?: { [mapId: string]: MapSettings }; // Per-map settings
   defaultFogOfWar?: boolean; // Default fog of war setting for new maps
+  lootBoxes?: LootBoxTemplate[]; // Loot box templates for this episode
   createdAt?: string;
   updatedAt?: string;
 }

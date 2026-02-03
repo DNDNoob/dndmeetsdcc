@@ -4,6 +4,8 @@ import {
   InventoryItem,
   Mob,
   Episode,
+  SentLootBox,
+  LootBoxTemplate,
   defaultCrawlers,
   defaultInventory,
   defaultMobs,
@@ -372,6 +374,61 @@ export const useGameState = () => {
     deleteItem('episodes', id);
   };
 
+  // --- Loot Boxes ---
+  const lootBoxes = useMemo(() => {
+    return getStableCollection<SentLootBox>('lootBoxes');
+  }, [getCollection, isLoaded]);
+
+  const sendLootBox = async (episodeId: string, template: LootBoxTemplate, crawlerIds: string[]) => {
+    const operations: BatchOperation[] = crawlerIds.map(crawlerId => ({
+      type: 'add' as const,
+      collection: 'lootBoxes' as const,
+      id: crypto.randomUUID(),
+      data: stripUndefinedDeep({
+        episodeId,
+        crawlerId,
+        name: template.name,
+        tier: template.tier,
+        items: template.items.map(item => ({ ...item, id: crypto.randomUUID() })),
+        locked: true,
+        sentAt: new Date().toISOString(),
+      }) as Record<string, unknown>,
+    }));
+    if (operations.length > 0) await batchWrite(operations);
+  };
+
+  const unlockLootBox = async (lootBoxId: string) => {
+    updateItem('lootBoxes', lootBoxId, { locked: false, unlockedAt: new Date().toISOString() });
+  };
+
+  const claimLootBoxItems = async (lootBoxId: string, crawlerId: string, itemIds: string[]) => {
+    const box = lootBoxes.find(b => b.id === lootBoxId);
+    if (!box) return;
+
+    const itemsToClaim = box.items.filter(i => itemIds.includes(i.id));
+    if (itemsToClaim.length === 0) return;
+
+    // Add items to crawler inventory
+    const currentItems = getCrawlerInventory(crawlerId);
+    updateCrawlerInventory(crawlerId, [...currentItems, ...itemsToClaim]);
+
+    // Remove claimed items from loot box
+    const remainingItems = box.items.filter(i => !itemIds.includes(i.id));
+    if (remainingItems.length === 0) {
+      deleteItem('lootBoxes', lootBoxId);
+    } else {
+      updateItem('lootBoxes', lootBoxId, { items: remainingItems });
+    }
+  };
+
+  const deleteLootBox = (lootBoxId: string) => {
+    deleteItem('lootBoxes', lootBoxId);
+  };
+
+  const getCrawlerLootBoxes = (crawlerId: string) => {
+    return lootBoxes.filter(b => b.crawlerId === crawlerId);
+  };
+
   // --- Dice Rolls ---
   const diceRolls = useMemo(() => {
     const stored = getStableCollection<DiceRollEntry>('diceRolls');
@@ -424,6 +481,12 @@ export const useGameState = () => {
     updateEpisode,
     deleteEpisode,
     partyGold,
+    lootBoxes,
+    sendLootBox,
+    unlockLootBox,
+    claimLootBoxItems,
+    deleteLootBox,
+    getCrawlerLootBoxes,
     diceRolls,
     addDiceRoll,
     clearDiceRolls,

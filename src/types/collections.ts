@@ -13,6 +13,7 @@ export type CollectionName =
   | 'soundEffects'
   | 'sound-broadcast'
   | 'diceRolls'
+  | 'lootBoxes'
   // Add new collections below:
   | 'quests'
   | 'npcs'
