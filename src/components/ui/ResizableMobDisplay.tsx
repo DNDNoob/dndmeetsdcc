@@ -21,8 +21,8 @@ export const ResizableMobDisplay: React.FC<ResizableMobDisplayProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Dice button is ~100px wide at right-4 (16px). Panel is w-72 (288px) + gap.
-  const diceButtonRight = 16 + 100 + 10; // right edge of dice button + spacing
-  const dicePanelRight = 16 + 288 + 8 + 100 + 10; // panel + gap + button + spacing
+  const diceButtonRight = 16 + 100 + 24; // right edge of dice button + spacing
+  const dicePanelRight = 16 + 288 + 8 + 100 + 24; // panel + gap + button + spacing
   const baseRight = isDiceExpanded ? dicePanelRight : diceButtonRight;
   const cardWidth = 140;
   const cardSpacing = 8;
@@ -52,6 +52,7 @@ export const ResizableMobDisplay: React.FC<ResizableMobDisplayProps> = ({
         transition: "all 0.25s ease",
         zIndex: 40,
       }}
+      title={!isExpanded ? mob.name : undefined}
       className="bg-muted border-2 border-primary rounded-lg shadow-lg overflow-hidden"
     >
       {/* Header */}
