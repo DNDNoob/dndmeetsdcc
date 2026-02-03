@@ -68,6 +68,10 @@ const Index = () => {
     claimLootBoxItems,
     deleteLootBox,
     getCrawlerLootBoxes,
+    lootBoxTemplates,
+    addLootBoxTemplate,
+    updateLootBoxTemplate,
+    deleteLootBoxTemplate,
     addDiceRoll,
     diceRolls,
     isLoaded
@@ -232,7 +236,7 @@ const Index = () => {
     for (const box of myBoxes) {
       if (!seenLootBoxIds.current.has(box.id)) {
         seenLootBoxIds.current.add(box.id);
-        toast(`New loot box received: ${box.name}!`, { icon: '📦' });
+        toast(`New loot box received: ${box.name}!`, { icon: '📦', duration: Infinity });
       }
     }
 
@@ -240,7 +244,7 @@ const Index = () => {
     for (const box of myBoxes) {
       const prev = prevMyBoxes.find(b => b.id === box.id);
       if (prev && prev.locked && !box.locked) {
-        toast(`Loot box unlocked: ${box.name}!`, { icon: '🔓' });
+        toast(`Loot box unlocked: ${box.name}!`, { icon: '🔓', duration: Infinity });
       }
     }
 
@@ -347,6 +351,10 @@ const Index = () => {
                 onDeleteEpisode={deleteEpisode}
                 onCleanupEmptyMaps={cleanupEmptyMaps}
                 getSharedInventory={getSharedInventory}
+                lootBoxTemplates={lootBoxTemplates}
+                onAddLootBoxTemplate={addLootBoxTemplate}
+                onUpdateLootBoxTemplate={updateLootBoxTemplate}
+                onDeleteLootBoxTemplate={deleteLootBoxTemplate}
               />
             )}
             {currentView === "showtime" && (
@@ -361,9 +369,11 @@ const Index = () => {
                 isNavVisible={isNavVisible}
                 isDiceExpanded={isDiceExpanded}
                 lootBoxes={lootBoxes}
+                lootBoxTemplates={lootBoxTemplates}
                 sendLootBox={sendLootBox}
                 unlockLootBox={unlockLootBox}
                 deleteLootBox={deleteLootBox}
+                addDiceRoll={addDiceRoll}
               />
             )}
             {currentView === "sounds" && <SoundEffectsView />}

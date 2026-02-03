@@ -29,9 +29,11 @@ interface ShowTimeViewProps {
   isNavVisible?: boolean;
   isDiceExpanded?: boolean;
   lootBoxes?: SentLootBox[];
+  lootBoxTemplates?: LootBoxTemplate[];
   sendLootBox?: (episodeId: string, template: LootBoxTemplate, crawlerIds: string[]) => Promise<void>;
   unlockLootBox?: (lootBoxId: string) => Promise<void>;
   deleteLootBox?: (lootBoxId: string) => void;
+  addDiceRoll?: (entry: import("@/hooks/useGameState").DiceRollEntry) => Promise<void>;
 }
 
 const SHOWTIME_STORAGE_KEY = 'dcc_showtime_state';
@@ -41,14 +43,18 @@ const LootBoxPanel: React.FC<{
   episode: Episode;
   crawlers: Crawler[];
   sentLootBoxes: SentLootBox[];
+  allTemplates: LootBoxTemplate[];
   onSend: (episodeId: string, template: LootBoxTemplate, crawlerIds: string[]) => Promise<void>;
   onUnlock?: (lootBoxId: string) => Promise<void>;
   onDelete?: (lootBoxId: string) => void;
-}> = ({ episode, crawlers, sentLootBoxes, onSend, onUnlock, onDelete }) => {
+  addDiceRoll?: (entry: import("@/hooks/useGameState").DiceRollEntry) => Promise<void>;
+}> = ({ episode, crawlers, sentLootBoxes, allTemplates, onSend, onUnlock, onDelete, addDiceRoll }) => {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [selectedCrawlerIds, setSelectedCrawlerIds] = useState<string[]>([]);
 
-  const templates = episode.lootBoxes || [];
+  // Get templates assigned to this episode (support both old embedded and new ID-based)
+  const episodeTemplateIds = episode.lootBoxIds || (episode.lootBoxes?.map(b => b.id) || []);
+  const templates = allTemplates.filter(t => episodeTemplateIds.includes(t.id));
   const episodeCrawlerIds = [...new Set((episode.crawlerPlacements || []).map(p => p.crawlerId))];
   const episodeCrawlers = crawlers.filter(c => episodeCrawlerIds.includes(c.id));
 
@@ -56,6 +62,27 @@ const LootBoxPanel: React.FC<{
     const template = templates.find(t => t.id === selectedTemplateId);
     if (!template || selectedCrawlerIds.length === 0) return;
     await onSend(episode.id, template, selectedCrawlerIds);
+
+    // Add notification to dice roll history
+    if (addDiceRoll) {
+      const recipientNames = selectedCrawlerIds
+        .map(id => crawlers.find(c => c.id === id)?.name)
+        .filter(Boolean) as string[];
+      await addDiceRoll({
+        id: crypto.randomUUID(),
+        crawlerName: 'DM',
+        crawlerId: '__dm__',
+        timestamp: Date.now(),
+        results: [],
+        total: 0,
+        lootBoxNotification: {
+          boxName: template.name,
+          tier: template.tier,
+          recipientNames,
+        },
+      });
+    }
+
     setSelectedCrawlerIds([]);
   };
 
@@ -188,7 +215,7 @@ const LootBoxPanel: React.FC<{
   );
 };
 
-const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], sendLootBox, unlockLootBox, deleteLootBox }) => {
+const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll }) => {
   const { roomId } = useFirebaseStore();
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
   const [currentMapIndex, setCurrentMapIndex] = useState(0);
@@ -1787,14 +1814,16 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             )}
 
             {/* Loot Box Panel - DM only */}
-            {isAdmin && selectedEpisode.lootBoxes && selectedEpisode.lootBoxes.length > 0 && sendLootBox && (
+            {isAdmin && ((selectedEpisode.lootBoxIds && selectedEpisode.lootBoxIds.length > 0) || (selectedEpisode.lootBoxes && selectedEpisode.lootBoxes.length > 0)) && sendLootBox && (
               <LootBoxPanel
                 episode={selectedEpisode}
                 crawlers={crawlers}
                 sentLootBoxes={lootBoxes.filter(b => b.episodeId === selectedEpisode.id)}
+                allTemplates={lootBoxTemplates}
                 onSend={sendLootBox}
                 onUnlock={unlockLootBox}
                 onDelete={deleteLootBox}
+                addDiceRoll={addDiceRoll}
               />
             )}
           </div>

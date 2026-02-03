@@ -21,6 +21,12 @@ export interface DiceRollEntry {
   results: { dice: string; result: number }[];
   total: number;
   statRoll?: { stat: string; modifier: number; rawRoll: number };
+  // For loot box notifications
+  lootBoxNotification?: {
+    boxName: string;
+    tier: string;
+    recipientNames: string[];
+  };
 }
 
 interface InventoryEntry {
@@ -429,6 +435,23 @@ export const useGameState = () => {
     return lootBoxes.filter(b => b.crawlerId === crawlerId);
   };
 
+  // --- Loot Box Templates ---
+  const lootBoxTemplates = useMemo(() => {
+    return getStableCollection<LootBoxTemplate>('lootBoxTemplates');
+  }, [getCollection, isLoaded]);
+
+  const addLootBoxTemplate = (template: LootBoxTemplate) => {
+    addItem('lootBoxTemplates', stripUndefinedDeep(template) as Record<string, unknown>);
+  };
+
+  const updateLootBoxTemplate = (id: string, updates: Partial<LootBoxTemplate>) => {
+    updateItem('lootBoxTemplates', id, stripUndefinedDeep(updates) as Record<string, unknown>);
+  };
+
+  const deleteLootBoxTemplate = (id: string) => {
+    deleteItem('lootBoxTemplates', id);
+  };
+
   // --- Dice Rolls ---
   const diceRolls = useMemo(() => {
     const stored = getStableCollection<DiceRollEntry>('diceRolls');
@@ -487,6 +510,10 @@ export const useGameState = () => {
     claimLootBoxItems,
     deleteLootBox,
     getCrawlerLootBoxes,
+    lootBoxTemplates,
+    addLootBoxTemplate,
+    updateLootBoxTemplate,
+    deleteLootBoxTemplate,
     diceRolls,
     addDiceRoll,
     clearDiceRolls,

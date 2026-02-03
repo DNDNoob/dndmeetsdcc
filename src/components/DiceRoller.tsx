@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DungeonButton } from "./ui/DungeonButton";
-import { Dices, ChevronUp, ChevronDown, Plus, X } from "lucide-react";
+import { Dices, ChevronUp, ChevronDown, Plus, X, Package } from "lucide-react";
+import { getLootBoxTierColor } from "@/lib/gameData";
 import { DiceRollEntry } from "@/hooks/useGameState";
 
 const diceTypes = [
@@ -165,52 +166,70 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
                 ) : (
                   [...diceRolls].reverse().map((entry) => (
                     <div key={entry.id} className="bg-muted/50 px-2 py-2 text-xs text-muted-foreground rounded">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-display text-primary">{entry.crawlerName}</span>
-                          <span className="text-[10px] text-muted-foreground/60">{formatTimestamp(entry.timestamp)}</span>
-                          {entry.statRoll ? (
-                            <span className="text-xs">
-                              {entry.statRoll.stat} Check: d20({entry.statRoll.rawRoll}) {entry.statRoll.modifier >= 0 ? '+' : ''}{entry.statRoll.modifier} = <span className="font-bold text-primary">{entry.total}</span>
+                      {entry.lootBoxNotification ? (
+                        // Loot box notification display
+                        <div className="flex items-center gap-2">
+                          <Package className="w-4 h-4 flex-shrink-0" style={{ color: getLootBoxTierColor(entry.lootBoxNotification.tier as 'Dirt' | 'Copper' | 'Silver' | 'Gold') }} />
+                          <div>
+                            <span className="font-display" style={{ color: getLootBoxTierColor(entry.lootBoxNotification.tier as 'Dirt' | 'Copper' | 'Silver' | 'Gold') }}>
+                              {entry.lootBoxNotification.boxName}
                             </span>
-                          ) : (
-                            <span className="text-xs">{entry.results.map(r => r.dice).join(', ')} — Total: <span className="font-bold text-primary">{entry.total}</span></span>
-                          )}
+                            <span className="text-muted-foreground"> sent to </span>
+                            <span className="text-primary">{entry.lootBoxNotification.recipientNames.join(', ')}</span>
+                          </div>
+                          <span className="text-[10px] text-muted-foreground/60 ml-auto">{formatTimestamp(entry.timestamp)}</span>
                         </div>
-                        <button
-                          onClick={() => setExpandedIds((prev) => ({ ...prev, [entry.id]: !prev[entry.id] }))}
-                          className="text-xs px-2 py-1"
-                        >
-                          {expandedIds[entry.id] ? '▾' : '▸'}
-                        </button>
-                      </div>
-                      {expandedIds[entry.id] && (
-                        <div className="mt-2 text-xs">
-                          {entry.results.map((r, i) => (
-                            <div key={i} className="flex items-center justify-between">
-                              <div>{r.dice}</div>
-                              <div className="font-bold text-primary">{r.result}</div>
+                      ) : (
+                        // Regular dice roll display
+                        <>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-display text-primary">{entry.crawlerName}</span>
+                              <span className="text-[10px] text-muted-foreground/60">{formatTimestamp(entry.timestamp)}</span>
+                              {entry.statRoll ? (
+                                <span className="text-xs">
+                                  {entry.statRoll.stat} Check: d20({entry.statRoll.rawRoll}) {entry.statRoll.modifier >= 0 ? '+' : ''}{entry.statRoll.modifier} = <span className="font-bold text-primary">{entry.total}</span>
+                                </span>
+                              ) : (
+                                <span className="text-xs">{entry.results.map(r => r.dice).join(', ')} — Total: <span className="font-bold text-primary">{entry.total}</span></span>
+                              )}
                             </div>
-                          ))}
-                          {entry.statRoll && (
-                            <div className="flex items-center justify-between border-t border-border/50 mt-1 pt-1">
-                              <div>{entry.statRoll.stat} modifier</div>
-                              <div className="font-bold text-accent">{entry.statRoll.modifier >= 0 ? '+' : ''}{entry.statRoll.modifier}</div>
+                            <button
+                              onClick={() => setExpandedIds((prev) => ({ ...prev, [entry.id]: !prev[entry.id] }))}
+                              className="text-xs px-2 py-1"
+                            >
+                              {expandedIds[entry.id] ? '▾' : '▸'}
+                            </button>
+                          </div>
+                          {expandedIds[entry.id] && (
+                            <div className="mt-2 text-xs">
+                              {entry.results.map((r, i) => (
+                                <div key={i} className="flex items-center justify-between">
+                                  <div>{r.dice}</div>
+                                  <div className="font-bold text-primary">{r.result}</div>
+                                </div>
+                              ))}
+                              {entry.statRoll && (
+                                <div className="flex items-center justify-between border-t border-border/50 mt-1 pt-1">
+                                  <div>{entry.statRoll.stat} modifier</div>
+                                  <div className="font-bold text-accent">{entry.statRoll.modifier >= 0 ? '+' : ''}{entry.statRoll.modifier}</div>
+                                </div>
+                              )}
                             </div>
                           )}
-                        </div>
-                      )}
-                      {entry.results.length === 1 && entry.results[0].dice === "D20" && entry.results[0].result === 20 && (
-                        <span className="text-accent text-xs font-display">CRITICAL HIT!</span>
-                      )}
-                      {entry.results.length === 1 && entry.results[0].dice === "D20" && entry.results[0].result === 1 && (
-                        <span className="text-destructive text-xs font-display">CRITICAL FAIL!</span>
-                      )}
-                      {entry.statRoll && entry.statRoll.rawRoll === 20 && (
-                        <span className="text-accent text-xs font-display">NAT 20!</span>
-                      )}
-                      {entry.statRoll && entry.statRoll.rawRoll === 1 && (
-                        <span className="text-destructive text-xs font-display">NAT 1!</span>
+                          {entry.results.length === 1 && entry.results[0].dice === "D20" && entry.results[0].result === 20 && (
+                            <span className="text-accent text-xs font-display">CRITICAL HIT!</span>
+                          )}
+                          {entry.results.length === 1 && entry.results[0].dice === "D20" && entry.results[0].result === 1 && (
+                            <span className="text-destructive text-xs font-display">CRITICAL FAIL!</span>
+                          )}
+                          {entry.statRoll && entry.statRoll.rawRoll === 20 && (
+                            <span className="text-accent text-xs font-display">NAT 20!</span>
+                          )}
+                          {entry.statRoll && entry.statRoll.rawRoll === 1 && (
+                            <span className="text-destructive text-xs font-display">NAT 1!</span>
+                          )}
+                        </>
                       )}
                     </div>
                   ))

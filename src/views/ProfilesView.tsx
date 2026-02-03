@@ -29,12 +29,35 @@ const LootBoxSection: React.FC<{
   const [expandedBoxId, setExpandedBoxId] = useState<string | null>(null);
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
 
+  // Get all unlocked boxes with items
+  const unlockedBoxesWithItems = boxes.filter(b => !b.locked && b.items.length > 0);
+  const totalUnlockedItems = unlockedBoxesWithItems.reduce((sum, b) => sum + b.items.length, 0);
+
+  const handleClaimAll = async () => {
+    if (!claimLootBoxItems) return;
+    for (const box of unlockedBoxesWithItems) {
+      await claimLootBoxItems(box.id, crawlerId, box.items.map(i => i.id));
+    }
+    setExpandedBoxId(null);
+    setSelectedItemIds([]);
+  };
+
   return (
     <div>
-      <h3 className="font-display text-lg text-amber-400 mb-4 flex items-center gap-2">
-        <Package className="w-5 h-5" />
-        LOOT BOXES ({boxes.length})
-      </h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-display text-lg text-amber-400 flex items-center gap-2">
+          <Package className="w-5 h-5" />
+          LOOT BOXES ({boxes.length})
+        </h3>
+        {claimLootBoxItems && totalUnlockedItems > 0 && (
+          <button
+            onClick={handleClaimAll}
+            className="px-3 py-1.5 bg-amber-600 text-white rounded text-sm font-semibold hover:bg-amber-700 transition-colors"
+          >
+            Claim All ({totalUnlockedItems} items)
+          </button>
+        )}
+      </div>
       <div className="space-y-2">
         {boxes.map(box => {
           const isExpanded = expandedBoxId === box.id;

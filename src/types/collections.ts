@@ -14,6 +14,7 @@ export type CollectionName =
   | 'sound-broadcast'
   | 'diceRolls'
   | 'lootBoxes'
+  | 'lootBoxTemplates'
   // Add new collections below:
   | 'quests'
   | 'npcs'

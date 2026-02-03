@@ -158,7 +158,8 @@ export interface Episode {
   crawlerPlacements?: CrawlerPlacement[]; // Pre-placed crawlers with positions
   mapSettings?: { [mapId: string]: MapSettings }; // Per-map settings
   defaultFogOfWar?: boolean; // Default fog of war setting for new maps
-  lootBoxes?: LootBoxTemplate[]; // Loot box templates for this episode
+  lootBoxes?: LootBoxTemplate[]; // Deprecated: embedded templates (for backwards compatibility)
+  lootBoxIds?: string[]; // IDs of loot box templates assigned to this episode
   createdAt?: string;
   updatedAt?: string;
 }
