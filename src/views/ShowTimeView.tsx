@@ -2036,7 +2036,8 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             style={{
               // This wrapper reserves layout space based on the scaled size
               // The actual image is 80vh tall, scaled by mapBaseScale
-              width: mapImageDimensions ? `${mapImageDimensions.width * mapBaseScale / 100}px` : 'auto',
+              // Use 16:10 aspect ratio fallback (128vh) until image loads
+              width: mapImageDimensions ? `${mapImageDimensions.width * mapBaseScale / 100}px` : `calc(128vh * ${mapBaseScale / 100})`,
               height: `calc(80vh * ${mapBaseScale / 100})`,
             }}
           >
