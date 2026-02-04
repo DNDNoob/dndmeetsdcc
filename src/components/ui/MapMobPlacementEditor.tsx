@@ -1,5 +1,4 @@
 import React, { useState, useRef } from "react";
-import { motion } from "framer-motion";
 import { Mob, EpisodeMobPlacement, Crawler, CrawlerPlacement } from "@/lib/gameData";
 import MobIcon from "@/components/ui/MobIcon";
 import { CrawlerIcon } from "@/components/ui/CrawlerIcon";
@@ -39,8 +38,12 @@ const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
   const [draggingCrawlerIndex, setDraggingCrawlerIndex] = useState<number | null>(null);
   const [showGrid, setShowGrid] = useState(false);
-  const gridSize = 51; // Reduced by 20% from 64px
+  const baseGridSize = 51; // Base grid size in pixels
   const mapContainerRef = useRef<HTMLDivElement>(null);
+
+  // Scale grid inversely to map scale (larger map = smaller grid cells in preview)
+  const iconScale = 100 / mapScale;
+  const scaledGridSize = baseGridSize * iconScale;
 
   const handleMouseDown = (e: React.MouseEvent, index: number) => {
     e.preventDefault();
@@ -194,7 +197,7 @@ const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
       >
-        <GridOverlay isVisible={showGrid} cellSize={gridSize} opacity={0.3} />
+        <GridOverlay isVisible={showGrid} cellSize={scaledGridSize} opacity={0.3} />
 
         {/* Scale preview indicator */}
         {mapScale !== 100 && (
@@ -230,11 +233,8 @@ const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
           // Count how many times this mob appears before this index on this map
           const sameIdBefore = currentMapPlacements.slice(0, index).filter(p => p.mobId === placement.mobId).length;
           const letter = sameIdBefore > 0 ? String.fromCharCode(65 + sameIdBefore) : '';
-          // Scale icons inversely to map scale (larger map = smaller icons in preview)
-          const iconScale = 100 / mapScale;
-
           return (
-            <motion.div
+            <div
               key={`${placement.mobId}-${mapId}-${index}`}
               className="absolute"
               style={{
@@ -244,8 +244,6 @@ const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
                 cursor: draggingIndex === index ? "grabbing" : "grab",
               }}
               onMouseDown={e => handleMouseDown(e, index)}
-              whileHover={{ scale: 1.1 * iconScale }}
-              whileDrag={{ scale: 1.15 * iconScale }}
             >
               <div className="relative">
                 <MobIcon
@@ -268,7 +266,7 @@ const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
                   <Trash2 className="w-3 h-3" />
                 </button>
               </div>
-            </motion.div>
+            </div>
           );
         })}
 
@@ -280,11 +278,9 @@ const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
           // Count how many times this crawler appears before this index on this map
           const sameIdBefore = currentMapCrawlerPlacements.slice(0, index).filter(p => p.crawlerId === placement.crawlerId).length;
           const letter = sameIdBefore > 0 ? String.fromCharCode(65 + sameIdBefore) : '';
-          // Scale icons inversely to map scale (larger map = smaller icons in preview)
-          const iconScale = 100 / mapScale;
 
           return (
-            <motion.div
+            <div
               key={`crawler-${placement.crawlerId}-${mapId}-${index}`}
               className="absolute"
               style={{
@@ -297,8 +293,6 @@ const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
                 e.preventDefault();
                 setDraggingCrawlerIndex(index);
               }}
-              whileHover={{ scale: 1.1 * iconScale }}
-              whileDrag={{ scale: 1.15 * iconScale }}
             >
               <div className="relative">
                 <CrawlerIcon
@@ -321,7 +315,7 @@ const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
                   <Trash2 className="w-3 h-3" />
                 </button>
               </div>
-            </motion.div>
+            </div>
           );
         })}
 

@@ -1323,6 +1323,9 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                         <span className="text-muted-foreground">
                           👹 {episode.mobPlacements.length} mob{episode.mobPlacements.length !== 1 ? "s" : ""}
                         </span>
+                        <span className="text-muted-foreground">
+                          📦 {(episode.lootBoxIds?.length ?? episode.lootBoxes?.length ?? 0)} loot box{(episode.lootBoxIds?.length ?? episode.lootBoxes?.length ?? 0) !== 1 ? "es" : ""}
+                        </span>
                       </div>
                     </div>
 
