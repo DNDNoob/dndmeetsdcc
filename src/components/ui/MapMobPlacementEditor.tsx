@@ -230,6 +230,8 @@ const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
           // Count how many times this mob appears before this index on this map
           const sameIdBefore = currentMapPlacements.slice(0, index).filter(p => p.mobId === placement.mobId).length;
           const letter = sameIdBefore > 0 ? String.fromCharCode(65 + sameIdBefore) : '';
+          // Scale icons inversely to map scale (larger map = smaller icons in preview)
+          const iconScale = 100 / mapScale;
 
           return (
             <motion.div
@@ -238,12 +240,12 @@ const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
               style={{
                 left: `${placement.x}%`,
                 top: `${placement.y}%`,
-                transform: "translate(-50%, -50%)",
+                transform: `translate(-50%, -50%) scale(${iconScale})`,
                 cursor: draggingIndex === index ? "grabbing" : "grab",
               }}
               onMouseDown={e => handleMouseDown(e, index)}
-              whileHover={{ scale: 1.1 }}
-              whileDrag={{ scale: 1.15 }}
+              whileHover={{ scale: 1.1 * iconScale }}
+              whileDrag={{ scale: 1.15 * iconScale }}
             >
               <div className="relative">
                 <MobIcon
@@ -278,6 +280,8 @@ const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
           // Count how many times this crawler appears before this index on this map
           const sameIdBefore = currentMapCrawlerPlacements.slice(0, index).filter(p => p.crawlerId === placement.crawlerId).length;
           const letter = sameIdBefore > 0 ? String.fromCharCode(65 + sameIdBefore) : '';
+          // Scale icons inversely to map scale (larger map = smaller icons in preview)
+          const iconScale = 100 / mapScale;
 
           return (
             <motion.div
@@ -286,15 +290,15 @@ const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
               style={{
                 left: `${placement.x}%`,
                 top: `${placement.y}%`,
-                transform: "translate(-50%, -50%)",
+                transform: `translate(-50%, -50%) scale(${iconScale})`,
                 cursor: draggingCrawlerIndex === index ? "grabbing" : "grab",
               }}
               onMouseDown={e => {
                 e.preventDefault();
                 setDraggingCrawlerIndex(index);
               }}
-              whileHover={{ scale: 1.1 }}
-              whileDrag={{ scale: 1.15 }}
+              whileHover={{ scale: 1.1 * iconScale }}
+              whileDrag={{ scale: 1.15 * iconScale }}
             >
               <div className="relative">
                 <CrawlerIcon

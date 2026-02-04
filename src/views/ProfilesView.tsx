@@ -89,7 +89,7 @@ const LootBoxSection: React.FC<{
                     <Unlock className="w-4 h-4 text-green-500" />
                   )}
                   <span className="text-xs text-muted-foreground">
-                    {box.items.length} items{box.gold ? ` · ${box.gold}g` : ''}
+                    {box.items.length} items{!box.locked && box.gold ? ` · ${box.gold}g` : ''}
                   </span>
                   {!box.locked && (isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)}
                 </div>

@@ -3,8 +3,9 @@ import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import MapMobPlacementEditor from "@/components/ui/MapMobPlacementEditor";
+import MapDesignerPopout from "@/components/ui/MapDesignerPopout";
 import { Mob, Episode, EpisodeMobPlacement, Crawler, CrawlerPlacement, InventoryItem, LootBoxTemplate, LootBoxTier, getLootBoxTierColor } from "@/lib/gameData";
-import { Brain, Upload, Plus, Trash2, Map, Skull, Image as ImageIcon, Save, Edit2, X, Layers, ChevronLeft, ChevronRight, User, Package, Search } from "lucide-react";
+import { Brain, Upload, Plus, Trash2, Map, Skull, Image as ImageIcon, Save, Edit2, X, Layers, ChevronLeft, ChevronRight, User, Package, Search, Maximize2 } from "lucide-react";
 
 interface DungeonAIViewProps {
   mobs: Mob[];
@@ -72,6 +73,8 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   const [currentMapIndexForEditor, setCurrentMapIndexForEditor] = useState(0);
   // Per-map settings: { [mapId]: { fogOfWar: boolean, scale: number } }
   const [mapSettingsForEpisode, setMapSettingsForEpisode] = useState<{ [mapId: string]: { fogOfWar: boolean; scale: number } }>({});
+  // Map designer popout
+  const [isMapDesignerOpen, setIsMapDesignerOpen] = useState(false);
 
   // Loot box state for episode (selected template IDs)
   const [selectedLootBoxIdsForEpisode, setSelectedLootBoxIdsForEpisode] = useState<string[]>([]);
@@ -1104,6 +1107,15 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                           <option value={3000}>3000%</option>
                           <option value={5000}>5000%</option>
                         </select>
+                        <DungeonButton
+                          variant="admin"
+                          size="sm"
+                          onClick={() => setIsMapDesignerOpen(true)}
+                          title="Open full-screen map designer"
+                        >
+                          <Maximize2 className="w-4 h-4 mr-1" />
+                          Designer
+                        </DungeonButton>
                       </div>
                     </div>
 
@@ -1612,6 +1624,23 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
           </div>
         )}
       </DungeonCard>
+
+      {/* Map Designer Popout */}
+      {selectedMapsForEpisode.length > 0 && (
+        <MapDesignerPopout
+          isOpen={isMapDesignerOpen}
+          onClose={() => setIsMapDesignerOpen(false)}
+          mapUrl={maps[parseInt(selectedMapsForEpisode[currentMapIndexForEditor], 10)]}
+          mapId={selectedMapsForEpisode[currentMapIndexForEditor]}
+          mapScale={mapSettingsForEpisode[selectedMapsForEpisode[currentMapIndexForEditor]]?.scale ?? 100}
+          mobs={mobs}
+          placements={selectedMobsForEpisode}
+          onPlacementsChange={setSelectedMobsForEpisode}
+          crawlers={crawlers}
+          crawlerPlacements={selectedCrawlersForEpisode}
+          onCrawlerPlacementsChange={setSelectedCrawlersForEpisode}
+        />
+      )}
     </motion.div>
   );
 };
