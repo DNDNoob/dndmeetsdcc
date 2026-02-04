@@ -4,7 +4,7 @@ import MobIcon from "@/components/ui/MobIcon";
 import { CrawlerIcon } from "@/components/ui/CrawlerIcon";
 import GridOverlay from "@/components/ui/GridOverlay";
 import { DungeonButton } from "@/components/ui/DungeonButton";
-import { X, Grid3x3, ZoomIn, ZoomOut, Move } from "lucide-react";
+import { X, Grid3x3, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
 
 interface MapDesignerPopoutProps {
   isOpen: boolean;
@@ -39,17 +39,24 @@ const MapDesignerPopout: React.FC<MapDesignerPopoutProps> = ({
 
   // Grid and zoom
   const [showGrid, setShowGrid] = useState(false);
-  const [viewZoom, setViewZoom] = useState(100); // Additional zoom for viewing (on top of mapScale)
+  const [viewZoom, setViewZoom] = useState(100); // User's viewport zoom (separate from episode scale)
   const gridSize = 64; // Match mob icon size
 
-  // Panning
+  // Panning (matches ShowTimeView behavior)
   const [isPanning, setIsPanning] = useState(false);
-  const [panStart, setPanStart] = useState<{ x: number; y: number } | null>(null);
+  const [panStart, setPanStart] = useState<{ x: number; y: number; panX: number; panY: number } | null>(null);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+
+  // Map dimensions for proper layout
+  const [mapImageDimensions, setMapImageDimensions] = useState<{ width: number; height: number } | null>(null);
 
   // Refs
   const mapImageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Zoom limits
+  const zoomMin = 1;
+  const zoomMax = 500;
 
   // Filter placements for current map
   const currentMapPlacements = placements.filter(p => p.mapId === mapId);
@@ -79,19 +86,43 @@ const MapDesignerPopout: React.FC<MapDesignerPopoutProps> = ({
     return -1;
   }, [crawlerPlacements, mapId]);
 
-  // Combined scale: mapScale is the episode's base scale, viewZoom is additional zoom for this view
-  const effectiveScale = (mapScale / 100) * (viewZoom / 100);
-  // Counter-scale for icons to maintain consistent physical size
-  const iconCounterScale = 1 / effectiveScale;
+  // Counter-scale for icons - only counters the episode's base scale, NOT the view zoom
+  // This matches ShowTimeView behavior where icons zoom WITH the user's scroll
+  const iconCounterScale = 100 / mapScale;
 
-  // Handle mouse move for dragging
+  // Handle zoom
+  const handleZoomIn = useCallback(() => {
+    setViewZoom(prev => Math.min(prev + 25, zoomMax));
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    setViewZoom(prev => Math.max(prev - 25, zoomMin));
+  }, []);
+
+  // Pan start
+  const handlePanStart = useCallback((e: React.MouseEvent) => {
+    // Don't pan if clicking on a draggable element
+    if ((e.target as HTMLElement).closest('[data-draggable]')) return;
+
+    setIsPanning(true);
+    setPanStart({
+      x: e.clientX,
+      y: e.clientY,
+      panX: panOffset.x,
+      panY: panOffset.y,
+    });
+  }, [panOffset]);
+
+  // Handle mouse move for dragging and panning
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     // Handle panning
     if (isPanning && panStart) {
       const dx = e.clientX - panStart.x;
       const dy = e.clientY - panStart.y;
-      setPanOffset(prev => ({ x: prev.x + dx, y: prev.y + dy }));
-      setPanStart({ x: e.clientX, y: e.clientY });
+      setPanOffset({
+        x: panStart.panX + dx,
+        y: panStart.panY + dy,
+      });
       return;
     }
 
@@ -129,27 +160,31 @@ const MapDesignerPopout: React.FC<MapDesignerPopoutProps> = ({
   const handleMouseUp = useCallback(() => {
     setDraggingMobIndex(null);
     setDraggingCrawlerIndex(null);
-    setIsPanning(false);
-    setPanStart(null);
-  }, []);
-
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    // Middle mouse button or if holding space - start panning
-    if (e.button === 1) {
-      e.preventDefault();
-      setIsPanning(true);
-      setPanStart({ x: e.clientX, y: e.clientY });
+    if (isPanning) {
+      setIsPanning(false);
+      setPanStart(null);
     }
-  }, []);
+  }, [isPanning]);
 
-  // Handle wheel for zoom
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? -10 : 10;
-    setViewZoom(prev => Math.max(25, Math.min(200, prev + delta)));
-  }, []);
+  // Handle scroll wheel zoom (matches ShowTimeView)
+  useEffect(() => {
+    if (!isOpen) return;
 
-  // Keyboard handler for panning
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.deltaY < 0) {
+        setViewZoom(prev => Math.min(prev + 2, zoomMax));
+      } else {
+        setViewZoom(prev => Math.max(prev - 2, zoomMin));
+      }
+    };
+
+    window.addEventListener('wheel', handleWheel, { passive: false });
+    return () => window.removeEventListener('wheel', handleWheel);
+  }, [isOpen]);
+
+  // Keyboard handler
   useEffect(() => {
     if (!isOpen) return;
 
@@ -163,7 +198,7 @@ const MapDesignerPopout: React.FC<MapDesignerPopoutProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  // Reset pan on open
+  // Reset pan/zoom on open
   useEffect(() => {
     if (isOpen) {
       setPanOffset({ x: 0, y: 0 });
@@ -180,7 +215,7 @@ const MapDesignerPopout: React.FC<MapDesignerPopoutProps> = ({
         <div className="flex items-center gap-4">
           <h2 className="font-display text-xl text-primary">Map Designer</h2>
           <span className="text-sm text-muted-foreground">
-            Episode Scale: {mapScale}% | View Zoom: {viewZoom}%
+            Base Scale: {mapScale}% | Zoom: {viewZoom}%
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -195,14 +230,19 @@ const MapDesignerPopout: React.FC<MapDesignerPopoutProps> = ({
           <DungeonButton
             variant="default"
             size="sm"
-            onClick={() => setViewZoom(prev => Math.min(200, prev + 25))}
+            onClick={handleZoomIn}
+            title="Zoom in"
           >
             <ZoomIn className="w-4 h-4" />
           </DungeonButton>
+          <div className="text-xs text-center text-muted-foreground bg-background/80 px-2 py-1 rounded border border-border min-w-[50px]">
+            {viewZoom}%
+          </div>
           <DungeonButton
             variant="default"
             size="sm"
-            onClick={() => setViewZoom(prev => Math.max(25, prev - 25))}
+            onClick={handleZoomOut}
+            title="Zoom out"
           >
             <ZoomOut className="w-4 h-4" />
           </DungeonButton>
@@ -210,9 +250,9 @@ const MapDesignerPopout: React.FC<MapDesignerPopoutProps> = ({
             variant="default"
             size="sm"
             onClick={() => { setPanOffset({ x: 0, y: 0 }); setViewZoom(100); }}
+            title="Reset view"
           >
-            <Move className="w-4 h-4 mr-2" />
-            Reset View
+            <RotateCcw className="w-4 h-4" />
           </DungeonButton>
           <DungeonButton
             variant="danger"
@@ -225,40 +265,59 @@ const MapDesignerPopout: React.FC<MapDesignerPopoutProps> = ({
         </div>
       </div>
 
-      {/* Map container */}
+      {/* Map container - matches ShowTimeView structure */}
       <div
         ref={containerRef}
-        className="flex-1 overflow-hidden relative cursor-grab active:cursor-grabbing"
+        className="flex-1 flex items-center justify-center p-4 select-none overflow-hidden relative"
+        style={{ cursor: isPanning ? 'grabbing' : 'grab' }}
+        onMouseDown={handlePanStart}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
-        onMouseDown={handleMouseDown}
-        onWheel={handleWheel}
       >
-        <div className="absolute inset-0 flex items-center justify-center">
+        {/* Outer transform for pan + user zoom */}
+        <div
+          className="relative"
+          style={{
+            transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${viewZoom / 100})`,
+            transformOrigin: 'center center',
+          }}
+        >
+          {/* Spacer div for layout */}
           <div
+            className="relative"
             style={{
-              transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
+              width: mapImageDimensions ? `${mapImageDimensions.width * mapScale / 100}px` : `calc(128vh * ${mapScale / 100})`,
+              height: `calc(80vh * ${mapScale / 100})`,
             }}
           >
-            {/* Scaled map wrapper */}
+            {/* Inner transform for episode base scale */}
             <div
-              className="relative"
+              className="absolute top-0 left-0"
               style={{
-                transform: `scale(${effectiveScale})`,
-                transformOrigin: 'center center',
+                transform: `scale(${mapScale / 100})`,
+                transformOrigin: 'top left',
               }}
             >
               <img
                 ref={mapImageRef}
                 src={mapUrl}
                 alt="Map"
-                className="max-h-[80vh] w-auto object-contain border-2 border-primary shadow-[0_0_15px_rgba(0,200,255,0.5)]"
+                className="object-contain pointer-events-none border-2 border-primary shadow-[0_0_15px_rgba(0,200,255,0.5)]"
+                style={{
+                  height: '80vh',
+                  width: 'auto',
+                  display: 'block',
+                }}
                 draggable={false}
+                onLoad={(e) => {
+                  const img = e.currentTarget;
+                  setMapImageDimensions({ width: img.clientWidth, height: img.clientHeight });
+                }}
               />
 
               {/* Grid overlay */}
-              <GridOverlay isVisible={showGrid} cellSize={gridSize} opacity={0.3} />
+              <GridOverlay isVisible={showGrid} cellSize={gridSize * iconCounterScale} opacity={0.3} />
 
               {/* Mob placements */}
               {currentMapPlacements.map((placement, localIndex) => {
@@ -272,6 +331,7 @@ const MapDesignerPopout: React.FC<MapDesignerPopoutProps> = ({
                   <div
                     key={`mob-${placement.mobId}-${localIndex}`}
                     className="absolute"
+                    data-draggable
                     style={{
                       left: `${placement.x}%`,
                       top: `${placement.y}%`,
@@ -311,6 +371,7 @@ const MapDesignerPopout: React.FC<MapDesignerPopoutProps> = ({
                   <div
                     key={`crawler-${placement.crawlerId}-${localIndex}`}
                     className="absolute"
+                    data-draggable
                     style={{
                       left: `${placement.x}%`,
                       top: `${placement.y}%`,
@@ -344,8 +405,8 @@ const MapDesignerPopout: React.FC<MapDesignerPopoutProps> = ({
         {/* Instructions overlay */}
         <div className="absolute bottom-4 left-4 bg-background/80 border border-border rounded p-3 text-xs text-muted-foreground space-y-1">
           <p><strong>Drag</strong> mobs/crawlers to position them</p>
+          <p><strong>Click + drag</strong> to pan</p>
           <p><strong>Scroll</strong> to zoom in/out</p>
-          <p><strong>Middle-click + drag</strong> to pan</p>
           <p><strong>Esc</strong> to close</p>
         </div>
       </div>
