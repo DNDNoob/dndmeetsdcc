@@ -16,6 +16,36 @@ interface InventoryViewProps {
   onUpdateSharedInventory: (items: InventoryItem[]) => void;
 }
 
+// Helper to create item signature for grouping
+const getItemSignature = (item: InventoryItem): string => {
+  const modifiersStr = item.statModifiers
+    ? JSON.stringify(Object.entries(item.statModifiers).filter(([, v]) => v !== 0).sort())
+    : '';
+  return `${item.name}|${item.description || ''}|${item.equipSlot || ''}|${item.goldValue ?? ''}|${modifiersStr}`;
+};
+
+// Consolidate items by signature
+interface ConsolidatedItem {
+  item: InventoryItem;
+  count: number;
+  ids: string[];
+}
+
+const consolidateItems = (items: InventoryItem[]): ConsolidatedItem[] => {
+  const groups = new Map<string, ConsolidatedItem>();
+  for (const item of items) {
+    const sig = getItemSignature(item);
+    const existing = groups.get(sig);
+    if (existing) {
+      existing.count++;
+      existing.ids.push(item.id);
+    } else {
+      groups.set(sig, { item, count: 1, ids: [item.id] });
+    }
+  }
+  return Array.from(groups.values());
+};
+
 const InventoryView: React.FC<InventoryViewProps> = ({
   crawlers,
   getCrawlerInventory,
@@ -26,14 +56,6 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   onUpdateSharedInventory,
 }) => {
   const [editMode, setEditMode] = useState(false);
-  const [newItem, setNewItem] = useState<{ crawlerId: string; name: string; description: string; equipSlot?: SlotType; goldValue?: number; statModifiers?: StatModifiers }>({
-    crawlerId: "",
-    name: "",
-    description: "",
-    equipSlot: undefined,
-    goldValue: undefined,
-    statModifiers: undefined,
-  });
 
   // Library item form state
   const [newLibraryItem, setNewLibraryItem] = useState<{ name: string; description: string; equipSlot?: SlotType; goldValue?: number; statModifiers?: StatModifiers }>({
@@ -63,24 +85,6 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     },
     300
   );
-
-  const handleAddItem = (crawlerId: string) => {
-    if (!newItem.name.trim()) return;
-    const items = getCrawlerInventory(crawlerId);
-    const mods = newItem.statModifiers
-      ? Object.fromEntries(Object.entries(newItem.statModifiers).filter(([, v]) => v !== 0 && v !== undefined))
-      : undefined;
-    const item: InventoryItem = {
-      id: crypto.randomUUID(),
-      name: newItem.name,
-      description: newItem.description,
-      equipSlot: newItem.equipSlot,
-      goldValue: newItem.goldValue,
-      ...(mods && Object.keys(mods).length > 0 ? { statModifiers: mods } : {}),
-    };
-    onUpdateInventory(crawlerId, [...items, item]);
-    setNewItem({ crawlerId: "", name: "", description: "", equipSlot: undefined, goldValue: undefined, statModifiers: undefined });
-  };
 
   const handleRemoveItem = (crawlerId: string, itemId: string) => {
     const items = getCrawlerInventory(crawlerId);
@@ -415,142 +419,63 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                   <p className="text-muted-foreground text-sm italic mb-3">No items in inventory</p>
                 ) : (
                   <ul className="space-y-2 mb-3">
-                    {items.map((item) => (
-                      <li
-                        key={item.id}
-                        className="flex items-center gap-3 text-sm py-2 border-b border-border/50 last:border-0"
-                      >
-                        {/* Item type icon */}
-                        {item.equipSlot === 'weapon' ? (
-                          <Sword className="w-4 h-4 text-destructive shrink-0" />
-                        ) : item.equipSlot ? (
-                          <HardHat className="w-4 h-4 text-accent shrink-0" />
-                        ) : (
-                          <Package className="w-4 h-4 text-muted-foreground shrink-0" />
-                        )}
-                        <div className="flex flex-col flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-foreground">{item.name}</span>
-                            {item.equipSlot && (
-                              <span className="text-xs bg-accent/20 text-accent px-2 py-0.5 rounded">
-                                {item.equipSlot === 'weapon' ? 'Weapon' :
-                                 item.equipSlot === 'leftHand' ? 'Left Hand' :
-                                 item.equipSlot === 'rightHand' ? 'Right Hand' :
-                                 item.equipSlot === 'ringFinger' ? 'Ring' :
-                                 item.equipSlot.charAt(0).toUpperCase() + item.equipSlot.slice(1)}
-                              </span>
-                            )}
-                            {item.goldValue !== undefined && item.goldValue > 0 && (
-                              <span className="text-xs bg-accent/10 text-accent px-2 py-0.5 rounded flex items-center gap-1">
-                                <Coins className="w-3 h-3" /> {item.goldValue}G
-                              </span>
+                    {consolidateItems(items).map((consolidated, idx) => {
+                      const item = consolidated.item;
+                      return (
+                        <li
+                          key={`${item.id}-${idx}`}
+                          className="flex items-center gap-3 text-sm py-2 border-b border-border/50 last:border-0"
+                        >
+                          {/* Item type icon */}
+                          {item.equipSlot === 'weapon' ? (
+                            <Sword className="w-4 h-4 text-destructive shrink-0" />
+                          ) : item.equipSlot ? (
+                            <HardHat className="w-4 h-4 text-accent shrink-0" />
+                          ) : (
+                            <Package className="w-4 h-4 text-muted-foreground shrink-0" />
+                          )}
+                          <div className="flex flex-col flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {consolidated.count > 1 && (
+                                <span className="text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded font-bold">
+                                  x{consolidated.count}
+                                </span>
+                              )}
+                              <span className="text-foreground">{item.name}</span>
+                              {item.equipSlot && (
+                                <span className="text-xs bg-accent/20 text-accent px-2 py-0.5 rounded">
+                                  {item.equipSlot === 'weapon' ? 'Weapon' :
+                                   item.equipSlot === 'leftHand' ? 'Left Hand' :
+                                   item.equipSlot === 'rightHand' ? 'Right Hand' :
+                                   item.equipSlot === 'ringFinger' ? 'Ring' :
+                                   item.equipSlot.charAt(0).toUpperCase() + item.equipSlot.slice(1)}
+                                </span>
+                              )}
+                              {item.goldValue !== undefined && item.goldValue > 0 && (
+                                <span className="text-xs bg-accent/10 text-accent px-2 py-0.5 rounded flex items-center gap-1">
+                                  <Coins className="w-3 h-3" /> {item.goldValue}G
+                                </span>
+                              )}
+                            </div>
+                            {item.description && (
+                              <span className="text-muted-foreground text-xs">({item.description})</span>
                             )}
                           </div>
-                          {item.description && (
-                            <span className="text-muted-foreground text-xs">({item.description})</span>
+                          {editMode && (
+                            <button
+                              onClick={() => handleRemoveItem(crawler.id, consolidated.ids[0])}
+                              className="text-destructive hover:text-destructive/80"
+                              title={consolidated.count > 1 ? "Remove one" : "Remove"}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           )}
-                        </div>
-                        {editMode && (
-                          <button
-                            onClick={() => handleRemoveItem(crawler.id, item.id)}
-                            className="text-destructive hover:text-destructive/80"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </li>
-                    ))}
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
 
-                {/* Add new item form */}
-                {editMode && (
-                  <div className="space-y-2 mt-3 pt-3 border-t border-border/50">
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="Item name"
-                        value={newItem.crawlerId === crawler.id ? newItem.name : ""}
-                        onChange={(e) =>
-                          setNewItem({ crawlerId: crawler.id, name: e.target.value, description: newItem.crawlerId === crawler.id ? newItem.description : "", equipSlot: newItem.crawlerId === crawler.id ? newItem.equipSlot : undefined })
-                        }
-                        className="bg-muted border border-border px-2 py-1 text-sm flex-1"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Description"
-                        value={newItem.crawlerId === crawler.id ? newItem.description : ""}
-                        onChange={(e) =>
-                          setNewItem({ ...newItem, crawlerId: crawler.id, description: e.target.value })
-                        }
-                        className="bg-muted border border-border px-2 py-1 text-sm flex-1"
-                      />
-                    </div>
-                    <div className="flex gap-2">
-                      <select
-                        value={newItem.crawlerId === crawler.id ? newItem.equipSlot || "" : ""}
-                        onChange={(e) =>
-                          setNewItem({ ...newItem, crawlerId: crawler.id, equipSlot: e.target.value as SlotType || undefined })
-                        }
-                        className="bg-muted border border-border px-2 py-1 text-sm flex-1"
-                      >
-                        <option value="">No Equipment Slot</option>
-                        <option value="weapon">Weapon</option>
-                        <option value="head">Head</option>
-                        <option value="chest">Chest</option>
-                        <option value="legs">Legs</option>
-                        <option value="feet">Feet</option>
-                        <option value="leftHand">Left Hand</option>
-                        <option value="rightHand">Right Hand</option>
-                        <option value="ringFinger">Ring Finger</option>
-                      </select>
-                      <div className="flex items-center gap-1">
-                        <Coins className="w-4 h-4 text-accent" />
-                        <input
-                          type="number"
-                          placeholder="Value"
-                          value={newItem.crawlerId === crawler.id && newItem.goldValue !== undefined ? newItem.goldValue : ""}
-                          onChange={(e) =>
-                            setNewItem({ ...newItem, crawlerId: crawler.id, goldValue: e.target.value ? parseInt(e.target.value) : undefined })
-                          }
-                          className="bg-muted border border-border px-2 py-1 text-sm w-20"
-                        />
-                      </div>
-                      <DungeonButton
-                        variant="default"
-                        size="sm"
-                        onClick={() => handleAddItem(crawler.id)}
-                      >
-                        <Plus className="w-4 h-4" />
-                      </DungeonButton>
-                    </div>
-                    {/* Stat Modifiers */}
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">Stat Modifiers (when equipped)</p>
-                      <div className="grid grid-cols-3 gap-1">
-                        {(['str', 'dex', 'con', 'int', 'cha', 'hp', 'maxHP', 'mana', 'maxMana'] as const).map((stat) => (
-                          <div key={stat} className="flex items-center gap-1">
-                            <label className="text-xs text-muted-foreground w-12 uppercase">{stat}</label>
-                            <input
-                              type="number"
-                              value={(newItem.crawlerId === crawler.id && newItem.statModifiers?.[stat]) ?? ""}
-                              onChange={(e) => setNewItem({
-                                ...newItem,
-                                crawlerId: crawler.id,
-                                statModifiers: {
-                                  ...newItem.statModifiers,
-                                  [stat]: e.target.value ? parseInt(e.target.value) : undefined,
-                                },
-                              })}
-                              placeholder="0"
-                              className="w-14 bg-muted border border-border px-1 py-0.5 text-xs text-center"
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
             );
           })}

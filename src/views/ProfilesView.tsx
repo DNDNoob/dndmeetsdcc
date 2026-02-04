@@ -1,11 +1,13 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import { HealthBar } from "@/components/ui/HealthBar";
 import { EquipmentSlot } from "@/components/ui/EquipmentSlot";
 import { Crawler, InventoryItem, createEmptyCrawler, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor } from "@/lib/gameData";
-import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Edit2, Backpack, HardHat, Package, Lock, Unlock, ChevronDown, ChevronUp, Check } from "lucide-react";
+import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Edit2, Backpack, HardHat, Package, Lock, Unlock, ChevronDown, ChevronUp, Check, Search, Send, BookOpen, Filter, X } from "lucide-react";
+
+type ProfileTab = 'profile' | 'inventory' | 'spells';
 
 interface ProfilesViewProps {
   crawlers: Crawler[];
@@ -186,8 +188,54 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   const [itemFormData, setItemFormData] = useState<Partial<InventoryItem>>({});
   const [expandedItems, setExpandedItems] = useState(false);
 
+  // Tab and filtering state
+  const [activeTab, setActiveTab] = useState<ProfileTab>('profile');
+  const [inventorySearch, setInventorySearch] = useState('');
+  const [inventoryFilter, setInventoryFilter] = useState<'all' | 'equipment' | 'consumable' | 'valuable'>('all');
+
+  // Send items/gold modal state
+  const [showSendModal, setShowSendModal] = useState(false);
+  const [sendTargetId, setSendTargetId] = useState<string>('');
+  const [sendGoldAmount, setSendGoldAmount] = useState(0);
+  const [selectedItemsToSend, setSelectedItemsToSend] = useState<string[]>([]);
+
   const selected = crawlers.find((c) => c.id === selectedId) || crawlers[0];
   const inventory = selected ? getCrawlerInventory(selected.id) : [];
+
+  // Filtered inventory for inventory tab
+  const filteredInventory = useMemo(() => {
+    let items = inventory;
+
+    // Apply search
+    if (inventorySearch) {
+      const search = inventorySearch.toLowerCase();
+      items = items.filter(item =>
+        item.name.toLowerCase().includes(search) ||
+        item.description?.toLowerCase().includes(search)
+      );
+    }
+
+    // Apply filter
+    if (inventoryFilter !== 'all') {
+      items = items.filter(item => {
+        if (inventoryFilter === 'equipment') return !!item.equipSlot;
+        if (inventoryFilter === 'consumable') return !item.equipSlot;
+        if (inventoryFilter === 'valuable') return (item.goldValue ?? 0) > 0;
+        return true;
+      });
+    }
+
+    return items;
+  }, [inventory, inventorySearch, inventoryFilter]);
+
+  // Inventory summary for main profile tab
+  const inventorySummary = useMemo(() => {
+    const totalItems = inventory.length;
+    const equippedCount = Object.values(selected?.equippedItems || {}).filter(Boolean).length;
+    const totalValue = inventory.reduce((sum, item) => sum + (item.goldValue || 0), 0);
+    const equipmentCount = inventory.filter(i => i.equipSlot).length;
+    return { totalItems, equippedCount, totalValue, equipmentCount };
+  }, [inventory, selected?.equippedItems]);
 
   const handleEdit = () => {
     if (selected) {
@@ -418,6 +466,36 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
     onUpdateCrawlerInventory(selected.id, updatedInventory);
   };
 
+  // Send gold/items to another player
+  const handleSend = () => {
+    if (!selected || !sendTargetId) return;
+
+    const targetCrawler = crawlers.find(c => c.id === sendTargetId);
+    if (!targetCrawler) return;
+
+    // Transfer gold
+    if (sendGoldAmount > 0 && sendGoldAmount <= (selected.gold || 0)) {
+      onUpdateCrawler(selected.id, { gold: (selected.gold || 0) - sendGoldAmount });
+      onUpdateCrawler(sendTargetId, { gold: (targetCrawler.gold || 0) + sendGoldAmount });
+    }
+
+    // Transfer items
+    if (selectedItemsToSend.length > 0) {
+      const itemsToSend = inventory.filter(item => selectedItemsToSend.includes(item.id));
+      const remainingItems = inventory.filter(item => !selectedItemsToSend.includes(item.id));
+      const targetInventory = getCrawlerInventory(sendTargetId);
+
+      onUpdateCrawlerInventory(selected.id, remainingItems);
+      onUpdateCrawlerInventory(sendTargetId, [...targetInventory, ...itemsToSend]);
+    }
+
+    // Reset modal state
+    setShowSendModal(false);
+    setSendTargetId('');
+    setSendGoldAmount(0);
+    setSelectedItemsToSend([]);
+  };
+
   if (!selected) return null;
 
   const currentAvatar = editMode ? (editData.avatar ?? selected.avatar) : selected.avatar;
@@ -482,8 +560,55 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
       </div>
 
       <DungeonCard className="min-h-[400px] overflow-hidden">
-        <div className="flex flex-col lg:flex-row gap-6">
-          {/* Equipment Slots - Left Side */}
+        <div className="flex">
+          {/* Tab buttons - Far Left */}
+          <div className="flex flex-col border-r border-border/50 pr-2 mr-4">
+            <button
+              onClick={() => setActiveTab('profile')}
+              className={`p-3 rounded-l-lg transition-colors flex items-center gap-2 ${
+                activeTab === 'profile'
+                  ? 'bg-primary/20 text-primary border-r-2 border-primary'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              }`}
+              title="Profile"
+            >
+              <User className="w-5 h-5" />
+              <span className="hidden xl:inline text-sm font-medium">Profile</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('inventory')}
+              className={`p-3 rounded-l-lg transition-colors flex items-center gap-2 ${
+                activeTab === 'inventory'
+                  ? 'bg-primary/20 text-primary border-r-2 border-primary'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              }`}
+              title="Inventory"
+            >
+              <Backpack className="w-5 h-5" />
+              <span className="hidden xl:inline text-sm font-medium">Inventory</span>
+              {inventory.length > 0 && (
+                <span className="bg-accent/20 text-accent text-xs px-1.5 py-0.5 rounded-full">{inventory.length}</span>
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab('spells')}
+              className={`p-3 rounded-l-lg transition-colors flex items-center gap-2 ${
+                activeTab === 'spells'
+                  ? 'bg-primary/20 text-primary border-r-2 border-primary'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              }`}
+              title="Spells"
+            >
+              <BookOpen className="w-5 h-5" />
+              <span className="hidden xl:inline text-sm font-medium">Spells</span>
+            </button>
+          </div>
+
+          {/* Tab Content */}
+          <div className="flex-1 min-w-0">
+            {activeTab === 'profile' && (
+              <div className="flex flex-col lg:flex-row gap-6">
+                {/* Equipment Slots - Left Side */}
           <div className="flex flex-col gap-3 lg:min-w-[280px]">
             <h3 className="font-display text-primary text-base mb-2">EQUIPMENT</h3>
 
@@ -826,230 +951,39 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
           </div>
         </div>
 
-        {/* Inventory section - full width */}
-        <div>
-          <div className="flex items-center justify-between mb-4 gap-4">
-            <h3 className="font-display text-primary text-xl flex items-center gap-2">
-              <Backpack className="w-6 h-6 shrink-0" /> INVENTORY
+        {/* Inventory Summary - on profile tab */}
+        <div className="bg-muted/30 border border-border rounded-lg p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-display text-primary text-lg flex items-center gap-2">
+              <Backpack className="w-5 h-5" /> INVENTORY SUMMARY
             </h3>
-            <div className="flex gap-2 shrink-0">
-              <DungeonButton variant="nav" size="sm" onClick={() => setExpandedItems(!expandedItems)}>
-                {expandedItems ? 'Collapse' : 'Expand'}
-              </DungeonButton>
-              <DungeonButton variant="default" size="sm" onClick={handleAddItem}>
-                <Plus className="w-4 h-4 mr-1" /> Add Item
-              </DungeonButton>
+            <button
+              onClick={() => setActiveTab('inventory')}
+              className="text-sm text-primary hover:underline flex items-center gap-1"
+            >
+              View All <ChevronDown className="w-4 h-4 rotate-[-90deg]" />
+            </button>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div className="bg-background/50 rounded p-3 text-center">
+              <p className="text-2xl font-bold text-foreground">{inventorySummary.totalItems}</p>
+              <p className="text-muted-foreground text-xs">Total Items</p>
+            </div>
+            <div className="bg-background/50 rounded p-3 text-center">
+              <p className="text-2xl font-bold text-primary">{inventorySummary.equippedCount}</p>
+              <p className="text-muted-foreground text-xs">Equipped</p>
+            </div>
+            <div className="bg-background/50 rounded p-3 text-center">
+              <p className="text-2xl font-bold text-accent">{inventorySummary.equipmentCount}</p>
+              <p className="text-muted-foreground text-xs">Equipment</p>
+            </div>
+            <div className="bg-background/50 rounded p-3 text-center">
+              <p className="text-2xl font-bold text-accent flex items-center justify-center gap-1">
+                <Coins className="w-4 h-4" />{inventorySummary.totalValue}
+              </p>
+              <p className="text-muted-foreground text-xs">Total Value</p>
             </div>
           </div>
-
-          {/* Item Form */}
-          {(isAddingItem || editingItemId) && (
-            <div className="mb-4 p-4 border border-accent bg-accent/10 rounded">
-              <h4 className="text-sm font-bold text-accent mb-3">
-                {isAddingItem ? "New Item" : "Edit Item"}
-              </h4>
-              <div className="space-y-3">
-                <input
-                  type="text"
-                  placeholder="Item Name"
-                  value={itemFormData.name || ""}
-                  onChange={(e) => setItemFormData({ ...itemFormData, name: e.target.value })}
-                  className="w-full bg-muted border border-border px-3 py-2 text-sm rounded"
-                />
-                <textarea
-                  placeholder="Description"
-                  value={itemFormData.description || ""}
-                  onChange={(e) => setItemFormData({ ...itemFormData, description: e.target.value })}
-                  className="w-full bg-muted border border-border px-3 py-2 text-sm min-h-[80px] rounded"
-                />
-                <div className="flex gap-3">
-                  <select
-                    value={itemFormData.equipSlot || ""}
-                    onChange={(e) => setItemFormData({ ...itemFormData, equipSlot: e.target.value as SlotType || undefined })}
-                    className="flex-1 bg-muted border border-border px-3 py-2 text-sm rounded"
-                  >
-                    <option value="">No Equipment Slot</option>
-                    <option value="weapon">Weapon</option>
-                    <option value="head">Head</option>
-                    <option value="chest">Chest</option>
-                    <option value="legs">Legs</option>
-                    <option value="feet">Feet</option>
-                    <option value="leftHand">Left Hand</option>
-                    <option value="rightHand">Right Hand</option>
-                    <option value="ringFinger">Ring Finger</option>
-                  </select>
-                  <div className="flex items-center gap-2">
-                    <Coins className="w-4 h-4 text-accent" />
-                    <input
-                      type="number"
-                      placeholder="Gold Value"
-                      value={itemFormData.goldValue ?? ""}
-                      onChange={(e) => setItemFormData({ ...itemFormData, goldValue: e.target.value ? parseInt(e.target.value) : undefined })}
-                      className="w-24 bg-muted border border-border px-3 py-2 text-sm rounded"
-                    />
-                  </div>
-                </div>
-                {/* Stat Modifiers */}
-                <div>
-                  <p className="text-xs text-muted-foreground mb-2">Stat Modifiers (when equipped)</p>
-                  <div className="grid grid-cols-3 gap-2">
-                    {(['str', 'dex', 'con', 'int', 'cha', 'hp', 'maxHP', 'mana', 'maxMana'] as const).map((stat) => (
-                      <div key={stat} className="flex items-center gap-1">
-                        <label className="text-xs text-muted-foreground w-12 uppercase">{stat}</label>
-                        <input
-                          type="number"
-                          value={itemFormData.statModifiers?.[stat] ?? ""}
-                          onChange={(e) => setItemFormData({
-                            ...itemFormData,
-                            statModifiers: {
-                              ...itemFormData.statModifiers,
-                              [stat]: e.target.value ? parseInt(e.target.value) : undefined,
-                            },
-                          })}
-                          placeholder="0"
-                          className="w-16 bg-muted border border-border px-2 py-1 text-xs rounded text-center"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex gap-3 mt-2">
-                    <DungeonButton variant="admin" size="sm" onClick={handleSaveItem}>
-                      <Save className="w-4 h-4 mr-1" /> Save Item
-                    </DungeonButton>
-                    <DungeonButton variant="default" size="sm" onClick={handleCancelItemEdit}>
-                      Cancel
-                    </DungeonButton>
-                  </div>
-                </div>
-              </div>
-            )}
-
-          {inventory.length === 0 ? (
-            <div className="bg-muted/30 border border-border/50 rounded p-6 text-center">
-              <p className="text-muted-foreground text-base italic">No items in inventory</p>
-            </div>
-          ) : (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {(() => {
-                // Group items by signature (name + description + equipSlot + goldValue + statModifiers)
-                // Equipped items are shown separately (not grouped)
-                const equippedItemIds = new Set(Object.values(selected.equippedItems || {}));
-                const getItemSignature = (item: InventoryItem) =>
-                  `${item.name}|${item.description}|${item.equipSlot || ''}|${item.goldValue || 0}|${JSON.stringify(item.statModifiers || {})}`;
-
-                // Separate equipped and unequipped items
-                const equippedItems = inventory.filter(item => equippedItemIds.has(item.id));
-                const unequippedItems = inventory.filter(item => !equippedItemIds.has(item.id));
-
-                // Group unequipped items by signature
-                const groupedItems = new Map<string, InventoryItem[]>();
-                unequippedItems.forEach(item => {
-                  const sig = getItemSignature(item);
-                  if (!groupedItems.has(sig)) {
-                    groupedItems.set(sig, []);
-                  }
-                  groupedItems.get(sig)!.push(item);
-                });
-
-                // Convert to array: equipped items first (as singles), then grouped unequipped
-                const displayItems: { item: InventoryItem; count: number; allIds: string[]; isEquipped: boolean }[] = [];
-
-                equippedItems.forEach(item => {
-                  displayItems.push({ item, count: 1, allIds: [item.id], isEquipped: true });
-                });
-
-                groupedItems.forEach((items) => {
-                  displayItems.push({ item: items[0], count: items.length, allIds: items.map(i => i.id), isEquipped: false });
-                });
-
-                return displayItems.map(({ item, count, allIds, isEquipped }) => {
-                  const isEditing = editingItemId === item.id;
-
-                  return (
-                    <div
-                      key={allIds[0]}
-                      draggable={!!item.equipSlot && !isEditing}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData('application/json', JSON.stringify(item));
-                        e.dataTransfer.effectAllowed = 'move';
-                      }}
-                      className={`bg-muted/50 p-4 rounded-lg ${
-                        item.equipSlot && !isEditing ? 'cursor-grab active:cursor-grabbing' : ''
-                      } ${isEditing ? 'border-2 border-accent' : 'border border-border'}`}
-                    >
-                      {/* Item header with action buttons */}
-                      <div className="flex items-start gap-2 mb-2">
-                        {/* Item type icon */}
-                        {item.equipSlot === 'weapon' ? (
-                          <Sword className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
-                        ) : item.equipSlot ? (
-                          <HardHat className="w-5 h-5 text-accent shrink-0 mt-0.5" />
-                        ) : (
-                          <Package className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
-                        )}
-                        {/* Item name and actions */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-foreground font-semibold text-base truncate" title={item.name}>
-                              {item.name}
-                              {count > 1 && (
-                                <span className="ml-2 text-accent font-bold">×{count}</span>
-                              )}
-                            </span>
-                            <div className="flex items-center gap-1 shrink-0">
-                              <button
-                                onClick={() => handleEditItem(item)}
-                                className="text-primary hover:text-primary/80 p-1"
-                                title={count > 1 ? "Edit (affects all copies)" : "Edit"}
-                              >
-                                <Edit2 className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteItem(allIds[0])}
-                                className="text-destructive hover:text-destructive/80 p-1"
-                                title={count > 1 ? "Delete one" : "Delete"}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Item badges */}
-                      <div className="flex flex-wrap items-center gap-2 mb-2">
-                        {item.equipSlot && (
-                          <span className="text-xs bg-accent/20 text-accent px-2 py-1 rounded">
-                            {item.equipSlot === 'weapon' ? 'Weapon' :
-                             item.equipSlot === 'leftHand' ? 'Left Hand' :
-                             item.equipSlot === 'rightHand' ? 'Right Hand' :
-                             item.equipSlot === 'ringFinger' ? 'Ring' :
-                             item.equipSlot.charAt(0).toUpperCase() + item.equipSlot.slice(1)}
-                          </span>
-                        )}
-                        {isEquipped && (
-                          <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded">Equipped</span>
-                        )}
-                        {item.goldValue !== undefined && item.goldValue > 0 && (
-                          <span className="text-xs bg-accent/10 text-accent px-2 py-1 rounded flex items-center gap-1">
-                            <Coins className="w-3 h-3" /> {item.goldValue}G
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Item description */}
-                      {expandedItems && (
-                        <p className="text-muted-foreground text-sm leading-relaxed">
-                          {item.description || "No description"}
-                        </p>
-                      )}
-                    </div>
-                  );
-                });
-              })()}
-            </div>
-          )}
         </div>
 
         {/* Loot Boxes section */}
@@ -1064,9 +998,249 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             />
           );
         })()}
+              </div>
+            </div>
+            )}
+
+            {/* Inventory Tab */}
+            {activeTab === 'inventory' && (
+              <div className="space-y-4">
+                {/* Header with actions */}
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <h2 className="font-display text-xl text-primary flex items-center gap-2">
+                    <Backpack className="w-6 h-6" /> INVENTORY
+                  </h2>
+                  <div className="flex gap-2">
+                    <DungeonButton
+                      variant="default"
+                      size="sm"
+                      onClick={() => setShowSendModal(true)}
+                      disabled={crawlers.length < 2}
+                    >
+                      <Send className="w-4 h-4 mr-1" /> Send
+                    </DungeonButton>
+                  </div>
+                </div>
+
+                {/* Filters */}
+                <div className="flex flex-wrap gap-3 items-center">
+                  <div className="relative flex-1 min-w-[200px]">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <input
+                      type="text"
+                      placeholder="Search items..."
+                      value={inventorySearch}
+                      onChange={(e) => setInventorySearch(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2 bg-muted border border-border rounded text-sm"
+                    />
+                    {inventorySearch && (
+                      <button
+                        onClick={() => setInventorySearch('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex gap-1">
+                    {(['all', 'equipment', 'consumable', 'valuable'] as const).map(filter => (
+                      <button
+                        key={filter}
+                        onClick={() => setInventoryFilter(filter)}
+                        className={`px-3 py-1.5 text-xs rounded transition-colors ${
+                          inventoryFilter === filter
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        {filter.charAt(0).toUpperCase() + filter.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Crawler Gold */}
+                <div className="flex items-center gap-2 p-3 bg-accent/10 border border-accent/30 rounded">
+                  <Coins className="w-5 h-5 text-accent" />
+                  <span className="text-accent font-display text-lg">{Math.floor(selected.gold || 0)}G</span>
+                  <span className="text-muted-foreground text-sm ml-2">Personal Gold</span>
+                </div>
+
+                {/* Items Grid */}
+                {filteredInventory.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    {inventory.length === 0 ? 'No items in inventory' : 'No items match your filters'}
+                  </div>
+                ) : (
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {(() => {
+                      const equippedItemIds = new Set(Object.values(selected.equippedItems || {}));
+                      const getItemSignature = (item: InventoryItem) =>
+                        `${item.name}|${item.description}|${item.equipSlot || ''}|${item.goldValue || 0}|${JSON.stringify(item.statModifiers || {})}`;
+
+                      const equippedItems = filteredInventory.filter(item => equippedItemIds.has(item.id));
+                      const unequippedItems = filteredInventory.filter(item => !equippedItemIds.has(item.id));
+
+                      const groupedItems = new Map<string, InventoryItem[]>();
+                      unequippedItems.forEach(item => {
+                        const sig = getItemSignature(item);
+                        if (!groupedItems.has(sig)) groupedItems.set(sig, []);
+                        groupedItems.get(sig)!.push(item);
+                      });
+
+                      const displayItems: { item: InventoryItem; count: number; allIds: string[]; isEquipped: boolean }[] = [];
+                      equippedItems.forEach(item => displayItems.push({ item, count: 1, allIds: [item.id], isEquipped: true }));
+                      groupedItems.forEach(items => displayItems.push({ item: items[0], count: items.length, allIds: items.map(i => i.id), isEquipped: false }));
+
+                      return displayItems.map(({ item, count, allIds, isEquipped }) => (
+                        <div
+                          key={allIds[0]}
+                          draggable={!!item.equipSlot}
+                          onDragStart={(e) => {
+                            e.dataTransfer.setData('application/json', JSON.stringify(item));
+                            e.dataTransfer.effectAllowed = 'move';
+                          }}
+                          className={`bg-muted/50 p-3 rounded-lg border transition-colors ${
+                            item.equipSlot ? 'cursor-grab active:cursor-grabbing' : ''
+                          } ${selectedItemsToSend.includes(allIds[0]) ? 'border-primary bg-primary/10' : 'border-border'}`}
+                          onClick={() => {
+                            if (showSendModal) {
+                              setSelectedItemsToSend(prev =>
+                                prev.includes(allIds[0]) ? prev.filter(id => id !== allIds[0]) : [...prev, allIds[0]]
+                              );
+                            }
+                          }}
+                        >
+                          <div className="flex items-start gap-2">
+                            {item.equipSlot === 'weapon' ? (
+                              <Sword className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+                            ) : item.equipSlot ? (
+                              <HardHat className="w-4 h-4 text-accent shrink-0 mt-0.5" />
+                            ) : (
+                              <Package className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-sm truncate">{item.name}</span>
+                                {count > 1 && <span className="text-accent font-bold text-xs">×{count}</span>}
+                              </div>
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {isEquipped && <span className="text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded">Equipped</span>}
+                                {item.goldValue && item.goldValue > 0 && (
+                                  <span className="text-xs text-accent flex items-center gap-0.5">
+                                    <Coins className="w-3 h-3" />{item.goldValue}
+                                  </span>
+                                )}
+                              </div>
+                              {item.description && (
+                                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{item.description}</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Spells Tab */}
+            {activeTab === 'spells' && (
+              <div className="text-center py-12">
+                <BookOpen className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                <h3 className="font-display text-xl text-primary mb-2">Spells Coming Soon</h3>
+                <p className="text-muted-foreground">
+                  The spell system is currently under development.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </DungeonCard>
+
+      {/* Send Gold/Items Modal */}
+      {showSendModal && (
+        <div className="fixed inset-0 bg-background/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-background border-2 border-primary rounded-lg p-6 max-w-md w-full shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display text-lg text-primary">Send Gold/Items</h3>
+              <button onClick={() => { setShowSendModal(false); setSendTargetId(''); setSendGoldAmount(0); setSelectedItemsToSend([]); }}>
+                <X className="w-5 h-5 text-muted-foreground hover:text-foreground" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Target Crawler */}
+              <div>
+                <label className="text-sm text-muted-foreground block mb-1">Send to:</label>
+                <select
+                  value={sendTargetId}
+                  onChange={(e) => setSendTargetId(e.target.value)}
+                  className="w-full bg-muted border border-border rounded px-3 py-2 text-sm"
+                >
+                  <option value="">Select a crawler...</option>
+                  {crawlers.filter(c => c.id !== selected.id).map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Gold Amount */}
+              <div>
+                <label className="text-sm text-muted-foreground block mb-1">
+                  Gold (available: {Math.floor(selected.gold || 0)}G)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  max={selected.gold || 0}
+                  value={sendGoldAmount}
+                  onChange={(e) => setSendGoldAmount(Math.min(selected.gold || 0, Math.max(0, parseInt(e.target.value) || 0)))}
+                  className="w-full bg-muted border border-border rounded px-3 py-2 text-sm"
+                />
+              </div>
+
+              {/* Items Selection */}
+              <div>
+                <label className="text-sm text-muted-foreground block mb-1">
+                  Items ({selectedItemsToSend.length} selected)
+                </label>
+                <p className="text-xs text-muted-foreground mb-2">Click items in your inventory to select them for sending</p>
+                {selectedItemsToSend.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {selectedItemsToSend.map(id => {
+                      const item = inventory.find(i => i.id === id);
+                      return item ? (
+                        <span key={id} className="text-xs bg-primary/20 text-primary px-2 py-1 rounded flex items-center gap-1">
+                          {item.name}
+                          <button onClick={() => setSelectedItemsToSend(prev => prev.filter(i => i !== id))}>
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ) : null;
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Send Button */}
+              <DungeonButton
+                variant="admin"
+                size="sm"
+                onClick={handleSend}
+                disabled={!sendTargetId || (sendGoldAmount === 0 && selectedItemsToSend.length === 0)}
+                className="w-full"
+              >
+                <Send className="w-4 h-4 mr-2" />
+                Send {sendGoldAmount > 0 && `${sendGoldAmount}G`}
+                {sendGoldAmount > 0 && selectedItemsToSend.length > 0 && ' + '}
+                {selectedItemsToSend.length > 0 && `${selectedItemsToSend.length} items`}
+              </DungeonButton>
+            </div>
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 };
