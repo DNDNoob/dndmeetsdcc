@@ -5,7 +5,33 @@ import { DungeonButton } from "@/components/ui/DungeonButton";
 import { HealthBar } from "@/components/ui/HealthBar";
 import { EquipmentSlot } from "@/components/ui/EquipmentSlot";
 import { Crawler, InventoryItem, createEmptyCrawler, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor } from "@/lib/gameData";
-import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Edit2, Backpack, HardHat, Package, Lock, Unlock, ChevronDown, ChevronUp, Check, Search, Send, BookOpen, Filter, X } from "lucide-react";
+import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Edit2, Backpack, HardHat, Package, Lock, Unlock, ChevronDown, ChevronUp, Check, Search, Send, BookOpen, Filter, X, ArrowUpDown, CircleDot, Footprints, Shirt, Hand } from "lucide-react";
+
+type SortOption = 'name-asc' | 'name-desc' | 'gold-desc' | 'gold-asc';
+
+// Helper to get the appropriate icon for an equipment slot
+const getEquipmentIcon = (slot?: string, className: string = "w-4 h-4 shrink-0") => {
+  switch (slot) {
+    case 'weapon':
+      return <Sword className={`${className} text-destructive`} />;
+    case 'ringFinger':
+      return <CircleDot className={`${className} text-purple-400`} />;
+    case 'feet':
+      return <Footprints className={`${className} text-amber-600`} />;
+    case 'head':
+      return <HardHat className={`${className} text-accent`} />;
+    case 'chest':
+      return <Shirt className={`${className} text-blue-400`} />;
+    case 'leftHand':
+    case 'rightHand':
+      return <Hand className={`${className} text-accent`} />;
+    case 'legs':
+      return <HardHat className={`${className} text-green-400`} />;
+    default:
+      if (slot) return <HardHat className={`${className} text-accent`} />;
+      return <Package className={`${className} text-muted-foreground`} />;
+  }
+};
 
 type ProfileTab = 'profile' | 'inventory' | 'spells';
 
@@ -91,7 +117,7 @@ const LootBoxSection: React.FC<{
                     <Unlock className="w-4 h-4 text-green-500" />
                   )}
                   <span className="text-xs text-muted-foreground">
-                    {box.items.length} items{!box.locked && box.gold ? ` · ${box.gold}g` : ''}
+                    {box.items.length} items{box.gold ? (box.locked ? ' · ?g' : ` · ${box.gold}g`) : ''}
                   </span>
                   {!box.locked && (isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)}
                 </div>
@@ -192,6 +218,9 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   const [activeTab, setActiveTab] = useState<ProfileTab>('profile');
   const [inventorySearch, setInventorySearch] = useState('');
   const [inventoryFilter, setInventoryFilter] = useState<'all' | 'equipment' | 'consumable' | 'valuable'>('all');
+  const [inventorySort, setInventorySort] = useState<SortOption>('name-asc');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [showTagFilter, setShowTagFilter] = useState(false);
 
   // Send items/gold modal state
   const [showSendModal, setShowSendModal] = useState(false);
@@ -202,7 +231,16 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   const selected = crawlers.find((c) => c.id === selectedId) || crawlers[0];
   const inventory = selected ? getCrawlerInventory(selected.id) : [];
 
-  // Filtered inventory for inventory tab
+  // Get all unique tags from inventory (dynamic)
+  const availableTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    inventory.forEach(item => {
+      item.tags?.forEach(tag => tagSet.add(tag));
+    });
+    return Array.from(tagSet).sort();
+  }, [inventory]);
+
+  // Filtered and sorted inventory for inventory tab
   const filteredInventory = useMemo(() => {
     let items = inventory;
 
@@ -215,7 +253,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
       );
     }
 
-    // Apply filter
+    // Apply type filter
     if (inventoryFilter !== 'all') {
       items = items.filter(item => {
         if (inventoryFilter === 'equipment') return !!item.equipSlot;
@@ -225,8 +263,31 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
       });
     }
 
+    // Apply tag filter
+    if (selectedTags.length > 0) {
+      items = items.filter(item =>
+        selectedTags.some(tag => item.tags?.includes(tag))
+      );
+    }
+
+    // Apply sorting
+    items = [...items].sort((a, b) => {
+      switch (inventorySort) {
+        case 'name-asc':
+          return a.name.localeCompare(b.name);
+        case 'name-desc':
+          return b.name.localeCompare(a.name);
+        case 'gold-desc':
+          return (b.goldValue ?? 0) - (a.goldValue ?? 0);
+        case 'gold-asc':
+          return (a.goldValue ?? 0) - (b.goldValue ?? 0);
+        default:
+          return 0;
+      }
+    });
+
     return items;
-  }, [inventory, inventorySearch, inventoryFilter]);
+  }, [inventory, inventorySearch, inventoryFilter, selectedTags, inventorySort]);
 
   // Inventory summary for main profile tab
   const inventorySummary = useMemo(() => {
@@ -991,11 +1052,13 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
           const boxes = getCrawlerLootBoxes(selected.id);
           if (boxes.length === 0) return null;
           return (
-            <LootBoxSection
-              boxes={boxes}
-              crawlerId={selected.id}
-              claimLootBoxItems={claimLootBoxItems}
-            />
+            <div className="mt-6">
+              <LootBoxSection
+                boxes={boxes}
+                crawlerId={selected.id}
+                claimLootBoxItems={claimLootBoxItems}
+              />
+            </div>
           );
         })()}
               </div>
@@ -1023,25 +1086,56 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 </div>
 
                 {/* Filters */}
-                <div className="flex flex-wrap gap-3 items-center">
-                  <div className="relative flex-1 min-w-[200px]">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <input
-                      type="text"
-                      placeholder="Search items..."
-                      value={inventorySearch}
-                      onChange={(e) => setInventorySearch(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 bg-muted border border-border rounded text-sm"
-                    />
-                    {inventorySearch && (
+                <div className="space-y-3">
+                  <div className="flex flex-wrap gap-3 items-center">
+                    <div className="relative flex-1 min-w-[200px]">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <input
+                        type="text"
+                        placeholder="Search items..."
+                        value={inventorySearch}
+                        onChange={(e) => setInventorySearch(e.target.value)}
+                        className="w-full pl-9 pr-3 py-2 bg-muted border border-border rounded text-sm"
+                      />
+                      {inventorySearch && (
+                        <button
+                          onClick={() => setInventorySearch('')}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Sort dropdown */}
+                    <select
+                      value={inventorySort}
+                      onChange={(e) => setInventorySort(e.target.value as SortOption)}
+                      className="bg-muted border border-border rounded px-3 py-2 text-sm"
+                    >
+                      <option value="name-asc">Name A-Z</option>
+                      <option value="name-desc">Name Z-A</option>
+                      <option value="gold-desc">Value (High-Low)</option>
+                      <option value="gold-asc">Value (Low-High)</option>
+                    </select>
+
+                    {/* Tag filter toggle */}
+                    {availableTags.length > 0 && (
                       <button
-                        onClick={() => setInventorySearch('')}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        onClick={() => setShowTagFilter(!showTagFilter)}
+                        className={`flex items-center gap-1 px-3 py-2 text-sm rounded transition-colors ${
+                          showTagFilter || selectedTags.length > 0
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted text-muted-foreground hover:text-foreground'
+                        }`}
                       >
-                        <X className="w-4 h-4" />
+                        <Filter className="w-4 h-4" />
+                        Tags {selectedTags.length > 0 && `(${selectedTags.length})`}
                       </button>
                     )}
                   </div>
+
+                  {/* Type filter buttons */}
                   <div className="flex gap-1">
                     {(['all', 'equipment', 'consumable', 'valuable'] as const).map(filter => (
                       <button
@@ -1057,6 +1151,38 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                       </button>
                     ))}
                   </div>
+
+                  {/* Tag checkboxes (dynamic) */}
+                  {showTagFilter && availableTags.length > 0 && (
+                    <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded border border-border">
+                      <span className="text-xs text-muted-foreground mr-2">Filter by tag:</span>
+                      {availableTags.map(tag => (
+                        <label key={tag} className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedTags.includes(tag)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedTags([...selectedTags, tag]);
+                              } else {
+                                setSelectedTags(selectedTags.filter(t => t !== tag));
+                              }
+                            }}
+                            className="w-3.5 h-3.5 rounded border-border"
+                          />
+                          <span className="text-xs">{tag}</span>
+                        </label>
+                      ))}
+                      {selectedTags.length > 0 && (
+                        <button
+                          onClick={() => setSelectedTags([])}
+                          className="text-xs text-primary hover:underline ml-2"
+                        >
+                          Clear all
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Crawler Gold */}
@@ -1100,25 +1226,12 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                             e.dataTransfer.setData('application/json', JSON.stringify(item));
                             e.dataTransfer.effectAllowed = 'move';
                           }}
-                          className={`bg-muted/50 p-3 rounded-lg border transition-colors ${
+                          className={`bg-muted/50 p-3 rounded-lg border border-border transition-colors ${
                             item.equipSlot ? 'cursor-grab active:cursor-grabbing' : ''
-                          } ${selectedItemsToSend.includes(allIds[0]) ? 'border-primary bg-primary/10' : 'border-border'}`}
-                          onClick={() => {
-                            if (showSendModal) {
-                              setSelectedItemsToSend(prev =>
-                                prev.includes(allIds[0]) ? prev.filter(id => id !== allIds[0]) : [...prev, allIds[0]]
-                              );
-                            }
-                          }}
+                          }`}
                         >
                           <div className="flex items-start gap-2">
-                            {item.equipSlot === 'weapon' ? (
-                              <Sword className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
-                            ) : item.equipSlot ? (
-                              <HardHat className="w-4 h-4 text-accent shrink-0 mt-0.5" />
-                            ) : (
-                              <Package className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
-                            )}
+                            {getEquipmentIcon(item.equipSlot, "w-4 h-4 shrink-0 mt-0.5")}
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
                                 <span className="font-semibold text-sm truncate">{item.name}</span>
@@ -1206,20 +1319,55 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 <label className="text-sm text-muted-foreground block mb-1">
                   Items ({selectedItemsToSend.length} selected)
                 </label>
-                <p className="text-xs text-muted-foreground mb-2">Click items in your inventory to select them for sending</p>
-                {selectedItemsToSend.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {selectedItemsToSend.map(id => {
-                      const item = inventory.find(i => i.id === id);
-                      return item ? (
-                        <span key={id} className="text-xs bg-primary/20 text-primary px-2 py-1 rounded flex items-center gap-1">
-                          {item.name}
-                          <button onClick={() => setSelectedItemsToSend(prev => prev.filter(i => i !== id))}>
-                            <X className="w-3 h-3" />
-                          </button>
-                        </span>
-                      ) : null;
-                    })}
+                <div className="max-h-48 overflow-y-auto border border-border rounded bg-muted/30">
+                  {inventory.length === 0 ? (
+                    <p className="text-xs text-muted-foreground p-3 text-center">No items in inventory</p>
+                  ) : (
+                    inventory.map(item => (
+                      <label
+                        key={item.id}
+                        className={`flex items-center gap-2 p-2 cursor-pointer hover:bg-muted/50 transition-colors border-b border-border/50 last:border-0 ${
+                          selectedItemsToSend.includes(item.id) ? 'bg-primary/10' : ''
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedItemsToSend.includes(item.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedItemsToSend([...selectedItemsToSend, item.id]);
+                            } else {
+                              setSelectedItemsToSend(selectedItemsToSend.filter(id => id !== item.id));
+                            }
+                          }}
+                          className="w-4 h-4 rounded"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <span className="text-sm font-medium">{item.name}</span>
+                          {item.goldValue && item.goldValue > 0 && (
+                            <span className="text-xs text-accent ml-2">{item.goldValue}g</span>
+                          )}
+                        </div>
+                      </label>
+                    ))
+                  )}
+                </div>
+                {inventory.length > 0 && (
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      onClick={() => setSelectedItemsToSend(inventory.map(i => i.id))}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      Select all
+                    </button>
+                    {selectedItemsToSend.length > 0 && (
+                      <button
+                        onClick={() => setSelectedItemsToSend([])}
+                        className="text-xs text-muted-foreground hover:underline"
+                      >
+                        Clear
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

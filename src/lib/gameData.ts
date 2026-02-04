@@ -42,6 +42,7 @@ export interface InventoryItem {
   goldValue?: number; // Value of the item in gold
   equipped?: boolean; // Deprecated - use equippedItems in Crawler instead
   statModifiers?: StatModifiers; // Stat adjustments when equipped
+  tags?: string[]; // Custom tags for filtering (e.g., "magic", "cursed", "quest")
 }
 
 // Compute total stat modifiers from all equipped items on a crawler

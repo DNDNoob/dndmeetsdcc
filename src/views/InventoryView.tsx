@@ -3,7 +3,31 @@ import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import { Crawler, InventoryItem, EquipmentSlot as SlotType, StatModifiers } from "@/lib/gameData";
-import { Coins, Package, Sword, Shield, Plus, Trash2, Edit2, Save, HardHat, Search, BookOpen } from "lucide-react";
+import { Coins, Package, Sword, Shield, Plus, Trash2, Edit2, Save, HardHat, Search, BookOpen, CircleDot, Footprints, Shirt, Hand } from "lucide-react";
+
+// Helper to get the appropriate icon for an equipment slot
+const getEquipmentIcon = (slot?: string, className: string = "w-4 h-4 shrink-0") => {
+  switch (slot) {
+    case 'weapon':
+      return <Sword className={`${className} text-destructive`} />;
+    case 'ringFinger':
+      return <CircleDot className={`${className} text-purple-400`} />;
+    case 'feet':
+      return <Footprints className={`${className} text-amber-600`} />;
+    case 'head':
+      return <HardHat className={`${className} text-accent`} />;
+    case 'chest':
+      return <Shirt className={`${className} text-blue-400`} />;
+    case 'leftHand':
+    case 'rightHand':
+      return <Hand className={`${className} text-accent`} />;
+    case 'legs':
+      return <HardHat className={`${className} text-green-400`} />;
+    default:
+      if (slot) return <HardHat className={`${className} text-accent`} />;
+      return <Package className={`${className} text-muted-foreground`} />;
+  }
+};
 import { useDebouncedCallback } from "@/hooks/useDebounce";
 
 interface InventoryViewProps {
@@ -65,6 +89,8 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   const [editingLibraryItemId, setEditingLibraryItemId] = useState<string | null>(null);
   // Per-crawler search queries
   const [searchQueries, setSearchQueries] = useState<Record<string, string>>({});
+  // Quantity to add per library item
+  const [addQuantities, setAddQuantities] = useState<Record<string, number>>({});
 
   // Local gold state for immediate UI updates (avoids lag while typing)
   const [localGold, setLocalGold] = useState<Record<string, number>>({});
@@ -131,7 +157,10 @@ const InventoryView: React.FC<InventoryViewProps> = ({
       : undefined;
 
     if (editingLibraryItemId) {
-      // Update existing item
+      // Get the old item for matching in crawler inventories
+      const oldItem = items.find(i => i.id === editingLibraryItemId);
+
+      // Update existing item in library
       const updated = items.map(item =>
         item.id === editingLibraryItemId
           ? {
@@ -145,6 +174,33 @@ const InventoryView: React.FC<InventoryViewProps> = ({
           : item
       );
       onUpdateSharedInventory(updated);
+
+      // Sync edits to all crawler inventories that have copies of this item
+      if (oldItem) {
+        const oldSig = getItemSignature(oldItem);
+        crawlers.forEach(crawler => {
+          const crawlerItems = getCrawlerInventory(crawler.id);
+          let hasMatch = false;
+          const updatedCrawlerItems = crawlerItems.map(ci => {
+            const ciSig = getItemSignature(ci);
+            if (ciSig === oldSig) {
+              hasMatch = true;
+              return {
+                ...ci,
+                name: newLibraryItem.name,
+                description: newLibraryItem.description,
+                equipSlot: newLibraryItem.equipSlot,
+                goldValue: newLibraryItem.goldValue,
+                ...(mods && Object.keys(mods).length > 0 ? { statModifiers: mods } : { statModifiers: undefined }),
+              };
+            }
+            return ci;
+          });
+          if (hasMatch) {
+            onUpdateInventory(crawler.id, updatedCrawlerItems);
+          }
+        });
+      }
     } else {
       // Add new item
       const item: InventoryItem = {
@@ -166,10 +222,13 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     setNewLibraryItem({ name: "", description: "", equipSlot: undefined, goldValue: undefined, statModifiers: undefined });
   };
 
-  const handleAddLibraryItemToCrawler = (crawlerId: string, libraryItem: InventoryItem) => {
+  const handleAddLibraryItemToCrawler = (crawlerId: string, libraryItem: InventoryItem, quantity: number = 1) => {
     const items = getCrawlerInventory(crawlerId);
-    const copy: InventoryItem = { ...libraryItem, id: crypto.randomUUID() };
-    onUpdateInventory(crawlerId, [...items, copy]);
+    const newItems: InventoryItem[] = [];
+    for (let i = 0; i < quantity; i++) {
+      newItems.push({ ...libraryItem, id: crypto.randomUUID() });
+    }
+    onUpdateInventory(crawlerId, [...items, ...newItems]);
   };
 
   const libraryItems = getSharedInventory();
@@ -227,13 +286,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-3">
               {libraryItems.map((item) => (
                 <div key={item.id} className={`flex items-start gap-2 text-sm py-2 px-3 border bg-background/50 ${editingLibraryItemId === item.id ? 'border-accent' : 'border-border/50'}`}>
-                  {item.equipSlot === 'weapon' ? (
-                    <Sword className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
-                  ) : item.equipSlot ? (
-                    <HardHat className="w-4 h-4 text-accent shrink-0 mt-0.5" />
-                  ) : (
-                    <Package className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
-                  )}
+                  {getEquipmentIcon(item.equipSlot, "w-4 h-4 shrink-0 mt-0.5")}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1 flex-wrap">
                       <span className="text-foreground font-medium">{item.name}</span>
@@ -390,21 +443,40 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                       />
                     </div>
                     {searchQueries[crawler.id] && (
-                      <div className="border border-border bg-background mt-1 max-h-40 overflow-y-auto">
+                      <div className="border border-border bg-background mt-1 max-h-48 overflow-y-auto">
                         {libraryItems
                           .filter(li => li.name.toLowerCase().includes(searchQueries[crawler.id].toLowerCase()))
                           .map(li => (
-                            <div key={li.id} className="flex items-center justify-between px-3 py-1.5 text-sm hover:bg-muted/50 border-b border-border/30 last:border-0">
-                              <div className="flex items-center gap-2">
-                                <span>{li.name}</span>
-                                {li.equipSlot && <span className="text-xs text-accent">({li.equipSlot})</span>}
+                            <div key={li.id} className="flex items-center justify-between px-3 py-2 text-sm hover:bg-muted/50 border-b border-border/30 last:border-0">
+                              <div className="flex items-center gap-2 flex-1 min-w-0">
+                                <span className="truncate">{li.name}</span>
+                                {li.equipSlot && <span className="text-xs text-accent shrink-0">({li.equipSlot})</span>}
+                                {li.goldValue && li.goldValue > 0 && (
+                                  <span className="text-xs text-accent shrink-0">{li.goldValue}g</span>
+                                )}
                               </div>
-                              <DungeonButton variant="default" size="sm" onClick={() => {
-                                handleAddLibraryItemToCrawler(crawler.id, li);
-                                setSearchQueries(prev => ({ ...prev, [crawler.id]: "" }));
-                              }}>
-                                <Plus className="w-3 h-3 mr-1" /> Add
-                              </DungeonButton>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={99}
+                                  value={addQuantities[`${crawler.id}-${li.id}`] || 1}
+                                  onChange={(e) => setAddQuantities(prev => ({
+                                    ...prev,
+                                    [`${crawler.id}-${li.id}`]: Math.max(1, Math.min(99, parseInt(e.target.value) || 1))
+                                  }))}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="w-12 bg-muted border border-border px-1 py-0.5 text-xs text-center rounded"
+                                />
+                                <DungeonButton variant="default" size="sm" onClick={() => {
+                                  const qty = addQuantities[`${crawler.id}-${li.id}`] || 1;
+                                  handleAddLibraryItemToCrawler(crawler.id, li, qty);
+                                  setSearchQueries(prev => ({ ...prev, [crawler.id]: "" }));
+                                  setAddQuantities(prev => ({ ...prev, [`${crawler.id}-${li.id}`]: 1 }));
+                                }}>
+                                  <Plus className="w-3 h-3 mr-1" /> Add
+                                </DungeonButton>
+                              </div>
                             </div>
                           ))}
                         {libraryItems.filter(li => li.name.toLowerCase().includes(searchQueries[crawler.id].toLowerCase())).length === 0 && (
@@ -427,13 +499,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                           className="flex items-center gap-3 text-sm py-2 border-b border-border/50 last:border-0"
                         >
                           {/* Item type icon */}
-                          {item.equipSlot === 'weapon' ? (
-                            <Sword className="w-4 h-4 text-destructive shrink-0" />
-                          ) : item.equipSlot ? (
-                            <HardHat className="w-4 h-4 text-accent shrink-0" />
-                          ) : (
-                            <Package className="w-4 h-4 text-muted-foreground shrink-0" />
-                          )}
+                          {getEquipmentIcon(item.equipSlot)}
                           <div className="flex flex-col flex-1">
                             <div className="flex items-center gap-2 flex-wrap">
                               {consolidated.count > 1 && (
