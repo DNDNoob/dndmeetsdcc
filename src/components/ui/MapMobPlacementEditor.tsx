@@ -19,6 +19,8 @@ interface MapMobPlacementEditorProps {
   crawlers?: Crawler[];
   crawlerPlacements?: CrawlerPlacement[];
   onCrawlerPlacementsChange?: (placements: CrawlerPlacement[]) => void;
+  // Scale preview
+  mapScale?: number;
 }
 
 const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
@@ -32,6 +34,7 @@ const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
   crawlers,
   crawlerPlacements,
   onCrawlerPlacementsChange,
+  mapScale = 100,
 }) => {
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
   const [draggingCrawlerIndex, setDraggingCrawlerIndex] = useState<number | null>(null);
@@ -192,6 +195,32 @@ const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
         onMouseLeave={handleMouseUp}
       >
         <GridOverlay isVisible={showGrid} cellSize={gridSize} opacity={0.3} />
+
+        {/* Scale preview indicator */}
+        {mapScale !== 100 && (
+          <div className="absolute top-2 left-2 bg-background/80 border border-primary rounded px-2 py-1 text-xs z-10">
+            <span className="text-primary font-bold">{mapScale}%</span>
+            <span className="text-muted-foreground ml-1">scale</span>
+            <div className="mt-1 text-muted-foreground text-[10px]">
+              Map will be {mapScale > 100 ? 'larger' : 'smaller'} in ShowTime
+            </div>
+          </div>
+        )}
+
+        {/* Scale visual preview - shows a box representing 100% viewport */}
+        {mapScale !== 100 && (
+          <div
+            className="absolute border-2 border-dashed border-primary/50 pointer-events-none"
+            style={{
+              width: `${100 * 100 / mapScale}%`,
+              height: `${100 * 100 / mapScale}%`,
+              left: '50%',
+              top: '50%',
+              transform: 'translate(-50%, -50%)',
+            }}
+            title="This box shows the approximate viewport at 100% zoom"
+          />
+        )}
 
         {/* Placed mobs - only show mobs for current map */}
         {currentMapPlacements.map((placement, index) => {

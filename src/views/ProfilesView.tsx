@@ -17,26 +17,27 @@ interface ProfilesViewProps {
   partyGold: number;
   onStatRoll?: (crawlerName: string, crawlerId: string, stat: string, totalStat: number) => void;
   getCrawlerLootBoxes?: (crawlerId: string) => SentLootBox[];
-  claimLootBoxItems?: (lootBoxId: string, crawlerId: string, itemIds: string[]) => Promise<void>;
+  claimLootBoxItems?: (lootBoxId: string, crawlerId: string, itemIds: string[], claimGold?: boolean) => Promise<void>;
 }
 
 // Loot Box display section for crawler profiles
 const LootBoxSection: React.FC<{
   boxes: SentLootBox[];
   crawlerId: string;
-  claimLootBoxItems?: (lootBoxId: string, crawlerId: string, itemIds: string[]) => Promise<void>;
+  claimLootBoxItems?: (lootBoxId: string, crawlerId: string, itemIds: string[], claimGold?: boolean) => Promise<void>;
 }> = ({ boxes, crawlerId, claimLootBoxItems }) => {
   const [expandedBoxId, setExpandedBoxId] = useState<string | null>(null);
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
 
-  // Get all unlocked boxes with items
-  const unlockedBoxesWithItems = boxes.filter(b => !b.locked && b.items.length > 0);
-  const totalUnlockedItems = unlockedBoxesWithItems.reduce((sum, b) => sum + b.items.length, 0);
+  // Get all unlocked boxes with items or gold
+  const unlockedBoxesWithContent = boxes.filter(b => !b.locked && (b.items.length > 0 || (b.gold && b.gold > 0)));
+  const totalUnlockedItems = unlockedBoxesWithContent.reduce((sum, b) => sum + b.items.length, 0);
+  const totalUnlockedGold = unlockedBoxesWithContent.reduce((sum, b) => sum + (b.gold || 0), 0);
 
   const handleClaimAll = async () => {
     if (!claimLootBoxItems) return;
-    for (const box of unlockedBoxesWithItems) {
-      await claimLootBoxItems(box.id, crawlerId, box.items.map(i => i.id));
+    for (const box of unlockedBoxesWithContent) {
+      await claimLootBoxItems(box.id, crawlerId, box.items.map(i => i.id), true);
     }
     setExpandedBoxId(null);
     setSelectedItemIds([]);
@@ -49,12 +50,12 @@ const LootBoxSection: React.FC<{
           <Package className="w-5 h-5" />
           LOOT BOXES ({boxes.length})
         </h3>
-        {claimLootBoxItems && totalUnlockedItems > 0 && (
+        {claimLootBoxItems && (totalUnlockedItems > 0 || totalUnlockedGold > 0) && (
           <button
             onClick={handleClaimAll}
             className="px-3 py-1.5 bg-amber-600 text-white rounded text-sm font-semibold hover:bg-amber-700 transition-colors"
           >
-            Claim All ({totalUnlockedItems} items)
+            Claim All ({totalUnlockedItems > 0 ? `${totalUnlockedItems} items` : ''}{totalUnlockedItems > 0 && totalUnlockedGold > 0 ? ' + ' : ''}{totalUnlockedGold > 0 ? `${totalUnlockedGold}g` : ''})
           </button>
         )}
       </div>
@@ -87,7 +88,9 @@ const LootBoxSection: React.FC<{
                   ) : (
                     <Unlock className="w-4 h-4 text-green-500" />
                   )}
-                  <span className="text-xs text-muted-foreground">{box.items.length} items</span>
+                  <span className="text-xs text-muted-foreground">
+                    {box.items.length} items{box.gold ? ` · ${box.gold}g` : ''}
+                  </span>
                   {!box.locked && (isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)}
                 </div>
               </button>
@@ -103,6 +106,13 @@ const LootBoxSection: React.FC<{
               {/* Unlocked expanded state */}
               {!box.locked && isExpanded && (
                 <div className="px-3 pb-3 space-y-2">
+                  {/* Gold display */}
+                  {box.gold && box.gold > 0 && (
+                    <div className="flex items-center gap-2 p-2 rounded border border-amber-500/30 bg-amber-500/10">
+                      <span className="text-amber-500 font-bold">{box.gold}g</span>
+                      <span className="text-xs text-muted-foreground">Gold (claimed with items)</span>
+                    </div>
+                  )}
                   {box.items.map(item => (
                     <div
                       key={item.id}
@@ -126,18 +136,21 @@ const LootBoxSection: React.FC<{
                       </div>
                     </div>
                   ))}
-                  {claimLootBoxItems && selectedItemIds.length > 0 && (
+                  {claimLootBoxItems && (selectedItemIds.length > 0 || (box.items.length === 0 && box.gold)) && (
                     <button
                       onClick={async () => {
-                        await claimLootBoxItems(box.id, crawlerId, selectedItemIds);
+                        const claimAllItems = selectedItemIds.length === box.items.length;
+                        await claimLootBoxItems(box.id, crawlerId, selectedItemIds, claimAllItems);
                         setSelectedItemIds([]);
-                        if (selectedItemIds.length === box.items.length) {
+                        if (claimAllItems && (!box.gold || box.gold === 0)) {
                           setExpandedBoxId(null);
                         }
                       }}
                       className="w-full py-2 bg-primary text-primary-foreground rounded text-sm font-semibold hover:bg-primary/90 transition-colors"
                     >
-                      Claim {selectedItemIds.length} item{selectedItemIds.length !== 1 ? 's' : ''} to Inventory
+                      {selectedItemIds.length > 0
+                        ? `Claim ${selectedItemIds.length} item${selectedItemIds.length !== 1 ? 's' : ''}${selectedItemIds.length === box.items.length && box.gold ? ` + ${box.gold}g` : ''}`
+                        : box.gold ? `Claim ${box.gold}g` : 'Claim'}
                     </button>
                   )}
                 </div>
@@ -918,88 +931,123 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             </div>
           ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {inventory.map((item) => {
-                const isEquipped = Object.values(selected.equippedItems || {}).includes(item.id);
-                const isEditing = editingItemId === item.id;
+              {(() => {
+                // Group items by signature (name + description + equipSlot + goldValue + statModifiers)
+                // Equipped items are shown separately (not grouped)
+                const equippedItemIds = new Set(Object.values(selected.equippedItems || {}));
+                const getItemSignature = (item: InventoryItem) =>
+                  `${item.name}|${item.description}|${item.equipSlot || ''}|${item.goldValue || 0}|${JSON.stringify(item.statModifiers || {})}`;
 
-                return (
-                  <div
-                    key={item.id}
-                    draggable={!!item.equipSlot && !isEditing}
-                    onDragStart={(e) => {
-                      e.dataTransfer.setData('application/json', JSON.stringify(item));
-                      e.dataTransfer.effectAllowed = 'move';
-                    }}
-                    className={`bg-muted/50 p-4 rounded-lg ${
-                      item.equipSlot && !isEditing ? 'cursor-grab active:cursor-grabbing' : ''
-                    } ${isEditing ? 'border-2 border-accent' : 'border border-border'}`}
-                  >
-                    {/* Item header with action buttons */}
-                    <div className="flex items-start gap-2 mb-2">
-                      {/* Item type icon */}
-                      {item.equipSlot === 'weapon' ? (
-                        <Sword className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
-                      ) : item.equipSlot ? (
-                        <HardHat className="w-5 h-5 text-accent shrink-0 mt-0.5" />
-                      ) : (
-                        <Package className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
-                      )}
-                      {/* Item name and actions */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-foreground font-semibold text-base truncate" title={item.name}>
-                            {item.name}
-                          </span>
-                          <div className="flex items-center gap-1 shrink-0">
-                            <button
-                              onClick={() => handleEditItem(item)}
-                              className="text-primary hover:text-primary/80 p-1"
-                              title="Edit"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteItem(item.id)}
-                              className="text-destructive hover:text-destructive/80 p-1"
-                              title="Delete"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                // Separate equipped and unequipped items
+                const equippedItems = inventory.filter(item => equippedItemIds.has(item.id));
+                const unequippedItems = inventory.filter(item => !equippedItemIds.has(item.id));
+
+                // Group unequipped items by signature
+                const groupedItems = new Map<string, InventoryItem[]>();
+                unequippedItems.forEach(item => {
+                  const sig = getItemSignature(item);
+                  if (!groupedItems.has(sig)) {
+                    groupedItems.set(sig, []);
+                  }
+                  groupedItems.get(sig)!.push(item);
+                });
+
+                // Convert to array: equipped items first (as singles), then grouped unequipped
+                const displayItems: { item: InventoryItem; count: number; allIds: string[]; isEquipped: boolean }[] = [];
+
+                equippedItems.forEach(item => {
+                  displayItems.push({ item, count: 1, allIds: [item.id], isEquipped: true });
+                });
+
+                groupedItems.forEach((items) => {
+                  displayItems.push({ item: items[0], count: items.length, allIds: items.map(i => i.id), isEquipped: false });
+                });
+
+                return displayItems.map(({ item, count, allIds, isEquipped }) => {
+                  const isEditing = editingItemId === item.id;
+
+                  return (
+                    <div
+                      key={allIds[0]}
+                      draggable={!!item.equipSlot && !isEditing}
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData('application/json', JSON.stringify(item));
+                        e.dataTransfer.effectAllowed = 'move';
+                      }}
+                      className={`bg-muted/50 p-4 rounded-lg ${
+                        item.equipSlot && !isEditing ? 'cursor-grab active:cursor-grabbing' : ''
+                      } ${isEditing ? 'border-2 border-accent' : 'border border-border'}`}
+                    >
+                      {/* Item header with action buttons */}
+                      <div className="flex items-start gap-2 mb-2">
+                        {/* Item type icon */}
+                        {item.equipSlot === 'weapon' ? (
+                          <Sword className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+                        ) : item.equipSlot ? (
+                          <HardHat className="w-5 h-5 text-accent shrink-0 mt-0.5" />
+                        ) : (
+                          <Package className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
+                        )}
+                        {/* Item name and actions */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-foreground font-semibold text-base truncate" title={item.name}>
+                              {item.name}
+                              {count > 1 && (
+                                <span className="ml-2 text-accent font-bold">×{count}</span>
+                              )}
+                            </span>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                onClick={() => handleEditItem(item)}
+                                className="text-primary hover:text-primary/80 p-1"
+                                title={count > 1 ? "Edit (affects all copies)" : "Edit"}
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteItem(allIds[0])}
+                                className="text-destructive hover:text-destructive/80 p-1"
+                                title={count > 1 ? "Delete one" : "Delete"}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Item badges */}
-                    <div className="flex flex-wrap items-center gap-2 mb-2">
-                      {item.equipSlot && (
-                        <span className="text-xs bg-accent/20 text-accent px-2 py-1 rounded">
-                          {item.equipSlot === 'weapon' ? 'Weapon' :
-                           item.equipSlot === 'leftHand' ? 'Left Hand' :
-                           item.equipSlot === 'rightHand' ? 'Right Hand' :
-                           item.equipSlot === 'ringFinger' ? 'Ring' :
-                           item.equipSlot.charAt(0).toUpperCase() + item.equipSlot.slice(1)}
-                        </span>
-                      )}
-                      {isEquipped && (
-                        <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded">Equipped</span>
-                      )}
-                      {item.goldValue !== undefined && item.goldValue > 0 && (
-                        <span className="text-xs bg-accent/10 text-accent px-2 py-1 rounded flex items-center gap-1">
-                          <Coins className="w-3 h-3" /> {item.goldValue}G
-                        </span>
+                      {/* Item badges */}
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        {item.equipSlot && (
+                          <span className="text-xs bg-accent/20 text-accent px-2 py-1 rounded">
+                            {item.equipSlot === 'weapon' ? 'Weapon' :
+                             item.equipSlot === 'leftHand' ? 'Left Hand' :
+                             item.equipSlot === 'rightHand' ? 'Right Hand' :
+                             item.equipSlot === 'ringFinger' ? 'Ring' :
+                             item.equipSlot.charAt(0).toUpperCase() + item.equipSlot.slice(1)}
+                          </span>
+                        )}
+                        {isEquipped && (
+                          <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded">Equipped</span>
+                        )}
+                        {item.goldValue !== undefined && item.goldValue > 0 && (
+                          <span className="text-xs bg-accent/10 text-accent px-2 py-1 rounded flex items-center gap-1">
+                            <Coins className="w-3 h-3" /> {item.goldValue}G
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Item description */}
+                      {expandedItems && (
+                        <p className="text-muted-foreground text-sm leading-relaxed">
+                          {item.description || "No description"}
+                        </p>
                       )}
                     </div>
-
-                    {/* Item description */}
-                    {expandedItems && (
-                      <p className="text-muted-foreground text-sm leading-relaxed">
-                        {item.description || "No description"}
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
+                  );
+                });
+              })()}
             </div>
           )}
         </div>

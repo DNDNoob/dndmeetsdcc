@@ -227,6 +227,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   const draggingMobIdRef = useRef<string | null>(null); // Ref for use in listeners to avoid re-subscription
   const [remoteDragState, setRemoteDragState] = useState<{placementIndex: number; x: number; y: number} | null>(null);
   const mapImageRef = useRef<HTMLImageElement>(null);
+  const [mapImageDimensions, setMapImageDimensions] = useState<{ width: number; height: number } | null>(null);
   const hasAutoLoaded = useRef(false);
   const mountTime = useRef(Timestamp.now());
   const lastBroadcastTime = useRef<number>(0);
@@ -1452,6 +1453,8 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     setCrawlerPlacements([]);
     setRuntimeMobPlacements([]);
     fogInitialLoadDone.current = null;
+    // Scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
   const handleEndEpisode = useCallback(() => {
@@ -2025,15 +2028,24 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
           onMouseUp={handleMouseUp}
           onClick={handleMapClick}
         >
-          {/* Inner wrapper scales the map AND all overlays together via mapBaseScale.
-              The img determines the layout size at 80vh, then transform scales everything uniformly.
-              Icons counter-scale to stay physically the same size. */}
+          {/* Outer wrapper reserves space for scaled content by using the scaled dimensions.
+              Inner wrapper applies transform scale. Icons counter-scale to stay physically same size. */}
           <div
             className="relative"
+            data-map-scale-spacer
+            style={{
+              // This wrapper reserves layout space based on the scaled size
+              // The actual image is 80vh tall, scaled by mapBaseScale
+              width: mapImageDimensions ? `${mapImageDimensions.width * mapBaseScale / 100}px` : 'auto',
+              height: `calc(80vh * ${mapBaseScale / 100})`,
+            }}
+          >
+          <div
+            className="absolute top-0 left-0"
             data-map-scale-wrapper
             style={{
               transform: `scale(${mapBaseScale / 100})`,
-              transformOrigin: 'center center',
+              transformOrigin: 'top left',
             }}
           >
           <img
@@ -2044,8 +2056,13 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             style={{
               height: '80vh',
               width: 'auto',
+              display: 'block',
             }}
             draggable={false}
+            onLoad={(e) => {
+              const img = e.currentTarget;
+              setMapImageDimensions({ width: img.clientWidth, height: img.clientHeight });
+            }}
           />
 
           {/* Grid overlay - only visible to DM */}
@@ -2392,6 +2409,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
           {/* Ping effects - on top of everything */}
           <PingEffect pings={pings} />
         </div>{/* end mapBaseScale wrapper */}
+        </div>{/* end mapBaseScale spacer */}
         </div>
       </div>
 

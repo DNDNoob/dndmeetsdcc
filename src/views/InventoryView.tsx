@@ -39,6 +39,11 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   const [newLibraryItem, setNewLibraryItem] = useState<{ name: string; description: string; equipSlot?: SlotType; goldValue?: number; statModifiers?: StatModifiers }>({
     name: "", description: "", equipSlot: undefined, goldValue: undefined, statModifiers: undefined,
   });
+  // Editing library item state
+  const [editingLibraryItemId, setEditingLibraryItemId] = useState<string | null>(null);
+  const [editingLibraryItem, setEditingLibraryItem] = useState<{ name: string; description: string; equipSlot?: SlotType; goldValue?: number; statModifiers?: StatModifiers }>({
+    name: "", description: "", equipSlot: undefined, goldValue: undefined, statModifiers: undefined,
+  });
   // Per-crawler search queries
   const [searchQueries, setSearchQueries] = useState<Record<string, string>>({});
 
@@ -124,6 +129,45 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     onUpdateSharedInventory(items.filter((i) => i.id !== itemId));
   };
 
+  const handleStartEditLibraryItem = (item: InventoryItem) => {
+    setEditingLibraryItemId(item.id);
+    setEditingLibraryItem({
+      name: item.name,
+      description: item.description,
+      equipSlot: item.equipSlot,
+      goldValue: item.goldValue,
+      statModifiers: item.statModifiers,
+    });
+  };
+
+  const handleSaveEditLibraryItem = () => {
+    if (!editingLibraryItemId || !editingLibraryItem.name.trim()) return;
+    const items = getSharedInventory();
+    const mods = editingLibraryItem.statModifiers
+      ? Object.fromEntries(Object.entries(editingLibraryItem.statModifiers).filter(([, v]) => v !== 0 && v !== undefined))
+      : undefined;
+    const updated = items.map(item =>
+      item.id === editingLibraryItemId
+        ? {
+            ...item,
+            name: editingLibraryItem.name,
+            description: editingLibraryItem.description,
+            equipSlot: editingLibraryItem.equipSlot,
+            goldValue: editingLibraryItem.goldValue,
+            ...(mods && Object.keys(mods).length > 0 ? { statModifiers: mods } : { statModifiers: undefined }),
+          }
+        : item
+    );
+    onUpdateSharedInventory(updated);
+    setEditingLibraryItemId(null);
+    setEditingLibraryItem({ name: "", description: "", equipSlot: undefined, goldValue: undefined, statModifiers: undefined });
+  };
+
+  const handleCancelEditLibraryItem = () => {
+    setEditingLibraryItemId(null);
+    setEditingLibraryItem({ name: "", description: "", equipSlot: undefined, goldValue: undefined, statModifiers: undefined });
+  };
+
   const handleAddLibraryItemToCrawler = (crawlerId: string, libraryItem: InventoryItem) => {
     const items = getCrawlerInventory(crawlerId);
     const copy: InventoryItem = { ...libraryItem, id: crypto.randomUUID() };
@@ -184,49 +228,116 @@ const InventoryView: React.FC<InventoryViewProps> = ({
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-3">
               {libraryItems.map((item) => (
-                <div key={item.id} className="flex items-start gap-2 text-sm py-2 px-3 border border-border/50 bg-background/50">
-                  {item.equipSlot === 'weapon' ? (
-                    <Sword className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
-                  ) : item.equipSlot ? (
-                    <HardHat className="w-4 h-4 text-accent shrink-0 mt-0.5" />
-                  ) : (
-                    <Package className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1 flex-wrap">
-                      <span className="text-foreground font-medium">{item.name}</span>
-                      {item.equipSlot && (
-                        <span className="text-xs bg-accent/20 text-accent px-1.5 py-0.5 rounded">
-                          {item.equipSlot === 'weapon' ? 'Weapon' :
-                           item.equipSlot === 'leftHand' ? 'Left Hand' :
-                           item.equipSlot === 'rightHand' ? 'Right Hand' :
-                           item.equipSlot === 'ringFinger' ? 'Ring' :
-                           item.equipSlot.charAt(0).toUpperCase() + item.equipSlot.slice(1)}
-                        </span>
-                      )}
-                      {item.goldValue !== undefined && item.goldValue > 0 && (
-                        <span className="text-xs bg-accent/10 text-accent px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                          <Coins className="w-3 h-3" /> {item.goldValue}G
-                        </span>
-                      )}
-                    </div>
-                    {item.description && (
-                      <span className="text-muted-foreground text-xs block">({item.description})</span>
-                    )}
-                    {item.statModifiers && Object.keys(item.statModifiers).length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {Object.entries(item.statModifiers).filter(([,v]) => v !== 0).map(([stat, val]) => (
-                          <span key={stat} className={`text-xs px-1 rounded ${(val as number) > 0 ? 'text-green-400 bg-green-400/10' : 'text-red-400 bg-red-400/10'}`}>
-                            {stat.toUpperCase()} {(val as number) > 0 ? '+' : ''}{val}
-                          </span>
-                        ))}
+                <div key={item.id} className={`flex items-start gap-2 text-sm py-2 px-3 border bg-background/50 ${editingLibraryItemId === item.id ? 'border-accent' : 'border-border/50'}`}>
+                  {editingLibraryItemId === item.id ? (
+                    // Edit form
+                    <div className="flex-1 space-y-2">
+                      <div className="flex gap-2">
+                        <input type="text" placeholder="Item name" value={editingLibraryItem.name}
+                          onChange={(e) => setEditingLibraryItem({ ...editingLibraryItem, name: e.target.value })}
+                          className="bg-muted border border-border px-2 py-1 text-sm flex-1" />
                       </div>
-                    )}
-                  </div>
-                  {editMode && (
-                    <button onClick={() => handleRemoveLibraryItem(item.id)} className="text-destructive hover:text-destructive/80 shrink-0">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                      <input type="text" placeholder="Description" value={editingLibraryItem.description}
+                        onChange={(e) => setEditingLibraryItem({ ...editingLibraryItem, description: e.target.value })}
+                        className="bg-muted border border-border px-2 py-1 text-sm w-full" />
+                      <div className="flex gap-2">
+                        <select value={editingLibraryItem.equipSlot || ""}
+                          onChange={(e) => setEditingLibraryItem({ ...editingLibraryItem, equipSlot: e.target.value as SlotType || undefined })}
+                          className="bg-muted border border-border px-2 py-1 text-sm flex-1">
+                          <option value="">No Slot</option>
+                          <option value="weapon">Weapon</option>
+                          <option value="head">Head</option>
+                          <option value="chest">Chest</option>
+                          <option value="legs">Legs</option>
+                          <option value="feet">Feet</option>
+                          <option value="leftHand">Left Hand</option>
+                          <option value="rightHand">Right Hand</option>
+                          <option value="ringFinger">Ring</option>
+                        </select>
+                        <div className="flex items-center gap-1">
+                          <Coins className="w-4 h-4 text-accent" />
+                          <input type="number" placeholder="Val" value={editingLibraryItem.goldValue !== undefined ? editingLibraryItem.goldValue : ""}
+                            onChange={(e) => setEditingLibraryItem({ ...editingLibraryItem, goldValue: e.target.value ? parseInt(e.target.value) : undefined })}
+                            className="bg-muted border border-border px-2 py-1 text-sm w-16" />
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Stat Modifiers</p>
+                        <div className="grid grid-cols-3 gap-1">
+                          {(['str', 'dex', 'con', 'int', 'cha', 'hp', 'maxHP', 'mana', 'maxMana'] as const).map((stat) => (
+                            <div key={stat} className="flex items-center gap-1">
+                              <label className="text-xs text-muted-foreground w-10 uppercase">{stat}</label>
+                              <input type="number" value={editingLibraryItem.statModifiers?.[stat] ?? ""}
+                                onChange={(e) => setEditingLibraryItem({
+                                  ...editingLibraryItem,
+                                  statModifiers: { ...editingLibraryItem.statModifiers, [stat]: e.target.value ? parseInt(e.target.value) : undefined },
+                                })}
+                                placeholder="0" className="w-12 bg-muted border border-border px-1 py-0.5 text-xs text-center" />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex gap-2 pt-2">
+                        <DungeonButton variant="default" size="sm" onClick={handleSaveEditLibraryItem}>
+                          <Save className="w-3 h-3 mr-1" /> Save
+                        </DungeonButton>
+                        <DungeonButton variant="danger" size="sm" onClick={handleCancelEditLibraryItem}>
+                          Cancel
+                        </DungeonButton>
+                      </div>
+                    </div>
+                  ) : (
+                    // Display mode
+                    <>
+                      {item.equipSlot === 'weapon' ? (
+                        <Sword className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+                      ) : item.equipSlot ? (
+                        <HardHat className="w-4 h-4 text-accent shrink-0 mt-0.5" />
+                      ) : (
+                        <Package className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <span className="text-foreground font-medium">{item.name}</span>
+                          {item.equipSlot && (
+                            <span className="text-xs bg-accent/20 text-accent px-1.5 py-0.5 rounded">
+                              {item.equipSlot === 'weapon' ? 'Weapon' :
+                               item.equipSlot === 'leftHand' ? 'Left Hand' :
+                               item.equipSlot === 'rightHand' ? 'Right Hand' :
+                               item.equipSlot === 'ringFinger' ? 'Ring' :
+                               item.equipSlot.charAt(0).toUpperCase() + item.equipSlot.slice(1)}
+                            </span>
+                          )}
+                          {item.goldValue !== undefined && item.goldValue > 0 && (
+                            <span className="text-xs bg-accent/10 text-accent px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                              <Coins className="w-3 h-3" /> {item.goldValue}G
+                            </span>
+                          )}
+                        </div>
+                        {item.description && (
+                          <span className="text-muted-foreground text-xs block">({item.description})</span>
+                        )}
+                        {item.statModifiers && Object.keys(item.statModifiers).length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {Object.entries(item.statModifiers).filter(([,v]) => v !== 0).map(([stat, val]) => (
+                              <span key={stat} className={`text-xs px-1 rounded ${(val as number) > 0 ? 'text-green-400 bg-green-400/10' : 'text-red-400 bg-red-400/10'}`}>
+                                {stat.toUpperCase()} {(val as number) > 0 ? '+' : ''}{val}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      {editMode && (
+                        <div className="flex flex-col gap-1 shrink-0">
+                          <button onClick={() => handleStartEditLibraryItem(item)} className="text-primary hover:text-primary/80">
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => handleRemoveLibraryItem(item.id)} className="text-destructive hover:text-destructive/80">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               ))}

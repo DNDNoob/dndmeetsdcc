@@ -82,6 +82,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   const [newLootBoxItems, setNewLootBoxItems] = useState<InventoryItem[]>([]);
   const [lootBoxItemSearch, setLootBoxItemSearch] = useState("");
   const [lootBoxItemQuantity, setLootBoxItemQuantity] = useState(1);
+  const [newLootBoxGold, setNewLootBoxGold] = useState(0);
   const [editingLootBoxId, setEditingLootBoxId] = useState<string | null>(null);
 
   const handleAddMob = async () => {
@@ -1117,6 +1118,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                       onRemoveMob={handleRemoveMobFromEpisode}
                       crawlers={crawlers}
                       crawlerPlacements={selectedCrawlersForEpisode}
+                      mapScale={mapSettingsForEpisode[selectedMapsForEpisode[currentMapIndexForEditor]]?.scale ?? 100}
                       onCrawlerPlacementsChange={setSelectedCrawlersForEpisode}
                     />
 
@@ -1244,7 +1246,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                               <Package className="w-4 h-4 flex-shrink-0" style={{ color: getLootBoxTierColor(template.tier) }} />
                               <div className="min-w-0 flex-1">
                                 <p className="text-sm font-semibold truncate">{template.name}</p>
-                                <p className="text-xs text-muted-foreground">{template.tier} · {template.items.length} items</p>
+                                <p className="text-xs text-muted-foreground">{template.tier} · {template.items.length} items{template.gold ? ` · ${template.gold}g` : ''}</p>
                               </div>
                               {isSelected && <span className="text-amber-500">✓</span>}
                             </div>
@@ -1343,7 +1345,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                 {editingLootBoxId ? "Edit Loot Box" : "Create Loot Box"}
               </h3>
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div>
                     <label className="text-xs text-muted-foreground mb-1 block">Name *</label>
                     <input
@@ -1368,6 +1370,17 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                         </option>
                       ))}
                     </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Gold</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={newLootBoxGold}
+                      onChange={e => setNewLootBoxGold(Math.max(0, parseInt(e.target.value) || 0))}
+                      placeholder="0"
+                      className="w-full bg-background border border-border rounded px-3 py-2 text-sm"
+                    />
                   </div>
                 </div>
 
@@ -1473,6 +1486,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                         setNewLootBoxName("");
                         setNewLootBoxTier("Copper");
                         setNewLootBoxItems([]);
+                        setNewLootBoxGold(0);
                       }}
                       className="flex-1"
                     >
@@ -1481,14 +1495,15 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                   )}
                   <DungeonButton
                     variant="admin"
-                    disabled={!newLootBoxName.trim() || newLootBoxItems.length === 0 || !onAddLootBoxTemplate}
+                    disabled={!newLootBoxName.trim() || (newLootBoxItems.length === 0 && newLootBoxGold === 0) || !onAddLootBoxTemplate}
                     onClick={() => {
-                      if (!newLootBoxName.trim() || newLootBoxItems.length === 0) return;
+                      if (!newLootBoxName.trim() || (newLootBoxItems.length === 0 && newLootBoxGold === 0)) return;
                       if (editingLootBoxId && onUpdateLootBoxTemplate) {
                         onUpdateLootBoxTemplate(editingLootBoxId, {
                           name: newLootBoxName,
                           tier: newLootBoxTier,
                           items: newLootBoxItems,
+                          gold: newLootBoxGold > 0 ? newLootBoxGold : undefined,
                         });
                         setEditingLootBoxId(null);
                       } else if (onAddLootBoxTemplate) {
@@ -1497,11 +1512,13 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                           name: newLootBoxName,
                           tier: newLootBoxTier,
                           items: newLootBoxItems,
+                          gold: newLootBoxGold > 0 ? newLootBoxGold : undefined,
                         });
                       }
                       setNewLootBoxName("");
                       setNewLootBoxTier("Copper");
                       setNewLootBoxItems([]);
+                      setNewLootBoxGold(0);
                     }}
                     className="flex-1"
                   >
@@ -1537,7 +1554,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                           <div className="min-w-0">
                             <h4 className="font-semibold truncate">{template.name}</h4>
                             <p className="text-xs text-muted-foreground">
-                              {template.tier} · {template.items.length} item{template.items.length !== 1 ? 's' : ''}
+                              {template.tier} · {template.items.length} item{template.items.length !== 1 ? 's' : ''}{template.gold ? ` · ${template.gold}g` : ''}
                             </p>
                           </div>
                         </div>
@@ -1548,6 +1565,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                               setNewLootBoxName(template.name);
                               setNewLootBoxTier(template.tier);
                               setNewLootBoxItems([...template.items]);
+                              setNewLootBoxGold(template.gold ?? 0);
                               window.scrollTo({ top: 0, behavior: 'smooth' });
                             }}
                             className="p-1.5 hover:bg-muted rounded transition-colors"

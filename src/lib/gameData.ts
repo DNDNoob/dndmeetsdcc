@@ -117,6 +117,7 @@ export interface LootBoxTemplate {
   name: string;
   tier: LootBoxTier;
   items: InventoryItem[];
+  gold?: number;
 }
 
 export interface SentLootBox {
@@ -126,6 +127,7 @@ export interface SentLootBox {
   name: string;
   tier: LootBoxTier;
   items: InventoryItem[];
+  gold?: number;
   locked: boolean;
   sentAt: string;
   unlockedAt?: string;

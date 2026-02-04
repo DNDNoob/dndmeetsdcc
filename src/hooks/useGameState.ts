@@ -396,6 +396,7 @@ export const useGameState = () => {
         name: template.name,
         tier: template.tier,
         items: template.items.map(item => ({ ...item, id: crypto.randomUUID() })),
+        gold: template.gold,
         locked: true,
         sentAt: new Date().toISOString(),
       }) as Record<string, unknown>,
@@ -407,23 +408,38 @@ export const useGameState = () => {
     updateItem('lootBoxes', lootBoxId, { locked: false, unlockedAt: new Date().toISOString() });
   };
 
-  const claimLootBoxItems = async (lootBoxId: string, crawlerId: string, itemIds: string[]) => {
+  const claimLootBoxItems = async (lootBoxId: string, crawlerId: string, itemIds: string[], claimGold = false) => {
     const box = lootBoxes.find(b => b.id === lootBoxId);
     if (!box) return;
 
     const itemsToClaim = box.items.filter(i => itemIds.includes(i.id));
-    if (itemsToClaim.length === 0) return;
 
     // Add items to crawler inventory
-    const currentItems = getCrawlerInventory(crawlerId);
-    updateCrawlerInventory(crawlerId, [...currentItems, ...itemsToClaim]);
+    if (itemsToClaim.length > 0) {
+      const currentItems = getCrawlerInventory(crawlerId);
+      updateCrawlerInventory(crawlerId, [...currentItems, ...itemsToClaim]);
+    }
+
+    // Add gold to crawler if claiming gold
+    if (claimGold && box.gold && box.gold > 0) {
+      const crawler = crawlers.find(c => c.id === crawlerId);
+      if (crawler) {
+        updateCrawler(crawlerId, { gold: (crawler.gold || 0) + box.gold });
+      }
+    }
 
     // Remove claimed items from loot box
     const remainingItems = box.items.filter(i => !itemIds.includes(i.id));
-    if (remainingItems.length === 0) {
+    const remainingGold = claimGold ? 0 : (box.gold || 0);
+
+    // Delete box if empty, otherwise update
+    if (remainingItems.length === 0 && remainingGold === 0) {
       deleteItem('lootBoxes', lootBoxId);
     } else {
-      updateItem('lootBoxes', lootBoxId, { items: remainingItems });
+      updateItem('lootBoxes', lootBoxId, {
+        items: remainingItems,
+        gold: remainingGold > 0 ? remainingGold : undefined
+      });
     }
   };
 
