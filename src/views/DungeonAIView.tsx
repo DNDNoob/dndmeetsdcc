@@ -25,6 +25,7 @@ interface DungeonAIViewProps {
   onAddLootBoxTemplate?: (template: LootBoxTemplate) => void;
   onUpdateLootBoxTemplate?: (id: string, updates: Partial<LootBoxTemplate>) => void;
   onDeleteLootBoxTemplate?: (id: string) => void;
+  onSetGameClock?: (gameTime: number) => Promise<void>;
 }
 
 const DungeonAIView: React.FC<DungeonAIViewProps> = ({
@@ -45,6 +46,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   onAddLootBoxTemplate,
   onUpdateLootBoxTemplate,
   onDeleteLootBoxTemplate,
+  onSetGameClock,
 }) => {
   const [activeTab, setActiveTab] = useState<"mobs" | "maps" | "episodes" | "lootboxes">("mobs");
   const [newMob, setNewMob] = useState<Partial<Mob>>({
@@ -73,6 +75,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   const [currentMapIndexForEditor, setCurrentMapIndexForEditor] = useState(0);
   // Per-map settings: { [mapId]: { fogOfWar: boolean, scale: number } }
   const [mapSettingsForEpisode, setMapSettingsForEpisode] = useState<{ [mapId: string]: { fogOfWar: boolean; scale: number } }>({});
+  const [newEpisodeStartingTime, setNewEpisodeStartingTime] = useState("");
   // Map designer popout
   const [isMapDesignerOpen, setIsMapDesignerOpen] = useState(false);
 
@@ -314,6 +317,8 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
 
     console.log('[DungeonAI] Saving episode mapSettings:', JSON.stringify(mapSettings));
 
+    const parsedStartingTime = newEpisodeStartingTime ? new Date(newEpisodeStartingTime).getTime() : undefined;
+
     if (editingEpisodeId) {
       // Update existing episode
       onUpdateEpisode(editingEpisodeId, {
@@ -323,7 +328,8 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
         mobPlacements: selectedMobsForEpisode,
         crawlerPlacements: selectedCrawlersForEpisode,
         mapSettings: mapSettings,
-        lootBoxIds: selectedLootBoxIdsForEpisode.length > 0 ? selectedLootBoxIdsForEpisode : undefined
+        lootBoxIds: selectedLootBoxIdsForEpisode.length > 0 ? selectedLootBoxIdsForEpisode : undefined,
+        startingGameTime: parsedStartingTime,
       });
       setEditingEpisodeId(null);
     } else {
@@ -336,9 +342,15 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
         mobPlacements: selectedMobsForEpisode,
         crawlerPlacements: selectedCrawlersForEpisode,
         mapSettings: mapSettings,
-        lootBoxIds: selectedLootBoxIdsForEpisode.length > 0 ? selectedLootBoxIdsForEpisode : undefined
+        lootBoxIds: selectedLootBoxIdsForEpisode.length > 0 ? selectedLootBoxIdsForEpisode : undefined,
+        startingGameTime: parsedStartingTime,
       };
       onAddEpisode(episode);
+
+      // Initialize game clock when creating episode with a starting time
+      if (parsedStartingTime && onSetGameClock) {
+        onSetGameClock(parsedStartingTime);
+      }
     }
 
     // Reset form
@@ -350,6 +362,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
     setCurrentMapIndexForEditor(0);
     setMapSettingsForEpisode({});
     setSelectedLootBoxIdsForEpisode([]);
+    setNewEpisodeStartingTime("");
   };
 
   const handleToggleMapForEpisode = (mapIndex: number) => {
@@ -438,6 +451,17 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
       setSelectedLootBoxIdsForEpisode(episode.lootBoxes.map(b => b.id));
     } else {
       setSelectedLootBoxIdsForEpisode([]);
+    }
+
+    // Load starting game time
+    if (episode.startingGameTime) {
+      const d = new Date(episode.startingGameTime);
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      setNewEpisodeStartingTime(
+        `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+      );
+    } else {
+      setNewEpisodeStartingTime("");
     }
 
     setCurrentMapIndexForEditor(0);
@@ -986,6 +1010,19 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                   />
                 </div>
 
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Starting Game Time</label>
+                  <input
+                    type="datetime-local"
+                    value={newEpisodeStartingTime}
+                    onChange={(e) => setNewEpisodeStartingTime(e.target.value)}
+                    className="w-full bg-muted border border-border px-3 py-2"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Sets the in-game clock when this episode begins
+                  </p>
+                </div>
+
                 {/* Map selection */}
                 <div>
                   <label className="text-xs text-muted-foreground mb-2 block font-semibold">Select Maps for Episode *</label>
@@ -1286,6 +1323,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                         setCurrentMapIndexForEditor(0);
                         setMapSettingsForEpisode({});
                         setSelectedLootBoxIdsForEpisode([]);
+                        setNewEpisodeStartingTime("");
                       }}
                       className="flex-1"
                     >

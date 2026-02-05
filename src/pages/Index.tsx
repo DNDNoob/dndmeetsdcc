@@ -78,6 +78,10 @@ const Index = () => {
     startNoncombatTurn,
     recordNoncombatRoll,
     getNoncombatRollsRemaining,
+    gameClockState,
+    setGameClock,
+    performShortRest,
+    performLongRest,
     isLoaded
   } = useGameState();
 
@@ -362,6 +366,7 @@ const Index = () => {
                 onAddLootBoxTemplate={addLootBoxTemplate}
                 onUpdateLootBoxTemplate={updateLootBoxTemplate}
                 onDeleteLootBoxTemplate={deleteLootBoxTemplate}
+                onSetGameClock={setGameClock}
               />
             )}
             {currentView === "showtime" && (
@@ -404,6 +409,9 @@ const Index = () => {
             noncombatTurnState={noncombatTurnState}
             onStartNoncombatTurn={startNoncombatTurn}
             crawlers={crawlers}
+            gameClockState={gameClockState}
+            onPerformShortRest={performShortRest}
+            onPerformLongRest={performLongRest}
           />
 
           <ChangelogViewer

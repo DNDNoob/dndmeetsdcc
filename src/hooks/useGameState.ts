@@ -7,6 +7,8 @@ import {
   SentLootBox,
   LootBoxTemplate,
   NoncombatTurnState,
+  GameClockState,
+  getEquippedModifiers,
   defaultCrawlers,
   defaultInventory,
   defaultMobs,
@@ -508,6 +510,12 @@ export const useGameState = () => {
 
   const startNoncombatTurn = async () => {
     const current = noncombatTurnState;
+
+    // Advance game clock by 1 hour when starting a new turn (not the very first one)
+    if (current && gameClockState) {
+      await advanceGameClock(1);
+    }
+
     const newTurn: NoncombatTurnState = {
       id: 'current',
       turnNumber: (current?.turnNumber ?? 0) + 1,
@@ -533,6 +541,81 @@ export const useGameState = () => {
     if (!noncombatTurnState) return 0; // No active turn = no rolls allowed
     const used = noncombatTurnState.rollsUsed[crawlerId] ?? 0;
     return Math.max(0, noncombatTurnState.maxRolls - used);
+  };
+
+  // --- Game Clock ---
+  const gameClockState = useMemo((): GameClockState | null => {
+    const stored = getStableCollection<GameClockState>('gameClock');
+    return stored.find(s => s.id === 'current') ?? null;
+  }, [getCollection, isLoaded]);
+
+  const setGameClock = async (gameTime: number) => {
+    const current = gameClockState;
+    const newState: GameClockState = { id: 'current', gameTime };
+    if (current) {
+      await updateItem('gameClock', 'current', newState as unknown as Record<string, unknown>);
+    } else {
+      await addItem('gameClock', newState as unknown as Record<string, unknown>);
+    }
+  };
+
+  const advanceGameClock = async (hours: number) => {
+    if (!gameClockState) return;
+    const msToAdd = hours * 60 * 60 * 1000;
+    await setGameClock(gameClockState.gameTime + msToAdd);
+  };
+
+  // --- Rest Mechanics ---
+  const performShortRest = async (crawlerIds: string[]) => {
+    if (gameClockState) await advanceGameClock(4);
+
+    const operations: BatchOperation[] = [];
+    for (const id of crawlerIds) {
+      const crawler = crawlers.find(c => c.id === id);
+      if (!crawler) continue;
+
+      const crawlerInv = getCrawlerInventory(id);
+      const mods = getEquippedModifiers(crawler, crawlerInv);
+      const effectiveMaxHP = crawler.maxHP + (mods.maxHP ?? 0);
+      const effectiveMaxMana = crawler.maxMana + (mods.maxMana ?? 0);
+
+      const missingHP = effectiveMaxHP - crawler.hp;
+      const missingMana = effectiveMaxMana - crawler.mana;
+
+      const newHP = Math.min(effectiveMaxHP, crawler.hp + Math.floor(missingHP / 2));
+      const newMana = Math.min(effectiveMaxMana, crawler.mana + Math.floor(missingMana / 2));
+
+      operations.push({
+        type: 'update' as const,
+        collection: 'crawlers' as const,
+        id,
+        data: { hp: newHP, mana: newMana },
+      });
+    }
+    if (operations.length > 0) await batchWrite(operations);
+  };
+
+  const performLongRest = async (crawlerIds: string[]) => {
+    if (gameClockState) await advanceGameClock(8);
+
+    const operations: BatchOperation[] = [];
+    for (const id of crawlerIds) {
+      const crawler = crawlers.find(c => c.id === id);
+      if (!crawler) continue;
+
+      const crawlerInv = getCrawlerInventory(id);
+      const mods = getEquippedModifiers(crawler, crawlerInv);
+      const effectiveMaxHP = crawler.maxHP + (mods.maxHP ?? 0);
+      const effectiveMaxMana = crawler.maxMana + (mods.maxMana ?? 0);
+
+      operations.push({
+        type: 'update' as const,
+        collection: 'crawlers' as const,
+        id,
+        data: { hp: effectiveMaxHP, mana: effectiveMaxMana },
+      });
+    }
+    if (operations.length > 0) await batchWrite(operations);
   };
 
   return {
@@ -573,6 +656,10 @@ export const useGameState = () => {
     startNoncombatTurn,
     recordNoncombatRoll,
     getNoncombatRollsRemaining,
+    gameClockState,
+    setGameClock,
+    performShortRest,
+    performLongRest,
     isLoaded,
   };
 };

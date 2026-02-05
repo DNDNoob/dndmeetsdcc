@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DungeonButton } from "./ui/DungeonButton";
-import { Dices, ChevronUp, ChevronDown, Plus, X, Package, RotateCcw } from "lucide-react";
-import { getLootBoxTierColor, type Crawler, type NoncombatTurnState } from "@/lib/gameData";
+import { Dices, ChevronUp, ChevronDown, Plus, X, Package, RotateCcw, Sun, Moon } from "lucide-react";
+import { getLootBoxTierColor, type Crawler, type NoncombatTurnState, type GameClockState } from "@/lib/gameData";
 import { DiceRollEntry } from "@/hooks/useGameState";
 
 const diceTypes = [
@@ -31,9 +31,12 @@ interface DiceRollerProps {
   noncombatTurnState?: NoncombatTurnState | null;
   onStartNoncombatTurn?: () => Promise<void>;
   crawlers?: Crawler[];
+  gameClockState?: GameClockState | null;
+  onPerformShortRest?: (crawlerIds: string[]) => Promise<void>;
+  onPerformLongRest?: (crawlerIds: string[]) => Promise<void>;
 }
 
-const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawlerId = "", diceRolls, addDiceRoll, onExpandedChange, isAdmin, noncombatTurnState, onStartNoncombatTurn, crawlers }) => {
+const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawlerId = "", diceRolls, addDiceRoll, onExpandedChange, isAdmin, noncombatTurnState, onStartNoncombatTurn, crawlers, gameClockState, onPerformShortRest, onPerformLongRest }) => {
 
   const [isExpanded, setIsExpandedRaw] = useState(false);
   const setIsExpanded = (v: boolean) => {
@@ -44,6 +47,8 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
   const [isRolling, setIsRolling] = useState(false);
   const [diceQueue, setDiceQueue] = useState<QueuedDice[]>([]);
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
+  const [showRestDropdown, setShowRestDropdown] = useState<'short' | 'long' | null>(null);
+  const [selectedCrawlersForRest, setSelectedCrawlersForRest] = useState<Record<string, boolean>>({});
   const lastSeenRollId = useRef<string | null>(null);
   const addDiceRollRef = useRef(addDiceRoll);
   addDiceRollRef.current = addDiceRoll;
@@ -125,6 +130,28 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
     return new Date(ts).toLocaleDateString();
   };
 
+  const openRestDropdown = (type: 'short' | 'long') => {
+    const playerCrawlers = (crawlers ?? []).filter(c => c.id !== 'dungeonai');
+    const selected: Record<string, boolean> = {};
+    playerCrawlers.forEach(c => { selected[c.id] = true; });
+    setSelectedCrawlersForRest(selected);
+    setShowRestDropdown(type);
+  };
+
+  const handleConfirmRest = async () => {
+    const selectedIds = Object.entries(selectedCrawlersForRest)
+      .filter(([, checked]) => checked)
+      .map(([id]) => id);
+    if (selectedIds.length === 0) return;
+
+    if (showRestDropdown === 'short' && onPerformShortRest) {
+      await onPerformShortRest(selectedIds);
+    } else if (showRestDropdown === 'long' && onPerformLongRest) {
+      await onPerformLongRest(selectedIds);
+    }
+    setShowRestDropdown(null);
+  };
+
   return (
     <div className="fixed bottom-4 right-4 z-[100] flex items-end gap-2">
       {/* Toggle tab - now to the left of the panel */}
@@ -155,6 +182,23 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
             <h3 className="font-display text-primary text-glow-cyan text-lg mb-3 flex items-center gap-2 shrink-0">
               <Dices className="w-5 h-5" /> DICE ROLLER
             </h3>
+
+            {/* Game Clock */}
+            {gameClockState && (
+              <div className="mb-3 text-center border border-border bg-muted/20 px-3 py-2 shrink-0">
+                <span className="text-[10px] text-muted-foreground font-display block mb-0.5">GAME TIME</span>
+                <span className="font-display text-primary text-sm">
+                  {new Date(gameClockState.gameTime).toLocaleString('en-US', {
+                    month: 'long',
+                    day: 'numeric',
+                    year: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true,
+                  })}
+                </span>
+              </div>
+            )}
 
             {/* Roll history - fills available space */}
             <div className="flex-1 min-h-0 flex flex-col mb-3">
@@ -282,6 +326,78 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
                 </div>
               );
             })()}
+
+            {/* DM Rest Buttons */}
+            {isAdmin && (onPerformShortRest || onPerformLongRest) && (
+              <div className="mb-3 shrink-0 space-y-2">
+                <div className="flex gap-2">
+                  {onPerformShortRest && (
+                    <button
+                      onClick={() => showRestDropdown === 'short' ? setShowRestDropdown(null) : openRestDropdown('short')}
+                      className={`flex-1 flex items-center justify-center gap-1 px-3 py-2 font-display text-xs border-2 rounded transition-all ${
+                        showRestDropdown === 'short'
+                          ? 'bg-primary/20 border-primary text-primary'
+                          : 'bg-muted/30 border-border text-muted-foreground hover:border-primary hover:text-primary'
+                      }`}
+                    >
+                      <Sun className="w-3 h-3" />
+                      SHORT REST
+                    </button>
+                  )}
+                  {onPerformLongRest && (
+                    <button
+                      onClick={() => showRestDropdown === 'long' ? setShowRestDropdown(null) : openRestDropdown('long')}
+                      className={`flex-1 flex items-center justify-center gap-1 px-3 py-2 font-display text-xs border-2 rounded transition-all ${
+                        showRestDropdown === 'long'
+                          ? 'bg-accent/20 border-accent text-accent'
+                          : 'bg-muted/30 border-border text-muted-foreground hover:border-accent hover:text-accent'
+                      }`}
+                    >
+                      <Moon className="w-3 h-3" />
+                      LONG REST
+                    </button>
+                  )}
+                </div>
+
+                {showRestDropdown && (
+                  <div className="border border-border bg-muted/30 p-3 rounded space-y-2">
+                    <span className="text-xs text-muted-foreground font-display block">
+                      {showRestDropdown === 'short' ? 'SHORT REST (+4 hrs, half HP/Mana)' : 'LONG REST (+8 hrs, full HP/Mana)'}
+                    </span>
+                    <div className="space-y-1">
+                      {(crawlers ?? []).filter(c => c.id !== 'dungeonai').map(c => (
+                        <label key={c.id} className="flex items-center gap-2 text-xs cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedCrawlersForRest[c.id] ?? false}
+                            onChange={(e) => setSelectedCrawlersForRest(prev => ({
+                              ...prev,
+                              [c.id]: e.target.checked,
+                            }))}
+                            className="w-4 h-4"
+                          />
+                          <span>{c.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        onClick={handleConfirmRest}
+                        className="flex-1 bg-primary text-primary-foreground font-display text-xs py-1.5 rounded hover:bg-primary/90 transition-colors"
+                      >
+                        CONFIRM
+                      </button>
+                      <button
+                        onClick={() => setShowRestDropdown(null)}
+                        className="flex-1 bg-muted text-muted-foreground font-display text-xs py-1.5 rounded hover:bg-muted/80 transition-colors"
+                      >
+                        CANCEL
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Queued dice */}
             {diceQueue.length > 0 && (

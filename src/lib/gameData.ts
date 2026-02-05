@@ -160,6 +160,12 @@ export interface NoncombatTurnState {
   maxRolls: number; // rolls per player per turn (default 3)
 }
 
+// Game clock state - synced via Firebase (singleton doc, id = 'current')
+export interface GameClockState {
+  id: string; // always 'current'
+  gameTime: number; // epoch milliseconds representing in-game time
+}
+
 export interface Episode {
   id: string;
   name: string;
@@ -171,6 +177,7 @@ export interface Episode {
   defaultFogOfWar?: boolean; // Default fog of war setting for new maps
   lootBoxes?: LootBoxTemplate[]; // Deprecated: embedded templates (for backwards compatibility)
   lootBoxIds?: string[]; // IDs of loot box templates assigned to this episode
+  startingGameTime?: number; // epoch ms for the game clock starting time
   createdAt?: string;
   updatedAt?: string;
 }
