@@ -5,7 +5,7 @@ import { DungeonButton } from "@/components/ui/DungeonButton";
 import { HealthBar } from "@/components/ui/HealthBar";
 import { EquipmentSlot } from "@/components/ui/EquipmentSlot";
 import { Crawler, InventoryItem, createEmptyCrawler, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor } from "@/lib/gameData";
-import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Backpack, HardHat, Package, Lock, Unlock, ChevronDown, ChevronUp, Check, Search, Send, BookOpen, Filter, X, Gem, Footprints, Shirt, Hand } from "lucide-react";
+import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Backpack, HardHat, Package, Lock, Unlock, ChevronDown, ChevronUp, Check, Search, Send, BookOpen, Filter, X, Gem, Footprints, Shirt, Hand, Target } from "lucide-react";
 
 type SortOption = 'name-asc' | 'name-desc' | 'gold-desc' | 'gold-asc';
 
@@ -40,7 +40,33 @@ const getEquipmentIcon = (slot?: string, className: string = "w-4 h-4 shrink-0")
   }
 };
 
-type ProfileTab = 'profile' | 'inventory' | 'spells';
+type ProfileTab = 'profile' | 'inventory' | 'actions' | 'spells';
+
+// Noncombat actions mapped to their associated ability score
+const NONCOMBAT_ACTIONS: { label: string; stat: 'str' | 'dex' | 'con' | 'int' | 'cha' }[] = [
+  { label: 'Acrobatics', stat: 'dex' },
+  { label: 'Animal Handling', stat: 'cha' },
+  { label: 'Athletics', stat: 'str' },
+  { label: 'Deception', stat: 'cha' },
+  { label: 'Intimidation', stat: 'cha' },
+  { label: 'Medicine', stat: 'int' },
+  { label: 'Performance', stat: 'cha' },
+  { label: 'Persuasion', stat: 'cha' },
+  { label: 'Sleight of Hand', stat: 'dex' },
+  { label: 'Stealth', stat: 'dex' },
+  { label: 'Survival', stat: 'con' },
+  { label: 'Arcana', stat: 'int' },
+];
+
+const INTELLIGENCE_ACTIONS: { label: string; stat: 'int' }[] = [
+  { label: 'Religion', stat: 'int' },
+  { label: 'Nature', stat: 'int' },
+  { label: 'Investigation', stat: 'int' },
+  { label: 'History', stat: 'int' },
+  { label: 'Memory', stat: 'int' },
+];
+
+const INITIATIVE_ACTION = { label: 'Initiative', stat: 'dex' as const };
 
 interface ProfilesViewProps {
   crawlers: Crawler[];
@@ -671,6 +697,18 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
               {inventory.length > 0 && (
                 <span className="bg-accent/20 text-accent text-xs px-1.5 py-0.5 rounded-full">{inventory.length}</span>
               )}
+            </button>
+            <button
+              onClick={() => setActiveTab('actions')}
+              className={`p-3 rounded-l-lg transition-colors flex items-center gap-2 ${
+                activeTab === 'actions'
+                  ? 'bg-primary/20 text-primary border-r-2 border-primary'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              }`}
+              title="Actions"
+            >
+              <Target className="w-5 h-5" />
+              <span className="hidden xl:inline text-sm font-medium">Actions</span>
             </button>
             <button
               onClick={() => setActiveTab('spells')}
@@ -1329,6 +1367,121 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                     })}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Actions Tab */}
+            {activeTab === 'actions' && (
+              <div className="space-y-6">
+                <h2 className="font-display text-xl text-primary flex items-center gap-2">
+                  <Target className="w-6 h-6" /> NONCOMBAT ACTIONS
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Roll d20 + stat modifier. Click any action to roll.
+                </p>
+
+                {/* General Actions */}
+                <div>
+                  <h3 className="font-display text-base text-accent mb-3">Actions</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                    {NONCOMBAT_ACTIONS.map(action => {
+                      const baseStat = (selected as any)[action.stat] as number;
+                      const mod = equippedMods[action.stat as keyof StatModifiers] ?? 0;
+                      const total = baseStat + mod;
+                      return (
+                        <button
+                          key={action.label}
+                          onClick={() => onStatRoll?.(selected.name, selected.id, action.label, total)}
+                          className="flex flex-col items-center gap-1 p-3 bg-muted/50 border border-border rounded-lg hover:bg-primary/20 hover:border-primary transition-colors text-left group"
+                          title={`Roll d20 + ${action.stat.toUpperCase()} (${total})`}
+                        >
+                          <span className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">{action.label}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {action.stat.toUpperCase()} {mod !== 0 ? (
+                              <span>
+                                <span>{baseStat}</span>
+                                <span className={mod > 0 ? 'text-green-400' : 'text-red-400'}>{mod > 0 ? `+${mod}` : mod}</span>
+                                <span className="text-orange-400"> = {total}</span>
+                              </span>
+                            ) : (
+                              <span className="font-bold">{total}</span>
+                            )}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Intelligence Based Actions */}
+                <div>
+                  <h3 className="font-display text-base text-accent mb-3 flex items-center gap-2">
+                    <Brain className="w-4 h-4" /> Intelligence Based
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
+                    {INTELLIGENCE_ACTIONS.map(action => {
+                      const baseStat = selected.int;
+                      const mod = equippedMods.int ?? 0;
+                      const total = baseStat + mod;
+                      return (
+                        <button
+                          key={action.label}
+                          onClick={() => onStatRoll?.(selected.name, selected.id, action.label, total)}
+                          className="flex flex-col items-center gap-1 p-3 bg-muted/50 border border-border rounded-lg hover:bg-primary/20 hover:border-primary transition-colors text-left group"
+                          title={`Roll d20 + INT (${total})`}
+                        >
+                          <span className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">{action.label}</span>
+                          <span className="text-xs text-muted-foreground">
+                            INT {mod !== 0 ? (
+                              <span>
+                                <span>{baseStat}</span>
+                                <span className={mod > 0 ? 'text-green-400' : 'text-red-400'}>{mod > 0 ? `+${mod}` : mod}</span>
+                                <span className="text-orange-400"> = {total}</span>
+                              </span>
+                            ) : (
+                              <span className="font-bold">{total}</span>
+                            )}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Initiative */}
+                <div>
+                  <h3 className="font-display text-base text-accent mb-3 flex items-center gap-2">
+                    <Zap className="w-4 h-4" /> Initiative
+                  </h3>
+                  {(() => {
+                    const baseStat = selected.dex;
+                    const mod = equippedMods.dex ?? 0;
+                    const total = baseStat + mod;
+                    return (
+                      <button
+                        onClick={() => onStatRoll?.(selected.name, selected.id, INITIATIVE_ACTION.label, total)}
+                        className="flex items-center gap-3 px-6 py-4 bg-accent/10 border-2 border-accent rounded-lg hover:bg-accent/20 transition-colors group w-full max-w-xs"
+                        title={`Roll d20 + DEX (${total})`}
+                      >
+                        <Zap className="w-6 h-6 text-accent" />
+                        <div>
+                          <span className="text-lg font-display text-accent group-hover:text-glow-gold">Initiative</span>
+                          <div className="text-xs text-muted-foreground">
+                            DEX {mod !== 0 ? (
+                              <span>
+                                <span>{baseStat}</span>
+                                <span className={mod > 0 ? 'text-green-400' : 'text-red-400'}>{mod > 0 ? `+${mod}` : mod}</span>
+                                <span className="text-orange-400"> = {total}</span>
+                              </span>
+                            ) : (
+                              <span className="font-bold">{total}</span>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })()}
+                </div>
               </div>
             )}
 
