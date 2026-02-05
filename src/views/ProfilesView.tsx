@@ -4,7 +4,7 @@ import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import { HealthBar } from "@/components/ui/HealthBar";
 import { EquipmentSlot } from "@/components/ui/EquipmentSlot";
-import { Crawler, InventoryItem, createEmptyCrawler, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor } from "@/lib/gameData";
+import { Crawler, InventoryItem, createEmptyCrawler, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState } from "@/lib/gameData";
 import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Backpack, HardHat, Package, Lock, Unlock, ChevronDown, ChevronUp, Check, Search, Send, BookOpen, Filter, X, Gem, Footprints, Shirt, Hand, Target } from "lucide-react";
 
 type SortOption = 'name-asc' | 'name-desc' | 'gold-desc' | 'gold-asc';
@@ -79,6 +79,9 @@ interface ProfilesViewProps {
   onStatRoll?: (crawlerName: string, crawlerId: string, stat: string, totalStat: number) => void;
   getCrawlerLootBoxes?: (crawlerId: string) => SentLootBox[];
   claimLootBoxItems?: (lootBoxId: string, crawlerId: string, itemIds: string[], claimGold?: boolean) => Promise<void>;
+  noncombatTurnState?: NoncombatTurnState | null;
+  getNoncombatRollsRemaining?: (crawlerId: string) => number;
+  recordNoncombatRoll?: (crawlerId: string) => Promise<void>;
 }
 
 // Loot Box display section for crawler profiles
@@ -235,6 +238,9 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   onStatRoll,
   getCrawlerLootBoxes,
   claimLootBoxItems,
+  noncombatTurnState,
+  getNoncombatRollsRemaining,
+  recordNoncombatRoll,
 }) => {
   const [selectedId, setSelectedId] = useState(crawlers[0]?.id || "");
   const [editMode, setEditMode] = useState(false);
@@ -1371,14 +1377,43 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             )}
 
             {/* Actions Tab */}
-            {activeTab === 'actions' && (
+            {activeTab === 'actions' && (() => {
+              const rollsRemaining = getNoncombatRollsRemaining?.(selected.id) ?? 0;
+              const hasActiveTurn = !!noncombatTurnState;
+              const canRoll = hasActiveTurn && rollsRemaining > 0;
+              const maxRolls = noncombatTurnState?.maxRolls ?? 3;
+
+              const handleActionRoll = (actionLabel: string, stat: string, total: number) => {
+                if (!canRoll) return;
+                onStatRoll?.(selected.name, selected.id, actionLabel, total);
+                recordNoncombatRoll?.(selected.id);
+              };
+
+              return (
               <div className="space-y-6">
                 <h2 className="font-display text-xl text-primary flex items-center gap-2">
                   <Target className="w-6 h-6" /> NONCOMBAT ACTIONS
                 </h2>
-                <p className="text-sm text-muted-foreground">
-                  Roll d20 + stat modifier. Click any action to roll.
-                </p>
+
+                {/* Turn status */}
+                {!hasActiveTurn ? (
+                  <div className="bg-muted/30 border border-border rounded-lg p-4 text-center">
+                    <p className="text-muted-foreground text-sm font-display">WAITING FOR DM TO START NONCOMBAT TURN</p>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between bg-muted/30 border border-border rounded-lg px-4 py-2">
+                    <span className="text-sm text-muted-foreground font-display">
+                      TURN {noncombatTurnState!.turnNumber}
+                    </span>
+                    <span className={`text-sm font-display ${rollsRemaining > 0 ? 'text-primary' : 'text-destructive'}`}>
+                      {rollsRemaining > 0 ? (
+                        <>ROLLS: {rollsRemaining} / {maxRolls}</>
+                      ) : (
+                        <>NO ROLLS LEFT — WAITING FOR DM</>
+                      )}
+                    </span>
+                  </div>
+                )}
 
                 {/* General Actions */}
                 <div>
@@ -1391,11 +1426,16 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                       return (
                         <button
                           key={action.label}
-                          onClick={() => onStatRoll?.(selected.name, selected.id, action.label, total)}
-                          className="flex flex-col items-center gap-1 p-3 bg-muted/50 border border-border rounded-lg hover:bg-primary/20 hover:border-primary transition-colors text-left group"
-                          title={`Roll d20 + ${action.stat.toUpperCase()} (${total})`}
+                          onClick={() => handleActionRoll(action.label, action.stat, total)}
+                          disabled={!canRoll}
+                          className={`flex flex-col items-center gap-1 p-3 border rounded-lg transition-colors text-left group ${
+                            canRoll
+                              ? 'bg-muted/50 border-border hover:bg-primary/20 hover:border-primary'
+                              : 'bg-muted/20 border-border/50 opacity-50 cursor-not-allowed'
+                          }`}
+                          title={canRoll ? `Roll d20 + ${action.stat.toUpperCase()} (${total})` : 'No rolls remaining'}
                         >
-                          <span className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">{action.label}</span>
+                          <span className={`text-sm font-semibold transition-colors ${canRoll ? 'text-foreground group-hover:text-primary' : 'text-muted-foreground'}`}>{action.label}</span>
                           <span className="text-xs text-muted-foreground">
                             {action.stat.toUpperCase()} {mod !== 0 ? (
                               <span>
@@ -1426,11 +1466,16 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                       return (
                         <button
                           key={action.label}
-                          onClick={() => onStatRoll?.(selected.name, selected.id, action.label, total)}
-                          className="flex flex-col items-center gap-1 p-3 bg-muted/50 border border-border rounded-lg hover:bg-primary/20 hover:border-primary transition-colors text-left group"
-                          title={`Roll d20 + INT (${total})`}
+                          onClick={() => handleActionRoll(action.label, action.stat, total)}
+                          disabled={!canRoll}
+                          className={`flex flex-col items-center gap-1 p-3 border rounded-lg transition-colors text-left group ${
+                            canRoll
+                              ? 'bg-muted/50 border-border hover:bg-primary/20 hover:border-primary'
+                              : 'bg-muted/20 border-border/50 opacity-50 cursor-not-allowed'
+                          }`}
+                          title={canRoll ? `Roll d20 + INT (${total})` : 'No rolls remaining'}
                         >
-                          <span className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">{action.label}</span>
+                          <span className={`text-sm font-semibold transition-colors ${canRoll ? 'text-foreground group-hover:text-primary' : 'text-muted-foreground'}`}>{action.label}</span>
                           <span className="text-xs text-muted-foreground">
                             INT {mod !== 0 ? (
                               <span>
@@ -1459,13 +1504,18 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                     const total = baseStat + mod;
                     return (
                       <button
-                        onClick={() => onStatRoll?.(selected.name, selected.id, INITIATIVE_ACTION.label, total)}
-                        className="flex items-center gap-3 px-6 py-4 bg-accent/10 border-2 border-accent rounded-lg hover:bg-accent/20 transition-colors group w-full max-w-xs"
-                        title={`Roll d20 + DEX (${total})`}
+                        onClick={() => handleActionRoll(INITIATIVE_ACTION.label, INITIATIVE_ACTION.stat, total)}
+                        disabled={!canRoll}
+                        className={`flex items-center gap-3 px-6 py-4 border-2 rounded-lg transition-colors group w-full max-w-xs ${
+                          canRoll
+                            ? 'bg-accent/10 border-accent hover:bg-accent/20'
+                            : 'bg-muted/20 border-border/50 opacity-50 cursor-not-allowed'
+                        }`}
+                        title={canRoll ? `Roll d20 + DEX (${total})` : 'No rolls remaining'}
                       >
-                        <Zap className="w-6 h-6 text-accent" />
+                        <Zap className={`w-6 h-6 ${canRoll ? 'text-accent' : 'text-muted-foreground'}`} />
                         <div>
-                          <span className="text-lg font-display text-accent group-hover:text-glow-gold">Initiative</span>
+                          <span className={`text-lg font-display ${canRoll ? 'text-accent group-hover:text-glow-gold' : 'text-muted-foreground'}`}>Initiative</span>
                           <div className="text-xs text-muted-foreground">
                             DEX {mod !== 0 ? (
                               <span>
@@ -1483,7 +1533,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                   })()}
                 </div>
               </div>
-            )}
+              );
+            })()}
 
             {/* Spells Tab */}
             {activeTab === 'spells' && (

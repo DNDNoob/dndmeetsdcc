@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DungeonButton } from "./ui/DungeonButton";
-import { Dices, ChevronUp, ChevronDown, Plus, X, Package } from "lucide-react";
-import { getLootBoxTierColor } from "@/lib/gameData";
+import { Dices, ChevronUp, ChevronDown, Plus, X, Package, RotateCcw } from "lucide-react";
+import { getLootBoxTierColor, type Crawler, type NoncombatTurnState } from "@/lib/gameData";
 import { DiceRollEntry } from "@/hooks/useGameState";
 
 const diceTypes = [
@@ -27,9 +27,13 @@ interface DiceRollerProps {
   diceRolls: DiceRollEntry[];
   addDiceRoll: (entry: DiceRollEntry) => Promise<void>;
   onExpandedChange?: (expanded: boolean) => void;
+  isAdmin?: boolean;
+  noncombatTurnState?: NoncombatTurnState | null;
+  onStartNoncombatTurn?: () => Promise<void>;
+  crawlers?: Crawler[];
 }
 
-const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawlerId = "", diceRolls, addDiceRoll, onExpandedChange }) => {
+const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawlerId = "", diceRolls, addDiceRoll, onExpandedChange, isAdmin, noncombatTurnState, onStartNoncombatTurn, crawlers }) => {
 
   const [isExpanded, setIsExpandedRaw] = useState(false);
   const setIsExpanded = (v: boolean) => {
@@ -236,6 +240,48 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
                 )}
               </div>
             </div>
+
+            {/* DM Noncombat Turn Button */}
+            {isAdmin && onStartNoncombatTurn && (() => {
+              const playerCrawlers = (crawlers ?? []).filter(c => c.id !== 'dungeonai');
+              const allPlayersSpent = noncombatTurnState != null && playerCrawlers.length > 0 && playerCrawlers.every(c => {
+                const used = noncombatTurnState.rollsUsed[c.id] ?? 0;
+                return used >= noncombatTurnState.maxRolls;
+              });
+              const turnNumber = noncombatTurnState?.turnNumber ?? 0;
+
+              return (
+                <div className="mb-3 shrink-0">
+                  <button
+                    onClick={onStartNoncombatTurn}
+                    className={`w-full flex items-center justify-center gap-2 px-4 py-3 font-display text-sm border-2 rounded transition-all ${
+                      allPlayersSpent
+                        ? 'bg-accent/20 border-accent text-accent animate-pulse hover:bg-accent/30'
+                        : 'bg-muted/30 border-border text-muted-foreground hover:bg-primary/10 hover:border-primary hover:text-primary'
+                    }`}
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    {turnNumber === 0 ? 'START NONCOMBAT TURN' : 'NEW NONCOMBAT TURN'}
+                  </button>
+                  {noncombatTurnState && playerCrawlers.length > 0 && (
+                    <div className="mt-2 text-[10px] text-muted-foreground space-y-0.5">
+                      {playerCrawlers.map(c => {
+                        const used = noncombatTurnState.rollsUsed[c.id] ?? 0;
+                        const remaining = Math.max(0, noncombatTurnState.maxRolls - used);
+                        return (
+                          <div key={c.id} className="flex justify-between">
+                            <span>{c.name}</span>
+                            <span className={remaining === 0 ? 'text-destructive' : 'text-primary'}>
+                              {used}/{noncombatTurnState.maxRolls} used
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Queued dice */}
             {diceQueue.length > 0 && (

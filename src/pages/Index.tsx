@@ -74,6 +74,10 @@ const Index = () => {
     deleteLootBoxTemplate,
     addDiceRoll,
     diceRolls,
+    noncombatTurnState,
+    startNoncombatTurn,
+    recordNoncombatRoll,
+    getNoncombatRollsRemaining,
     isLoaded
   } = useGameState();
 
@@ -312,6 +316,9 @@ const Index = () => {
                 onStatRoll={handleStatRoll}
                 getCrawlerLootBoxes={getCrawlerLootBoxes}
                 claimLootBoxItems={claimLootBoxItems}
+                noncombatTurnState={noncombatTurnState}
+                getNoncombatRollsRemaining={getNoncombatRollsRemaining}
+                recordNoncombatRoll={recordNoncombatRoll}
               />
             )}
             {currentView === "maps" && (
@@ -387,7 +394,17 @@ const Index = () => {
             )}
           </main>
 
-          <DiceRoller crawlerName={currentPlayer.name} crawlerId={currentPlayer.id} diceRolls={diceRolls} addDiceRoll={addDiceRoll} onExpandedChange={setIsDiceExpanded} />
+          <DiceRoller
+            crawlerName={currentPlayer.name}
+            crawlerId={currentPlayer.id}
+            diceRolls={diceRolls}
+            addDiceRoll={addDiceRoll}
+            onExpandedChange={setIsDiceExpanded}
+            isAdmin={isAdmin}
+            noncombatTurnState={noncombatTurnState}
+            onStartNoncombatTurn={startNoncombatTurn}
+            crawlers={crawlers}
+          />
 
           <ChangelogViewer
             isOpen={showChangelog}

@@ -6,6 +6,7 @@ import {
   Episode,
   SentLootBox,
   LootBoxTemplate,
+  NoncombatTurnState,
   defaultCrawlers,
   defaultInventory,
   defaultMobs,
@@ -499,6 +500,41 @@ export const useGameState = () => {
     if (ops.length > 0) await batchWrite(ops);
   };
 
+  // --- Noncombat Turns ---
+  const noncombatTurnState = useMemo((): NoncombatTurnState | null => {
+    const stored = getStableCollection<NoncombatTurnState>('noncombatTurns');
+    return stored.find(s => s.id === 'current') ?? null;
+  }, [getCollection, isLoaded]);
+
+  const startNoncombatTurn = async () => {
+    const current = noncombatTurnState;
+    const newTurn: NoncombatTurnState = {
+      id: 'current',
+      turnNumber: (current?.turnNumber ?? 0) + 1,
+      rollsUsed: {},
+      maxRolls: 3,
+    };
+    if (current) {
+      await updateItem('noncombatTurns', 'current', newTurn as unknown as Record<string, unknown>);
+    } else {
+      await addItem('noncombatTurns', newTurn as unknown as Record<string, unknown>);
+    }
+  };
+
+  const recordNoncombatRoll = async (crawlerId: string) => {
+    const current = noncombatTurnState;
+    if (!current) return;
+    const updatedRolls = { ...current.rollsUsed };
+    updatedRolls[crawlerId] = (updatedRolls[crawlerId] ?? 0) + 1;
+    await updateItem('noncombatTurns', 'current', { rollsUsed: updatedRolls } as Record<string, unknown>);
+  };
+
+  const getNoncombatRollsRemaining = (crawlerId: string): number => {
+    if (!noncombatTurnState) return 0; // No active turn = no rolls allowed
+    const used = noncombatTurnState.rollsUsed[crawlerId] ?? 0;
+    return Math.max(0, noncombatTurnState.maxRolls - used);
+  };
+
   return {
     crawlers,
     setCrawlers,
@@ -533,6 +569,10 @@ export const useGameState = () => {
     diceRolls,
     addDiceRoll,
     clearDiceRolls,
+    noncombatTurnState,
+    startNoncombatTurn,
+    recordNoncombatRoll,
+    getNoncombatRollsRemaining,
     isLoaded,
   };
 };

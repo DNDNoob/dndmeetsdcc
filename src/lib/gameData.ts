@@ -152,6 +152,14 @@ export const getLootBoxTierBorder = (tier: LootBoxTier): string => {
   }
 };
 
+// Noncombat turn state - synced via Firebase
+export interface NoncombatTurnState {
+  id: string; // always 'current'
+  turnNumber: number;
+  rollsUsed: Record<string, number>; // crawlerId -> number of rolls used
+  maxRolls: number; // rolls per player per turn (default 3)
+}
+
 export interface Episode {
   id: string;
   name: string;
