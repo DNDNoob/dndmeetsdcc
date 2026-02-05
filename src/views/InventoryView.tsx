@@ -3,7 +3,14 @@ import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import { Crawler, InventoryItem, EquipmentSlot as SlotType, StatModifiers } from "@/lib/gameData";
-import { Coins, Package, Sword, Shield, Plus, Trash2, Edit2, Save, HardHat, Search, BookOpen, CircleDot, Footprints, Shirt, Hand } from "lucide-react";
+import { Coins, Package, Sword, Shield, Plus, Trash2, Edit2, Save, HardHat, Search, BookOpen, Gem, Footprints, Shirt, Hand } from "lucide-react";
+
+// Inline SVG for legs/pants slot
+const LegsIcon: React.FC<{ className?: string }> = ({ className = "w-4 h-4" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M6 2h12v6l-2 14h-2l-1-10h-2l-1 10H8L6 8V2z" />
+  </svg>
+);
 
 // Helper to get the appropriate icon for an equipment slot
 const getEquipmentIcon = (slot?: string, className: string = "w-4 h-4 shrink-0") => {
@@ -11,7 +18,7 @@ const getEquipmentIcon = (slot?: string, className: string = "w-4 h-4 shrink-0")
     case 'weapon':
       return <Sword className={`${className} text-destructive`} />;
     case 'ringFinger':
-      return <CircleDot className={`${className} text-purple-400`} />;
+      return <Gem className={`${className} text-purple-400`} />;
     case 'feet':
       return <Footprints className={`${className} text-amber-600`} />;
     case 'head':
@@ -22,7 +29,7 @@ const getEquipmentIcon = (slot?: string, className: string = "w-4 h-4 shrink-0")
     case 'rightHand':
       return <Hand className={`${className} text-accent`} />;
     case 'legs':
-      return <HardHat className={`${className} text-green-400`} />;
+      return <LegsIcon className={`${className} text-green-400`} />;
     default:
       if (slot) return <HardHat className={`${className} text-accent`} />;
       return <Package className={`${className} text-muted-foreground`} />;

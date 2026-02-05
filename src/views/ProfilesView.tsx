@@ -5,9 +5,16 @@ import { DungeonButton } from "@/components/ui/DungeonButton";
 import { HealthBar } from "@/components/ui/HealthBar";
 import { EquipmentSlot } from "@/components/ui/EquipmentSlot";
 import { Crawler, InventoryItem, createEmptyCrawler, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor } from "@/lib/gameData";
-import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Edit2, Backpack, HardHat, Package, Lock, Unlock, ChevronDown, ChevronUp, Check, Search, Send, BookOpen, Filter, X, ArrowUpDown, CircleDot, Footprints, Shirt, Hand } from "lucide-react";
+import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Backpack, HardHat, Package, Lock, Unlock, ChevronDown, ChevronUp, Check, Search, Send, BookOpen, Filter, X, Gem, Footprints, Shirt, Hand } from "lucide-react";
 
 type SortOption = 'name-asc' | 'name-desc' | 'gold-desc' | 'gold-asc';
+
+// Inline SVG for legs/pants slot (no lucide icon exists)
+const LegsIcon: React.FC<{ className?: string }> = ({ className = "w-4 h-4" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M6 2h12v6l-2 14h-2l-1-10h-2l-1 10H8L6 8V2z" />
+  </svg>
+);
 
 // Helper to get the appropriate icon for an equipment slot
 const getEquipmentIcon = (slot?: string, className: string = "w-4 h-4 shrink-0") => {
@@ -15,7 +22,7 @@ const getEquipmentIcon = (slot?: string, className: string = "w-4 h-4 shrink-0")
     case 'weapon':
       return <Sword className={`${className} text-destructive`} />;
     case 'ringFinger':
-      return <CircleDot className={`${className} text-purple-400`} />;
+      return <Gem className={`${className} text-purple-400`} />;
     case 'feet':
       return <Footprints className={`${className} text-amber-600`} />;
     case 'head':
@@ -26,7 +33,7 @@ const getEquipmentIcon = (slot?: string, className: string = "w-4 h-4 shrink-0")
     case 'rightHand':
       return <Hand className={`${className} text-accent`} />;
     case 'legs':
-      return <HardHat className={`${className} text-green-400`} />;
+      return <LegsIcon className={`${className} text-green-400`} />;
     default:
       if (slot) return <HardHat className={`${className} text-accent`} />;
       return <Package className={`${className} text-muted-foreground`} />;
@@ -208,11 +215,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   const [editData, setEditData] = useState<Partial<Crawler>>({});
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
-  // Inventory item editing
-  const [editingItemId, setEditingItemId] = useState<string | null>(null);
-  const [isAddingItem, setIsAddingItem] = useState(false);
-  const [itemFormData, setItemFormData] = useState<Partial<InventoryItem>>({});
-  const [expandedItems, setExpandedItems] = useState(false);
+  // Expanded items tracking
+  const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
 
   // Tab and filtering state
   const [activeTab, setActiveTab] = useState<ProfileTab>('profile');
@@ -226,7 +230,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   const [showSendModal, setShowSendModal] = useState(false);
   const [sendTargetId, setSendTargetId] = useState<string>('');
   const [sendGoldAmount, setSendGoldAmount] = useState(0);
-  const [selectedItemsToSend, setSelectedItemsToSend] = useState<string[]>([]);
+  // Track quantity to send per consolidated group (key = item signature)
+  const [sendQuantities, setSendQuantities] = useState<Record<string, number>>({});
 
   const selected = crawlers.find((c) => c.id === selectedId) || crawlers[0];
   const inventory = selected ? getCrawlerInventory(selected.id) : [];
@@ -462,72 +467,77 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
     return inventory.find(item => item.id === itemId);
   };
 
-  const handleAddItem = () => {
-    setIsAddingItem(true);
-    setItemFormData({
-      name: "",
-      description: "",
-      equipSlot: undefined,
-      goldValue: undefined,
+  // Helper to create item signature for consolidation
+  const getItemSignature = (item: InventoryItem) =>
+    `${item.name}|${item.description || ''}|${item.equipSlot || ''}|${item.goldValue ?? 0}|${JSON.stringify(item.statModifiers || {})}`;
+
+  // Consolidated inventory for display (groups identical items)
+  const consolidatedInventory = useMemo(() => {
+    const equippedItemIds = new Set(Object.values(selected?.equippedItems || {}));
+
+    // Keep equipped items separate (they always show individually)
+    const equippedItems = filteredInventory.filter(item => equippedItemIds.has(item.id));
+    const unequippedItems = filteredInventory.filter(item => !equippedItemIds.has(item.id));
+
+    const groupedItems = new Map<string, InventoryItem[]>();
+    unequippedItems.forEach(item => {
+      const sig = getItemSignature(item);
+      if (!groupedItems.has(sig)) groupedItems.set(sig, []);
+      groupedItems.get(sig)!.push(item);
     });
+
+    const displayItems: { item: InventoryItem; count: number; allIds: string[]; isEquipped: boolean; sig: string }[] = [];
+    equippedItems.forEach(item => displayItems.push({ item, count: 1, allIds: [item.id], isEquipped: true, sig: getItemSignature(item) }));
+    groupedItems.forEach((items, sig) => displayItems.push({ item: items[0], count: items.length, allIds: items.map(i => i.id), isEquipped: false, sig }));
+
+    // Apply sorting to the display items
+    displayItems.sort((a, b) => {
+      switch (inventorySort) {
+        case 'name-asc': return a.item.name.localeCompare(b.item.name);
+        case 'name-desc': return b.item.name.localeCompare(a.item.name);
+        case 'gold-desc': return (b.item.goldValue ?? 0) - (a.item.goldValue ?? 0);
+        case 'gold-asc': return (a.item.goldValue ?? 0) - (b.item.goldValue ?? 0);
+        default: return 0;
+      }
+    });
+
+    return displayItems;
+  }, [filteredInventory, selected?.equippedItems, inventorySort]);
+
+  // Double-click to equip an item
+  const handleDoubleClickEquip = (item: InventoryItem) => {
+    if (!item.equipSlot || !selected) return;
+    const slot = item.equipSlot;
+    const equippedItems = selected.equippedItems ?? {};
+    const updatedEquipped = { ...equippedItems, [slot]: item.id };
+    onUpdateCrawler(selected.id, { equippedItems: updatedEquipped });
   };
 
-  const handleEditItem = (item: InventoryItem) => {
-    setEditingItemId(item.id);
-    setItemFormData({ ...item });
-  };
+  // Consolidated inventory for send modal (groups identical unequipped items)
+  const sendConsolidatedInventory = useMemo(() => {
+    const equippedItemIds = new Set(Object.values(selected?.equippedItems || {}));
+    // Only allow sending unequipped items
+    const unequippedItems = inventory.filter(item => !equippedItemIds.has(item.id));
 
-  const handleSaveItem = () => {
-    if (!selected) return;
+    const groupedItems = new Map<string, InventoryItem[]>();
+    unequippedItems.forEach(item => {
+      const sig = getItemSignature(item);
+      if (!groupedItems.has(sig)) groupedItems.set(sig, []);
+      groupedItems.get(sig)!.push(item);
+    });
 
-    if (isAddingItem) {
-      // Strip zero-value modifiers
-      const mods = itemFormData.statModifiers
-        ? Object.fromEntries(Object.entries(itemFormData.statModifiers).filter(([, v]) => v !== 0 && v !== undefined))
-        : undefined;
-      const newItem: InventoryItem = {
-        id: crypto.randomUUID(),
-        name: itemFormData.name || "New Item",
-        description: itemFormData.description || "",
-        equipSlot: itemFormData.equipSlot,
-        goldValue: itemFormData.goldValue,
-        ...(mods && Object.keys(mods).length > 0 ? { statModifiers: mods } : {}),
-      };
-      onUpdateCrawlerInventory(selected.id, [...inventory, newItem]);
-    } else if (editingItemId) {
-      const editMods = itemFormData.statModifiers
-        ? Object.fromEntries(Object.entries(itemFormData.statModifiers).filter(([, v]) => v !== 0 && v !== undefined))
-        : undefined;
-      const cleanedFormData = {
-        ...itemFormData,
-        statModifiers: editMods && Object.keys(editMods).length > 0 ? editMods : undefined,
-      };
-      const updatedInventory = inventory.map((item) =>
-        item.id === editingItemId
-          ? { ...item, ...cleanedFormData }
-          : item
-      );
-      onUpdateCrawlerInventory(selected.id, updatedInventory);
-    }
+    const displayItems: { item: InventoryItem; count: number; allIds: string[]; sig: string }[] = [];
+    groupedItems.forEach((items, sig) => displayItems.push({ item: items[0], count: items.length, allIds: items.map(i => i.id), sig }));
+    displayItems.sort((a, b) => a.item.name.localeCompare(b.item.name));
+    return displayItems;
+  }, [inventory, selected?.equippedItems]);
 
-    setIsAddingItem(false);
-    setEditingItemId(null);
-    setItemFormData({});
-  };
+  // Total items selected to send
+  const totalItemsToSend = useMemo(() => {
+    return Object.values(sendQuantities).reduce((sum, qty) => sum + qty, 0);
+  }, [sendQuantities]);
 
-  const handleCancelItemEdit = () => {
-    setIsAddingItem(false);
-    setEditingItemId(null);
-    setItemFormData({});
-  };
-
-  const handleDeleteItem = (itemId: string) => {
-    if (!selected) return;
-    const updatedInventory = inventory.filter((item) => item.id !== itemId);
-    onUpdateCrawlerInventory(selected.id, updatedInventory);
-  };
-
-  // Send gold/items to another player
+  // Send gold/items to another player (with consolidated quantities)
   const handleSend = () => {
     if (!selected || !sendTargetId) return;
 
@@ -540,10 +550,21 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
       onUpdateCrawler(sendTargetId, { gold: (targetCrawler.gold || 0) + sendGoldAmount });
     }
 
-    // Transfer items
-    if (selectedItemsToSend.length > 0) {
-      const itemsToSend = inventory.filter(item => selectedItemsToSend.includes(item.id));
-      const remainingItems = inventory.filter(item => !selectedItemsToSend.includes(item.id));
+    // Transfer items based on sendQuantities (key = item signature, value = quantity)
+    const itemIdsToSend: string[] = [];
+    for (const [sig, qty] of Object.entries(sendQuantities)) {
+      if (qty <= 0) continue;
+      const group = sendConsolidatedInventory.find(g => g.sig === sig);
+      if (group) {
+        // Take up to qty item IDs from this group
+        itemIdsToSend.push(...group.allIds.slice(0, qty));
+      }
+    }
+
+    if (itemIdsToSend.length > 0) {
+      const idsToSendSet = new Set(itemIdsToSend);
+      const itemsToSend = inventory.filter(item => idsToSendSet.has(item.id));
+      const remainingItems = inventory.filter(item => !idsToSendSet.has(item.id));
       const targetInventory = getCrawlerInventory(sendTargetId);
 
       onUpdateCrawlerInventory(selected.id, remainingItems);
@@ -554,7 +575,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
     setShowSendModal(false);
     setSendTargetId('');
     setSendGoldAmount(0);
-    setSelectedItemsToSend([]);
+    setSendQuantities({});
   };
 
   if (!selected) return null;
@@ -862,6 +883,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                   current={effectiveHP}
                   max={effectiveMaxHP}
                   label={`HP: ${effectiveHP}/${effectiveMaxHP}`}
+                  baseMax={maxHPMod !== 0 ? baseMaxHP : undefined}
                 />
                 {(hpMod !== 0 || maxHPMod !== 0) && (
                   <div className="text-xs mt-1 ml-1">
@@ -909,6 +931,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                   max={effectiveMaxMana}
                   label={`Mana: ${effectiveMana}/${effectiveMaxMana}`}
                   variant="mana"
+                  baseMax={maxManaMod !== 0 ? baseMaxMana : undefined}
                 />
                 {(manaMod !== 0 || maxManaMod !== 0) && (
                   <div className="text-xs mt-1 ml-1">
@@ -1185,6 +1208,37 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                   )}
                 </div>
 
+                {/* Equipment Slots */}
+                <div className="bg-muted/30 border border-border rounded-lg p-4">
+                  <h3 className="font-display text-primary text-base mb-3">EQUIPMENT</h3>
+                  <div className="flex flex-col items-center gap-2">
+                    {/* Head */}
+                    <div className="grid grid-cols-3 gap-2" style={{ width: '282px' }}>
+                      <div />
+                      <EquipmentSlot slot="head" label="Head" equippedItem={getEquippedItem('head')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={false} />
+                      <div />
+                    </div>
+                    {/* Left Hand, Chest, Right Hand */}
+                    <div className="grid grid-cols-3 gap-2" style={{ width: '282px' }}>
+                      <EquipmentSlot slot="leftHand" label="Left Hand" equippedItem={getEquippedItem('leftHand')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={false} />
+                      <EquipmentSlot slot="chest" label="Chest" equippedItem={getEquippedItem('chest')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={false} />
+                      <EquipmentSlot slot="rightHand" label="Right Hand" equippedItem={getEquippedItem('rightHand')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={false} />
+                    </div>
+                    {/* Ring, Legs, Weapon */}
+                    <div className="grid grid-cols-3 gap-2" style={{ width: '282px' }}>
+                      <EquipmentSlot slot="ringFinger" label="Ring" equippedItem={getEquippedItem('ringFinger')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={false} />
+                      <EquipmentSlot slot="legs" label="Legs" equippedItem={getEquippedItem('legs')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={false} />
+                      <EquipmentSlot slot="weapon" label="Weapon" equippedItem={getEquippedItem('weapon')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={false} />
+                    </div>
+                    {/* Feet */}
+                    <div className="grid grid-cols-3 gap-2" style={{ width: '282px' }}>
+                      <div />
+                      <EquipmentSlot slot="feet" label="Feet" equippedItem={getEquippedItem('feet')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={false} />
+                      <div />
+                    </div>
+                  </div>
+                </div>
+
                 {/* Crawler Gold */}
                 <div className="flex items-center gap-2 p-3 bg-accent/10 border border-accent/30 rounded">
                   <Coins className="w-5 h-5 text-accent" />
@@ -1192,67 +1246,87 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                   <span className="text-muted-foreground text-sm ml-2">Personal Gold</span>
                 </div>
 
-                {/* Items Grid */}
-                {filteredInventory.length === 0 ? (
+                {/* Items List */}
+                {consolidatedInventory.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     {inventory.length === 0 ? 'No items in inventory' : 'No items match your filters'}
                   </div>
                 ) : (
                   <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {(() => {
-                      const equippedItemIds = new Set(Object.values(selected.equippedItems || {}));
-                      const getItemSignature = (item: InventoryItem) =>
-                        `${item.name}|${item.description}|${item.equipSlot || ''}|${item.goldValue || 0}|${JSON.stringify(item.statModifiers || {})}`;
-
-                      const equippedItems = filteredInventory.filter(item => equippedItemIds.has(item.id));
-                      const unequippedItems = filteredInventory.filter(item => !equippedItemIds.has(item.id));
-
-                      const groupedItems = new Map<string, InventoryItem[]>();
-                      unequippedItems.forEach(item => {
-                        const sig = getItemSignature(item);
-                        if (!groupedItems.has(sig)) groupedItems.set(sig, []);
-                        groupedItems.get(sig)!.push(item);
-                      });
-
-                      const displayItems: { item: InventoryItem; count: number; allIds: string[]; isEquipped: boolean }[] = [];
-                      equippedItems.forEach(item => displayItems.push({ item, count: 1, allIds: [item.id], isEquipped: true }));
-                      groupedItems.forEach(items => displayItems.push({ item: items[0], count: items.length, allIds: items.map(i => i.id), isEquipped: false }));
-
-                      return displayItems.map(({ item, count, allIds, isEquipped }) => (
+                    {consolidatedInventory.map(({ item, count, allIds, isEquipped, sig }) => {
+                      const isExpanded = expandedItemId === sig;
+                      return (
                         <div
-                          key={allIds[0]}
+                          key={sig}
                           draggable={!!item.equipSlot}
                           onDragStart={(e) => {
                             e.dataTransfer.setData('application/json', JSON.stringify(item));
                             e.dataTransfer.effectAllowed = 'move';
                           }}
-                          className={`bg-muted/50 p-3 rounded-lg border border-border transition-colors ${
-                            item.equipSlot ? 'cursor-grab active:cursor-grabbing' : ''
-                          }`}
+                          onDoubleClick={() => handleDoubleClickEquip(item)}
+                          onClick={() => setExpandedItemId(isExpanded ? null : sig)}
+                          className={`bg-muted/50 p-3 rounded-lg border transition-colors select-none ${
+                            isEquipped ? 'border-primary/50' : 'border-border'
+                          } ${item.equipSlot ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'} hover:bg-muted/70`}
+                          title={item.equipSlot ? 'Drag to equip slot, or double-click to equip' : 'Click to expand'}
                         >
                           <div className="flex items-start gap-2">
                             {getEquipmentIcon(item.equipSlot, "w-4 h-4 shrink-0 mt-0.5")}
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
                                 <span className="font-semibold text-sm truncate">{item.name}</span>
-                                {count > 1 && <span className="text-accent font-bold text-xs">×{count}</span>}
+                                {count > 1 && <span className="text-accent font-bold text-xs">x{count}</span>}
+                                {isExpanded ? <ChevronUp className="w-3 h-3 text-muted-foreground ml-auto shrink-0" /> : <ChevronDown className="w-3 h-3 text-muted-foreground ml-auto shrink-0" />}
                               </div>
                               <div className="flex flex-wrap gap-1 mt-1">
                                 {isEquipped && <span className="text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded">Equipped</span>}
-                                {item.goldValue && item.goldValue > 0 && (
+                                {item.equipSlot && !isEquipped && (
+                                  <span className="text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded">{item.equipSlot}</span>
+                                )}
+                                {item.goldValue != null && item.goldValue > 0 && (
                                   <span className="text-xs text-accent flex items-center gap-0.5">
-                                    <Coins className="w-3 h-3" />{item.goldValue}
+                                    <Coins className="w-3 h-3" />{item.goldValue}g
                                   </span>
                                 )}
                               </div>
-                              {item.description && (
-                                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{item.description}</p>
+
+                              {/* Expanded detail */}
+                              {isExpanded && (
+                                <div className="mt-2 pt-2 border-t border-border/50 space-y-1.5">
+                                  {item.description && (
+                                    <p className="text-xs text-muted-foreground">{item.description}</p>
+                                  )}
+                                  {item.statModifiers && Object.entries(item.statModifiers).some(([, v]) => v !== 0) && (
+                                    <div className="flex flex-wrap gap-1">
+                                      {Object.entries(item.statModifiers).filter(([, v]) => v !== 0).map(([stat, val]) => (
+                                        <span key={stat} className={`text-xs px-1.5 py-0.5 rounded ${(val as number) > 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                                          {stat}: {(val as number) > 0 ? '+' : ''}{val}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {item.tags && item.tags.length > 0 && (
+                                    <div className="flex flex-wrap gap-1">
+                                      {item.tags.map(tag => (
+                                        <span key={tag} className="text-xs bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">{tag}</span>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {item.equipSlot && !isEquipped && (
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); handleDoubleClickEquip(item); }}
+                                      className="text-xs text-primary hover:underline mt-1"
+                                    >
+                                      Equip to {item.equipSlot}
+                                    </button>
+                                  )}
+                                </div>
                               )}
                             </div>
                           </div>
                         </div>
-                      ));
-                    })()}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -1278,7 +1352,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
           <div className="bg-background border-2 border-primary rounded-lg p-6 max-w-md w-full shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-display text-lg text-primary">Send Gold/Items</h3>
-              <button onClick={() => { setShowSendModal(false); setSendTargetId(''); setSendGoldAmount(0); setSelectedItemsToSend([]); }}>
+              <button onClick={() => { setShowSendModal(false); setSendTargetId(''); setSendGoldAmount(0); setSendQuantities({}); }}>
                 <X className="w-5 h-5 text-muted-foreground hover:text-foreground" />
               </button>
             </div>
@@ -1314,55 +1388,74 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 />
               </div>
 
-              {/* Items Selection */}
+              {/* Items Selection - Consolidated with quantity */}
               <div>
                 <label className="text-sm text-muted-foreground block mb-1">
-                  Items ({selectedItemsToSend.length} selected)
+                  Items ({totalItemsToSend} selected)
                 </label>
                 <div className="max-h-48 overflow-y-auto border border-border rounded bg-muted/30">
-                  {inventory.length === 0 ? (
-                    <p className="text-xs text-muted-foreground p-3 text-center">No items in inventory</p>
+                  {sendConsolidatedInventory.length === 0 ? (
+                    <p className="text-xs text-muted-foreground p-3 text-center">No items available to send</p>
                   ) : (
-                    inventory.map(item => (
-                      <label
-                        key={item.id}
-                        className={`flex items-center gap-2 p-2 cursor-pointer hover:bg-muted/50 transition-colors border-b border-border/50 last:border-0 ${
-                          selectedItemsToSend.includes(item.id) ? 'bg-primary/10' : ''
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedItemsToSend.includes(item.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedItemsToSend([...selectedItemsToSend, item.id]);
-                            } else {
-                              setSelectedItemsToSend(selectedItemsToSend.filter(id => id !== item.id));
-                            }
-                          }}
-                          className="w-4 h-4 rounded"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <span className="text-sm font-medium">{item.name}</span>
-                          {item.goldValue && item.goldValue > 0 && (
-                            <span className="text-xs text-accent ml-2">{item.goldValue}g</span>
-                          )}
+                    sendConsolidatedInventory.map(({ item, count, sig }) => {
+                      const qty = sendQuantities[sig] || 0;
+                      return (
+                        <div
+                          key={sig}
+                          className={`flex items-center gap-2 p-2 border-b border-border/50 last:border-0 ${
+                            qty > 0 ? 'bg-primary/10' : ''
+                          }`}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              {getEquipmentIcon(item.equipSlot, "w-3.5 h-3.5 shrink-0")}
+                              <span className="text-sm font-medium truncate">{item.name}</span>
+                              {count > 1 && <span className="text-xs text-accent font-bold">x{count}</span>}
+                            </div>
+                            {item.goldValue != null && item.goldValue > 0 && (
+                              <span className="text-xs text-accent ml-5">{item.goldValue}g each</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              onClick={() => setSendQuantities(prev => {
+                                const newQty = Math.max(0, (prev[sig] || 0) - 1);
+                                if (newQty === 0) { const { [sig]: _, ...rest } = prev; return rest; }
+                                return { ...prev, [sig]: newQty };
+                              })}
+                              disabled={qty === 0}
+                              className="w-6 h-6 flex items-center justify-center text-xs rounded bg-muted border border-border hover:bg-muted/80 disabled:opacity-30"
+                            >-</button>
+                            <span className="w-6 text-center text-sm font-bold">{qty}</span>
+                            <button
+                              onClick={() => setSendQuantities(prev => ({
+                                ...prev,
+                                [sig]: Math.min(count, (prev[sig] || 0) + 1)
+                              }))}
+                              disabled={qty >= count}
+                              className="w-6 h-6 flex items-center justify-center text-xs rounded bg-muted border border-border hover:bg-muted/80 disabled:opacity-30"
+                            >+</button>
+                          </div>
                         </div>
-                      </label>
-                    ))
+                      );
+                    })
                   )}
                 </div>
-                {inventory.length > 0 && (
+                {sendConsolidatedInventory.length > 0 && (
                   <div className="flex gap-2 mt-2">
                     <button
-                      onClick={() => setSelectedItemsToSend(inventory.map(i => i.id))}
+                      onClick={() => {
+                        const allMax: Record<string, number> = {};
+                        sendConsolidatedInventory.forEach(g => { allMax[g.sig] = g.count; });
+                        setSendQuantities(allMax);
+                      }}
                       className="text-xs text-primary hover:underline"
                     >
-                      Select all
+                      Send all
                     </button>
-                    {selectedItemsToSend.length > 0 && (
+                    {totalItemsToSend > 0 && (
                       <button
-                        onClick={() => setSelectedItemsToSend([])}
+                        onClick={() => setSendQuantities({})}
                         className="text-xs text-muted-foreground hover:underline"
                       >
                         Clear
@@ -1377,13 +1470,13 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 variant="admin"
                 size="sm"
                 onClick={handleSend}
-                disabled={!sendTargetId || (sendGoldAmount === 0 && selectedItemsToSend.length === 0)}
+                disabled={!sendTargetId || (sendGoldAmount === 0 && totalItemsToSend === 0)}
                 className="w-full"
               >
                 <Send className="w-4 h-4 mr-2" />
                 Send {sendGoldAmount > 0 && `${sendGoldAmount}G`}
-                {sendGoldAmount > 0 && selectedItemsToSend.length > 0 && ' + '}
-                {selectedItemsToSend.length > 0 && `${selectedItemsToSend.length} items`}
+                {sendGoldAmount > 0 && totalItemsToSend > 0 && ' + '}
+                {totalItemsToSend > 0 && `${totalItemsToSend} item${totalItemsToSend !== 1 ? 's' : ''}`}
               </DungeonButton>
             </div>
           </div>
