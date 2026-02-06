@@ -313,6 +313,9 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
   }, [roomId]);
 
   // Batch write for multiple operations in a single atomic transaction
+  // IMPORTANT: 'add' uses batch.set() which REPLACES the entire document
+  //            'update' uses batch.update() which MERGES fields into existing document
+  // Always use 'update' when modifying existing documents to avoid data loss!
   const batchWrite = useCallback(async (operations: BatchOperation[]) => {
     if (!db || operations.length === 0) return;
 
@@ -386,6 +389,18 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
             if (!op.data) continue;
             const updateData = { ...op.data };
             const cleanedUpdate = cleanObject(updateData);
+
+            // Safety check: log if updating crawlers with very few fields
+            // This helps catch accidental overwrites early
+            if (op.collection === 'crawlers') {
+              const fieldCount = Object.keys(cleanedUpdate as Record<string, unknown>).length;
+              console.log('[FirebaseStore] 🔄 Crawler update:', {
+                id: op.id,
+                fields: Object.keys(cleanedUpdate as Record<string, unknown>),
+                fieldCount
+              });
+            }
+
             batch.update(docRef, cleanedUpdate as Record<string, unknown>);
             break;
           }
