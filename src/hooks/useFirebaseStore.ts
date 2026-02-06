@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { db, getCollectionRef, getDocs, setDoc, doc, deleteDoc, updateDoc, onSnapshot, initAuth, writeBatch } from '../lib/firebase';
+import { db, getCollectionRef, setDoc, doc, deleteDoc, updateDoc, onSnapshot, initAuth, writeBatch } from '../lib/firebase';
 import type { CollectionName } from '../types/collections';
 
 interface DataStore {
@@ -319,40 +319,39 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
   const batchWrite = useCallback(async (operations: BatchOperation[]) => {
     if (!db || operations.length === 0) return;
 
-    // Store previous state for rollback
-    const previousData = { ...data };
+    // Capture previous state via functional update to avoid stale closure
+    let previousData: DataStore = {};
+    setData(prevData => {
+      previousData = prevData;
+      const newData = { ...prevData };
+
+      for (const op of operations) {
+        const collection = op.collection;
+        const currentItems = newData[collection] || [];
+
+        switch (op.type) {
+          case 'add':
+            if (op.data) {
+              newData[collection] = [...currentItems, { ...op.data, id: op.id }];
+            }
+            break;
+          case 'update':
+            if (op.data) {
+              newData[collection] = currentItems.map((item: Record<string, unknown>) =>
+                item.id === op.id ? { ...item, ...op.data } : item
+              );
+            }
+            break;
+          case 'delete':
+            newData[collection] = currentItems.filter((item: Record<string, unknown>) => item.id !== op.id);
+            break;
+        }
+      }
+
+      return newData;
+    });
 
     try {
-      // Optimistic update: apply all operations to local state immediately
-      setData(prevData => {
-        const newData = { ...prevData };
-
-        for (const op of operations) {
-          const collection = op.collection;
-          const currentItems = newData[collection] || [];
-
-          switch (op.type) {
-            case 'add':
-              if (op.data) {
-                newData[collection] = [...currentItems, { ...op.data, id: op.id }];
-              }
-              break;
-            case 'update':
-              if (op.data) {
-                newData[collection] = currentItems.map((item: Record<string, unknown>) =>
-                  item.id === op.id ? { ...item, ...op.data } : item
-                );
-              }
-              break;
-            case 'delete':
-              newData[collection] = currentItems.filter((item: Record<string, unknown>) => item.id !== op.id);
-              break;
-          }
-        }
-
-        return newData;
-      });
-
       const batch = writeBatch(db);
 
       for (const op of operations) {
@@ -362,7 +361,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
         switch (op.type) {
           case 'add': {
             if (!op.data) continue;
-            let itemData = { ...op.data, id: op.id };
+            const itemData = { ...op.data, id: op.id };
             if (roomId) {
               itemData.roomId = roomId;
             }
@@ -419,7 +418,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
       setError(err instanceof Error ? err.message : 'Failed to batch write');
       throw err;
     }
-  }, [roomId, data]);
+  }, [roomId]);
 
   const getCollection = useCallback(<T = Record<string, unknown>>(collection: CollectionName): T[] => {
     return (data[collection] || []) as T[];
