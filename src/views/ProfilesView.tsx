@@ -82,6 +82,7 @@ interface ProfilesViewProps {
   noncombatTurnState?: NoncombatTurnState | null;
   getNoncombatRollsRemaining?: (crawlerId: string) => number;
   recordNoncombatRoll?: (crawlerId: string) => Promise<void>;
+  currentPlayerId?: string;
 }
 
 // Loot Box display section for crawler profiles
@@ -241,6 +242,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   noncombatTurnState,
   getNoncombatRollsRemaining,
   recordNoncombatRoll,
+  currentPlayerId,
 }) => {
   const [selectedId, setSelectedId] = useState(crawlers[0]?.id || "");
   const [editMode, setEditMode] = useState(false);
@@ -248,7 +250,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
   // Expanded items tracking
-  const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
+  const [expandedItemIds, setExpandedItemIds] = useState<Set<string>>(new Set());
+  const [allItemsExpanded, setAllItemsExpanded] = useState(false);
 
   // Tab and filtering state
   const [activeTab, setActiveTab] = useState<ProfileTab>('profile');
@@ -266,6 +269,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   const [sendQuantities, setSendQuantities] = useState<Record<string, number>>({});
 
   const selected = crawlers.find((c) => c.id === selectedId) || crawlers[0];
+  const isOwnProfile = !currentPlayerId || currentPlayerId === selected?.id;
   const inventory = selected ? getCrawlerInventory(selected.id) : [];
 
   // Get all unique tags from inventory (dynamic)
@@ -306,22 +310,6 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
         selectedTags.some(tag => item.tags?.includes(tag))
       );
     }
-
-    // Apply sorting
-    items = [...items].sort((a, b) => {
-      switch (inventorySort) {
-        case 'name-asc':
-          return a.name.localeCompare(b.name);
-        case 'name-desc':
-          return b.name.localeCompare(a.name);
-        case 'gold-desc':
-          return (b.goldValue ?? 0) - (a.goldValue ?? 0);
-        case 'gold-asc':
-          return (a.goldValue ?? 0) - (b.goldValue ?? 0);
-        default:
-          return 0;
-      }
-    });
 
     return items;
   }, [inventory, inventorySearch, inventoryFilter, selectedTags, inventorySort]);
@@ -500,8 +488,11 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   };
 
   // Helper to create item signature for consolidation
-  const getItemSignature = (item: InventoryItem) =>
-    `${item.name}|${item.description || ''}|${item.equipSlot || ''}|${item.goldValue ?? 0}|${JSON.stringify(item.statModifiers || {})}`;
+  const getItemSignature = (item: InventoryItem) => {
+    const mods = item.statModifiers || {};
+    const sortedMods = JSON.stringify(Object.keys(mods).sort().reduce((acc, key) => ({ ...acc, [key]: mods[key as keyof typeof mods] }), {}));
+    return `${item.name}|${item.description || ''}|${item.equipSlot || ''}|${item.goldValue ?? 0}|${sortedMods}`;
+  };
 
   // Consolidated inventory for display (groups identical items)
   const consolidatedInventory = useMemo(() => {
@@ -747,7 +738,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 equippedItem={getEquippedItem('head')}
                 onDrop={handleEquipItem}
                 onUnequip={handleUnequipItem}
-                disabled={false}
+                disabled={!isOwnProfile}
               />
               <div></div>
             </div>
@@ -760,7 +751,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 equippedItem={getEquippedItem('leftHand')}
                 onDrop={handleEquipItem}
                 onUnequip={handleUnequipItem}
-                disabled={false}
+                disabled={!isOwnProfile}
               />
               <EquipmentSlot
                 slot="chest"
@@ -768,7 +759,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 equippedItem={getEquippedItem('chest')}
                 onDrop={handleEquipItem}
                 onUnequip={handleUnequipItem}
-                disabled={false}
+                disabled={!isOwnProfile}
               />
               <EquipmentSlot
                 slot="rightHand"
@@ -776,7 +767,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 equippedItem={getEquippedItem('rightHand')}
                 onDrop={handleEquipItem}
                 onUnequip={handleUnequipItem}
-                disabled={false}
+                disabled={!isOwnProfile}
               />
             </div>
 
@@ -788,7 +779,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 equippedItem={getEquippedItem('ringFinger')}
                 onDrop={handleEquipItem}
                 onUnequip={handleUnequipItem}
-                disabled={false}
+                disabled={!isOwnProfile}
               />
               <EquipmentSlot
                 slot="legs"
@@ -796,7 +787,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 equippedItem={getEquippedItem('legs')}
                 onDrop={handleEquipItem}
                 onUnequip={handleUnequipItem}
-                disabled={false}
+                disabled={!isOwnProfile}
               />
               <EquipmentSlot
                 slot="weapon"
@@ -804,7 +795,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 equippedItem={getEquippedItem('weapon')}
                 onDrop={handleEquipItem}
                 onUnequip={handleUnequipItem}
-                disabled={false}
+                disabled={!isOwnProfile}
               />
             </div>
 
@@ -817,7 +808,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 equippedItem={getEquippedItem('feet')}
                 onDrop={handleEquipItem}
                 onUnequip={handleUnequipItem}
-                disabled={false}
+                disabled={!isOwnProfile}
               />
               <div></div>
             </div>
@@ -1252,127 +1243,170 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                   )}
                 </div>
 
-                {/* Equipment Slots */}
-                <div className="bg-muted/30 border border-border rounded-lg p-4">
-                  <h3 className="font-display text-primary text-base mb-3">EQUIPMENT</h3>
-                  <div className="flex flex-col items-center gap-2">
-                    {/* Head */}
-                    <div className="grid grid-cols-3 gap-2" style={{ width: '282px' }}>
-                      <div />
-                      <EquipmentSlot slot="head" label="Head" equippedItem={getEquippedItem('head')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={false} />
-                      <div />
+                {/* Equipment + Items side-by-side */}
+                <div className="flex gap-4">
+                  {/* Equipment Slots - Left Side */}
+                  {isOwnProfile && (
+                    <div className="bg-muted/30 border border-border rounded-lg p-3 shrink-0" style={{ width: '220px' }}>
+                      <h3 className="font-display text-primary text-sm mb-2">EQUIPMENT</h3>
+                      <div className="flex flex-col items-center gap-1.5">
+                        <EquipmentSlot slot="head" label="Head" equippedItem={getEquippedItem('head')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={!isOwnProfile} />
+                        <div className="grid grid-cols-3 gap-1.5" style={{ width: '198px' }}>
+                          <EquipmentSlot slot="leftHand" label="L.Hand" equippedItem={getEquippedItem('leftHand')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={!isOwnProfile} />
+                          <EquipmentSlot slot="chest" label="Chest" equippedItem={getEquippedItem('chest')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={!isOwnProfile} />
+                          <EquipmentSlot slot="rightHand" label="R.Hand" equippedItem={getEquippedItem('rightHand')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={!isOwnProfile} />
+                        </div>
+                        <div className="grid grid-cols-3 gap-1.5" style={{ width: '198px' }}>
+                          <EquipmentSlot slot="ringFinger" label="Ring" equippedItem={getEquippedItem('ringFinger')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={!isOwnProfile} />
+                          <EquipmentSlot slot="legs" label="Legs" equippedItem={getEquippedItem('legs')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={!isOwnProfile} />
+                          <EquipmentSlot slot="weapon" label="Weapon" equippedItem={getEquippedItem('weapon')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={!isOwnProfile} />
+                        </div>
+                        <EquipmentSlot slot="feet" label="Feet" equippedItem={getEquippedItem('feet')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={!isOwnProfile} />
+                      </div>
+                      {/* Gold */}
+                      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border/50">
+                        <Coins className="w-4 h-4 text-accent" />
+                        <span className="text-accent font-display text-sm">{Math.floor(selected.gold || 0)}G</span>
+                      </div>
                     </div>
-                    {/* Left Hand, Chest, Right Hand */}
-                    <div className="grid grid-cols-3 gap-2" style={{ width: '282px' }}>
-                      <EquipmentSlot slot="leftHand" label="Left Hand" equippedItem={getEquippedItem('leftHand')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={false} />
-                      <EquipmentSlot slot="chest" label="Chest" equippedItem={getEquippedItem('chest')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={false} />
-                      <EquipmentSlot slot="rightHand" label="Right Hand" equippedItem={getEquippedItem('rightHand')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={false} />
-                    </div>
-                    {/* Ring, Legs, Weapon */}
-                    <div className="grid grid-cols-3 gap-2" style={{ width: '282px' }}>
-                      <EquipmentSlot slot="ringFinger" label="Ring" equippedItem={getEquippedItem('ringFinger')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={false} />
-                      <EquipmentSlot slot="legs" label="Legs" equippedItem={getEquippedItem('legs')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={false} />
-                      <EquipmentSlot slot="weapon" label="Weapon" equippedItem={getEquippedItem('weapon')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={false} />
-                    </div>
-                    {/* Feet */}
-                    <div className="grid grid-cols-3 gap-2" style={{ width: '282px' }}>
-                      <div />
-                      <EquipmentSlot slot="feet" label="Feet" equippedItem={getEquippedItem('feet')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={false} />
-                      <div />
-                    </div>
-                  </div>
-                </div>
+                  )}
 
-                {/* Crawler Gold */}
-                <div className="flex items-center gap-2 p-3 bg-accent/10 border border-accent/30 rounded">
-                  <Coins className="w-5 h-5 text-accent" />
-                  <span className="text-accent font-display text-lg">{Math.floor(selected.gold || 0)}G</span>
-                  <span className="text-muted-foreground text-sm ml-2">Personal Gold</span>
-                </div>
+                  {/* Items List - Right Side */}
+                  <div className="flex-1 min-w-0">
+                    {/* Expand All / Item Count */}
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs text-muted-foreground">
+                        {consolidatedInventory.length} item{consolidatedInventory.length !== 1 ? 's' : ''}
+                        {!isOwnProfile && (
+                          <span className="ml-2">
+                            <Coins className="w-3 h-3 inline text-accent" /> {Math.floor(selected.gold || 0)}G
+                          </span>
+                        )}
+                      </span>
+                      <button
+                        onClick={() => {
+                          if (allItemsExpanded) {
+                            setExpandedItemIds(new Set());
+                            setAllItemsExpanded(false);
+                          } else {
+                            setExpandedItemIds(new Set(consolidatedInventory.map(c => c.sig)));
+                            setAllItemsExpanded(true);
+                          }
+                        }}
+                        className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
+                      >
+                        {allItemsExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                        {allItemsExpanded ? 'Collapse All' : 'Expand All'}
+                      </button>
+                    </div>
 
-                {/* Items List */}
-                {consolidatedInventory.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    {inventory.length === 0 ? 'No items in inventory' : 'No items match your filters'}
-                  </div>
-                ) : (
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {consolidatedInventory.map(({ item, count, allIds, isEquipped, sig }) => {
-                      const isExpanded = expandedItemId === sig;
-                      return (
-                        <div
-                          key={sig}
-                          draggable={!!item.equipSlot}
-                          onDragStart={(e) => {
-                            e.dataTransfer.setData('application/json', JSON.stringify(item));
-                            e.dataTransfer.effectAllowed = 'move';
-                          }}
-                          onDoubleClick={() => handleDoubleClickEquip(item)}
-                          onClick={() => setExpandedItemId(isExpanded ? null : sig)}
-                          className={`bg-muted/50 p-3 rounded-lg border transition-colors select-none ${
-                            isEquipped ? 'border-primary/50' : 'border-border'
-                          } ${item.equipSlot ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'} hover:bg-muted/70`}
-                          title={item.equipSlot ? 'Drag to equip slot, or double-click to equip' : 'Click to expand'}
-                        >
-                          <div className="flex items-start gap-2">
-                            {getEquipmentIcon(item.equipSlot, "w-4 h-4 shrink-0 mt-0.5")}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold text-sm truncate">{item.name}</span>
-                                {count > 1 && <span className="text-accent font-bold text-xs">x{count}</span>}
-                                {isExpanded ? <ChevronUp className="w-3 h-3 text-muted-foreground ml-auto shrink-0" /> : <ChevronDown className="w-3 h-3 text-muted-foreground ml-auto shrink-0" />}
-                              </div>
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {isEquipped && <span className="text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded">Equipped</span>}
-                                {item.equipSlot && !isEquipped && (
-                                  <span className="text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded">{item.equipSlot}</span>
-                                )}
-                                {item.goldValue != null && item.goldValue > 0 && (
-                                  <span className="text-xs text-accent flex items-center gap-0.5">
-                                    <Coins className="w-3 h-3" />{item.goldValue}g
-                                  </span>
-                                )}
-                              </div>
+                    {consolidatedInventory.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        {inventory.length === 0 ? 'No items in inventory' : 'No items match your filters'}
+                      </div>
+                    ) : (
+                      <div className="grid md:grid-cols-2 gap-3">
+                        {consolidatedInventory.map(({ item, count, allIds, isEquipped, sig }) => {
+                          const isExpanded = expandedItemIds.has(sig) || allItemsExpanded;
+                          return (
+                            <div
+                              key={sig}
+                              draggable={isOwnProfile && !!item.equipSlot}
+                              onDragStart={(e) => {
+                                e.dataTransfer.setData('application/json', JSON.stringify(item));
+                                e.dataTransfer.effectAllowed = 'move';
+                              }}
+                              onDoubleClick={() => isOwnProfile && handleDoubleClickEquip(item)}
+                              onClick={() => {
+                                setAllItemsExpanded(false);
+                                setExpandedItemIds(prev => {
+                                  const next = new Set(prev);
+                                  if (next.has(sig)) next.delete(sig);
+                                  else next.add(sig);
+                                  return next;
+                                });
+                              }}
+                              className={`bg-muted/50 p-3 rounded-lg border transition-colors select-none ${
+                                isEquipped ? 'border-primary/50' : 'border-border'
+                              } ${isOwnProfile && item.equipSlot ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'} hover:bg-muted/70`}
+                              title={isOwnProfile && item.equipSlot ? 'Drag to equip slot, or double-click to equip' : 'Click to expand'}
+                            >
+                              <div className="flex items-start gap-2">
+                                {getEquipmentIcon(item.equipSlot, "w-4 h-4 shrink-0 mt-0.5")}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-semibold text-sm truncate">{item.name}</span>
+                                    {count > 1 && <span className="text-accent font-bold text-xs">x{count}</span>}
+                                    {isExpanded ? <ChevronUp className="w-3 h-3 text-muted-foreground ml-auto shrink-0" /> : <ChevronDown className="w-3 h-3 text-muted-foreground ml-auto shrink-0" />}
+                                  </div>
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {isEquipped && <span className="text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded">Equipped</span>}
+                                    {item.equipSlot && !isEquipped && (
+                                      <span className="text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded">{item.equipSlot}</span>
+                                    )}
+                                    {(item.goldValue ?? 0) > 0 && (
+                                      <span className="text-xs text-accent flex items-center gap-0.5">
+                                        <Coins className="w-3 h-3" />{item.goldValue}g
+                                      </span>
+                                    )}
+                                  </div>
 
-                              {/* Expanded detail */}
-                              {isExpanded && (
-                                <div className="mt-2 pt-2 border-t border-border/50 space-y-1.5">
-                                  {item.description && (
-                                    <p className="text-xs text-muted-foreground">{item.description}</p>
-                                  )}
-                                  {item.statModifiers && Object.entries(item.statModifiers).some(([, v]) => v !== 0) && (
-                                    <div className="flex flex-wrap gap-1">
-                                      {Object.entries(item.statModifiers).filter(([, v]) => v !== 0).map(([stat, val]) => (
-                                        <span key={stat} className={`text-xs px-1.5 py-0.5 rounded ${(val as number) > 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                                          {stat}: {(val as number) > 0 ? '+' : ''}{val}
-                                        </span>
-                                      ))}
+                                  {/* Expanded detail */}
+                                  {isExpanded && (
+                                    <div className="mt-2 pt-2 border-t border-border/50 space-y-1.5">
+                                      {item.description && (
+                                        <p className="text-xs text-muted-foreground">{item.description}</p>
+                                      )}
+                                      {item.statModifiers && Object.entries(item.statModifiers).some(([, v]) => v !== 0) && (
+                                        <div className="flex flex-wrap gap-1">
+                                          {Object.entries(item.statModifiers).filter(([, v]) => v !== 0).map(([stat, val]) => (
+                                            <span key={stat} className={`text-xs px-1.5 py-0.5 rounded ${(val as number) > 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                                              {stat}: {(val as number) > 0 ? '+' : ''}{val}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      )}
+                                      {item.tags && item.tags.length > 0 && (
+                                        <div className="flex flex-wrap gap-1">
+                                          {item.tags.map(tag => (
+                                            <span key={tag} className="text-xs bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">{tag}</span>
+                                          ))}
+                                        </div>
+                                      )}
+                                      <div className="flex gap-2 mt-1">
+                                        {isOwnProfile && item.equipSlot && !isEquipped && (
+                                          <button
+                                            onClick={(e) => { e.stopPropagation(); handleDoubleClickEquip(item); }}
+                                            className="text-xs text-primary hover:underline"
+                                          >
+                                            Equip to {item.equipSlot}
+                                          </button>
+                                        )}
+                                        {isOwnProfile && (
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              if (!confirm(`Delete ${count > 1 ? `all ${count} copies of ` : ''}"${item.name}"?`)) return;
+                                              const remaining = inventory.filter(i => !allIds.includes(i.id));
+                                              onUpdateCrawlerInventory(selected.id, remaining);
+                                            }}
+                                            className="text-xs text-destructive hover:underline flex items-center gap-0.5"
+                                          >
+                                            <Trash2 className="w-3 h-3" /> Delete{count > 1 ? ` (${count})` : ''}
+                                          </button>
+                                        )}
+                                      </div>
                                     </div>
-                                  )}
-                                  {item.tags && item.tags.length > 0 && (
-                                    <div className="flex flex-wrap gap-1">
-                                      {item.tags.map(tag => (
-                                        <span key={tag} className="text-xs bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">{tag}</span>
-                                      ))}
-                                    </div>
-                                  )}
-                                  {item.equipSlot && !isEquipped && (
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); handleDoubleClickEquip(item); }}
-                                      className="text-xs text-primary hover:underline mt-1"
-                                    >
-                                      Equip to {item.equipSlot}
-                                    </button>
                                   )}
                                 </div>
-                              )}
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                      );
-                    })}
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
             )}
 
@@ -1380,13 +1414,17 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             {activeTab === 'actions' && (() => {
               const rollsRemaining = getNoncombatRollsRemaining?.(selected.id) ?? 0;
               const hasActiveTurn = !!noncombatTurnState;
-              const canRoll = hasActiveTurn && rollsRemaining > 0;
+              const isTestMode = !hasActiveTurn;
+              const canRoll = isTestMode || rollsRemaining > 0;
               const maxRolls = noncombatTurnState?.maxRolls ?? 3;
 
               const handleActionRoll = (actionLabel: string, stat: string, total: number) => {
                 if (!canRoll) return;
                 onStatRoll?.(selected.name, selected.id, actionLabel, total);
-                recordNoncombatRoll?.(selected.id);
+                // Only track rolls when in an active noncombat turn (not test mode)
+                if (!isTestMode) {
+                  recordNoncombatRoll?.(selected.id);
+                }
               };
 
               return (
@@ -1396,9 +1434,9 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 </h2>
 
                 {/* Turn status */}
-                {!hasActiveTurn ? (
+                {isTestMode ? (
                   <div className="bg-muted/30 border border-border rounded-lg p-4 text-center">
-                    <p className="text-muted-foreground text-sm font-display">WAITING FOR DM TO START NONCOMBAT TURN</p>
+                    <p className="text-muted-foreground text-sm font-display">TEST MODE — FREE ROLLS</p>
                   </div>
                 ) : (
                   <div className="flex items-center justify-between bg-muted/30 border border-border rounded-lg px-4 py-2">

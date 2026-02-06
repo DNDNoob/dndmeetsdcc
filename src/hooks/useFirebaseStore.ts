@@ -357,8 +357,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
         const docRef = doc(collectionRef, op.id);
 
         switch (op.type) {
-          case 'add':
-          case 'update': {
+          case 'add': {
             if (!op.data) continue;
             let itemData = { ...op.data, id: op.id };
             if (roomId) {
@@ -381,6 +380,13 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
 
             const cleaned = cleanObject(itemData);
             batch.set(docRef, cleaned as Record<string, unknown>);
+            break;
+          }
+          case 'update': {
+            if (!op.data) continue;
+            const updateData = { ...op.data };
+            const cleanedUpdate = cleanObject(updateData);
+            batch.update(docRef, cleanedUpdate as Record<string, unknown>);
             break;
           }
           case 'delete':

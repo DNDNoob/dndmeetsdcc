@@ -4,6 +4,7 @@ import SplashScreen from "@/components/SplashScreen";
 import MainMenu from "@/components/MainMenu";
 import Navigation from "@/components/Navigation";
 import DiceRoller from "@/components/DiceRoller";
+import PingPanel from "@/components/PingPanel";
 import ChangelogViewer from "@/components/ChangelogViewer";
 import ProfilesView from "@/views/ProfilesView";
 import MapsView from "@/views/MapsView";
@@ -323,6 +324,7 @@ const Index = () => {
                 noncombatTurnState={noncombatTurnState}
                 getNoncombatRollsRemaining={getNoncombatRollsRemaining}
                 recordNoncombatRoll={recordNoncombatRoll}
+                currentPlayerId={currentPlayer?.id}
               />
             )}
             {currentView === "maps" && (
@@ -405,6 +407,12 @@ const Index = () => {
             diceRolls={diceRolls}
             addDiceRoll={addDiceRoll}
             onExpandedChange={setIsDiceExpanded}
+            noncombatTurnState={noncombatTurnState}
+            crawlers={crawlers}
+            currentPlayerId={currentPlayer.id}
+          />
+
+          <PingPanel
             isAdmin={isAdmin}
             noncombatTurnState={noncombatTurnState}
             onStartNoncombatTurn={startNoncombatTurn}
