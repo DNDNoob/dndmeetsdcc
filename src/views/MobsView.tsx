@@ -44,7 +44,7 @@ const MobsView: React.FC<MobsViewProps> = ({ mobs }) => {
                     <img
                       src={mob.image}
                       alt={mob.name}
-                      className="w-24 h-24 object-cover border border-border"
+                      className="w-20 h-20 sm:w-24 sm:h-24 object-cover border border-border"
                     />
                   )}
                   {mob.type === "boss" && (
@@ -147,7 +147,7 @@ const MobsView: React.FC<MobsViewProps> = ({ mobs }) => {
         </div>
 
         {/* Stats */}
-        <div className="mt-8 border-t border-border pt-6 grid grid-cols-3 gap-4 text-center">
+        <div className="mt-8 border-t border-border pt-6 grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
           <div>
             <p className="text-2xl font-display text-destructive">
               {visibleMobs.filter((m) => m.encountered).length}

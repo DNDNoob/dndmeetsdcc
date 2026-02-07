@@ -125,7 +125,7 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
   };
 
   return (
-    <div className="fixed bottom-4 right-4 z-[100] flex items-end gap-2">
+    <div className="fixed bottom-4 right-2 sm:right-4 z-[100] flex items-end gap-2">
       {/* Toggle tab - now to the left of the panel */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
@@ -147,8 +147,8 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
             initial={{ opacity: 0, x: 20, scale: 0.95 }}
             animate={{ opacity: 1, x: 0, scale: 1 }}
             exit={{ opacity: 0, x: 20, scale: 0.95 }}
-            className="bg-background border-2 border-primary p-4 w-72 shadow-lg shadow-primary/20 flex flex-col"
-            style={{ height: 'calc(100vh - 2rem)' }}
+            className="bg-background border-2 border-primary p-4 w-[calc(100vw-1rem)] sm:w-72 shadow-lg shadow-primary/20 flex flex-col"
+            style={{ maxHeight: 'calc(100vh - 2rem)' }}
             onWheel={(e) => e.stopPropagation()}
           >
             <h3 className="font-display text-primary text-glow-cyan text-lg mb-3 flex items-center gap-2 shrink-0">
@@ -297,7 +297,7 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
 
               {showDiceOptions && (
                 <>
-                  <div className="grid grid-cols-4 gap-2 mb-3">
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mb-3">
                     {diceTypes.map((dice) => (
                       <button
                         key={dice.sides}

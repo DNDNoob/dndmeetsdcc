@@ -60,7 +60,7 @@ const PingPanel: React.FC<PingPanelProps> = ({
   if (!hasContent) return null;
 
   return (
-    <div className="fixed bottom-4 left-4 z-[99] flex items-end gap-2">
+    <div className="fixed bottom-4 left-2 sm:left-4 z-[99] flex items-end gap-2">
       {/* Toggle tab */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
@@ -89,7 +89,7 @@ const PingPanel: React.FC<PingPanelProps> = ({
             initial={{ opacity: 0, x: -20, scale: 0.95 }}
             animate={{ opacity: 1, x: 0, scale: 1 }}
             exit={{ opacity: 0, x: -20, scale: 0.95 }}
-            className="bg-background border-2 border-accent p-4 w-72 shadow-lg shadow-accent/20 max-h-[60vh] overflow-y-auto"
+            className="bg-background border-2 border-accent p-4 w-[calc(100vw-1rem)] sm:w-72 shadow-lg shadow-accent/20 max-h-[60vh] overflow-y-auto"
             onWheel={(e) => e.stopPropagation()}
           >
             <h3 className="font-display text-accent text-lg mb-3 flex items-center gap-2 shrink-0">

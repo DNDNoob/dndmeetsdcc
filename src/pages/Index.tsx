@@ -308,7 +308,7 @@ const Index = () => {
             onVisibilityChange={setIsNavVisible}
           />
 
-          <main className="pb-12">
+          <main className="pb-16 sm:pb-12">
             {currentView === "profiles" && (
               <ProfilesView
                 crawlers={crawlers}
@@ -392,7 +392,7 @@ const Index = () => {
             )}
             {currentView === "sounds" && <SoundEffectsView />}
             {currentView === "multiplayer" && (
-              <div className="container mx-auto p-6 max-w-2xl">
+              <div className="container mx-auto px-4 sm:px-6 max-w-2xl">
                 <h1 className="font-display text-3xl text-primary text-glow-cyan mb-6 text-center">
                   MULTIPLAYER
                 </h1>

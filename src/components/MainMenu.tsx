@@ -78,7 +78,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ onNavigate, onDungeonAI, isDungeonA
         SYSTEM HUB
       </motion.h1>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-5 max-w-2xl px-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 sm:gap-5 max-w-2xl md:max-w-3xl px-4">
         {menuItems.map((item, index) => (
           <motion.div
             key={item.id}
