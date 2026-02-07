@@ -233,9 +233,20 @@ if (operations.length > 0) await batchWrite(operations);
 
 | Field | Max Size | Behavior If Exceeded |
 |-------|----------|---------------------|
-| `image` (maps, mobs) | 5 MB string length (`MAX_IMAGE_LENGTH`) | Silently stripped before save |
-| `avatar` (crawlers) | 500 KB string length (`MAX_AVATAR_LENGTH`) | Silently stripped before save |
+| `image` (maps) | 5 MB string length (`MAX_IMAGE_LENGTH`) | Silently stripped before save |
+| `image` (mobs) | Compressed to ~800 KB | Resized to 512px max, JPEG quality reduced |
+| `avatar` (crawlers) | 500 KB string length (`MAX_AVATAR_LENGTH`) | Resized to 512px max, JPEG quality reduced |
 | Firestore document | 1 MB total | Write fails |
+
+### Image Compression Policy
+
+The goal is to save Firebase storage space **without reducing resolution where high-res display is needed**:
+
+- **Map images**: Uploaded at **full resolution** — no compression or resizing. Maps are displayed at large sizes and need high resolution. The 5 MB Firestore limit in `useFirebaseStore.ts` is the only constraint.
+- **Mob images**: Compressed client-side in `DungeonAIView.tsx` via `resizeImage()` (512px max, JPEG quality 0.7). Mobs are displayed at small sizes on the map.
+- **Avatar/profile images**: Compressed client-side in `ProfilesView.tsx` (512px max, JPEG quality 0.8). Avatars are displayed as small thumbnails.
+
+**Never add compression to map uploads.** If a map image exceeds 5 MB, it will be silently stripped by `useFirebaseStore` — the user should be informed to use a smaller image.
 
 - `cleanObject()` in useFirebaseStore automatically strips `undefined` values before every write
 - You do **not** need to manually call cleanObject — it's applied in addItem, updateItem, and batchWrite

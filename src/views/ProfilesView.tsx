@@ -496,7 +496,9 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
 
   // Consolidated inventory for display (groups identical items)
   const consolidatedInventory = useMemo(() => {
-    const equippedItemIds = new Set(Object.values(selected?.equippedItems || {}));
+    const equippedItemIds = isOwnProfile 
+      ? new Set(Object.values(selected?.equippedItems || {}))
+      : new Set<string>(); // Don't show equipped state for other players' inventories
 
     // Keep equipped items separate (they always show individually)
     const equippedItems = filteredInventory.filter(item => equippedItemIds.has(item.id));
@@ -515,17 +517,24 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
 
     // Apply sorting to the display items
     displayItems.sort((a, b) => {
+      let primary: number;
       switch (inventorySort) {
-        case 'name-asc': return a.item.name.localeCompare(b.item.name);
-        case 'name-desc': return b.item.name.localeCompare(a.item.name);
-        case 'gold-desc': return (b.item.goldValue ?? 0) - (a.item.goldValue ?? 0);
-        case 'gold-asc': return (a.item.goldValue ?? 0) - (b.item.goldValue ?? 0);
-        default: return 0;
+        case 'name-asc': primary = a.item.name.localeCompare(b.item.name); break;
+        case 'name-desc': primary = b.item.name.localeCompare(a.item.name); break;
+        case 'gold-desc': primary = (b.item.goldValue ?? 0) - (a.item.goldValue ?? 0); break;
+        case 'gold-asc': primary = (a.item.goldValue ?? 0) - (b.item.goldValue ?? 0); break;
+        default: primary = 0;
       }
+      if (primary !== 0) return primary;
+      // Secondary: keep equipped items next to their unequipped group (same name together)
+      const nameCmp = a.item.name.localeCompare(b.item.name);
+      if (nameCmp !== 0) return nameCmp;
+      // Equipped items come before unequipped
+      return (a.isEquipped ? 0 : 1) - (b.isEquipped ? 0 : 1);
     });
 
     return displayItems;
-  }, [filteredInventory, selected?.equippedItems, inventorySort]);
+  }, [filteredInventory, selected?.equippedItems, inventorySort, isOwnProfile]);
 
   // Double-click to equip an item
   const handleDoubleClickEquip = (item: InventoryItem) => {

@@ -249,14 +249,16 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   const handleMapUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      console.log('[DungeonAI] 📤 Uploading map...');
+      console.log('[DungeonAI] 📤 Uploading map (full resolution)...');
       try {
-        const base64 = await resizeImage(file);
-        if (!base64) {
-          console.error('[DungeonAI] ❌ Map image too large even after compression');
-          return;
-        }
-        console.log('[DungeonAI] ✅ Map loaded, size:', base64.length);
+        // Read the file at full resolution — no compression for maps
+        const base64: string = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        console.log('[DungeonAI] ✅ Map loaded, size:', base64.length, '(' + (base64.length / 1_000_000).toFixed(2) + 'MB)');
         const updatedMaps = [...maps, base64];
         console.log('[DungeonAI] 📊 Calling onUpdateMaps with', updatedMaps.length, 'maps');
         const result = onUpdateMaps(updatedMaps);

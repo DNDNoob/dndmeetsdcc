@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import { Crawler, InventoryItem, EquipmentSlot as SlotType, StatModifiers } from "@/lib/gameData";
+import { EquipmentSlot } from "@/components/ui/EquipmentSlot";
 import { Coins, Package, Sword, Shield, Plus, Trash2, Edit2, Save, HardHat, Search, BookOpen, Gem, Footprints, Shirt, Hand } from "lucide-react";
 
 // Inline SVG for legs/pants slot
@@ -52,7 +53,7 @@ const getItemSignature = (item: InventoryItem): string => {
   const modifiersStr = item.statModifiers
     ? JSON.stringify(Object.entries(item.statModifiers).filter(([, v]) => v !== 0).sort())
     : '';
-  return `${item.name}|${item.description || ''}|${item.equipSlot || ''}|${item.goldValue ?? ''}|${modifiersStr}`;
+  return `${item.name}|${item.description || ''}|${item.equipSlot || ''}|${item.goldValue ?? 0}|${modifiersStr}`;
 };
 
 // Consolidate items by signature
@@ -239,6 +240,21 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   };
 
   const libraryItems = getSharedInventory();
+
+  const handleEquipItem = (crawlerId: string, slot: SlotType, itemId: string) => {
+    const crawler = crawlers.find(c => c.id === crawlerId);
+    if (!crawler) return;
+    const updatedEquipped = { ...(crawler.equippedItems ?? {}), [slot]: itemId };
+    onUpdateCrawler(crawlerId, { equippedItems: updatedEquipped });
+  };
+
+  const handleUnequipItem = (crawlerId: string, slot: SlotType) => {
+    const crawler = crawlers.find(c => c.id === crawlerId);
+    if (!crawler) return;
+    const updatedEquipped = { ...(crawler.equippedItems ?? {}) };
+    delete updatedEquipped[slot];
+    onUpdateCrawler(crawlerId, { equippedItems: updatedEquipped });
+  };
 
   return (
     <motion.div
@@ -494,60 +510,99 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                   </div>
                 )}
 
-                {items.length === 0 ? (
-                  <p className="text-muted-foreground text-sm italic mb-3">No items in inventory</p>
-                ) : (
-                  <ul className="space-y-2 mb-3">
-                    {consolidateItems(items).map((consolidated, idx) => {
-                      const item = consolidated.item;
-                      return (
-                        <li
-                          key={`${item.id}-${idx}`}
-                          className="flex items-center gap-3 text-sm py-2 border-b border-border/50 last:border-0"
-                        >
-                          {/* Item type icon */}
-                          {getEquipmentIcon(item.equipSlot)}
-                          <div className="flex flex-col flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              {consolidated.count > 1 && (
-                                <span className="text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded font-bold">
-                                  x{consolidated.count}
-                                </span>
-                              )}
-                              <span className="text-foreground">{item.name}</span>
-                              {item.equipSlot && (
-                                <span className="text-xs bg-accent/20 text-accent px-2 py-0.5 rounded">
-                                  {item.equipSlot === 'weapon' ? 'Weapon' :
-                                   item.equipSlot === 'leftHand' ? 'Left Hand' :
-                                   item.equipSlot === 'rightHand' ? 'Right Hand' :
-                                   item.equipSlot === 'ringFinger' ? 'Ring' :
-                                   item.equipSlot.charAt(0).toUpperCase() + item.equipSlot.slice(1)}
-                                </span>
-                              )}
-                              {item.goldValue !== undefined && item.goldValue > 0 && (
-                                <span className="text-xs bg-accent/10 text-accent px-2 py-0.5 rounded flex items-center gap-1">
-                                  <Coins className="w-3 h-3" /> {item.goldValue}G
-                                </span>
-                              )}
-                            </div>
-                            {item.description && (
-                              <span className="text-muted-foreground text-xs">({item.description})</span>
-                            )}
-                          </div>
-                          {editMode && (
-                            <button
-                              onClick={() => handleRemoveItem(crawler.id, consolidated.ids[0])}
-                              className="text-destructive hover:text-destructive/80"
-                              title={consolidated.count > 1 ? "Remove one" : "Remove"}
+                <div className="flex gap-4">
+                  {/* Items list */}
+                  <div className="flex-1 min-w-0">
+                    {items.length === 0 ? (
+                      <p className="text-muted-foreground text-sm italic mb-3">No items in inventory</p>
+                    ) : (
+                      <ul className="space-y-2 mb-3">
+                        {consolidateItems(items).map((consolidated, idx) => {
+                          const item = consolidated.item;
+                          return (
+                            <li
+                              key={`${item.id}-${idx}`}
+                              className={`flex items-center gap-3 text-sm py-2 border-b border-border/50 last:border-0 ${item.equipSlot ? 'cursor-grab' : ''}`}
+                              draggable={!!item.equipSlot}
+                              onDragStart={item.equipSlot ? (e) => {
+                                e.dataTransfer.setData('application/json', JSON.stringify(item));
+                              } : undefined}
+                              onDoubleClick={item.equipSlot ? () => {
+                                const slot = item.equipSlot!;
+                                handleEquipItem(crawler.id, slot, item.id);
+                              } : undefined}
                             >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
-                        </li>
+                              {/* Item type icon */}
+                              {getEquipmentIcon(item.equipSlot)}
+                              <div className="flex flex-col flex-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  {consolidated.count > 1 && (
+                                    <span className="text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded font-bold">
+                                      x{consolidated.count}
+                                    </span>
+                                  )}
+                                  <span className="text-foreground">{item.name}</span>
+                                  {item.equipSlot && (
+                                    <span className="text-xs bg-accent/20 text-accent px-2 py-0.5 rounded">
+                                      {item.equipSlot === 'weapon' ? 'Weapon' :
+                                       item.equipSlot === 'leftHand' ? 'Left Hand' :
+                                       item.equipSlot === 'rightHand' ? 'Right Hand' :
+                                       item.equipSlot === 'ringFinger' ? 'Ring' :
+                                       item.equipSlot.charAt(0).toUpperCase() + item.equipSlot.slice(1)}
+                                    </span>
+                                  )}
+                                  {item.goldValue !== undefined && item.goldValue > 0 && (
+                                    <span className="text-xs bg-accent/10 text-accent px-2 py-0.5 rounded flex items-center gap-1">
+                                      <Coins className="w-3 h-3" /> {item.goldValue}G
+                                    </span>
+                                  )}
+                                </div>
+                                {item.description && (
+                                  <span className="text-muted-foreground text-xs">({item.description})</span>
+                                )}
+                              </div>
+                              {editMode && (
+                                <button
+                                  onClick={() => handleRemoveItem(crawler.id, consolidated.ids[0])}
+                                  className="text-destructive hover:text-destructive/80"
+                                  title={consolidated.count > 1 ? "Remove one" : "Remove"}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+
+                  {/* Equipment Slots - Right Side */}
+                  <div className="bg-muted/30 border border-border rounded-lg p-3 shrink-0" style={{ width: '180px' }}>
+                    <h4 className="font-display text-primary text-xs mb-2">EQUIPMENT</h4>
+                    {(() => {
+                      const eq = crawler.equippedItems ?? {};
+                      const dropHandler = (slot: SlotType, itemId: string) => handleEquipItem(crawler.id, slot, itemId);
+                      const unequipHandler = (slot: SlotType) => handleUnequipItem(crawler.id, slot);
+                      return (
+                        <div className="flex flex-col items-center gap-1">
+                          <EquipmentSlot slot="head" label="Head" equippedItem={items.find(i => i.id === eq.head)} onDrop={dropHandler} onUnequip={unequipHandler} />
+                          <div className="grid grid-cols-3 gap-1" style={{ width: '168px' }}>
+                            <EquipmentSlot slot="leftHand" label="L.Hand" equippedItem={items.find(i => i.id === eq.leftHand)} onDrop={dropHandler} onUnequip={unequipHandler} />
+                            <EquipmentSlot slot="chest" label="Chest" equippedItem={items.find(i => i.id === eq.chest)} onDrop={dropHandler} onUnequip={unequipHandler} />
+                            <EquipmentSlot slot="rightHand" label="R.Hand" equippedItem={items.find(i => i.id === eq.rightHand)} onDrop={dropHandler} onUnequip={unequipHandler} />
+                          </div>
+                          <div className="grid grid-cols-3 gap-1" style={{ width: '168px' }}>
+                            <EquipmentSlot slot="ringFinger" label="Ring" equippedItem={items.find(i => i.id === eq.ringFinger)} onDrop={dropHandler} onUnequip={unequipHandler} />
+                            <EquipmentSlot slot="legs" label="Legs" equippedItem={items.find(i => i.id === eq.legs)} onDrop={dropHandler} onUnequip={unequipHandler} />
+                            <EquipmentSlot slot="weapon" label="Weapon" equippedItem={items.find(i => i.id === eq.weapon)} onDrop={dropHandler} onUnequip={unequipHandler} />
+                          </div>
+                          <EquipmentSlot slot="feet" label="Feet" equippedItem={items.find(i => i.id === eq.feet)} onDrop={dropHandler} onUnequip={unequipHandler} />
+                        </div>
                       );
-                    })}
-                  </ul>
-                )}
+                    })()}
+                  </div>
+                </div>
 
               </div>
             );
