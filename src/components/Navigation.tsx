@@ -100,7 +100,7 @@ const Navigation: React.FC<NavigationProps> = ({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-center gap-2 md:gap-3">
+        <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-2 md:gap-3">
           <DungeonButton
             variant="nav"
             size="sm"
