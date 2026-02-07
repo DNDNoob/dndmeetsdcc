@@ -41,7 +41,6 @@ interface InventoryEntry {
 export const useGameState = () => {
   const {
     getCollection,
-    setCollection,
     addItem,
     updateItem,
     deleteItem,
@@ -127,30 +126,6 @@ export const useGameState = () => {
     return crawlers.reduce((sum, c) => sum + (c.gold || 0), 0);
   }, [crawlers]);
 
-  // Helper functions that work with the new data store
-  const setCrawlers = (newCrawlers: Crawler[]) => {
-    setCollection('crawlers', newCrawlers);
-  };
-
-  // Remove undefined fields before sending to Firestore
-  const stripUndefinedDeep = (obj: unknown): unknown => {
-    if (obj === null || obj === undefined) return obj;
-    if (Array.isArray(obj)) {
-      return obj
-        .map((v) => (typeof v === 'object' && v !== null ? stripUndefinedDeep(v) : v))
-        .filter((v) => v !== undefined);
-    }
-    if (typeof obj === 'object') {
-      const out: Record<string, unknown> = {};
-      for (const [key, value] of Object.entries(obj)) {
-        if (value === undefined) continue;
-        out[key] = typeof value === 'object' && value !== null ? stripUndefinedDeep(value) : value;
-      }
-      return out;
-    }
-    return obj;
-  };
-
   const setMobs = async (newMobs: Mob[]) => {
     // Persist changes to Firestore by diffing existing vs new
     const existingMobs = getCollection('mobs') as Mob[];
@@ -174,13 +149,13 @@ export const useGameState = () => {
         type: 'add' as const,
         collection: 'mobs' as const,
         id: mob.id,
-        data: stripUndefinedDeep(mob) as Record<string, unknown>,
+        data: { ...mob } as Record<string, unknown>,
       })),
       ...toUpdate.map(mob => ({
         type: 'update' as const,
         collection: 'mobs' as const,
         id: mob.id,
-        data: stripUndefinedDeep({ ...mob }) as Record<string, unknown>,
+        data: { ...mob } as Record<string, unknown>,
       })),
       ...toDelete.map(mob => ({
         type: 'delete' as const,
@@ -317,16 +292,12 @@ export const useGameState = () => {
 
   const updateCrawler = (id: string, updates: Partial<Crawler>) => {
     console.log('[GameState] 📝 Updating crawler:', { id, updates });
-    const cleaned = stripUndefinedDeep(updates) as Record<string, unknown>;
-    console.log('[GameState] 📝 Cleaned updates:', cleaned);
-    updateItem('crawlers', id, cleaned);
+    updateItem('crawlers', id, updates as Record<string, unknown>);
   };
 
   const addCrawler = (crawler: Crawler) => {
     console.log('[GameState] ➕ Adding crawler:', crawler);
-    const cleaned = stripUndefinedDeep(crawler) as Record<string, unknown>;
-    console.log('[GameState] ➕ Cleaned crawler:', cleaned);
-    addItem('crawlers', cleaned);
+    addItem('crawlers', { ...crawler } as Record<string, unknown>);
     addItem('inventory', { crawlerId: crawler.id, items: [] });
   };
 
@@ -352,14 +323,13 @@ export const useGameState = () => {
 
   const updateCrawlerInventory = (crawlerId: string, items: InventoryItem[]) => {
     const existing = inventory.find((i) => i.crawlerId === crawlerId) as InventoryEntry | undefined;
-    const cleaned = stripUndefinedDeep(items) as InventoryItem[];
 
     if (existing && existing.id) {
       // Update existing inventory in Firebase using the document ID
-      updateItem('inventory', existing.id, { crawlerId, items: cleaned });
+      updateItem('inventory', existing.id, { crawlerId, items });
     } else {
       // Add new inventory entry to Firebase
-      addItem('inventory', { crawlerId, items: cleaned });
+      addItem('inventory', { crawlerId, items });
     }
   };
 
@@ -393,7 +363,7 @@ export const useGameState = () => {
       type: 'add' as const,
       collection: 'lootBoxes' as const,
       id: crypto.randomUUID(),
-      data: stripUndefinedDeep({
+      data: {
         episodeId,
         crawlerId,
         name: template.name,
@@ -402,7 +372,7 @@ export const useGameState = () => {
         gold: template.gold,
         locked: true,
         sentAt: new Date().toISOString(),
-      }) as Record<string, unknown>,
+      } as Record<string, unknown>,
     }));
     if (operations.length > 0) await batchWrite(operations);
   };
@@ -441,7 +411,7 @@ export const useGameState = () => {
     } else {
       updateItem('lootBoxes', lootBoxId, {
         items: remainingItems,
-        gold: remainingGold > 0 ? remainingGold : undefined
+        gold: remainingGold
       });
     }
   };
@@ -460,11 +430,11 @@ export const useGameState = () => {
   }, [getCollection, isLoaded]);
 
   const addLootBoxTemplate = (template: LootBoxTemplate) => {
-    addItem('lootBoxTemplates', stripUndefinedDeep(template) as Record<string, unknown>);
+    addItem('lootBoxTemplates', { ...template } as Record<string, unknown>);
   };
 
   const updateLootBoxTemplate = (id: string, updates: Partial<LootBoxTemplate>) => {
-    updateItem('lootBoxTemplates', id, stripUndefinedDeep(updates) as Record<string, unknown>);
+    updateItem('lootBoxTemplates', id, updates as Record<string, unknown>);
   };
 
   const deleteLootBoxTemplate = (id: string) => {
@@ -478,7 +448,7 @@ export const useGameState = () => {
   }, [getCollection, isLoaded]);
 
   const addDiceRoll = async (entry: DiceRollEntry) => {
-    await addItem('diceRolls', stripUndefinedDeep(entry) as Record<string, unknown>);
+    await addItem('diceRolls', { ...entry } as Record<string, unknown>);
     const all = getCollection('diceRolls') as DiceRollEntry[];
     if (all.length > 500) {
       const sorted = [...all].sort((a, b) => a.timestamp - b.timestamp);
@@ -516,16 +486,15 @@ export const useGameState = () => {
       await advanceGameClock(1);
     }
 
-    const newTurn: NoncombatTurnState = {
-      id: 'current',
+    const turnData = {
       turnNumber: (current?.turnNumber ?? 0) + 1,
       rollsUsed: {},
       maxRolls: 3,
     };
     if (current) {
-      await updateItem('noncombatTurns', 'current', newTurn as unknown as Record<string, unknown>);
+      await updateItem('noncombatTurns', 'current', turnData as Record<string, unknown>);
     } else {
-      await addItem('noncombatTurns', newTurn as unknown as Record<string, unknown>);
+      await addItem('noncombatTurns', { id: 'current', ...turnData } as Record<string, unknown>);
     }
   };
 
@@ -551,11 +520,10 @@ export const useGameState = () => {
 
   const setGameClock = async (gameTime: number) => {
     const current = gameClockState;
-    const newState: GameClockState = { id: 'current', gameTime };
     if (current) {
-      await updateItem('gameClock', 'current', newState as unknown as Record<string, unknown>);
+      await updateItem('gameClock', 'current', { gameTime } as Record<string, unknown>);
     } else {
-      await addItem('gameClock', newState as unknown as Record<string, unknown>);
+      await addItem('gameClock', { id: 'current', gameTime } as Record<string, unknown>);
     }
   };
 
@@ -620,7 +588,6 @@ export const useGameState = () => {
 
   return {
     crawlers,
-    setCrawlers,
     updateCrawler,
     addCrawler,
     deleteCrawler,
