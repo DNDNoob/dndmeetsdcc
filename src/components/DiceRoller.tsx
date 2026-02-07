@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DungeonButton } from "./ui/DungeonButton";
 import { Dices, ChevronUp, ChevronDown, Plus, X, Package } from "lucide-react";
-import { getLootBoxTierColor, type Crawler, type NoncombatTurnState } from "@/lib/gameData";
+import { getLootBoxTierColor } from "@/lib/gameData";
 import { DiceRollEntry } from "@/hooks/useGameState";
 
 const diceTypes = [
@@ -27,12 +27,9 @@ interface DiceRollerProps {
   diceRolls: DiceRollEntry[];
   addDiceRoll: (entry: DiceRollEntry) => Promise<void>;
   onExpandedChange?: (expanded: boolean) => void;
-  noncombatTurnState?: NoncombatTurnState | null;
-  crawlers?: Crawler[];
-  currentPlayerId?: string;
 }
 
-const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawlerId = "", diceRolls, addDiceRoll, onExpandedChange, noncombatTurnState, crawlers, currentPlayerId }) => {
+const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawlerId = "", diceRolls, addDiceRoll, onExpandedChange }) => {
 
   const [isExpanded, setIsExpandedRaw] = useState(false);
   const setIsExpanded = (v: boolean) => {
@@ -155,19 +152,7 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
               <Dices className="w-5 h-5" /> DICE ROLLER
             </h3>
 
-            {/* Noncombat Roll Count */}
-            {noncombatTurnState && currentPlayerId && (() => {
-              const used = noncombatTurnState.rollsUsed[currentPlayerId] ?? 0;
-              const remaining = Math.max(0, noncombatTurnState.maxRolls - used);
-              return (
-                <div className="mb-3 text-center border border-border bg-muted/20 px-3 py-1.5 shrink-0">
-                  <span className="text-[10px] text-muted-foreground font-display">TURN {noncombatTurnState.turnNumber}</span>
-                  <span className={`text-xs font-display ml-2 ${remaining > 0 ? 'text-primary' : 'text-destructive'}`}>
-                    {remaining > 0 ? `${remaining}/${noncombatTurnState.maxRolls} rolls left` : 'No rolls left'}
-                  </span>
-                </div>
-              );
-            })()}
+
 
             {/* Roll history - fills available space */}
             <div className="flex-1 min-h-0 flex flex-col mb-3">

@@ -535,23 +535,31 @@ export const useGameState = () => {
 
   // --- Rest Mechanics ---
   const performShortRest = async (crawlerIds: string[]) => {
+    // Capture current crawlers before any async operations
+    const currentCrawlers = getCollection('crawlers') as Crawler[];
     if (gameClockState) await advanceGameClock(4);
 
     const operations: BatchOperation[] = [];
     for (const id of crawlerIds) {
-      const crawler = crawlers.find(c => c.id === id);
+      const crawler = currentCrawlers.find(c => c.id === id);
       if (!crawler) continue;
 
       const crawlerInv = getCrawlerInventory(id);
       const mods = getEquippedModifiers(crawler, crawlerInv);
-      const effectiveMaxHP = crawler.maxHP + (mods.maxHP ?? 0);
-      const effectiveMaxMana = crawler.maxMana + (mods.maxMana ?? 0);
+      const effectiveMaxHP = (crawler.maxHP || 0) + (mods.maxHP ?? 0);
+      const effectiveMaxMana = (crawler.maxMana || 0) + (mods.maxMana ?? 0);
 
-      const missingHP = effectiveMaxHP - crawler.hp;
-      const missingMana = effectiveMaxMana - crawler.mana;
+      const currentHP = crawler.hp || 0;
+      const currentMana = crawler.mana || 0;
+      const missingHP = effectiveMaxHP - currentHP;
+      const missingMana = effectiveMaxMana - currentMana;
 
-      const newHP = Math.min(effectiveMaxHP, crawler.hp + Math.floor(missingHP / 2));
-      const newMana = Math.min(effectiveMaxMana, crawler.mana + Math.floor(missingMana / 2));
+      const newHP = Math.min(effectiveMaxHP, currentHP + Math.ceil(missingHP / 2));
+      const newMana = Math.min(effectiveMaxMana, currentMana + Math.ceil(missingMana / 2));
+
+      console.log('[GameState] 🛌 Short rest for', crawler.name, {
+        currentHP, currentMana, effectiveMaxHP, effectiveMaxMana, newHP, newMana
+      });
 
       operations.push({
         type: 'update' as const,
@@ -564,17 +572,23 @@ export const useGameState = () => {
   };
 
   const performLongRest = async (crawlerIds: string[]) => {
+    // Capture current crawlers before any async operations
+    const currentCrawlers = getCollection('crawlers') as Crawler[];
     if (gameClockState) await advanceGameClock(8);
 
     const operations: BatchOperation[] = [];
     for (const id of crawlerIds) {
-      const crawler = crawlers.find(c => c.id === id);
+      const crawler = currentCrawlers.find(c => c.id === id);
       if (!crawler) continue;
 
       const crawlerInv = getCrawlerInventory(id);
       const mods = getEquippedModifiers(crawler, crawlerInv);
-      const effectiveMaxHP = crawler.maxHP + (mods.maxHP ?? 0);
-      const effectiveMaxMana = crawler.maxMana + (mods.maxMana ?? 0);
+      const effectiveMaxHP = (crawler.maxHP || 0) + (mods.maxHP ?? 0);
+      const effectiveMaxMana = (crawler.maxMana || 0) + (mods.maxMana ?? 0);
+
+      console.log('[GameState] 🛏️ Long rest for', crawler.name, {
+        effectiveMaxHP, effectiveMaxMana
+      });
 
       operations.push({
         type: 'update' as const,

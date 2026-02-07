@@ -16,6 +16,7 @@ import SoundEffectsView from "@/views/SoundEffectsView";
 import { RoomManager } from "@/components/RoomManager";
 import { useGameState, DiceRollEntry } from "@/hooks/useGameState";
 import { toast } from "sonner";
+import type { Episode } from "@/lib/gameData";
 
 type AppScreen = "splash" | "menu" | "game";
 type GameView = "profiles" | "maps" | "inventory" | "mobs" | "dungeonai" | "showtime" | "sounds" | "multiplayer";
@@ -38,6 +39,8 @@ const Index = () => {
   const [isNavVisible, setIsNavVisible] = useState(true);
   const [isDiceExpanded, setIsDiceExpanded] = useState(false);
   const [isDungeonAILoggedIn, setIsDungeonAILoggedIn] = useState(false);
+  const [isShowtimeActive, setIsShowtimeActive] = useState(false);
+  const [activeEpisode, setActiveEpisode] = useState<Episode | null>(null);
   const [previousPlayer, setPreviousPlayer] = useState<{
     id: string;
     name: string;
@@ -388,6 +391,17 @@ const Index = () => {
                 unlockLootBox={unlockLootBox}
                 deleteLootBox={deleteLootBox}
                 addDiceRoll={addDiceRoll}
+                onEndEpisode={() => {
+                  setIsShowtimeActive(false);
+                  setActiveEpisode(null);
+                  setCurrentView("dungeonai");
+                }}
+                onShowtimeActiveChange={(active, episode) => {
+                  setIsShowtimeActive(active);
+                  setActiveEpisode(episode ?? null);
+                }}
+                getCrawlerInventory={getCrawlerInventory}
+                onUpdateCrawlerInventory={updateCrawlerInventory}
               />
             )}
             {currentView === "sounds" && <SoundEffectsView />}
@@ -407,20 +421,20 @@ const Index = () => {
             diceRolls={diceRolls}
             addDiceRoll={addDiceRoll}
             onExpandedChange={setIsDiceExpanded}
-            noncombatTurnState={noncombatTurnState}
-            crawlers={crawlers}
-            currentPlayerId={currentPlayer.id}
           />
 
-          <PingPanel
-            isAdmin={isAdmin}
-            noncombatTurnState={noncombatTurnState}
-            onStartNoncombatTurn={startNoncombatTurn}
-            crawlers={crawlers}
-            gameClockState={gameClockState}
-            onPerformShortRest={performShortRest}
-            onPerformLongRest={performLongRest}
-          />
+          {isShowtimeActive && (
+            <PingPanel
+              isAdmin={isAdmin}
+              noncombatTurnState={noncombatTurnState}
+              onStartNoncombatTurn={startNoncombatTurn}
+              crawlers={crawlers}
+              gameClockState={gameClockState}
+              onPerformShortRest={performShortRest}
+              onPerformLongRest={performLongRest}
+              activeEpisode={activeEpisode}
+            />
+          )}
 
           <ChangelogViewer
             isOpen={showChangelog}

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Clock, ChevronUp, ChevronDown, RotateCcw, Sun, Moon } from "lucide-react";
-import { type Crawler, type NoncombatTurnState, type GameClockState } from "@/lib/gameData";
+import { type Crawler, type NoncombatTurnState, type GameClockState, type Episode } from "@/lib/gameData";
 
 interface PingPanelProps {
   isAdmin?: boolean;
@@ -11,6 +11,7 @@ interface PingPanelProps {
   gameClockState?: GameClockState | null;
   onPerformShortRest?: (crawlerIds: string[]) => Promise<void>;
   onPerformLongRest?: (crawlerIds: string[]) => Promise<void>;
+  activeEpisode?: Episode | null;
 }
 
 const PingPanel: React.FC<PingPanelProps> = ({
@@ -21,6 +22,7 @@ const PingPanel: React.FC<PingPanelProps> = ({
   gameClockState,
   onPerformShortRest,
   onPerformLongRest,
+  activeEpisode,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showRestDropdown, setShowRestDropdown] = useState<'short' | 'long' | null>(null);
@@ -59,6 +61,13 @@ const PingPanel: React.FC<PingPanelProps> = ({
   const hasContent = gameClockState || isAdmin;
   if (!hasContent) return null;
 
+  // Calculate days since episode start
+  const daysSinceStart = (() => {
+    if (!gameClockState || !activeEpisode?.startingGameTime) return null;
+    const diffMs = gameClockState.gameTime - activeEpisode.startingGameTime;
+    return Math.max(0, Math.floor(diffMs / (24 * 60 * 60 * 1000)));
+  })();
+
   return (
     <div className="fixed bottom-4 left-2 sm:left-4 z-[99] flex items-end gap-2">
       {/* Toggle tab */}
@@ -93,13 +102,12 @@ const PingPanel: React.FC<PingPanelProps> = ({
             onWheel={(e) => e.stopPropagation()}
           >
             <h3 className="font-display text-accent text-lg mb-3 flex items-center gap-2 shrink-0">
-              <Clock className="w-5 h-5" /> GAME PANEL
+              <Clock className="w-5 h-5" /> GAME CLOCK
             </h3>
 
             {/* Game Clock */}
             {gameClockState && (
               <div className="mb-3 text-center border border-border bg-muted/20 px-3 py-2">
-                <span className="text-[10px] text-muted-foreground font-display block mb-0.5">GAME TIME</span>
                 <span className="font-display text-primary text-sm">
                   {new Date(gameClockState.gameTime).toLocaleString('en-US', {
                     month: 'long',
@@ -110,6 +118,37 @@ const PingPanel: React.FC<PingPanelProps> = ({
                     hour12: true,
                   })}
                 </span>
+              </div>
+            )}
+
+            {/* Days Since Episode Start */}
+            {daysSinceStart !== null && (
+              <div className="mb-3 text-center border border-border bg-muted/20 px-3 py-2">
+                <span className="text-[10px] text-muted-foreground font-display block mb-0.5">DAYS SINCE START</span>
+                <span className="font-display text-accent text-lg">{daysSinceStart}</span>
+              </div>
+            )}
+
+            {/* Noncombat Turn Info - visible to all players */}
+            {noncombatTurnState && playerCrawlers.length > 0 && (
+              <div className="mb-3">
+                <div className="text-center mb-2">
+                  <span className="text-[10px] text-muted-foreground font-display">TURN {noncombatTurnState.turnNumber}</span>
+                </div>
+                <div className="text-[10px] text-muted-foreground space-y-0.5">
+                  {playerCrawlers.map(c => {
+                    const used = noncombatTurnState.rollsUsed[c.id] ?? 0;
+                    const remaining = Math.max(0, noncombatTurnState.maxRolls - used);
+                    return (
+                      <div key={c.id} className="flex justify-between">
+                        <span>{c.name}</span>
+                        <span className={remaining === 0 ? 'text-destructive' : 'text-primary'}>
+                          {used}/{noncombatTurnState.maxRolls} used
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
 
@@ -127,22 +166,6 @@ const PingPanel: React.FC<PingPanelProps> = ({
                   <RotateCcw className="w-4 h-4" />
                   {turnNumber === 0 ? 'START NONCOMBAT TURN' : 'NEW NONCOMBAT TURN'}
                 </button>
-                {noncombatTurnState && playerCrawlers.length > 0 && (
-                  <div className="mt-2 text-[10px] text-muted-foreground space-y-0.5">
-                    {playerCrawlers.map(c => {
-                      const used = noncombatTurnState.rollsUsed[c.id] ?? 0;
-                      const remaining = Math.max(0, noncombatTurnState.maxRolls - used);
-                      return (
-                        <div key={c.id} className="flex justify-between">
-                          <span>{c.name}</span>
-                          <span className={remaining === 0 ? 'text-destructive' : 'text-primary'}>
-                            {used}/{noncombatTurnState.maxRolls} used
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
               </div>
             )}
 
