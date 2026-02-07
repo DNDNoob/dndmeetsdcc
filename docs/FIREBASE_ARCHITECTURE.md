@@ -8,12 +8,12 @@ Technical details about Firebase setup, configuration, and usage.
 
 Environment variables needed (`.env` file):
 ```bash
-VITE_FIREBASE_API_KEY=AIzaSyDi9DX1nEPBXTHuQEuzcpc-BSYVj7DxgPA
-VITE_FIREBASE_AUTH_DOMAIN=dndmeetsdcc.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=dndmeetsdcc
-VITE_FIREBASE_STORAGE_BUCKET=dndmeetsdcc.firebasestorage.app
-VITE_FIREBASE_MESSAGING_SENDER_ID=425884882250
-VITE_FIREBASE_APP_ID=1:425884882250:web:bc666f87585802ef7b5db3
+VITE_FIREBASE_API_KEY=your-api-key-here
+VITE_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your-project-id
+VITE_FIREBASE_STORAGE_BUCKET=your-project.firebasestorage.app
+VITE_FIREBASE_MESSAGING_SENDER_ID=your-sender-id
+VITE_FIREBASE_APP_ID=your-app-id
 ```
 
 **Location**: `src/lib/firebase.ts`

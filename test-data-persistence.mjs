@@ -10,17 +10,18 @@
  * - Maps (images)
  */
 
+import 'dotenv/config';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { getAuth, signInAnonymously } from 'firebase/auth';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDi9DX1nEPBXTHuQEuzcpc-BSYVj7DxgPA",
-  authDomain: "dndmeetsdcc.firebaseapp.com",
-  projectId: "dndmeetsdcc",
-  storageBucket: "dndmeetsdcc.firebasestorage.app",
-  messagingSenderId: "425884882250",
-  appId: "1:425884882250:web:bc666f87585802ef7b5db3"
+  apiKey: process.env.VITE_FIREBASE_API_KEY,
+  authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.VITE_FIREBASE_APP_ID
 };
 
 // Initialize Firebase
