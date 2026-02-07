@@ -368,6 +368,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
         }
       } else {
         setSelectedEpisode(null);
+        localStorage.removeItem(SHOWTIME_STORAGE_KEY);
       }
 
       // Update map index
@@ -425,7 +426,12 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   // Or restore from localStorage if available
   useEffect(() => {
     if (episodes.length > 0 && !selectedEpisode && !hasAutoLoaded.current) {
-      // Try to restore from localStorage
+      // Non-admin players get their state from the DM's Firebase broadcast
+      if (!isAdmin) {
+        hasAutoLoaded.current = true;
+        return;
+      }
+      // Try to restore from localStorage (admin only)
       try {
         const savedState = localStorage.getItem(SHOWTIME_STORAGE_KEY);
         if (savedState) {
@@ -462,7 +468,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       }
       hasAutoLoaded.current = true;
     }
-  }, [episodes, maps]);
+  }, [episodes, maps, isAdmin]);
 
   // Save episode/map selection to localStorage (fog state is persisted in Firebase, zoom always starts at 100%)
   useEffect(() => {
@@ -1471,6 +1477,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     setRuntimeMobPlacements([]);
     // Broadcast end of episode
     broadcastShowtimeState(null, 0, null);
+    localStorage.removeItem(SHOWTIME_STORAGE_KEY);
   }, [broadcastShowtimeState]);
 
   const handleMobMouseDown = (placementKey: string) => {
@@ -1751,6 +1758,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             <DungeonButton variant="default" onClick={() => {
               setSelectedEpisode(null);
               broadcastShowtimeState(null, 0, null);
+              localStorage.removeItem(SHOWTIME_STORAGE_KEY);
             }}>
               <X className="w-4 h-4 mr-2" /> Back to Episodes
             </DungeonButton>
