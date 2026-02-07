@@ -54,3 +54,23 @@ To enable searching a large public sound database (Freesound), set the environme
 ## How can I deploy this project?
 
 The project deploys automatically to GitHub Pages on push to `main` via the GitHub Actions workflow in `.github/workflows/deploy.yml`.
+
+## AI Coding Instructions
+
+This project is exclusively coded by AI. Custom instructions are set up so that AI tools automatically follow the project's conventions.
+
+### How Each Tool Finds Instructions
+
+| AI Tool | Instruction File | Auto-loaded? |
+|---------|-----------------|--------------|
+| **Claude Code** (VS Code extension or CLI) | `CLAUDE.md` (repo root) | ✅ Yes — automatically read on every interaction |
+| **GitHub Copilot Chat** (VS Code / GitHub.com) | `.github/copilot-instructions.md` | ✅ Yes — automatically included in every Copilot request |
+| **GitHub Copilot Coding Agent** (GitHub Issues/PRs) | `CLAUDE.md` + `.github/copilot-instructions.md` | ✅ Yes — reads both files automatically |
+| **Cursor IDE** | Create `.cursorrules` or `.cursor/rules/` | ❌ Not set up yet — copy from `CLAUDE.md` if needed |
+
+### No Extra Setup Required
+
+- **GitHub Copilot** (agent or chat): The `.github/copilot-instructions.md` file is automatically included in Copilot's context. No settings changes needed.
+- **Claude Code** (via VS Code or CLI): The `CLAUDE.md` file at the repo root is automatically read when Claude Code opens the project. No settings changes needed.
+- **GitHub Copilot Coding Agent**: Reads both `CLAUDE.md` and `.github/copilot-instructions.md` automatically when working on issues/PRs.
+- Both files are checked into version control, so all contributors get the same AI behavior.
