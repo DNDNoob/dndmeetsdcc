@@ -328,6 +328,7 @@ const Index = () => {
                 getNoncombatRollsRemaining={getNoncombatRollsRemaining}
                 recordNoncombatRoll={recordNoncombatRoll}
                 currentPlayerId={currentPlayer?.id}
+                isShowtimeActive={isShowtimeActive}
               />
             )}
             {currentView === "maps" && (
@@ -394,7 +395,6 @@ const Index = () => {
                 onEndEpisode={() => {
                   setIsShowtimeActive(false);
                   setActiveEpisode(null);
-                  setCurrentView("dungeonai");
                 }}
                 onShowtimeActiveChange={(active, episode) => {
                   setIsShowtimeActive(active);
@@ -402,6 +402,8 @@ const Index = () => {
                 }}
                 getCrawlerInventory={getCrawlerInventory}
                 onUpdateCrawlerInventory={updateCrawlerInventory}
+                getSharedInventory={getSharedInventory}
+                onSetGameClock={setGameClock}
               />
             )}
             {currentView === "sounds" && <SoundEffectsView />}

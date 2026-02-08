@@ -1,9 +1,8 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import { Crawler, InventoryItem, EquipmentSlot as SlotType, StatModifiers } from "@/lib/gameData";
-import { EquipmentSlot } from "@/components/ui/EquipmentSlot";
 import { Coins, Package, Sword, Shield, Plus, Trash2, Edit2, Save, HardHat, Search, BookOpen, Gem, Footprints, Shirt, Hand } from "lucide-react";
 
 // Inline SVG for legs/pants slot
@@ -240,21 +239,6 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   };
 
   const libraryItems = getSharedInventory();
-
-  const handleEquipItem = (crawlerId: string, slot: SlotType, itemId: string) => {
-    const crawler = crawlers.find(c => c.id === crawlerId);
-    if (!crawler) return;
-    const updatedEquipped = { ...(crawler.equippedItems ?? {}), [slot]: itemId };
-    onUpdateCrawler(crawlerId, { equippedItems: updatedEquipped });
-  };
-
-  const handleUnequipItem = (crawlerId: string, slot: SlotType) => {
-    const crawler = crawlers.find(c => c.id === crawlerId);
-    if (!crawler) return;
-    const updatedEquipped = { ...(crawler.equippedItems ?? {}) };
-    delete updatedEquipped[slot];
-    onUpdateCrawler(crawlerId, { equippedItems: updatedEquipped });
-  };
 
   return (
     <motion.div
@@ -510,9 +494,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                   </div>
                 )}
 
-                <div className="flex gap-4">
-                  {/* Items list */}
-                  <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0">
                     {items.length === 0 ? (
                       <p className="text-muted-foreground text-sm italic mb-3">No items in inventory</p>
                     ) : (
@@ -522,15 +504,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                           return (
                             <li
                               key={`${item.id}-${idx}`}
-                              className={`flex items-center gap-3 text-sm py-2 border-b border-border/50 last:border-0 ${item.equipSlot ? 'cursor-grab' : ''}`}
-                              draggable={!!item.equipSlot}
-                              onDragStart={item.equipSlot ? (e) => {
-                                e.dataTransfer.setData('application/json', JSON.stringify(item));
-                              } : undefined}
-                              onDoubleClick={item.equipSlot ? () => {
-                                const slot = item.equipSlot!;
-                                handleEquipItem(crawler.id, slot, item.id);
-                              } : undefined}
+                              className="flex items-center gap-3 text-sm py-2 border-b border-border/50 last:border-0"
                             >
                               {/* Item type icon */}
                               {getEquipmentIcon(item.equipSlot)}
@@ -575,33 +549,6 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                         })}
                       </ul>
                     )}
-                  </div>
-
-                  {/* Equipment Slots - Right Side */}
-                  <div className="bg-muted/30 border border-border rounded-lg p-3 shrink-0" style={{ width: '180px' }}>
-                    <h4 className="font-display text-primary text-xs mb-2">EQUIPMENT</h4>
-                    {(() => {
-                      const eq = crawler.equippedItems ?? {};
-                      const dropHandler = (slot: SlotType, itemId: string) => handleEquipItem(crawler.id, slot, itemId);
-                      const unequipHandler = (slot: SlotType) => handleUnequipItem(crawler.id, slot);
-                      return (
-                        <div className="flex flex-col items-center gap-1">
-                          <EquipmentSlot slot="head" label="Head" equippedItem={items.find(i => i.id === eq.head)} onDrop={dropHandler} onUnequip={unequipHandler} />
-                          <div className="grid grid-cols-3 gap-1" style={{ width: '168px' }}>
-                            <EquipmentSlot slot="leftHand" label="L.Hand" equippedItem={items.find(i => i.id === eq.leftHand)} onDrop={dropHandler} onUnequip={unequipHandler} />
-                            <EquipmentSlot slot="chest" label="Chest" equippedItem={items.find(i => i.id === eq.chest)} onDrop={dropHandler} onUnequip={unequipHandler} />
-                            <EquipmentSlot slot="rightHand" label="R.Hand" equippedItem={items.find(i => i.id === eq.rightHand)} onDrop={dropHandler} onUnequip={unequipHandler} />
-                          </div>
-                          <div className="grid grid-cols-3 gap-1" style={{ width: '168px' }}>
-                            <EquipmentSlot slot="ringFinger" label="Ring" equippedItem={items.find(i => i.id === eq.ringFinger)} onDrop={dropHandler} onUnequip={unequipHandler} />
-                            <EquipmentSlot slot="legs" label="Legs" equippedItem={items.find(i => i.id === eq.legs)} onDrop={dropHandler} onUnequip={unequipHandler} />
-                            <EquipmentSlot slot="weapon" label="Weapon" equippedItem={items.find(i => i.id === eq.weapon)} onDrop={dropHandler} onUnequip={unequipHandler} />
-                          </div>
-                          <EquipmentSlot slot="feet" label="Feet" equippedItem={items.find(i => i.id === eq.feet)} onDrop={dropHandler} onUnequip={unequipHandler} />
-                        </div>
-                      );
-                    })()}
-                  </div>
                 </div>
 
               </div>

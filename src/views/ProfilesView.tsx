@@ -83,6 +83,7 @@ interface ProfilesViewProps {
   getNoncombatRollsRemaining?: (crawlerId: string) => number;
   recordNoncombatRoll?: (crawlerId: string) => Promise<void>;
   currentPlayerId?: string;
+  isShowtimeActive?: boolean;
 }
 
 // Loot Box display section for crawler profiles
@@ -243,6 +244,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   getNoncombatRollsRemaining,
   recordNoncombatRoll,
   currentPlayerId,
+  isShowtimeActive = false,
 }) => {
   const [selectedId, setSelectedId] = useState(crawlers[0]?.id || "");
   const [editMode, setEditMode] = useState(false);
@@ -312,7 +314,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
     }
 
     return items;
-  }, [inventory, inventorySearch, inventoryFilter, selectedTags, inventorySort]);
+  }, [inventory, inventorySearch, inventoryFilter, selectedTags]);
 
   // Inventory summary for main profile tab
   const inventorySummary = useMemo(() => {
@@ -512,7 +514,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
     });
 
     const displayItems: { item: InventoryItem; count: number; allIds: string[]; isEquipped: boolean; sig: string }[] = [];
-    equippedItems.forEach(item => displayItems.push({ item, count: 1, allIds: [item.id], isEquipped: true, sig: getItemSignature(item) }));
+    equippedItems.forEach(item => displayItems.push({ item, count: 1, allIds: [item.id], isEquipped: true, sig: getItemSignature(item) + '|equipped' }));
     groupedItems.forEach((items, sig) => displayItems.push({ item: items[0], count: items.length, allIds: items.map(i => i.id), isEquipped: false, sig }));
 
     // Apply sorting to the display items
@@ -1255,30 +1257,28 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 {/* Equipment + Items side-by-side */}
                 <div className="flex gap-4">
                   {/* Equipment Slots - Left Side */}
-                  {isOwnProfile && (
-                    <div className="bg-muted/30 border border-border rounded-lg p-3 shrink-0" style={{ width: '220px' }}>
-                      <h3 className="font-display text-primary text-sm mb-2">EQUIPMENT</h3>
-                      <div className="flex flex-col items-center gap-1.5">
-                        <EquipmentSlot slot="head" label="Head" equippedItem={getEquippedItem('head')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={!isOwnProfile} />
-                        <div className="grid grid-cols-3 gap-1.5" style={{ width: '198px' }}>
-                          <EquipmentSlot slot="leftHand" label="L.Hand" equippedItem={getEquippedItem('leftHand')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={!isOwnProfile} />
-                          <EquipmentSlot slot="chest" label="Chest" equippedItem={getEquippedItem('chest')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={!isOwnProfile} />
-                          <EquipmentSlot slot="rightHand" label="R.Hand" equippedItem={getEquippedItem('rightHand')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={!isOwnProfile} />
-                        </div>
-                        <div className="grid grid-cols-3 gap-1.5" style={{ width: '198px' }}>
-                          <EquipmentSlot slot="ringFinger" label="Ring" equippedItem={getEquippedItem('ringFinger')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={!isOwnProfile} />
-                          <EquipmentSlot slot="legs" label="Legs" equippedItem={getEquippedItem('legs')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={!isOwnProfile} />
-                          <EquipmentSlot slot="weapon" label="Weapon" equippedItem={getEquippedItem('weapon')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={!isOwnProfile} />
-                        </div>
-                        <EquipmentSlot slot="feet" label="Feet" equippedItem={getEquippedItem('feet')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={!isOwnProfile} />
+                  <div className="bg-muted/30 border border-border rounded-lg p-3 shrink-0" style={{ width: '220px' }}>
+                    <h3 className="font-display text-primary text-sm mb-2">EQUIPMENT</h3>
+                    <div className="flex flex-col items-center gap-1.5">
+                      <EquipmentSlot slot="head" label="Head" equippedItem={getEquippedItem('head')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={!isOwnProfile} />
+                      <div className="grid grid-cols-3 gap-1.5" style={{ width: '198px' }}>
+                        <EquipmentSlot slot="leftHand" label="L.Hand" equippedItem={getEquippedItem('leftHand')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={!isOwnProfile} />
+                        <EquipmentSlot slot="chest" label="Chest" equippedItem={getEquippedItem('chest')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={!isOwnProfile} />
+                        <EquipmentSlot slot="rightHand" label="R.Hand" equippedItem={getEquippedItem('rightHand')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={!isOwnProfile} />
                       </div>
-                      {/* Gold */}
-                      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border/50">
-                        <Coins className="w-4 h-4 text-accent" />
-                        <span className="text-accent font-display text-sm">{Math.floor(selected.gold || 0)}G</span>
+                      <div className="grid grid-cols-3 gap-1.5" style={{ width: '198px' }}>
+                        <EquipmentSlot slot="ringFinger" label="Ring" equippedItem={getEquippedItem('ringFinger')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={!isOwnProfile} />
+                        <EquipmentSlot slot="legs" label="Legs" equippedItem={getEquippedItem('legs')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={!isOwnProfile} />
+                        <EquipmentSlot slot="weapon" label="Weapon" equippedItem={getEquippedItem('weapon')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={!isOwnProfile} />
                       </div>
+                      <EquipmentSlot slot="feet" label="Feet" equippedItem={getEquippedItem('feet')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={!isOwnProfile} />
                     </div>
-                  )}
+                    {/* Gold */}
+                    <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border/50">
+                      <Coins className="w-4 h-4 text-accent" />
+                      <span className="text-accent font-display text-sm">{Math.floor(selected.gold || 0)}G</span>
+                    </div>
+                  </div>
 
                   {/* Items List - Right Side */}
                   <div className="flex-1 min-w-0">
@@ -1383,14 +1383,6 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                                         </div>
                                       )}
                                       <div className="flex gap-2 mt-1">
-                                        {isOwnProfile && item.equipSlot && !isEquipped && (
-                                          <button
-                                            onClick={(e) => { e.stopPropagation(); handleDoubleClickEquip(item); }}
-                                            className="text-xs text-primary hover:underline"
-                                          >
-                                            Equip to {item.equipSlot}
-                                          </button>
-                                        )}
                                         {isOwnProfile && (
                                           <button
                                             onClick={(e) => {
@@ -1422,7 +1414,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             {/* Actions Tab */}
             {activeTab === 'actions' && (() => {
               const rollsRemaining = getNoncombatRollsRemaining?.(selected.id) ?? 0;
-              const hasActiveTurn = !!noncombatTurnState;
+              const hasActiveTurn = !!noncombatTurnState && isShowtimeActive;
               const isTestMode = !hasActiveTurn;
               const canRoll = isTestMode || rollsRemaining > 0;
               const maxRolls = noncombatTurnState?.maxRolls ?? 3;

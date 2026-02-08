@@ -146,7 +146,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
     return obj;
   };
 
-  const MAX_IMAGE_LENGTH = 5_000_000; // ~3.75 MB of raw image data once base64 is decoded
+  const MAX_IMAGE_LENGTH = 15_000_000; // ~11.25 MB of raw image data once base64 is decoded
   const MAX_AVATAR_LENGTH = 500_000; // 500KB for avatars
 
   const addItem = useCallback(async (collection: CollectionName, item: Record<string, unknown>) => {
