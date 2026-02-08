@@ -39,6 +39,7 @@ interface ShowTimeViewProps {
   getCrawlerInventory?: (crawlerId: string) => import("@/lib/gameData").InventoryItem[];
   onUpdateCrawlerInventory?: (crawlerId: string, items: import("@/lib/gameData").InventoryItem[]) => void;
   getSharedInventory?: () => import("@/lib/gameData").InventoryItem[];
+  onSetGameClock?: (gameTime: number) => Promise<void>;
 }
 
 const SHOWTIME_STORAGE_KEY = 'dcc_showtime_state';
@@ -352,7 +353,7 @@ const InventoryPanel: React.FC<{
   );
 };
 
-const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory }) => {
+const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock }) => {
   const { roomId } = useFirebaseStore();
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
   const [currentMapIndex, setCurrentMapIndex] = useState(0);
@@ -1601,9 +1602,13 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     setCrawlerPlacements([]);
     setRuntimeMobPlacements([]);
     fogInitialLoadDone.current = null;
+    // Set game clock to episode's starting time if available
+    if (episode.startingGameTime && onSetGameClock) {
+      onSetGameClock(episode.startingGameTime);
+    }
     // Scroll to top
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, []);
+  }, [onSetGameClock]);
 
   const handleEndEpisode = useCallback(() => {
     setSelectedEpisode(null);

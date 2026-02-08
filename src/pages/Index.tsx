@@ -403,6 +403,7 @@ const Index = () => {
                 getCrawlerInventory={getCrawlerInventory}
                 onUpdateCrawlerInventory={updateCrawlerInventory}
                 getSharedInventory={getSharedInventory}
+                onSetGameClock={setGameClock}
               />
             )}
             {currentView === "sounds" && <SoundEffectsView />}
