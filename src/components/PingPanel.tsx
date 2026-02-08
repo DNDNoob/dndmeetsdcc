@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Clock, ChevronUp, ChevronDown, RotateCcw, Sun, Moon } from "lucide-react";
 import { type Crawler, type NoncombatTurnState, type GameClockState, type Episode } from "@/lib/gameData";
@@ -27,6 +27,20 @@ const PingPanel: React.FC<PingPanelProps> = ({
   const [isExpanded, setIsExpanded] = useState(false);
   const [showRestDropdown, setShowRestDropdown] = useState<'short' | 'long' | null>(null);
   const [selectedCrawlersForRest, setSelectedCrawlersForRest] = useState<Record<string, boolean>>({});
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Click outside to minimize
+  useEffect(() => {
+    if (!isExpanded) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        setIsExpanded(false);
+        setShowRestDropdown(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isExpanded]);
 
   const openRestDropdown = (type: 'short' | 'long') => {
     const playerCrawlers = (crawlers ?? []).filter(c => c.id !== 'dungeonai');
@@ -69,36 +83,15 @@ const PingPanel: React.FC<PingPanelProps> = ({
   })();
 
   return (
-    <div className="fixed bottom-4 left-2 sm:left-4 z-[99] flex items-end gap-2">
-      {/* Toggle tab */}
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="flex items-center gap-2 bg-accent text-accent-foreground px-4 py-2 font-display text-sm hover:bg-accent/90 transition-colors shadow-lg"
-      >
-        <Clock className="w-4 h-4" />
-        {gameClockState ? (
-          <span className="text-xs">
-            {new Date(gameClockState.gameTime).toLocaleString('en-US', {
-              month: 'short',
-              day: 'numeric',
-              hour: 'numeric',
-              minute: '2-digit',
-              hour12: true,
-            })}
-          </span>
-        ) : (
-          'GAME'
-        )}
-        {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-      </button>
-
+    <div ref={panelRef} className="fixed bottom-4 left-2 sm:left-4 z-[99] flex flex-col items-start">
+      {/* Expanded panel - appears above the toggle button */}
       <AnimatePresence>
         {isExpanded && (
           <motion.div
-            initial={{ opacity: 0, x: -20, scale: 0.95 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            exit={{ opacity: 0, x: -20, scale: 0.95 }}
-            className="bg-background border-2 border-accent p-4 w-[calc(100vw-1rem)] sm:w-72 shadow-lg shadow-accent/20 max-h-[60vh] overflow-y-auto"
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            className="bg-background border-2 border-accent p-4 w-[calc(100vw-1rem)] sm:w-72 shadow-lg shadow-accent/20 max-h-[60vh] overflow-y-auto mb-2"
             onWheel={(e) => e.stopPropagation()}
           >
             <h3 className="font-display text-accent text-lg mb-3 flex items-center gap-2 shrink-0">
@@ -243,6 +236,28 @@ const PingPanel: React.FC<PingPanelProps> = ({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Toggle tab */}
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="flex items-center gap-2 bg-accent text-accent-foreground px-4 py-2 font-display text-sm hover:bg-accent/90 transition-colors shadow-lg"
+      >
+        <Clock className="w-4 h-4" />
+        {gameClockState ? (
+          <span className="text-xs">
+            {new Date(gameClockState.gameTime).toLocaleString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true,
+            })}
+          </span>
+        ) : (
+          'GAME'
+        )}
+        {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+      </button>
     </div>
   );
 };
