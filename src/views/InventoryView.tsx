@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
@@ -494,7 +494,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                   </div>
                 )}
 
-                <div>
+                <div className="flex-1 min-w-0">
                     {items.length === 0 ? (
                       <p className="text-muted-foreground text-sm italic mb-3">No items in inventory</p>
                     ) : (
