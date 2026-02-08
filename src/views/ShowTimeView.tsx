@@ -7,8 +7,8 @@ import { GridOverlay } from "@/components/ui/GridOverlay";
 import RulerOverlay from "@/components/ui/RulerOverlay";
 import { MobIcon } from "@/components/ui/MobIcon";
 import { FogOfWar } from "@/components/ui/FogOfWar";
-import { Episode, Mob, MapSettings, Crawler, CrawlerPlacement, EpisodeMobPlacement, SentLootBox, LootBoxTemplate, getLootBoxTierColor } from "@/lib/gameData";
-import { Map, X, Eye, Layers, ChevronLeft, ChevronRight, PlayCircle, Grid3x3, CloudFog, Eraser, Trash2, Target, ZoomIn, ZoomOut, Package, Lock, Unlock } from "lucide-react";
+import { Episode, Mob, MapSettings, Crawler, CrawlerPlacement, EpisodeMobPlacement, SentLootBox, LootBoxTemplate, getLootBoxTierColor, InventoryItem } from "@/lib/gameData";
+import { Map, X, Eye, Layers, ChevronLeft, ChevronRight, PlayCircle, Grid3x3, CloudFog, Eraser, Trash2, Target, ZoomIn, ZoomOut, Package, Lock, Unlock, Search, Plus } from "lucide-react";
 import { PingEffect, Ping } from "@/components/ui/PingEffect";
 import { MapBox, MapBoxData, ShapeType } from "@/components/ui/MapBox";
 import { MapToolsMenu } from "@/components/ui/MapToolsMenu";
@@ -34,6 +34,10 @@ interface ShowTimeViewProps {
   unlockLootBox?: (lootBoxId: string) => Promise<void>;
   deleteLootBox?: (lootBoxId: string) => void;
   addDiceRoll?: (entry: import("@/hooks/useGameState").DiceRollEntry) => Promise<void>;
+  onEndEpisode?: () => void;
+  onShowtimeActiveChange?: (active: boolean, episode?: Episode | null) => void;
+  getCrawlerInventory?: (crawlerId: string) => import("@/lib/gameData").InventoryItem[];
+  onUpdateCrawlerInventory?: (crawlerId: string, items: import("@/lib/gameData").InventoryItem[]) => void;
 }
 
 const SHOWTIME_STORAGE_KEY = 'dcc_showtime_state';
@@ -215,7 +219,141 @@ const LootBoxPanel: React.FC<{
   );
 };
 
-const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll }) => {
+// Inventory Panel for DM to search and add items to player inventories
+const InventoryPanel: React.FC<{
+  crawlers: Crawler[];
+  getCrawlerInventory: (crawlerId: string) => InventoryItem[];
+  onUpdateCrawlerInventory: (crawlerId: string, items: InventoryItem[]) => void;
+}> = ({ crawlers, getCrawlerInventory, onUpdateCrawlerInventory }) => {
+  const [selectedCrawlerId, setSelectedCrawlerId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [newItemName, setNewItemName] = useState('');
+  const [newItemDescription, setNewItemDescription] = useState('');
+
+  const playerCrawlers = crawlers.filter(c => c.id !== 'dungeonai');
+
+  const selectedCrawlerItems = selectedCrawlerId ? getCrawlerInventory(selectedCrawlerId) : [];
+  const filteredItems = searchQuery
+    ? selectedCrawlerItems.filter(item =>
+        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.description.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : selectedCrawlerItems;
+
+  const handleAddItem = () => {
+    if (!selectedCrawlerId || !newItemName.trim()) return;
+    const currentItems = getCrawlerInventory(selectedCrawlerId);
+    const newItem: InventoryItem = {
+      id: crypto.randomUUID(),
+      name: newItemName.trim(),
+      description: newItemDescription.trim(),
+    };
+    onUpdateCrawlerInventory(selectedCrawlerId, [...currentItems, newItem]);
+    setNewItemName('');
+    setNewItemDescription('');
+  };
+
+  const handleRemoveItem = (itemId: string) => {
+    if (!selectedCrawlerId) return;
+    const currentItems = getCrawlerInventory(selectedCrawlerId);
+    onUpdateCrawlerInventory(selectedCrawlerId, currentItems.filter(i => i.id !== itemId));
+  };
+
+  return (
+    <div>
+      <h3 className="font-display text-primary text-lg mb-4 flex items-center gap-2">
+        <Package className="w-5 h-5" /> Player Inventory
+      </h3>
+
+      {/* Crawler selector */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        {playerCrawlers.map(c => (
+          <button
+            key={c.id}
+            onClick={() => { setSelectedCrawlerId(c.id); setSearchQuery(''); }}
+            className={`px-3 py-1.5 text-xs font-display border-2 rounded transition-all ${
+              selectedCrawlerId === c.id
+                ? 'bg-primary/20 border-primary text-primary'
+                : 'bg-muted/30 border-border text-muted-foreground hover:border-primary hover:text-primary'
+            }`}
+          >
+            {c.name}
+          </button>
+        ))}
+      </div>
+
+      {selectedCrawlerId && (
+        <>
+          {/* Search */}
+          <div className="relative mb-3">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search items..."
+              className="w-full pl-9 pr-3 py-2 bg-muted/20 border border-border rounded text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+            />
+          </div>
+
+          {/* Items list */}
+          <div className="max-h-40 overflow-y-auto space-y-1 mb-3">
+            {filteredItems.length === 0 ? (
+              <p className="text-xs text-muted-foreground italic">
+                {searchQuery ? 'No items match your search' : 'No items in inventory'}
+              </p>
+            ) : (
+              filteredItems.map(item => (
+                <div key={item.id} className="flex items-center justify-between bg-muted/30 border border-border rounded px-2 py-1.5">
+                  <div className="min-w-0">
+                    <span className="text-xs font-display text-primary block truncate">{item.name}</span>
+                    {item.description && (
+                      <span className="text-[10px] text-muted-foreground block truncate">{item.description}</span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => handleRemoveItem(item.id)}
+                    className="p-0.5 hover:bg-destructive/10 rounded flex-shrink-0 ml-2"
+                  >
+                    <Trash2 className="w-3 h-3 text-destructive" />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Add new item */}
+          <div className="border border-border bg-muted/20 p-3 rounded space-y-2">
+            <span className="text-xs text-muted-foreground font-display block">ADD ITEM</span>
+            <input
+              type="text"
+              value={newItemName}
+              onChange={(e) => setNewItemName(e.target.value)}
+              placeholder="Item name"
+              className="w-full px-3 py-1.5 bg-background border border-border rounded text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+            />
+            <input
+              type="text"
+              value={newItemDescription}
+              onChange={(e) => setNewItemDescription(e.target.value)}
+              placeholder="Description (optional)"
+              className="w-full px-3 py-1.5 bg-background border border-border rounded text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+            />
+            <button
+              onClick={handleAddItem}
+              disabled={!newItemName.trim()}
+              className="w-full flex items-center justify-center gap-1 px-3 py-1.5 bg-primary text-primary-foreground font-display text-xs rounded hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Plus className="w-3 h-3" /> Add to {playerCrawlers.find(c => c.id === selectedCrawlerId)?.name ?? 'Inventory'}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory }) => {
   const { roomId } = useFirebaseStore();
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
   const [currentMapIndex, setCurrentMapIndex] = useState(0);
@@ -308,6 +446,11 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       }
     }
   }, [episodes]);
+
+  // Notify parent when episode active state changes
+  useEffect(() => {
+    onShowtimeActiveChange?.(!!selectedEpisode, selectedEpisode);
+  }, [selectedEpisode, onShowtimeActiveChange]);
 
   // Keep draggingMobId ref in sync with state (avoids listener re-subscription)
   useEffect(() => {
@@ -1478,7 +1621,9 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     // Broadcast end of episode
     broadcastShowtimeState(null, 0, null);
     localStorage.removeItem(SHOWTIME_STORAGE_KEY);
-  }, [broadcastShowtimeState]);
+    // Notify parent to close showtime view
+    onEndEpisodeCallback?.();
+  }, [broadcastShowtimeState, onEndEpisodeCallback]);
 
   const handleMobMouseDown = (placementKey: string) => {
     // All users can move mobs
@@ -1835,6 +1980,15 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                 onUnlock={unlockLootBox}
                 onDelete={deleteLootBox}
                 addDiceRoll={addDiceRoll}
+              />
+            )}
+
+            {/* Inventory Management - DM only */}
+            {isAdmin && getCrawlerInventory && onUpdateCrawlerInventory && (
+              <InventoryPanel
+                crawlers={crawlers}
+                getCrawlerInventory={getCrawlerInventory}
+                onUpdateCrawlerInventory={onUpdateCrawlerInventory}
               />
             )}
           </div>
