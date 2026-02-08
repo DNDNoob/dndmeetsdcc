@@ -38,6 +38,8 @@ interface ShowTimeViewProps {
   onShowtimeActiveChange?: (active: boolean, episode?: Episode | null) => void;
   getCrawlerInventory?: (crawlerId: string) => import("@/lib/gameData").InventoryItem[];
   onUpdateCrawlerInventory?: (crawlerId: string, items: import("@/lib/gameData").InventoryItem[]) => void;
+  getSharedInventory?: () => import("@/lib/gameData").InventoryItem[];
+  onSetGameClock?: (gameTime: number) => Promise<void>;
 }
 
 const SHOWTIME_STORAGE_KEY = 'dcc_showtime_state';
@@ -224,33 +226,30 @@ const InventoryPanel: React.FC<{
   crawlers: Crawler[];
   getCrawlerInventory: (crawlerId: string) => InventoryItem[];
   onUpdateCrawlerInventory: (crawlerId: string, items: InventoryItem[]) => void;
-}> = ({ crawlers, getCrawlerInventory, onUpdateCrawlerInventory }) => {
+  getSharedInventory?: () => InventoryItem[];
+}> = ({ crawlers, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory }) => {
   const [selectedCrawlerId, setSelectedCrawlerId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [newItemName, setNewItemName] = useState('');
-  const [newItemDescription, setNewItemDescription] = useState('');
 
   const playerCrawlers = crawlers.filter(c => c.id !== 'dungeonai');
+  const libraryItems = getSharedInventory?.() ?? [];
 
-  const selectedCrawlerItems = selectedCrawlerId ? getCrawlerInventory(selectedCrawlerId) : [];
-  const filteredItems = searchQuery
-    ? selectedCrawlerItems.filter(item =>
+  // Search the item library
+  const filteredLibraryItems = searchQuery
+    ? libraryItems.filter(item =>
         item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.description.toLowerCase().includes(searchQuery.toLowerCase())
+        (item.description && item.description.toLowerCase().includes(searchQuery.toLowerCase()))
       )
-    : selectedCrawlerItems;
+    : libraryItems;
 
-  const handleAddItem = () => {
-    if (!selectedCrawlerId || !newItemName.trim()) return;
+  // Current crawler's inventory for display
+  const selectedCrawlerItems = selectedCrawlerId ? getCrawlerInventory(selectedCrawlerId) : [];
+
+  const handleAddLibraryItem = (libraryItem: InventoryItem) => {
+    if (!selectedCrawlerId) return;
     const currentItems = getCrawlerInventory(selectedCrawlerId);
-    const newItem: InventoryItem = {
-      id: crypto.randomUUID(),
-      name: newItemName.trim(),
-      description: newItemDescription.trim(),
-    };
+    const newItem: InventoryItem = { ...libraryItem, id: crypto.randomUUID() };
     onUpdateCrawlerInventory(selectedCrawlerId, [...currentItems, newItem]);
-    setNewItemName('');
-    setNewItemDescription('');
   };
 
   const handleRemoveItem = (itemId: string) => {
@@ -284,26 +283,53 @@ const InventoryPanel: React.FC<{
 
       {selectedCrawlerId && (
         <>
-          {/* Search */}
+          {/* Search item library */}
           <div className="relative mb-3">
             <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search items..."
+              placeholder="Search item library..."
               className="w-full pl-9 pr-3 py-2 bg-muted/20 border border-border rounded text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
             />
           </div>
 
-          {/* Items list */}
+          {/* Library items search results */}
+          {searchQuery && (
+            <div className="max-h-40 overflow-y-auto space-y-1 mb-3 border border-border bg-background rounded p-2">
+              {filteredLibraryItems.length === 0 ? (
+                <p className="text-xs text-muted-foreground italic">No items match your search</p>
+              ) : (
+                filteredLibraryItems.map(item => (
+                  <div key={item.id} className="flex items-center justify-between bg-muted/30 border border-border rounded px-2 py-1.5 hover:bg-muted/50">
+                    <div className="min-w-0">
+                      <span className="text-xs font-display text-primary block truncate">{item.name}</span>
+                      {item.description && (
+                        <span className="text-[10px] text-muted-foreground block truncate">{item.description}</span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => handleAddLibraryItem(item)}
+                      className="flex items-center gap-1 px-2 py-1 bg-primary text-primary-foreground font-display text-[10px] rounded hover:bg-primary/90 transition-colors flex-shrink-0 ml-2"
+                    >
+                      <Plus className="w-3 h-3" /> Give
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
+          {/* Current inventory */}
           <div className="max-h-40 overflow-y-auto space-y-1 mb-3">
-            {filteredItems.length === 0 ? (
-              <p className="text-xs text-muted-foreground italic">
-                {searchQuery ? 'No items match your search' : 'No items in inventory'}
-              </p>
+            <span className="text-xs text-muted-foreground font-display block mb-1">
+              {playerCrawlers.find(c => c.id === selectedCrawlerId)?.name}'s Items ({selectedCrawlerItems.length})
+            </span>
+            {selectedCrawlerItems.length === 0 ? (
+              <p className="text-xs text-muted-foreground italic">No items in inventory</p>
             ) : (
-              filteredItems.map(item => (
+              selectedCrawlerItems.map(item => (
                 <div key={item.id} className="flex items-center justify-between bg-muted/30 border border-border rounded px-2 py-1.5">
                   <div className="min-w-0">
                     <span className="text-xs font-display text-primary block truncate">{item.name}</span>
@@ -321,39 +347,13 @@ const InventoryPanel: React.FC<{
               ))
             )}
           </div>
-
-          {/* Add new item */}
-          <div className="border border-border bg-muted/20 p-3 rounded space-y-2">
-            <span className="text-xs text-muted-foreground font-display block">ADD ITEM</span>
-            <input
-              type="text"
-              value={newItemName}
-              onChange={(e) => setNewItemName(e.target.value)}
-              placeholder="Item name"
-              className="w-full px-3 py-1.5 bg-background border border-border rounded text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
-            />
-            <input
-              type="text"
-              value={newItemDescription}
-              onChange={(e) => setNewItemDescription(e.target.value)}
-              placeholder="Description (optional)"
-              className="w-full px-3 py-1.5 bg-background border border-border rounded text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
-            />
-            <button
-              onClick={handleAddItem}
-              disabled={!newItemName.trim()}
-              className="w-full flex items-center justify-center gap-1 px-3 py-1.5 bg-primary text-primary-foreground font-display text-xs rounded hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Plus className="w-3 h-3" /> Add to {playerCrawlers.find(c => c.id === selectedCrawlerId)?.name ?? 'Inventory'}
-            </button>
-          </div>
         </>
       )}
     </div>
   );
 };
 
-const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory }) => {
+const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock }) => {
   const { roomId } = useFirebaseStore();
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
   const [currentMapIndex, setCurrentMapIndex] = useState(0);
@@ -1602,9 +1602,13 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     setCrawlerPlacements([]);
     setRuntimeMobPlacements([]);
     fogInitialLoadDone.current = null;
+    // Set game clock to episode's starting time if available
+    if (episode.startingGameTime && onSetGameClock) {
+      onSetGameClock(episode.startingGameTime);
+    }
     // Scroll to top
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, []);
+  }, [onSetGameClock]);
 
   const handleEndEpisode = useCallback(() => {
     setSelectedEpisode(null);
@@ -1989,6 +1993,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                 crawlers={crawlers}
                 getCrawlerInventory={getCrawlerInventory}
                 onUpdateCrawlerInventory={onUpdateCrawlerInventory}
+                getSharedInventory={getSharedInventory}
               />
             )}
           </div>
