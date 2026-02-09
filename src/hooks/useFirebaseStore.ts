@@ -146,7 +146,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
     return obj;
   };
 
-  const MAX_IMAGE_LENGTH = 15_000_000; // ~11.25 MB of raw image data once base64 is decoded
+  const MAX_IMAGE_LENGTH = 1_040_000; // Firestore field limit is ~1,048,487 bytes; leave margin
   const MAX_AVATAR_LENGTH = 500_000; // 500KB for avatars
 
   const addItem = useCallback(async (collection: CollectionName, item: Record<string, unknown>) => {

@@ -15,6 +15,8 @@ import {
 } from "@/lib/gameData";
 import { useGame } from "@/contexts/GameContext";
 import type { BatchOperation } from "@/hooks/useFirebaseStore";
+import { storage } from "@/lib/firebase";
+import { ref as storageRef, deleteObject } from "firebase/storage";
 
 export interface DiceRollEntry {
   id: string;
@@ -230,6 +232,19 @@ export const useGameState = () => {
       newFingerprintSample: newMapFingerprints.slice(0, 2)
     });
 
+    // Helper to extract Firebase Storage path from a download URL
+    const extractStoragePath = (url: string): string | null => {
+      try {
+        const u = new URL(url);
+        if (!u.hostname.includes('firebasestorage.googleapis.com')) return null;
+        const match = u.pathname.match(/\/o\/(.+)/);
+        if (!match) return null;
+        return decodeURIComponent(match[1]);
+      } catch {
+        return null;
+      }
+    };
+
     // Use batch writes for fast, atomic updates
     const operations: BatchOperation[] = [];
 
@@ -237,16 +252,37 @@ export const useGameState = () => {
     for (const mapIdx of mapsToAddIndices) {
       const img = newMaps[mapIdx];
       const newId = crypto.randomUUID();
+      const data: Record<string, unknown> = {
+        image: img,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      // If this is a Firebase Storage URL, store the storagePath for cleanup on delete
+      const sp = extractStoragePath(img);
+      if (sp) {
+        data.storagePath = sp;
+      }
       operations.push({
         type: 'add',
         collection: 'maps',
         id: newId,
-        data: { image: img, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+        data,
       });
     }
 
-    // Delete removed maps
+    // Delete removed maps (and clean up Firebase Storage files)
     for (const id of mapsToDeleteIds) {
+      // Check if the map has a Storage-backed image that needs cleanup
+      const docWithId = existingDocs.find(d => d?.id === id);
+      const sp = (docWithId?.storagePath as string) || null;
+      if (sp && storage) {
+        try {
+          await deleteObject(storageRef(storage, sp));
+          console.log('[GameState] 🗑️ Deleted map from Firebase Storage:', sp);
+        } catch (err) {
+          console.warn('[GameState] ⚠️ Failed to delete map from Storage (may already be deleted):', sp, err);
+        }
+      }
       operations.push({
         type: 'delete',
         collection: 'maps',
