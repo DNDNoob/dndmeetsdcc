@@ -43,7 +43,6 @@ const PingPanel: React.FC<PingPanelProps> = ({
   }, [isExpanded]);
 
   const openRestDropdown = (type: 'short' | 'long') => {
-    const playerCrawlers = (crawlers ?? []).filter(c => c.id !== 'dungeonai');
     const selected: Record<string, boolean> = {};
     playerCrawlers.forEach(c => { selected[c.id] = true; });
     setSelectedCrawlersForRest(selected);
@@ -64,7 +63,16 @@ const PingPanel: React.FC<PingPanelProps> = ({
     setShowRestDropdown(null);
   };
 
-  const playerCrawlers = (crawlers ?? []).filter(c => c.id !== 'dungeonai');
+  // Filter to only crawlers loaded in the active episode
+  const episodeCrawlerIds = activeEpisode?.crawlerPlacements
+    ? [...new Set(activeEpisode.crawlerPlacements.map(p => p.crawlerId))]
+    : null;
+  const playerCrawlers = (crawlers ?? []).filter(c => {
+    if (c.id === 'dungeonai') return false;
+    // If we have an active episode with crawler placements, only show those crawlers
+    if (episodeCrawlerIds) return episodeCrawlerIds.includes(c.id);
+    return true;
+  });
   const allPlayersSpent = noncombatTurnState != null && playerCrawlers.length > 0 && playerCrawlers.every(c => {
     const used = noncombatTurnState.rollsUsed[c.id] ?? 0;
     return used >= noncombatTurnState.maxRolls;
@@ -91,8 +99,7 @@ const PingPanel: React.FC<PingPanelProps> = ({
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            className="bg-background border-2 border-accent p-4 w-[calc(100vw-1rem)] sm:w-72 shadow-lg shadow-accent/20 max-h-[60vh] overflow-y-auto mb-2"
-            onWheel={(e) => e.stopPropagation()}
+            className="bg-background border-2 border-accent p-4 w-[calc(100vw-1rem)] sm:w-80 shadow-lg shadow-accent/20 mb-2"
           >
             <h3 className="font-display text-accent text-lg mb-3 flex items-center gap-2 shrink-0">
               <Clock className="w-5 h-5" /> GAME CLOCK
@@ -101,9 +108,9 @@ const PingPanel: React.FC<PingPanelProps> = ({
             {/* Game Clock */}
             {gameClockState && (
               <div className="mb-3 text-center border border-border bg-muted/20 px-3 py-2">
-                <span className="font-display text-primary text-sm">
+                <span className="font-display text-primary text-sm whitespace-nowrap">
                   {new Date(gameClockState.gameTime).toLocaleString('en-US', {
-                    month: 'long',
+                    month: 'short',
                     day: 'numeric',
                     year: 'numeric',
                     hour: 'numeric',

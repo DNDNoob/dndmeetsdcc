@@ -478,7 +478,7 @@ export const useGameState = () => {
     return stored.find(s => s.id === 'current') ?? null;
   }, [getCollection, isLoaded]);
 
-  const startNoncombatTurn = async () => {
+  const startNoncombatTurn = async (episodeId?: string) => {
     const current = noncombatTurnState;
 
     // Advance game clock by 1 hour when starting a new turn (not the very first one)
@@ -490,6 +490,22 @@ export const useGameState = () => {
       turnNumber: (current?.turnNumber ?? 0) + 1,
       rollsUsed: {},
       maxRolls: 3,
+      episodeId: episodeId || current?.episodeId,
+    };
+    if (current) {
+      await updateItem('noncombatTurns', 'current', turnData as Record<string, unknown>);
+    } else {
+      await addItem('noncombatTurns', { id: 'current', ...turnData } as Record<string, unknown>);
+    }
+  };
+
+  const resetNoncombatTurns = async (episodeId: string) => {
+    const current = noncombatTurnState;
+    const turnData = {
+      turnNumber: 0,
+      rollsUsed: {},
+      maxRolls: 3,
+      episodeId,
     };
     if (current) {
       await updateItem('noncombatTurns', 'current', turnData as Record<string, unknown>);
@@ -635,6 +651,7 @@ export const useGameState = () => {
     clearDiceRolls,
     noncombatTurnState,
     startNoncombatTurn,
+    resetNoncombatTurns,
     recordNoncombatRoll,
     getNoncombatRollsRemaining,
     gameClockState,

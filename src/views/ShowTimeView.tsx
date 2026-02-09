@@ -40,6 +40,8 @@ interface ShowTimeViewProps {
   onUpdateCrawlerInventory?: (crawlerId: string, items: import("@/lib/gameData").InventoryItem[]) => void;
   getSharedInventory?: () => import("@/lib/gameData").InventoryItem[];
   onSetGameClock?: (gameTime: number) => Promise<void>;
+  noncombatTurnState?: import("@/lib/gameData").NoncombatTurnState | null;
+  resetNoncombatTurns?: (episodeId: string) => Promise<void>;
 }
 
 const SHOWTIME_STORAGE_KEY = 'dcc_showtime_state';
@@ -353,7 +355,7 @@ const InventoryPanel: React.FC<{
   );
 };
 
-const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock }) => {
+const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock, noncombatTurnState, resetNoncombatTurns }) => {
   const { roomId } = useFirebaseStore();
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
   const [currentMapIndex, setCurrentMapIndex] = useState(0);
@@ -1606,9 +1608,13 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     if (episode.startingGameTime && onSetGameClock) {
       onSetGameClock(episode.startingGameTime);
     }
+    // Reset turn counter if switching to a different episode
+    if (resetNoncombatTurns && (!noncombatTurnState?.episodeId || noncombatTurnState.episodeId !== episode.id)) {
+      resetNoncombatTurns(episode.id);
+    }
     // Scroll to top
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [onSetGameClock]);
+  }, [onSetGameClock, resetNoncombatTurns, noncombatTurnState]);
 
   const handleEndEpisode = useCallback(() => {
     setSelectedEpisode(null);
@@ -1987,15 +1993,21 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
               />
             )}
 
-            {/* Inventory Management - DM only */}
-            {isAdmin && getCrawlerInventory && onUpdateCrawlerInventory && (
-              <InventoryPanel
-                crawlers={crawlers}
-                getCrawlerInventory={getCrawlerInventory}
-                onUpdateCrawlerInventory={onUpdateCrawlerInventory}
-                getSharedInventory={getSharedInventory}
-              />
-            )}
+            {/* Inventory Management - DM only (filtered to episode crawlers) */}
+            {isAdmin && getCrawlerInventory && onUpdateCrawlerInventory && (() => {
+              const epCrawlerIds = [...new Set((selectedEpisode.crawlerPlacements || []).map(p => p.crawlerId))];
+              const epCrawlers = epCrawlerIds.length > 0
+                ? crawlers.filter(c => epCrawlerIds.includes(c.id))
+                : crawlers;
+              return (
+                <InventoryPanel
+                  crawlers={epCrawlers}
+                  getCrawlerInventory={getCrawlerInventory}
+                  onUpdateCrawlerInventory={onUpdateCrawlerInventory}
+                  getSharedInventory={getSharedInventory}
+                />
+              );
+            })()}
           </div>
         </DungeonCard>
       </motion.div>

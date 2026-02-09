@@ -737,11 +737,11 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             {activeTab === 'profile' && (
               <div className="flex flex-col lg:flex-row gap-6">
                 {/* Equipment Slots - Left Side */}
-          <div className="flex flex-col gap-3 lg:min-w-[280px]">
+          <div className="flex flex-col gap-3 lg:min-w-[330px]">
             <h3 className="font-display text-primary text-base mb-2">EQUIPMENT</h3>
 
             {/* Head (center column) */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-3">
               <div></div>
               <EquipmentSlot
                 slot="head"
@@ -755,7 +755,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             </div>
 
             {/* Left Hand, Chest, Right Hand */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-3">
               <EquipmentSlot
                 slot="leftHand"
                 label="Left Hand"
@@ -783,7 +783,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             </div>
 
             {/* Ring, Legs, Weapon */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-3">
               <EquipmentSlot
                 slot="ringFinger"
                 label="Ring"
@@ -811,7 +811,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             </div>
 
             {/* Feet (center column) */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-3">
               <div></div>
               <EquipmentSlot
                 slot="feet"
@@ -1257,16 +1257,16 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 {/* Equipment + Items side-by-side */}
                 <div className="flex gap-4">
                   {/* Equipment Slots - Left Side */}
-                  <div className="bg-muted/30 border border-border rounded-lg p-3 shrink-0" style={{ width: '220px' }}>
-                    <h3 className="font-display text-primary text-sm mb-2">EQUIPMENT</h3>
-                    <div className="flex flex-col items-center gap-1.5">
+                  <div className="bg-muted/30 border border-border rounded-lg p-4 shrink-0" style={{ width: '340px' }}>
+                    <h3 className="font-display text-primary text-sm mb-3">EQUIPMENT</h3>
+                    <div className="flex flex-col items-center gap-2">
                       <EquipmentSlot slot="head" label="Head" equippedItem={getEquippedItem('head')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={!isOwnProfile} />
-                      <div className="grid grid-cols-3 gap-1.5" style={{ width: '198px' }}>
+                      <div className="grid grid-cols-3 gap-2" style={{ width: '316px' }}>
                         <EquipmentSlot slot="leftHand" label="L.Hand" equippedItem={getEquippedItem('leftHand')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={!isOwnProfile} />
                         <EquipmentSlot slot="chest" label="Chest" equippedItem={getEquippedItem('chest')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={!isOwnProfile} />
                         <EquipmentSlot slot="rightHand" label="R.Hand" equippedItem={getEquippedItem('rightHand')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={!isOwnProfile} />
                       </div>
-                      <div className="grid grid-cols-3 gap-1.5" style={{ width: '198px' }}>
+                      <div className="grid grid-cols-3 gap-2" style={{ width: '316px' }}>
                         <EquipmentSlot slot="ringFinger" label="Ring" equippedItem={getEquippedItem('ringFinger')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={!isOwnProfile} />
                         <EquipmentSlot slot="legs" label="Legs" equippedItem={getEquippedItem('legs')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={!isOwnProfile} />
                         <EquipmentSlot slot="weapon" label="Weapon" equippedItem={getEquippedItem('weapon')} onDrop={handleEquipItem} onUnequip={handleUnequipItem} disabled={!isOwnProfile} />
