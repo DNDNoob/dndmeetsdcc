@@ -6,6 +6,8 @@ import MapMobPlacementEditor from "@/components/ui/MapMobPlacementEditor";
 import MapDesignerPopout from "@/components/ui/MapDesignerPopout";
 import { Mob, Episode, EpisodeMobPlacement, Crawler, CrawlerPlacement, InventoryItem, LootBoxTemplate, LootBoxTier, getLootBoxTierColor } from "@/lib/gameData";
 import { Brain, Upload, Plus, Trash2, Map, Skull, Image as ImageIcon, Save, Edit2, X, Layers, ChevronLeft, ChevronRight, User, Package, Search, Maximize2 } from "lucide-react";
+import { storage } from "@/lib/firebase";
+import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 
 interface DungeonAIViewProps {
   mobs: Mob[];
@@ -246,8 +248,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
     }
   };
 
-  // Compress a map image to fit within Firestore's payload limit while preserving resolution
-  // Only called when the raw image exceeds the safe threshold
+  // Compress a map image as a fallback when Firebase Storage is unavailable
   const compressMapImage = async (dataUrl: string, targetMaxBytes: number): Promise<string> => {
     const img = new window.Image();
     const loaded: Promise<void> = new Promise((resolve, reject) => {
@@ -293,8 +294,8 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
     if (file) {
       console.log('[DungeonAI] 📤 Uploading map (full resolution)...');
       try {
-        // Read the file at full resolution
-        let base64: string = await new Promise((resolve, reject) => {
+        // Read the file at full resolution as base64
+        const base64: string = await new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result as string);
           reader.onerror = reject;
@@ -302,16 +303,32 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
         });
         console.log('[DungeonAI] ✅ Map loaded, size:', base64.length, '(' + (base64.length / 1_000_000).toFixed(2) + 'MB)');
 
-        // Firestore batch payload limit is ~11MB. Compress if map exceeds ~9.5MB
-        // to leave room for Firestore overhead (metadata, other fields).
-        const FIRESTORE_SAFE_LIMIT = 9_500_000;
-        if (base64.length > FIRESTORE_SAFE_LIMIT) {
-          console.log('[DungeonAI] 📦 Map exceeds Firestore safe limit, compressing...');
-          base64 = await compressMapImage(base64, FIRESTORE_SAFE_LIMIT);
-          console.log('[DungeonAI] ✅ Map compressed to:', (base64.length / 1_000_000).toFixed(2) + 'MB');
+        let mapImage: string;
+
+        // Firestore has a hard ~1MB per-field limit (1,048,487 bytes).
+        // For images exceeding this, upload to Firebase Storage instead.
+        const FIRESTORE_FIELD_LIMIT = 950_000;
+        if (base64.length > FIRESTORE_FIELD_LIMIT) {
+          if (storage) {
+            console.log('[DungeonAI] 📦 Map exceeds Firestore field limit, uploading to Firebase Storage...');
+            const mapId = crypto.randomUUID();
+            const path = `maps/${mapId}`;
+            const fileRef = storageRef(storage, path);
+            await uploadBytes(fileRef, file);
+            const url = await getDownloadURL(fileRef);
+            console.log('[DungeonAI] ✅ Map uploaded to Firebase Storage:', path, '(' + (file.size / 1_000_000).toFixed(2) + 'MB)');
+            mapImage = url;
+          } else {
+            // Fallback: compress to fit in Firestore when Storage is unavailable
+            console.warn('[DungeonAI] ⚠️ Firebase Storage not available, compressing map to fit in Firestore...');
+            mapImage = await compressMapImage(base64, FIRESTORE_FIELD_LIMIT);
+            console.log('[DungeonAI] ✅ Map compressed to:', (mapImage.length / 1_000_000).toFixed(2) + 'MB');
+          }
+        } else {
+          mapImage = base64;
         }
 
-        const updatedMaps = [...maps, base64];
+        const updatedMaps = [...maps, mapImage];
         console.log('[DungeonAI] 📊 Calling onUpdateMaps with', updatedMaps.length, 'maps');
         const result = onUpdateMaps(updatedMaps);
         if (result instanceof Promise) {
