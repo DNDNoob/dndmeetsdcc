@@ -246,19 +246,71 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
     }
   };
 
+  // Compress a map image to fit within Firestore's payload limit while preserving resolution
+  // Only called when the raw image exceeds the safe threshold
+  const compressMapImage = async (dataUrl: string, targetMaxBytes: number): Promise<string> => {
+    const img = new window.Image();
+    const loaded: Promise<void> = new Promise((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = reject;
+    });
+    img.src = dataUrl;
+    await loaded;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Failed to get canvas context');
+    ctx.drawImage(img, 0, 0);
+
+    // Try progressively lower JPEG quality to fit under the limit
+    let quality = 0.92;
+    let compressed = canvas.toDataURL('image/jpeg', quality);
+    console.log('[DungeonAI] 📦 Compressing map at full resolution, quality', quality.toFixed(2), ', size:', (compressed.length / 1_000_000).toFixed(2) + 'MB');
+
+    while (compressed.length > targetMaxBytes && quality > 0.1) {
+      quality -= 0.05;
+      compressed = canvas.toDataURL('image/jpeg', quality);
+      console.log('[DungeonAI] 📉 Reduced quality to', quality.toFixed(2), ', size:', (compressed.length / 1_000_000).toFixed(2) + 'MB');
+    }
+
+    // If still too large at minimum quality, scale down resolution
+    if (compressed.length > targetMaxBytes) {
+      const scaleFactor = Math.sqrt(targetMaxBytes / compressed.length) * 0.9; // 10% margin
+      canvas.width = Math.round(img.width * scaleFactor);
+      canvas.height = Math.round(img.height * scaleFactor);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      compressed = canvas.toDataURL('image/jpeg', 0.85);
+      console.log('[DungeonAI] 📐 Scaled down to', canvas.width, 'x', canvas.height, ', size:', (compressed.length / 1_000_000).toFixed(2) + 'MB');
+    }
+
+    return compressed;
+  };
+
   const handleMapUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       console.log('[DungeonAI] 📤 Uploading map (full resolution)...');
       try {
-        // Read the file at full resolution — no compression for maps
-        const base64: string = await new Promise((resolve, reject) => {
+        // Read the file at full resolution
+        let base64: string = await new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result as string);
           reader.onerror = reject;
           reader.readAsDataURL(file);
         });
         console.log('[DungeonAI] ✅ Map loaded, size:', base64.length, '(' + (base64.length / 1_000_000).toFixed(2) + 'MB)');
+
+        // Firestore batch payload limit is ~11MB. Compress if map exceeds ~9.5MB
+        // to leave room for Firestore overhead (metadata, other fields).
+        const FIRESTORE_SAFE_LIMIT = 9_500_000;
+        if (base64.length > FIRESTORE_SAFE_LIMIT) {
+          console.log('[DungeonAI] 📦 Map exceeds Firestore safe limit, compressing...');
+          base64 = await compressMapImage(base64, FIRESTORE_SAFE_LIMIT);
+          console.log('[DungeonAI] ✅ Map compressed to:', (base64.length / 1_000_000).toFixed(2) + 'MB');
+        }
+
         const updatedMaps = [...maps, base64];
         console.log('[DungeonAI] 📊 Calling onUpdateMaps with', updatedMaps.length, 'maps');
         const result = onUpdateMaps(updatedMaps);

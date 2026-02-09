@@ -80,6 +80,7 @@ const Index = () => {
     diceRolls,
     noncombatTurnState,
     startNoncombatTurn,
+    resetNoncombatTurns,
     recordNoncombatRoll,
     getNoncombatRollsRemaining,
     gameClockState,
@@ -404,6 +405,8 @@ const Index = () => {
                 onUpdateCrawlerInventory={updateCrawlerInventory}
                 getSharedInventory={getSharedInventory}
                 onSetGameClock={setGameClock}
+                noncombatTurnState={noncombatTurnState}
+                resetNoncombatTurns={resetNoncombatTurns}
               />
             )}
             {currentView === "sounds" && <SoundEffectsView />}

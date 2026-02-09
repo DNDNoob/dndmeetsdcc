@@ -158,6 +158,7 @@ export interface NoncombatTurnState {
   turnNumber: number;
   rollsUsed: Record<string, number>; // crawlerId -> number of rolls used
   maxRolls: number; // rolls per player per turn (default 3)
+  episodeId?: string; // tracks which episode this turn state belongs to
 }
 
 // Game clock state - synced via Firebase (singleton doc, id = 'current')

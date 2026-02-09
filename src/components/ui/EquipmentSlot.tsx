@@ -65,7 +65,7 @@ export const EquipmentSlot: React.FC<EquipmentSlotProps> = ({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      style={{ width: '90px', height: '90px' }}
+      style={{ width: '100px', height: '100px' }}
     >
       {/* Slot label */}
       <div className="absolute top-0 left-0 right-0 bg-background/80 px-1 py-0.5">
