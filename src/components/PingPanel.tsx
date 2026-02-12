@@ -155,7 +155,7 @@ const PingPanel: React.FC<PingPanelProps> = ({
   };
 
   // Only show if there's something to display
-  const hasContent = gameClockState || isAdmin || isCombatActive;
+  const hasContent = gameClockState || isAdmin || isCombatActive || noncombatTurnState;
   if (!hasContent) return null;
 
   // Calculate days since episode start
