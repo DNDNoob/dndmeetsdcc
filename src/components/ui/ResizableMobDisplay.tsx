@@ -46,7 +46,7 @@ export const ResizableMobDisplay: React.FC<ResizableMobDisplayProps> = ({
             }
           : {
               right: minimizedRight,
-              bottom: 16,
+              bottom: 40,
               width: cardWidth,
             }),
         transition: "all 0.25s ease",

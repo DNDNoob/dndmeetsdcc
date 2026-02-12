@@ -122,7 +122,7 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
   };
 
   return (
-    <div className="fixed bottom-4 right-2 sm:right-4 z-[100] flex items-end gap-2">
+    <div className="fixed bottom-10 right-2 sm:right-4 z-[100] flex items-end gap-2">
       {/* Toggle tab - now to the left of the panel */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}

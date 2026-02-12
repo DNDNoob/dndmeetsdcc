@@ -2074,7 +2074,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
       {/* Zoom controls - available to all users, fixed position so they stay visible */}
       {selectedMap && (
-        <div className="fixed bottom-20 left-4 z-40 flex flex-col gap-2">
+        <div className="fixed bottom-24 left-4 z-40 flex flex-col gap-2">
           <DungeonButton
             variant="default"
             size="sm"

@@ -166,7 +166,7 @@ const PingPanel: React.FC<PingPanelProps> = ({
   })();
 
   return (
-    <div ref={panelRef} className="fixed bottom-4 left-2 sm:left-4 z-[99] flex flex-col items-start">
+    <div ref={panelRef} className="fixed bottom-10 left-2 sm:left-4 z-[99] flex flex-col items-start">
       {/* Expanded panel - appears above the toggle button */}
       <AnimatePresence>
         {isExpanded && (
@@ -174,7 +174,7 @@ const PingPanel: React.FC<PingPanelProps> = ({
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            className="bg-background border-2 border-accent p-4 w-[calc(100vw-1rem)] sm:w-80 shadow-lg shadow-accent/20 mb-2 max-h-[70vh] overflow-y-auto"
+            className="bg-background border-2 border-accent p-4 w-[calc(100vw-1rem)] sm:w-80 shadow-lg shadow-accent/20 mb-2 max-h-[calc(100vh-7rem)] overflow-y-auto"
           >
             <h3 className="font-display text-accent text-lg mb-3 flex items-center gap-2 shrink-0">
               <Clock className="w-5 h-5" /> GAME CLOCK
