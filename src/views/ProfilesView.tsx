@@ -4,8 +4,9 @@ import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import { HealthBar } from "@/components/ui/HealthBar";
 import { EquipmentSlot } from "@/components/ui/EquipmentSlot";
-import { Crawler, InventoryItem, createEmptyCrawler, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState } from "@/lib/gameData";
-import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Backpack, HardHat, Package, Lock, Unlock, ChevronDown, ChevronUp, Check, Search, Send, BookOpen, Filter, X, Gem, Footprints, Shirt, Hand, Target } from "lucide-react";
+import { Crawler, Mob, InventoryItem, createEmptyCrawler, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState } from "@/lib/gameData";
+import type { DiceRollEntry } from "@/hooks/useGameState";
+import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Backpack, HardHat, Package, Lock, Unlock, ChevronDown, ChevronUp, Check, Search, Send, BookOpen, Filter, X, Gem, Footprints, Shirt, Hand, Target, Swords, RefreshCw } from "lucide-react";
 
 type SortOption = 'name-asc' | 'name-desc' | 'gold-desc' | 'gold-asc';
 
@@ -40,7 +41,7 @@ const getEquipmentIcon = (slot?: string, className: string = "w-4 h-4 shrink-0")
   }
 };
 
-type ProfileTab = 'profile' | 'inventory' | 'actions' | 'spells';
+type ProfileTab = 'profile' | 'inventory' | 'actions' | 'spells' | 'reactions' | 'attacks';
 
 // Noncombat actions mapped to their associated ability score
 const NONCOMBAT_ACTIONS: { label: string; stat: 'str' | 'dex' | 'con' | 'int' | 'cha' }[] = [
@@ -84,6 +85,12 @@ interface ProfilesViewProps {
   recordNoncombatRoll?: (crawlerId: string) => Promise<void>;
   currentPlayerId?: string;
   isShowtimeActive?: boolean;
+  combatState?: CombatState | null;
+  onRecordCombatInitiative?: (combatantId: string, roll: number) => Promise<void>;
+  onRecordCombatAction?: (combatantId: string, actionType: 'action' | 'bonus') => Promise<void>;
+  onApplyCombatDamage?: (targetId: string, targetType: 'crawler' | 'mob', damage: number) => Promise<void>;
+  addDiceRoll?: (entry: DiceRollEntry) => Promise<void>;
+  mobs?: Mob[];
 }
 
 // Loot Box display section for crawler profiles
@@ -245,6 +252,12 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   recordNoncombatRoll,
   currentPlayerId,
   isShowtimeActive = false,
+  combatState,
+  onRecordCombatInitiative,
+  onRecordCombatAction,
+  onApplyCombatDamage,
+  addDiceRoll,
+  mobs: mobsProp,
 }) => {
   const [selectedId, setSelectedId] = useState(crawlers[0]?.id || "");
   const [editMode, setEditMode] = useState(false);
@@ -262,6 +275,13 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   const [inventorySort, setInventorySort] = useState<SortOption>('name-asc');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [showTagFilter, setShowTagFilter] = useState(false);
+
+  // Combat targeting state
+  const [showDamageTargetModal, setShowDamageTargetModal] = useState(false);
+  const [pendingDamageRoll, setPendingDamageRoll] = useState<{ dice: string; bonus: number; actionName: string } | null>(null);
+  const [damageTargetId, setDamageTargetId] = useState<string>('');
+  const [damageTargetType, setDamageTargetType] = useState<'crawler' | 'mob'>('mob');
+  const [damageRollResult, setDamageRollResult] = useState<number | null>(null);
 
   // Send items/gold modal state
   const [showSendModal, setShowSendModal] = useState(false);
@@ -729,6 +749,30 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             >
               <BookOpen className="w-5 h-5" />
               <span className="hidden xl:inline text-sm font-medium">Spells</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('reactions')}
+              className={`p-3 rounded-l-lg transition-colors flex items-center gap-2 ${
+                activeTab === 'reactions'
+                  ? 'bg-primary/20 text-primary border-r-2 border-primary'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              }`}
+              title="Reactions"
+            >
+              <RefreshCw className="w-5 h-5" />
+              <span className="hidden xl:inline text-sm font-medium">Reactions</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('attacks')}
+              className={`p-3 rounded-l-lg transition-colors flex items-center gap-2 ${
+                activeTab === 'attacks'
+                  ? 'bg-primary/20 text-primary border-r-2 border-primary'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              }`}
+              title="Attacks"
+            >
+              <Swords className="w-5 h-5" />
+              <span className="hidden xl:inline text-sm font-medium">Attacks</span>
             </button>
           </div>
 
@@ -1415,27 +1459,108 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             {activeTab === 'actions' && (() => {
               const rollsRemaining = getNoncombatRollsRemaining?.(selected.id) ?? 0;
               const hasActiveTurn = !!noncombatTurnState && isShowtimeActive;
-              const isTestMode = !hasActiveTurn;
-              const canRoll = isTestMode || rollsRemaining > 0;
+              const isCombatActive = combatState?.active && combatState.phase !== 'ended';
+              const isInitiativePhase = combatState?.active && combatState.phase === 'initiative';
+              const isCombatPhase = combatState?.active && combatState.phase === 'combat';
+              const myCombatant = combatState?.combatants.find(c => c.id === selected.id);
+              const isMyTurn = isCombatPhase && combatState && combatState.combatants[combatState.currentTurnIndex]?.id === selected.id;
+              const hasUsedAction = myCombatant?.hasUsedAction ?? false;
+
+              // In combat: only allow rolls on your turn. Outside combat: normal rules
+              const isTestMode = !hasActiveTurn && !isCombatActive;
+              const canRoll = isCombatActive
+                ? (isInitiativePhase || (isMyTurn && !hasUsedAction))
+                : (isTestMode || rollsRemaining > 0);
               const maxRolls = noncombatTurnState?.maxRolls ?? 3;
 
+              // Disable non-initiative action buttons during initiative phase
+              const canUseActions = isCombatActive
+                ? (isMyTurn && !hasUsedAction)
+                : canRoll;
+
               const handleActionRoll = (actionLabel: string, stat: string, total: number) => {
-                if (!canRoll) return;
+                if (!canUseActions) return;
                 onStatRoll?.(selected.name, selected.id, actionLabel, total);
-                // Only track rolls when in an active noncombat turn (not test mode)
-                if (!isTestMode) {
+                if (!isTestMode && !isCombatActive) {
                   recordNoncombatRoll?.(selected.id);
+                }
+                // Record as combat action
+                if (isCombatActive && isMyTurn) {
+                  onRecordCombatAction?.(selected.id, 'action');
+                }
+              };
+
+              const handleCombatInitiativeRoll = () => {
+                if (!isInitiativePhase || !myCombatant || myCombatant.hasRolledInitiative) return;
+                const baseStat = selected.dex;
+                const mod = equippedMods.dex ?? 0;
+                const modifier = Math.floor(((baseStat + mod) - 10) / 2);
+                const rawRoll = Math.floor(Math.random() * 20) + 1;
+                const total = rawRoll + modifier;
+                onRecordCombatInitiative?.(selected.id, total);
+                // Also add to dice history
+                if (addDiceRoll) {
+                  addDiceRoll({
+                    id: crypto.randomUUID(),
+                    crawlerName: selected.name,
+                    crawlerId: selected.id,
+                    timestamp: Date.now(),
+                    results: [{ dice: 'D20', result: rawRoll }],
+                    total,
+                    statRoll: { stat: 'Initiative', modifier, rawRoll },
+                  });
                 }
               };
 
               return (
               <div className="space-y-6">
+                {/* Combat Initiative Banner */}
+                {isInitiativePhase && myCombatant && (
+                  <div className={`border-2 rounded-lg p-4 text-center ${
+                    myCombatant.hasRolledInitiative
+                      ? 'border-accent/50 bg-accent/10'
+                      : 'border-destructive bg-destructive/10 animate-pulse'
+                  }`}>
+                    {myCombatant.hasRolledInitiative ? (
+                      <div>
+                        <p className="text-accent font-display text-lg">INITIATIVE: {myCombatant.initiative}</p>
+                        <p className="text-muted-foreground text-xs">Waiting for other combatants...</p>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="text-destructive font-display text-lg mb-3">COMBAT INITIATED!</p>
+                        <button
+                          onClick={handleCombatInitiativeRoll}
+                          className="px-8 py-3 bg-accent text-accent-foreground font-display text-lg rounded-lg hover:bg-accent/90 transition-colors"
+                        >
+                          <Zap className="w-5 h-5 inline mr-2" />
+                          ROLL INITIATIVE
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Combat turn status */}
+                {isCombatPhase && myCombatant && (
+                  <div className={`border-2 rounded-lg px-4 py-2 ${
+                    isMyTurn ? 'border-accent bg-accent/10' : 'border-border bg-muted/30'
+                  }`}>
+                    <span className={`text-sm font-display ${isMyTurn ? 'text-accent' : 'text-muted-foreground'}`}>
+                      {isMyTurn ? 'YOUR TURN — Select an action' : 'Waiting for your turn...'}
+                    </span>
+                    {isMyTurn && hasUsedAction && (
+                      <span className="text-xs text-muted-foreground ml-2">(Action used)</span>
+                    )}
+                  </div>
+                )}
+
                 <h2 className="font-display text-xl text-primary flex items-center gap-2">
-                  <Target className="w-6 h-6" /> NONCOMBAT ACTIONS
+                  <Target className="w-6 h-6" /> {isCombatActive ? 'COMBAT ACTIONS' : 'NONCOMBAT ACTIONS'}
                 </h2>
 
-                {/* Turn status */}
-                {isTestMode ? (
+                {/* Noncombat Turn status (only outside combat) */}
+                {!isCombatActive && (isTestMode ? (
                   <div className="bg-muted/30 border border-border rounded-lg p-4 text-center">
                     <p className="text-muted-foreground text-sm font-display">TEST MODE — FREE ROLLS</p>
                   </div>
@@ -1452,29 +1577,30 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                       )}
                     </span>
                   </div>
-                )}
+                ))}
 
                 {/* General Actions */}
                 <div>
                   <h3 className="font-display text-base text-accent mb-3">Actions</h3>
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
                     {NONCOMBAT_ACTIONS.map(action => {
-                      const baseStat = (selected as any)[action.stat] as number;
+                      const baseStat = (selected as Record<string, unknown>)[action.stat] as number;
                       const mod = equippedMods[action.stat as keyof StatModifiers] ?? 0;
                       const total = baseStat + mod;
+                      const disabled = !canUseActions;
                       return (
                         <button
                           key={action.label}
                           onClick={() => handleActionRoll(action.label, action.stat, total)}
-                          disabled={!canRoll}
+                          disabled={disabled}
                           className={`flex flex-col items-center gap-1 p-3 border rounded-lg transition-colors text-left group ${
-                            canRoll
+                            !disabled
                               ? 'bg-muted/50 border-border hover:bg-primary/20 hover:border-primary'
                               : 'bg-muted/20 border-border/50 opacity-50 cursor-not-allowed'
                           }`}
-                          title={canRoll ? `Roll d20 + ${action.stat.toUpperCase()} (${total})` : 'No rolls remaining'}
+                          title={!disabled ? `Roll d20 + ${action.stat.toUpperCase()} (${total})` : isCombatActive ? 'Not your turn' : 'No rolls remaining'}
                         >
-                          <span className={`text-sm font-semibold transition-colors ${canRoll ? 'text-foreground group-hover:text-primary' : 'text-muted-foreground'}`}>{action.label}</span>
+                          <span className={`text-sm font-semibold transition-colors ${!disabled ? 'text-foreground group-hover:text-primary' : 'text-muted-foreground'}`}>{action.label}</span>
                           <span className="text-xs text-muted-foreground">
                             {action.stat.toUpperCase()} {mod !== 0 ? (
                               <span>
@@ -1502,19 +1628,20 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                       const baseStat = selected.int;
                       const mod = equippedMods.int ?? 0;
                       const total = baseStat + mod;
+                      const disabled = !canUseActions;
                       return (
                         <button
                           key={action.label}
                           onClick={() => handleActionRoll(action.label, action.stat, total)}
-                          disabled={!canRoll}
+                          disabled={disabled}
                           className={`flex flex-col items-center gap-1 p-3 border rounded-lg transition-colors text-left group ${
-                            canRoll
+                            !disabled
                               ? 'bg-muted/50 border-border hover:bg-primary/20 hover:border-primary'
                               : 'bg-muted/20 border-border/50 opacity-50 cursor-not-allowed'
                           }`}
-                          title={canRoll ? `Roll d20 + INT (${total})` : 'No rolls remaining'}
+                          title={!disabled ? `Roll d20 + INT (${total})` : isCombatActive ? 'Not your turn' : 'No rolls remaining'}
                         >
-                          <span className={`text-sm font-semibold transition-colors ${canRoll ? 'text-foreground group-hover:text-primary' : 'text-muted-foreground'}`}>{action.label}</span>
+                          <span className={`text-sm font-semibold transition-colors ${!disabled ? 'text-foreground group-hover:text-primary' : 'text-muted-foreground'}`}>{action.label}</span>
                           <span className="text-xs text-muted-foreground">
                             INT {mod !== 0 ? (
                               <span>
@@ -1532,7 +1659,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                   </div>
                 </div>
 
-                {/* Initiative */}
+                {/* Initiative - always visible but context-aware */}
+                {!isInitiativePhase && (
                 <div>
                   <h3 className="font-display text-base text-accent mb-3 flex items-center gap-2">
                     <Zap className="w-4 h-4" /> Initiative
@@ -1543,7 +1671,12 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                     const total = baseStat + mod;
                     return (
                       <button
-                        onClick={() => handleActionRoll(INITIATIVE_ACTION.label, INITIATIVE_ACTION.stat, total)}
+                        onClick={() => {
+                          onStatRoll?.(selected.name, selected.id, INITIATIVE_ACTION.label, total);
+                          if (!isTestMode && !isCombatActive) {
+                            recordNoncombatRoll?.(selected.id);
+                          }
+                        }}
                         disabled={!canRoll}
                         className={`flex items-center gap-3 px-6 py-4 border-2 rounded-lg transition-colors group w-full max-w-xs ${
                           canRoll
@@ -1571,6 +1704,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                     );
                   })()}
                 </div>
+                )}
               </div>
               );
             })()}
@@ -1585,6 +1719,134 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 </p>
               </div>
             )}
+
+            {/* Reactions Tab */}
+            {activeTab === 'reactions' && (() => {
+              // Reactions are ALWAYS clickable, regardless of turn
+              const handleReactionRoll = (actionName: string, stat: 'str' | 'dex' | 'con' | 'int' | 'cha') => {
+                const baseStat = (selected as Record<string, unknown>)[stat] as number;
+                const mod = equippedMods[stat as keyof StatModifiers] ?? 0;
+                const total = baseStat + mod;
+                const modifier = Math.floor((total - 10) / 2);
+                const rawRoll = Math.floor(Math.random() * 20) + 1;
+                const rollTotal = rawRoll + modifier;
+
+                onStatRoll?.(selected.name, selected.id, actionName, total);
+                if (addDiceRoll) {
+                  addDiceRoll({
+                    id: crypto.randomUUID(),
+                    crawlerName: selected.name,
+                    crawlerId: selected.id,
+                    timestamp: Date.now(),
+                    results: [{ dice: 'D20', result: rawRoll }],
+                    total: rollTotal,
+                    statRoll: { stat: actionName, modifier, rawRoll },
+                  });
+                }
+              };
+
+              return (
+                <div className="space-y-6">
+                  <h2 className="font-display text-xl text-primary flex items-center gap-2">
+                    <RefreshCw className="w-6 h-6" /> REACTIONS
+                  </h2>
+                  <p className="text-xs text-muted-foreground">Reactions can be used at any time, even when it is not your turn.</p>
+
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {/* Trip Reaction */}
+                    <button
+                      onClick={() => handleReactionRoll('Trip', 'dex')}
+                      className="flex flex-col items-center gap-2 p-4 border-2 border-accent/50 rounded-lg bg-accent/5 hover:bg-accent/20 hover:border-accent transition-colors group"
+                    >
+                      <Footprints className="w-8 h-8 text-accent group-hover:scale-110 transition-transform" />
+                      <span className="text-sm font-display text-accent">Trip</span>
+                      <span className="text-[10px] text-muted-foreground">DEX check (d20 + modifier)</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Attacks Tab */}
+            {activeTab === 'attacks' && (() => {
+              const isCombatActive = combatState?.active && combatState.phase === 'combat';
+              const isMyTurn = isCombatActive && combatState && combatState.combatants[combatState.currentTurnIndex]?.id === selected.id;
+              const myCombatant = combatState?.combatants.find(c => c.id === selected.id);
+              const hasUsedAction = myCombatant?.hasUsedAction ?? false;
+              const canAttack = !isCombatActive || (isMyTurn && !hasUsedAction);
+
+              const combatTargets = combatState?.combatants.filter(c => c.id !== selected.id) ?? [];
+
+              const handleAttackRoll = (attackName: string, stat: 'str' | 'dex', damageDice: string, damageBonus: number) => {
+                if (!canAttack) return;
+                const baseStat = (selected as Record<string, unknown>)[stat] as number;
+                const mod = equippedMods[stat as keyof StatModifiers] ?? 0;
+                const total = baseStat + mod;
+                const modifier = Math.floor((total - 10) / 2);
+                const rawRoll = Math.floor(Math.random() * 20) + 1;
+                const rollTotal = rawRoll + modifier;
+
+                onStatRoll?.(selected.name, selected.id, attackName, total);
+                if (addDiceRoll) {
+                  addDiceRoll({
+                    id: crypto.randomUUID(),
+                    crawlerName: selected.name,
+                    crawlerId: selected.id,
+                    timestamp: Date.now(),
+                    results: [{ dice: 'D20', result: rawRoll }],
+                    total: rollTotal,
+                    statRoll: { stat: `${attackName} (Attack)`, modifier, rawRoll },
+                  });
+                }
+
+                // If in combat and attack hits, prompt for damage target
+                if (isCombatActive && combatTargets.length > 0) {
+                  setPendingDamageRoll({ dice: damageDice, bonus: damageBonus, actionName: attackName });
+                  setShowDamageTargetModal(true);
+                  setDamageRollResult(null);
+                }
+
+                // Record as combat action
+                if (isCombatActive && isMyTurn) {
+                  onRecordCombatAction?.(selected.id, 'action');
+                }
+              };
+
+              return (
+                <div className="space-y-6">
+                  <h2 className="font-display text-xl text-primary flex items-center gap-2">
+                    <Swords className="w-6 h-6" /> ATTACKS
+                  </h2>
+
+                  {isCombatActive && (
+                    <div className={`border-2 rounded-lg px-4 py-2 ${
+                      isMyTurn && !hasUsedAction ? 'border-accent bg-accent/10' : 'border-border bg-muted/30'
+                    }`}>
+                      <span className={`text-sm font-display ${isMyTurn && !hasUsedAction ? 'text-accent' : 'text-muted-foreground'}`}>
+                        {isMyTurn ? (hasUsedAction ? 'Action already used this turn' : 'YOUR TURN — Select an attack') : 'Waiting for your turn...'}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {/* Unarmed Strike */}
+                    <button
+                      onClick={() => handleAttackRoll('Unarmed Strike', 'str', 'd4', 0)}
+                      disabled={!canAttack}
+                      className={`flex flex-col items-center gap-2 p-4 border-2 rounded-lg transition-colors group ${
+                        canAttack
+                          ? 'border-destructive/50 bg-destructive/5 hover:bg-destructive/20 hover:border-destructive'
+                          : 'border-border/50 bg-muted/20 opacity-50 cursor-not-allowed'
+                      }`}
+                    >
+                      <Hand className={`w-8 h-8 ${canAttack ? 'text-destructive group-hover:scale-110 transition-transform' : 'text-muted-foreground'}`} />
+                      <span className={`text-sm font-display ${canAttack ? 'text-destructive' : 'text-muted-foreground'}`}>Unarmed Strike</span>
+                      <span className="text-[10px] text-muted-foreground">STR check, d4 damage on hit</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       </DungeonCard>
@@ -1721,6 +1983,109 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 {sendGoldAmount > 0 && totalItemsToSend > 0 && ' + '}
                 {totalItemsToSend > 0 && `${totalItemsToSend} item${totalItemsToSend !== 1 ? 's' : ''}`}
               </DungeonButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Damage Target Modal */}
+      {showDamageTargetModal && pendingDamageRoll && combatState && (
+        <div className="fixed inset-0 bg-background/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-background border-2 border-destructive rounded-lg p-6 max-w-md w-full shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display text-lg text-destructive">{pendingDamageRoll.actionName} — Select Target</h3>
+              <button onClick={() => { setShowDamageTargetModal(false); setPendingDamageRoll(null); setDamageRollResult(null); }}>
+                <X className="w-5 h-5 text-muted-foreground hover:text-foreground" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {/* Target selection */}
+              <div>
+                <label className="text-sm text-muted-foreground block mb-2">Target:</label>
+                <div className="space-y-1">
+                  {combatState.combatants.filter(c => c.id !== selected.id).map(c => {
+                    const mob = c.type === 'mob' ? (mobsProp ?? []).find(m => m.id === c.id) : null;
+                    const crawler = c.type === 'crawler' ? crawlers.find(cr => cr.id === c.id) : null;
+                    return (
+                      <button
+                        key={c.id}
+                        onClick={() => {
+                          setDamageTargetId(c.id);
+                          setDamageTargetType(c.type);
+                        }}
+                        className={`w-full text-left px-3 py-2 border rounded text-sm transition-colors ${
+                          damageTargetId === c.id
+                            ? 'bg-destructive/20 border-destructive text-destructive'
+                            : 'bg-muted/30 border-border hover:border-destructive/50'
+                        }`}
+                      >
+                        <span className={c.type === 'crawler' ? 'text-primary' : 'text-destructive'}>{c.name}</span>
+                        {mob && mob.hitPoints != null && (
+                          <span className="text-muted-foreground ml-2">({mob.hitPoints} HP)</span>
+                        )}
+                        {crawler && (
+                          <span className="text-muted-foreground ml-2">({crawler.hp}/{crawler.maxHP} HP)</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Damage roll */}
+              {damageTargetId && (
+                <div className="border border-border bg-muted/30 rounded p-3">
+                  {damageRollResult === null ? (
+                    <button
+                      onClick={() => {
+                        // Roll damage dice
+                        let maxVal = 4;
+                        if (pendingDamageRoll.dice === 'd6') maxVal = 6;
+                        else if (pendingDamageRoll.dice === 'd8') maxVal = 8;
+                        else if (pendingDamageRoll.dice === 'd10') maxVal = 10;
+                        else if (pendingDamageRoll.dice === 'd12') maxVal = 12;
+                        else if (pendingDamageRoll.dice === 'd20') maxVal = 20;
+                        const roll = Math.floor(Math.random() * maxVal) + 1;
+                        const totalDmg = roll + pendingDamageRoll.bonus;
+                        setDamageRollResult(totalDmg);
+
+                        // Add to dice history
+                        if (addDiceRoll) {
+                          addDiceRoll({
+                            id: crypto.randomUUID(),
+                            crawlerName: selected.name,
+                            crawlerId: selected.id,
+                            timestamp: Date.now(),
+                            results: [{ dice: pendingDamageRoll.dice.toUpperCase(), result: roll }],
+                            total: totalDmg,
+                            statRoll: { stat: `${pendingDamageRoll.actionName} (Damage)`, modifier: pendingDamageRoll.bonus, rawRoll: roll },
+                          });
+                        }
+                      }}
+                      className="w-full py-3 bg-destructive text-destructive-foreground font-display rounded hover:bg-destructive/90 transition-colors"
+                    >
+                      ROLL {pendingDamageRoll.dice.toUpperCase()} DAMAGE
+                    </button>
+                  ) : (
+                    <div className="text-center space-y-3">
+                      <p className="font-display text-2xl text-destructive">{damageRollResult} DAMAGE</p>
+                      <button
+                        onClick={async () => {
+                          await onApplyCombatDamage?.(damageTargetId, damageTargetType, damageRollResult);
+                          setShowDamageTargetModal(false);
+                          setPendingDamageRoll(null);
+                          setDamageRollResult(null);
+                          setDamageTargetId('');
+                        }}
+                        className="w-full py-2 bg-destructive text-destructive-foreground font-display text-sm rounded hover:bg-destructive/90 transition-colors"
+                      >
+                        APPLY DAMAGE
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>

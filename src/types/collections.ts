@@ -15,6 +15,7 @@ export type CollectionName =
   | 'diceRolls'
   | 'lootBoxes'
   | 'lootBoxTemplates'
+  | 'combatState'
   // Add new collections below:
   | 'quests'
   | 'npcs'

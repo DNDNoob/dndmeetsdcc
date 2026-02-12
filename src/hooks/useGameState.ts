@@ -8,6 +8,8 @@ import {
   LootBoxTemplate,
   NoncombatTurnState,
   GameClockState,
+  CombatState,
+  CombatantEntry,
   getEquippedModifiers,
   defaultCrawlers,
   defaultInventory,
@@ -652,6 +654,179 @@ export const useGameState = () => {
     if (operations.length > 0) await batchWrite(operations);
   };
 
+  // --- Combat State ---
+  const combatState = useMemo((): CombatState | null => {
+    const stored = getStableCollection<CombatState>('combatState');
+    return stored.find(s => s.id === 'current') ?? null;
+  }, [getCollection, isLoaded]);
+
+  const startCombat = async (crawlerIds: string[], mobIds: string[]) => {
+    const combatants: CombatantEntry[] = [
+      ...crawlerIds.map(id => {
+        const crawler = crawlers.find(c => c.id === id);
+        return {
+          id,
+          type: 'crawler' as const,
+          name: crawler?.name ?? 'Unknown',
+          initiative: 0,
+          hasRolledInitiative: false,
+          hasUsedAction: false,
+          hasUsedBonusAction: false,
+          avatar: crawler?.avatar,
+        };
+      }),
+      ...mobIds.map(id => {
+        const mob = mobs.find(m => m.id === id);
+        return {
+          id,
+          type: 'mob' as const,
+          name: mob?.name ?? 'Unknown',
+          initiative: 0,
+          hasRolledInitiative: false,
+          hasUsedAction: false,
+          hasUsedBonusAction: false,
+          avatar: mob?.image,
+        };
+      }),
+    ];
+
+    const combatData: Record<string, unknown> = {
+      active: true,
+      phase: 'initiative',
+      combatants,
+      currentTurnIndex: 0,
+      combatRound: 1,
+    };
+
+    const current = combatState;
+    if (current) {
+      await updateItem('combatState', 'current', combatData);
+    } else {
+      await addItem('combatState', { id: 'current', ...combatData });
+    }
+    console.log('[GameState] ⚔️ Combat started with', combatants.length, 'combatants');
+  };
+
+  const rollMobInitiatives = async () => {
+    if (!combatState) return;
+    const updatedCombatants = combatState.combatants.map(c => {
+      if (c.type === 'mob' && !c.hasRolledInitiative) {
+        const roll = Math.floor(Math.random() * 20) + 1;
+        return { ...c, initiative: roll, hasRolledInitiative: true };
+      }
+      return c;
+    });
+    await updateItem('combatState', 'current', { combatants: updatedCombatants } as Record<string, unknown>);
+    console.log('[GameState] 🎲 Mob initiatives rolled');
+  };
+
+  const recordCombatInitiative = async (combatantId: string, roll: number) => {
+    if (!combatState) return;
+    const updatedCombatants = combatState.combatants.map(c => {
+      if (c.id === combatantId) {
+        return { ...c, initiative: roll, hasRolledInitiative: true };
+      }
+      return c;
+    });
+    await updateItem('combatState', 'current', { combatants: updatedCombatants } as Record<string, unknown>);
+  };
+
+  const confirmInitiative = async () => {
+    if (!combatState) return;
+    // Sort combatants by initiative (highest first)
+    const sorted = [...combatState.combatants].sort((a, b) => b.initiative - a.initiative);
+    await updateItem('combatState', 'current', {
+      combatants: sorted,
+      phase: 'combat',
+      currentTurnIndex: 0,
+      combatRound: 1,
+    } as Record<string, unknown>);
+    console.log('[GameState] ⚔️ Combat order confirmed, starting combat phase');
+  };
+
+  const advanceCombatTurn = async () => {
+    if (!combatState) return;
+    const nextIndex = combatState.currentTurnIndex + 1;
+    const isNewRound = nextIndex >= combatState.combatants.length;
+    // Reset action flags for the combatant whose turn just ended
+    const resetCombatants = combatState.combatants.map((c, i) => {
+      if (i === combatState.currentTurnIndex) {
+        return { ...c, hasUsedAction: false, hasUsedBonusAction: false };
+      }
+      return c;
+    });
+    await updateItem('combatState', 'current', {
+      combatants: resetCombatants,
+      currentTurnIndex: isNewRound ? 0 : nextIndex,
+      combatRound: isNewRound ? combatState.combatRound + 1 : combatState.combatRound,
+    } as Record<string, unknown>);
+  };
+
+  const recordCombatAction = async (combatantId: string, actionType: 'action' | 'bonus') => {
+    if (!combatState) return;
+    const updatedCombatants = combatState.combatants.map(c => {
+      if (c.id === combatantId) {
+        if (actionType === 'action') {
+          return { ...c, hasUsedAction: true };
+        }
+        return { ...c, hasUsedBonusAction: true };
+      }
+      return c;
+    });
+    await updateItem('combatState', 'current', { combatants: updatedCombatants } as Record<string, unknown>);
+  };
+
+  const applyCombatDamage = async (targetId: string, targetType: 'crawler' | 'mob', damage: number) => {
+    if (targetType === 'crawler') {
+      const crawler = crawlers.find(c => c.id === targetId);
+      if (crawler) {
+        const newHP = Math.max(0, (crawler.hp || 0) - damage);
+        await updateItem('crawlers', targetId, { hp: newHP } as Record<string, unknown>);
+        console.log('[GameState] ⚔️ Damage applied to crawler', crawler.name, ':', damage, '→ HP:', newHP);
+      }
+    } else {
+      const mob = mobs.find(m => m.id === targetId);
+      if (mob) {
+        const newHP = Math.max(0, (mob.hitPoints || 0) - damage);
+        await updateItem('mobs', targetId, { hitPoints: newHP } as Record<string, unknown>);
+        console.log('[GameState] ⚔️ Damage applied to mob', mob.name, ':', damage, '→ HP:', newHP);
+      }
+    }
+  };
+
+  const overrideMobHealth = async (mobId: string, newHP: number) => {
+    await updateItem('mobs', mobId, { hitPoints: newHP } as Record<string, unknown>);
+    console.log('[GameState] ⚔️ DM override: mob HP set to', newHP);
+  };
+
+  const endCombat = async () => {
+    if (!combatState) return;
+    await updateItem('combatState', 'current', {
+      active: false,
+      phase: 'ended',
+      combatants: [],
+      currentTurnIndex: 0,
+    } as Record<string, unknown>);
+    console.log('[GameState] ⚔️ Combat ended');
+  };
+
+  const removeCombatant = async (combatantId: string) => {
+    if (!combatState) return;
+    const updatedCombatants = combatState.combatants.filter(c => c.id !== combatantId);
+    // Adjust currentTurnIndex if needed
+    let newIndex = combatState.currentTurnIndex;
+    const removedIndex = combatState.combatants.findIndex(c => c.id === combatantId);
+    if (removedIndex < combatState.currentTurnIndex) {
+      newIndex = Math.max(0, newIndex - 1);
+    } else if (newIndex >= updatedCombatants.length) {
+      newIndex = 0;
+    }
+    await updateItem('combatState', 'current', {
+      combatants: updatedCombatants,
+      currentTurnIndex: newIndex,
+    } as Record<string, unknown>);
+  };
+
   return {
     crawlers,
     updateCrawler,
@@ -694,6 +869,17 @@ export const useGameState = () => {
     setGameClock,
     performShortRest,
     performLongRest,
+    combatState,
+    startCombat,
+    rollMobInitiatives,
+    recordCombatInitiative,
+    confirmInitiative,
+    advanceCombatTurn,
+    recordCombatAction,
+    applyCombatDamage,
+    overrideMobHealth,
+    endCombat,
+    removeCombatant,
     isLoaded,
   };
 };
