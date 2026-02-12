@@ -2146,11 +2146,6 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
         </div>
       )}
 
-      {/* Map interaction blocker during initiative (non-admin) */}
-      {combatState?.active && combatState.phase === 'initiative' && !isAdmin && (
-        <div className="absolute inset-0 z-40 bg-background/30 pointer-events-auto" />
-      )}
-
       {/* Map display */}
       <div
         ref={mapContainerRef}
@@ -2164,6 +2159,10 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
           handleMouseUp();
         }}
       >
+        {/* Map interaction blocker during initiative (non-admin) - scoped to map container */}
+        {combatState?.active && combatState.phase === 'initiative' && !isAdmin && (
+          <div className="absolute inset-0 z-40 bg-background/30 pointer-events-auto" />
+        )}
         {/* Cursor follower for ping/box/crawler/mob mode */}
         {cursorPosition && (isPingMode || isBoxMode || (isAddCrawlerMode && selectedCrawlerId) || (isAddMobMode && selectedMobId)) && (
           <div
