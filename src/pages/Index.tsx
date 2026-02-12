@@ -17,7 +17,7 @@ import SoundEffectsView from "@/views/SoundEffectsView";
 
 import { useGameState, DiceRollEntry } from "@/hooks/useGameState";
 import { toast } from "sonner";
-import type { Episode } from "@/lib/gameData";
+import type { Episode, Mob } from "@/lib/gameData";
 
 type AppScreen = "splash" | "menu" | "game";
 type GameView = "profiles" | "maps" | "inventory" | "mobs" | "dungeonai" | "showtime" | "sounds";
@@ -148,6 +148,17 @@ const Index = () => {
     setGameClock,
     performShortRest,
     performLongRest,
+    combatState,
+    startCombat,
+    rollMobInitiatives,
+    recordCombatInitiative,
+    confirmInitiative,
+    advanceCombatTurn,
+    recordCombatAction,
+    applyCombatDamage,
+    overrideMobHealth,
+    endCombat,
+    removeCombatant,
     isLoaded
   } = useGameState();
 
@@ -373,6 +384,12 @@ const Index = () => {
                 recordNoncombatRoll={recordNoncombatRoll}
                 currentPlayerId={currentPlayer?.id}
                 isShowtimeActive={isShowtimeActive}
+                combatState={combatState}
+                onRecordCombatInitiative={recordCombatInitiative}
+                onRecordCombatAction={recordCombatAction}
+                onApplyCombatDamage={applyCombatDamage}
+                addDiceRoll={addDiceRoll}
+                mobs={mobs}
               />
             )}
             {currentView === "maps" && (
@@ -450,6 +467,7 @@ const Index = () => {
                 onSetGameClock={setGameClock}
                 noncombatTurnState={noncombatTurnState}
                 resetNoncombatTurns={resetNoncombatTurns}
+                combatState={combatState}
               />
             )}
             {currentView === "sounds" && <SoundEffectsView />}
@@ -469,10 +487,19 @@ const Index = () => {
               noncombatTurnState={noncombatTurnState}
               onStartNoncombatTurn={() => startNoncombatTurn()}
               crawlers={crawlers}
+              mobs={mobs}
               gameClockState={gameClockState}
               onPerformShortRest={performShortRest}
               onPerformLongRest={performLongRest}
               activeEpisode={activeEpisode}
+              combatState={combatState}
+              onStartCombat={startCombat}
+              onRollMobInitiatives={rollMobInitiatives}
+              onConfirmInitiative={confirmInitiative}
+              onAdvanceCombatTurn={advanceCombatTurn}
+              onEndCombat={endCombat}
+              onOverrideMobHealth={overrideMobHealth}
+              onRemoveCombatant={removeCombatant}
             />
           )}
 

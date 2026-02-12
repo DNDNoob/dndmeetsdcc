@@ -167,6 +167,30 @@ export interface GameClockState {
   gameTime: number; // epoch milliseconds representing in-game time
 }
 
+// Combat system types
+export type CombatPhase = 'initiative' | 'combat' | 'ended';
+
+export interface CombatantEntry {
+  id: string; // crawlerId or mobId
+  type: 'crawler' | 'mob';
+  name: string;
+  initiative: number; // d20 roll result + modifier
+  hasRolledInitiative: boolean;
+  hasUsedAction: boolean;
+  hasUsedBonusAction: boolean;
+  avatar?: string; // cached avatar/image for display
+}
+
+// Combat state - synced via Firebase (singleton doc, id = 'current')
+export interface CombatState {
+  id: string; // always 'current'
+  active: boolean;
+  phase: CombatPhase;
+  combatants: CombatantEntry[];
+  currentTurnIndex: number;
+  combatRound: number;
+}
+
 export interface Episode {
   id: string;
   name: string;

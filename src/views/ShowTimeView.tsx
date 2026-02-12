@@ -7,7 +7,7 @@ import { GridOverlay } from "@/components/ui/GridOverlay";
 import RulerOverlay from "@/components/ui/RulerOverlay";
 import { MobIcon } from "@/components/ui/MobIcon";
 import { FogOfWar } from "@/components/ui/FogOfWar";
-import { Episode, Mob, MapSettings, Crawler, CrawlerPlacement, EpisodeMobPlacement, SentLootBox, LootBoxTemplate, getLootBoxTierColor, InventoryItem } from "@/lib/gameData";
+import { Episode, Mob, MapSettings, Crawler, CrawlerPlacement, EpisodeMobPlacement, SentLootBox, LootBoxTemplate, getLootBoxTierColor, InventoryItem, CombatState } from "@/lib/gameData";
 import { Map, X, Eye, Layers, ChevronLeft, ChevronRight, PlayCircle, Grid3x3, CloudFog, Eraser, Trash2, Target, ZoomIn, ZoomOut, Package, Lock, Unlock, Search, Plus } from "lucide-react";
 import { PingEffect, Ping } from "@/components/ui/PingEffect";
 import { MapBox, MapBoxData, ShapeType } from "@/components/ui/MapBox";
@@ -42,6 +42,7 @@ interface ShowTimeViewProps {
   onSetGameClock?: (gameTime: number) => Promise<void>;
   noncombatTurnState?: import("@/lib/gameData").NoncombatTurnState | null;
   resetNoncombatTurns?: (episodeId: string) => Promise<void>;
+  combatState?: CombatState | null;
 }
 
 const SHOWTIME_STORAGE_KEY = 'dcc_showtime_state';
@@ -355,7 +356,7 @@ const InventoryPanel: React.FC<{
   );
 };
 
-const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock, noncombatTurnState, resetNoncombatTurns }) => {
+const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock, noncombatTurnState, resetNoncombatTurns, combatState }) => {
   const { roomId } = useFirebaseStore();
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
   const [currentMapIndex, setCurrentMapIndex] = useState(0);
@@ -2094,6 +2095,60 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             <ZoomOut className="w-4 h-4" />
           </DungeonButton>
         </div>
+      )}
+
+      {/* Combat Order Display - shows above map during active combat */}
+      {combatState?.active && combatState.phase === 'combat' && combatState.combatants.length > 0 && (
+        <div className="w-full bg-background/90 border-b-2 border-destructive/50 px-4 py-2 flex items-center gap-1 overflow-x-auto shrink-0">
+          <span className="text-[10px] text-destructive font-display mr-2 shrink-0">R{combatState.combatRound}</span>
+          {combatState.combatants.map((c, i) => {
+            const isCurrent = i === combatState.currentTurnIndex;
+            const crawlerData = c.type === 'crawler' ? crawlers.find(cr => cr.id === c.id) : null;
+            const mobData = c.type === 'mob' ? mobs.find(m => m.id === c.id) : null;
+            const avatar = crawlerData?.avatar || mobData?.image;
+            return (
+              <div
+                key={c.id}
+                className={`flex flex-col items-center shrink-0 px-1 py-1 rounded transition-all ${
+                  isCurrent
+                    ? 'bg-accent/20 border border-accent shadow-[0_0_8px_rgba(251,191,36,0.4)] scale-110'
+                    : 'opacity-60'
+                }`}
+                title={`${c.name} (Initiative: ${c.initiative})`}
+              >
+                <div className={`w-10 h-10 rounded-full border-2 overflow-hidden flex items-center justify-center ${
+                  c.type === 'crawler' ? 'border-primary' : 'border-destructive'
+                } ${isCurrent ? 'ring-2 ring-accent' : ''}`}>
+                  {avatar ? (
+                    <img src={avatar} alt={c.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className={`text-xs font-bold ${c.type === 'crawler' ? 'text-primary' : 'text-destructive'}`}>
+                      {c.name.charAt(0)}
+                    </span>
+                  )}
+                </div>
+                <span className={`text-[9px] mt-0.5 max-w-[48px] truncate ${
+                  isCurrent ? 'text-accent font-bold' : 'text-muted-foreground'
+                }`}>
+                  {c.name}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Initiative Phase Banner */}
+      {combatState?.active && combatState.phase === 'initiative' && (
+        <div className="w-full bg-destructive/10 border-b-2 border-destructive/50 px-4 py-3 text-center shrink-0">
+          <span className="text-destructive font-display text-sm animate-pulse">ROLL FOR INITIATIVE</span>
+          <p className="text-[10px] text-muted-foreground mt-1">Go to your profile to roll initiative</p>
+        </div>
+      )}
+
+      {/* Map interaction blocker during initiative (non-admin) */}
+      {combatState?.active && combatState.phase === 'initiative' && !isAdmin && (
+        <div className="absolute inset-0 z-40 bg-background/30 pointer-events-auto" />
       )}
 
       {/* Map display */}
