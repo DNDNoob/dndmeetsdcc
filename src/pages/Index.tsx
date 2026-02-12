@@ -14,15 +14,15 @@ import MobsView from "@/views/MobsView";
 import DungeonAIView from "@/views/DungeonAIView";
 import ShowTimeView from "@/views/ShowTimeView";
 import SoundEffectsView from "@/views/SoundEffectsView";
-import { RoomManager } from "@/components/RoomManager";
+
 import { useGameState, DiceRollEntry } from "@/hooks/useGameState";
 import { toast } from "sonner";
 import type { Episode } from "@/lib/gameData";
 
 type AppScreen = "splash" | "menu" | "game";
-type GameView = "profiles" | "maps" | "inventory" | "mobs" | "dungeonai" | "showtime" | "sounds" | "multiplayer";
+type GameView = "profiles" | "maps" | "inventory" | "mobs" | "dungeonai" | "showtime" | "sounds";
 
-const GAME_VIEWS: readonly string[] = ["profiles", "maps", "inventory", "mobs", "dungeonai", "showtime", "sounds", "multiplayer"];
+const GAME_VIEWS: readonly string[] = ["profiles", "maps", "inventory", "mobs", "dungeonai", "showtime", "sounds"];
 
 const STORAGE_KEY_PLAYER = "dcc_current_player";
 const STORAGE_KEY_MAP_VISIBILITY = "dcc_map_visibility";
@@ -453,14 +453,6 @@ const Index = () => {
               />
             )}
             {currentView === "sounds" && <SoundEffectsView />}
-            {currentView === "multiplayer" && (
-              <div className="container mx-auto px-4 sm:px-6 max-w-2xl">
-                <h1 className="font-display text-3xl text-primary text-glow-cyan mb-6 text-center">
-                  MULTIPLAYER
-                </h1>
-                <RoomManager />
-              </div>
-            )}
           </main>
 
           <DiceRoller

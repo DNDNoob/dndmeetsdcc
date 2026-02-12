@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { DungeonButton } from "./ui/DungeonButton";
-import { User, Map, Backpack, Skull, Brain, Lock, Presentation, Volume2, Users } from "lucide-react";
+import { User, Map, Backpack, Skull, Brain, Lock, Presentation, Volume2 } from "lucide-react";
 
 interface MainMenuProps {
   onNavigate: (view: string) => void;
@@ -19,7 +19,6 @@ const menuItems = [
   { id: "mobs", label: "Mob Profiles", icon: Skull },
   { id: "showtime", label: "Show Time", icon: Presentation },
   { id: "sounds", label: "Sound Effects", icon: Volume2 },
-  { id: "multiplayer", label: "Multiplayer", icon: Users },
 ];
 
 const DM_PASSWORD = "DND_IS_LIFE!";
