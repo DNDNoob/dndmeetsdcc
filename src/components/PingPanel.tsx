@@ -156,7 +156,7 @@ const PingPanel: React.FC<PingPanelProps> = ({
             {isAdmin && onStartNoncombatTurn && (
               <div className="mb-3">
                 <button
-                  onClick={onStartNoncombatTurn}
+                  onClick={() => onStartNoncombatTurn()}
                   className={`w-full flex items-center justify-center gap-2 px-4 py-3 font-display text-sm border-2 rounded transition-all ${
                     allPlayersSpent
                       ? 'bg-accent/20 border-accent text-accent animate-pulse hover:bg-accent/30'
