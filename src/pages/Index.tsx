@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import SplashScreen from "@/components/SplashScreen";
 import MainMenu from "@/components/MainMenu";
@@ -21,31 +22,91 @@ import type { Episode } from "@/lib/gameData";
 type AppScreen = "splash" | "menu" | "game";
 type GameView = "profiles" | "maps" | "inventory" | "mobs" | "dungeonai" | "showtime" | "sounds" | "multiplayer";
 
+const GAME_VIEWS: readonly string[] = ["profiles", "maps", "inventory", "mobs", "dungeonai", "showtime", "sounds", "multiplayer"];
+
 const STORAGE_KEY_PLAYER = "dcc_current_player";
 const STORAGE_KEY_MAP_VISIBILITY = "dcc_map_visibility";
 const STORAGE_KEY_DUNGEON_AI_LOGIN = "dcc_dungeon_ai_login";
 
+function loadSavedPlayer(): { id: string; name: string; type: "crawler" | "ai" | "npc" } | null {
+  const saved = localStorage.getItem(STORAGE_KEY_PLAYER);
+  if (saved) {
+    try { return JSON.parse(saved); } catch { return null; }
+  }
+  return null;
+}
+
 const Index = () => {
-  const [screen, setScreen] = useState<AppScreen>("splash");
-  const [currentView, setCurrentView] = useState<GameView>("profiles");
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Derive screen and currentView from the URL path
+  const pathSegment = location.pathname.replace(/^\//, '').split('/')[0] || '';
+
+  const { screen, currentView } = useMemo((): { screen: AppScreen; currentView: GameView } => {
+    if (pathSegment === '') {
+      return { screen: 'splash', currentView: 'profiles' };
+    }
+    if (pathSegment === 'menu') {
+      return { screen: 'menu', currentView: 'profiles' };
+    }
+    if (GAME_VIEWS.includes(pathSegment)) {
+      return { screen: 'game', currentView: pathSegment as GameView };
+    }
+    // Unknown path — will be redirected by the guard effect
+    return { screen: 'splash', currentView: 'profiles' };
+  }, [pathSegment]);
+
   const [showChangelog, setShowChangelog] = useState(false);
+
+  // Initialize player synchronously from localStorage to avoid redirect flash on refresh
   const [currentPlayer, setCurrentPlayer] = useState<{
     id: string;
     name: string;
     type: "crawler" | "ai" | "npc";
-  } | null>(null);
-  const [mapVisibility, setMapVisibility] = useState<boolean[]>([]);
-  const [mapNames, setMapNames] = useState<string[]>([]);
+  } | null>(() => {
+    if (localStorage.getItem(STORAGE_KEY_DUNGEON_AI_LOGIN) === "true") {
+      return { id: "dungeonai", name: "DUNGEON AI", type: "ai" };
+    }
+    return loadSavedPlayer();
+  });
+
+  const [mapVisibility, setMapVisibility] = useState<boolean[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY_MAP_VISIBILITY);
+    if (saved) {
+      try { return JSON.parse(saved); } catch { return []; }
+    }
+    return [];
+  });
+
+  const [mapNames, setMapNames] = useState<string[]>(() => {
+    const saved = localStorage.getItem('dcc_map_names');
+    if (saved) {
+      try { return JSON.parse(saved); } catch { return []; }
+    }
+    return [];
+  });
+
   const [isNavVisible, setIsNavVisible] = useState(true);
   const [isDiceExpanded, setIsDiceExpanded] = useState(false);
-  const [isDungeonAILoggedIn, setIsDungeonAILoggedIn] = useState(false);
+
+  const [isDungeonAILoggedIn, setIsDungeonAILoggedIn] = useState(
+    () => localStorage.getItem(STORAGE_KEY_DUNGEON_AI_LOGIN) === "true"
+  );
+
   const [isShowtimeActive, setIsShowtimeActive] = useState(false);
   const [activeEpisode, setActiveEpisode] = useState<Episode | null>(null);
+
   const [previousPlayer, setPreviousPlayer] = useState<{
     id: string;
     name: string;
     type: "crawler" | "ai" | "npc";
-  } | null>(null);
+  } | null>(() => {
+    if (localStorage.getItem(STORAGE_KEY_DUNGEON_AI_LOGIN) === "true") {
+      return loadSavedPlayer();
+    }
+    return null;
+  });
 
   const {
     crawlers,
@@ -90,67 +151,50 @@ const Index = () => {
     isLoaded
   } = useGameState();
 
+  // Route guards — redirect invalid navigation states
   useEffect(() => {
-    const savedPlayer = localStorage.getItem(STORAGE_KEY_PLAYER);
-    if (savedPlayer) {
-      try {
-        const player = JSON.parse(savedPlayer);
-        setCurrentPlayer(player);
-      } catch (e) {
-        console.error("Failed to load player:", e);
-      }
+    // Unknown route → splash
+    if (pathSegment !== '' && pathSegment !== 'menu' && !GAME_VIEWS.includes(pathSegment)) {
+      navigate('/', { replace: true });
+      return;
     }
-
-    const savedVisibility = localStorage.getItem(STORAGE_KEY_MAP_VISIBILITY);
-    if (savedVisibility) {
-      try {
-        setMapVisibility(JSON.parse(savedVisibility));
-      } catch (e) {
-        console.error("Failed to load map visibility:", e);
-      }
+    // No player selected but trying to access menu or game views → splash
+    if (!currentPlayer && pathSegment !== '') {
+      navigate('/', { replace: true });
+      return;
     }
-
-    const savedMapNames = localStorage.getItem('dcc_map_names');
-    if (savedMapNames) {
-      try {
-        setMapNames(JSON.parse(savedMapNames));
-      } catch (e) {
-        console.error("Failed to load map names:", e);
-      }
+    // Non-admin trying to access dungeonai → menu
+    if (pathSegment === 'dungeonai' && currentPlayer?.type !== 'ai') {
+      navigate('/menu', { replace: true });
+      return;
     }
+  }, [pathSegment, currentPlayer, navigate]);
 
-    const savedDungeonAILogin = localStorage.getItem(STORAGE_KEY_DUNGEON_AI_LOGIN);
-    if (savedDungeonAILogin === "true") {
-      setIsDungeonAILoggedIn(true);
-      // If a Dungeon AI login was persisted, switch the current player to the Dungeon AI profile
-      setPreviousPlayer(savedPlayer ? JSON.parse(savedPlayer) : null);
-      setCurrentPlayer({ id: "dungeonai", name: "DUNGEON AI", type: "ai" });
-    }
-  }, []);
-
+  // Persist player to localStorage
   useEffect(() => {
     if (currentPlayer) {
       localStorage.setItem(STORAGE_KEY_PLAYER, JSON.stringify(currentPlayer));
     }
   }, [currentPlayer]);
 
+  // Persist map visibility to localStorage
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_MAP_VISIBILITY, JSON.stringify(mapVisibility));
   }, [mapVisibility]);
 
+  // --- Navigation handlers (now use navigate()) ---
+
   const handlePlayerSelect = (playerId: string, playerName: string, playerType: "crawler" | "ai" | "npc") => {
     setCurrentPlayer({ id: playerId, name: playerName, type: playerType });
-    setScreen("menu");
+    navigate('/menu');
   };
 
   const handleNavigate = (view: string) => {
-    setCurrentView(view as GameView);
-    setScreen("game");
+    navigate('/' + view);
   };
 
   const handleDungeonAI = () => {
-    setCurrentView("dungeonai");
-    setScreen("game");
+    navigate('/dungeonai');
   };
 
   const handleDungeonAILogin = () => {
@@ -167,18 +211,17 @@ const Index = () => {
     if (previousPlayer) {
       setCurrentPlayer(previousPlayer);
       setPreviousPlayer(null);
-      setScreen("menu");
+      navigate('/menu');
     } else {
       setCurrentPlayer(null);
-      setScreen("splash");
+      navigate('/');
     }
 
-    setCurrentView("profiles");
     localStorage.removeItem(STORAGE_KEY_DUNGEON_AI_LOGIN);
   };
 
   const handleReturnToMenu = () => {
-    setScreen("menu");
+    navigate('/menu');
   };
 
   const handleStatRoll = (crawlerName: string, crawlerId: string, stat: string, totalStat: number) => {
@@ -432,7 +475,7 @@ const Index = () => {
             <PingPanel
               isAdmin={isAdmin}
               noncombatTurnState={noncombatTurnState}
-              onStartNoncombatTurn={startNoncombatTurn}
+              onStartNoncombatTurn={() => startNoncombatTurn()}
               crawlers={crawlers}
               gameClockState={gameClockState}
               onPerformShortRest={performShortRest}

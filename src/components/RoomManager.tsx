@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useGame } from "@/contexts/GameContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,41 +9,35 @@ import { Users, Copy, Check, LogOut } from "lucide-react";
 
 export const RoomManager = () => {
   const { roomId, setRoomId } = useGame();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [inputRoomId, setInputRoomId] = useState("");
   const [copied, setCopied] = useState(false);
 
   // Check URL for room parameter on mount
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const urlRoomId = params.get('room');
+    const urlRoomId = searchParams.get('room');
     if (urlRoomId && !roomId) {
       setRoomId(urlRoomId);
     }
   }, []);
 
-  // Generate invite link
-  const inviteLink = roomId 
-    ? `${window.location.origin}${window.location.pathname}?room=${roomId}`
+  // Generate invite link (always points to /multiplayer with room param)
+  const inviteLink = roomId
+    ? `${window.location.origin}/multiplayer?room=${roomId}`
     : "";
 
   // Create new room
   const handleCreateRoom = () => {
     const newRoomId = crypto.randomUUID();
     setRoomId(newRoomId);
-    
-    // Update URL without reload
-    const newUrl = `${window.location.origin}${window.location.pathname}?room=${newRoomId}`;
-    window.history.pushState({}, '', newUrl);
+    setSearchParams({ room: newRoomId });
   };
 
   // Join existing room
   const handleJoinRoom = () => {
     if (inputRoomId.trim()) {
       setRoomId(inputRoomId.trim());
-      
-      // Update URL without reload
-      const newUrl = `${window.location.origin}${window.location.pathname}?room=${inputRoomId.trim()}`;
-      window.history.pushState({}, '', newUrl);
+      setSearchParams({ room: inputRoomId.trim() });
     }
   };
 
@@ -50,10 +45,7 @@ export const RoomManager = () => {
   const handleLeaveRoom = () => {
     setRoomId(null);
     setInputRoomId("");
-    
-    // Remove room from URL
-    const newUrl = `${window.location.origin}${window.location.pathname}`;
-    window.history.pushState({}, '', newUrl);
+    setSearchParams({});
   };
 
   // Copy invite link to clipboard

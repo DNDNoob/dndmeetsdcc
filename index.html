@@ -21,6 +21,28 @@
 
   <body>
     <div id="root"></div>
+    <!-- GitHub Pages SPA redirect: restores the route from 404.html redirect -->
+    <script>
+      (function(){
+        var redirect = sessionStorage.redirect;
+        delete sessionStorage.redirect;
+        if (redirect && redirect !== location.href) {
+          history.replaceState(null, null, redirect);
+        }
+      })();
+      (function(){
+        var l = window.location;
+        if (l.search[1] === '/') {
+          var decoded = l.search.slice(1).split('&').map(function(s) {
+            return s.replace(/~and~/g, '&');
+          }).join('?');
+          var path = decoded.split('?');
+          window.history.replaceState(null, null,
+            l.pathname.slice(0, -1) + path[0] + (path[1] ? ('?' + path[1]) : '') + l.hash
+          );
+        }
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
