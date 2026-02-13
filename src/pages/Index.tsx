@@ -494,7 +494,6 @@ const Index = () => {
               activeEpisode={activeEpisode}
               combatState={combatState}
               onStartCombat={startCombat}
-              onRollMobInitiatives={rollMobInitiatives}
               onConfirmInitiative={confirmInitiative}
               onAdvanceCombatTurn={advanceCombatTurn}
               onEndCombat={endCombat}

@@ -2104,7 +2104,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
           {combatState.combatants.map((c, i) => {
             const isCurrent = i === combatState.currentTurnIndex;
             const crawlerData = c.type === 'crawler' ? crawlers.find(cr => cr.id === c.id) : null;
-            const mobData = c.type === 'mob' ? mobs.find(m => m.id === c.id) : null;
+            const mobData = c.type === 'mob' ? mobs.find(m => m.id === (c.sourceId || c.id)) : null;
             const avatar = crawlerData?.avatar || mobData?.image;
             return (
               <div

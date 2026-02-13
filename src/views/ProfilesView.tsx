@@ -6,7 +6,7 @@ import { HealthBar } from "@/components/ui/HealthBar";
 import { EquipmentSlot } from "@/components/ui/EquipmentSlot";
 import { Crawler, Mob, InventoryItem, createEmptyCrawler, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState } from "@/lib/gameData";
 import type { DiceRollEntry } from "@/hooks/useGameState";
-import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Backpack, HardHat, Package, Lock, Unlock, ChevronDown, ChevronUp, Check, Search, Send, BookOpen, Filter, X, Gem, Footprints, Shirt, Hand, Target, Swords, RefreshCw } from "lucide-react";
+import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Backpack, HardHat, Package, Lock, Unlock, ChevronDown, ChevronUp, Check, Search, Send, BookOpen, Filter, X, Gem, Footprints, Shirt, Hand, Target, Swords, RefreshCw, Timer } from "lucide-react";
 
 type SortOption = 'name-asc' | 'name-desc' | 'gold-desc' | 'gold-asc';
 
@@ -41,7 +41,7 @@ const getEquipmentIcon = (slot?: string, className: string = "w-4 h-4 shrink-0")
   }
 };
 
-type ProfileTab = 'profile' | 'inventory' | 'actions' | 'spells' | 'reactions' | 'attacks';
+type ProfileTab = 'profile' | 'inventory' | 'actions' | 'spells' | 'reactions' | 'attacks' | 'bonus';
 
 // Noncombat actions mapped to their associated ability score
 const NONCOMBAT_ACTIONS: { label: string; stat: 'str' | 'dex' | 'con' | 'int' | 'cha' }[] = [
@@ -773,6 +773,18 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             >
               <Swords className="w-5 h-5" />
               <span className="hidden xl:inline text-sm font-medium">Attacks</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('bonus')}
+              className={`p-3 rounded-l-lg transition-colors flex items-center gap-2 ${
+                activeTab === 'bonus'
+                  ? 'bg-primary/20 text-primary border-r-2 border-primary'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              }`}
+              title="Bonus Actions"
+            >
+              <Timer className="w-5 h-5" />
+              <span className="hidden xl:inline text-sm font-medium">Bonus</span>
             </button>
           </div>
 
@@ -1769,11 +1781,12 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
 
             {/* Attacks Tab */}
             {activeTab === 'attacks' && (() => {
-              const isCombatActive = combatState?.active && combatState.phase === 'combat';
-              const isMyTurn = isCombatActive && combatState && combatState.combatants[combatState.currentTurnIndex]?.id === selected.id;
+              const isAnyCombatActive = combatState?.active && combatState.phase !== 'ended';
+              const isCombatPhaseLocal = combatState?.active && combatState.phase === 'combat';
+              const isMyTurn = isCombatPhaseLocal && combatState && combatState.combatants[combatState.currentTurnIndex]?.id === selected.id;
               const myCombatant = combatState?.combatants.find(c => c.id === selected.id);
               const hasUsedAction = myCombatant?.hasUsedAction ?? false;
-              const canAttack = !isCombatActive || (isMyTurn && !hasUsedAction);
+              const canAttack = !isAnyCombatActive || (isMyTurn && !hasUsedAction);
 
               const combatTargets = combatState?.combatants.filter(c => c.id !== selected.id) ?? [];
 
@@ -1800,14 +1813,14 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 }
 
                 // If in combat and attack hits, prompt for damage target
-                if (isCombatActive && combatTargets.length > 0) {
+                if (isCombatPhaseLocal && combatTargets.length > 0) {
                   setPendingDamageRoll({ dice: damageDice, bonus: damageBonus, actionName: attackName });
                   setShowDamageTargetModal(true);
                   setDamageRollResult(null);
                 }
 
                 // Record as combat action
-                if (isCombatActive && isMyTurn) {
+                if (isCombatPhaseLocal && isMyTurn) {
                   onRecordCombatAction?.(selected.id, 'action');
                 }
               };
@@ -1818,12 +1831,14 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                     <Swords className="w-6 h-6" /> ATTACKS
                   </h2>
 
-                  {isCombatActive && (
+                  {isAnyCombatActive && (
                     <div className={`border-2 rounded-lg px-4 py-2 ${
                       isMyTurn && !hasUsedAction ? 'border-accent bg-accent/10' : 'border-border bg-muted/30'
                     }`}>
                       <span className={`text-sm font-display ${isMyTurn && !hasUsedAction ? 'text-accent' : 'text-muted-foreground'}`}>
-                        {isMyTurn ? (hasUsedAction ? 'Action already used this turn' : 'YOUR TURN — Select an attack') : 'Waiting for your turn...'}
+                        {combatState?.phase === 'initiative'
+                          ? 'Rolling initiative — attacks locked'
+                          : isMyTurn ? (hasUsedAction ? 'Action already used this turn' : 'YOUR TURN — Select an attack') : 'Waiting for your turn...'}
                       </span>
                     </div>
                   )}
@@ -1842,6 +1857,127 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                       <Hand className={`w-8 h-8 ${canAttack ? 'text-destructive group-hover:scale-110 transition-transform' : 'text-muted-foreground'}`} />
                       <span className={`text-sm font-display ${canAttack ? 'text-destructive' : 'text-muted-foreground'}`}>Unarmed Strike</span>
                       <span className="text-[10px] text-muted-foreground">STR check, d4 damage on hit</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Bonus Actions Tab */}
+            {activeTab === 'bonus' && (() => {
+              const isCombatActive = combatState?.active && combatState.phase !== 'ended';
+              const isCombatPhaseLocal = combatState?.active && combatState.phase === 'combat';
+              const isMyTurn = isCombatPhaseLocal && combatState && combatState.combatants[combatState.currentTurnIndex]?.id === selected.id;
+              const myCombatant = combatState?.combatants.find(c => c.id === selected.id);
+              const hasUsedBonusAction = myCombatant?.hasUsedBonusAction ?? false;
+              const canUseBonus = !isCombatActive || (isMyTurn && !hasUsedBonusAction);
+
+              const handleBonusActionRoll = (actionName: string, stat: 'str' | 'dex' | 'con' | 'int' | 'cha') => {
+                if (!canUseBonus) return;
+                const baseStat = (selected as Record<string, unknown>)[stat] as number;
+                const mod = equippedMods[stat as keyof StatModifiers] ?? 0;
+                const total = baseStat + mod;
+                const modifier = Math.floor((total - 10) / 2);
+                const rawRoll = Math.floor(Math.random() * 20) + 1;
+                const rollTotal = rawRoll + modifier;
+
+                onStatRoll?.(selected.name, selected.id, actionName, total);
+                if (addDiceRoll) {
+                  addDiceRoll({
+                    id: crypto.randomUUID(),
+                    crawlerName: selected.name,
+                    crawlerId: selected.id,
+                    timestamp: Date.now(),
+                    results: [{ dice: 'D20', result: rawRoll }],
+                    total: rollTotal,
+                    statRoll: { stat: `${actionName} (Bonus)`, modifier, rawRoll },
+                  });
+                }
+                if (isCombatPhaseLocal && isMyTurn) {
+                  onRecordCombatAction?.(selected.id, 'bonus');
+                }
+              };
+
+              return (
+                <div className="space-y-6">
+                  <h2 className="font-display text-xl text-primary flex items-center gap-2">
+                    <Timer className="w-6 h-6" /> BONUS ACTIONS
+                  </h2>
+                  <p className="text-xs text-muted-foreground">
+                    You can take one bonus action on your turn. Bonus actions are separate from your main action.
+                  </p>
+
+                  {isCombatActive && (
+                    <div className={`border-2 rounded-lg px-4 py-2 ${
+                      isMyTurn && !hasUsedBonusAction ? 'border-accent bg-accent/10' : 'border-border bg-muted/30'
+                    }`}>
+                      <span className={`text-sm font-display ${isMyTurn && !hasUsedBonusAction ? 'text-accent' : 'text-muted-foreground'}`}>
+                        {combatState?.phase === 'initiative'
+                          ? 'Rolling initiative — bonus actions locked'
+                          : isMyTurn ? (hasUsedBonusAction ? 'Bonus action already used this turn' : 'YOUR TURN — Select a bonus action') : 'Waiting for your turn...'}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {/* Off-hand Attack */}
+                    <button
+                      onClick={() => handleBonusActionRoll('Off-hand Attack', 'str')}
+                      disabled={!canUseBonus}
+                      className={`flex flex-col items-center gap-2 p-4 border-2 rounded-lg transition-colors group ${
+                        canUseBonus
+                          ? 'border-accent/50 bg-accent/5 hover:bg-accent/20 hover:border-accent'
+                          : 'border-border/50 bg-muted/20 opacity-50 cursor-not-allowed'
+                      }`}
+                    >
+                      <Sword className={`w-8 h-8 ${canUseBonus ? 'text-accent group-hover:scale-110 transition-transform' : 'text-muted-foreground'}`} />
+                      <span className={`text-sm font-display ${canUseBonus ? 'text-accent' : 'text-muted-foreground'}`}>Off-hand Attack</span>
+                      <span className="text-[10px] text-muted-foreground">STR check (dual wield)</span>
+                    </button>
+
+                    {/* Dash */}
+                    <button
+                      onClick={() => handleBonusActionRoll('Dash', 'dex')}
+                      disabled={!canUseBonus}
+                      className={`flex flex-col items-center gap-2 p-4 border-2 rounded-lg transition-colors group ${
+                        canUseBonus
+                          ? 'border-accent/50 bg-accent/5 hover:bg-accent/20 hover:border-accent'
+                          : 'border-border/50 bg-muted/20 opacity-50 cursor-not-allowed'
+                      }`}
+                    >
+                      <Zap className={`w-8 h-8 ${canUseBonus ? 'text-accent group-hover:scale-110 transition-transform' : 'text-muted-foreground'}`} />
+                      <span className={`text-sm font-display ${canUseBonus ? 'text-accent' : 'text-muted-foreground'}`}>Dash</span>
+                      <span className="text-[10px] text-muted-foreground">Double movement speed</span>
+                    </button>
+
+                    {/* Disengage */}
+                    <button
+                      onClick={() => handleBonusActionRoll('Disengage', 'dex')}
+                      disabled={!canUseBonus}
+                      className={`flex flex-col items-center gap-2 p-4 border-2 rounded-lg transition-colors group ${
+                        canUseBonus
+                          ? 'border-accent/50 bg-accent/5 hover:bg-accent/20 hover:border-accent'
+                          : 'border-border/50 bg-muted/20 opacity-50 cursor-not-allowed'
+                      }`}
+                    >
+                      <RefreshCw className={`w-8 h-8 ${canUseBonus ? 'text-accent group-hover:scale-110 transition-transform' : 'text-muted-foreground'}`} />
+                      <span className={`text-sm font-display ${canUseBonus ? 'text-accent' : 'text-muted-foreground'}`}>Disengage</span>
+                      <span className="text-[10px] text-muted-foreground">No opportunity attacks</span>
+                    </button>
+
+                    {/* Hide */}
+                    <button
+                      onClick={() => handleBonusActionRoll('Hide', 'dex')}
+                      disabled={!canUseBonus}
+                      className={`flex flex-col items-center gap-2 p-4 border-2 rounded-lg transition-colors group ${
+                        canUseBonus
+                          ? 'border-accent/50 bg-accent/5 hover:bg-accent/20 hover:border-accent'
+                          : 'border-border/50 bg-muted/20 opacity-50 cursor-not-allowed'
+                      }`}
+                    >
+                      <Search className={`w-8 h-8 ${canUseBonus ? 'text-accent group-hover:scale-110 transition-transform' : 'text-muted-foreground'}`} />
+                      <span className={`text-sm font-display ${canUseBonus ? 'text-accent' : 'text-muted-foreground'}`}>Hide</span>
+                      <span className="text-[10px] text-muted-foreground">DEX stealth check</span>
                     </button>
                   </div>
                 </div>
@@ -2005,7 +2141,9 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 <label className="text-sm text-muted-foreground block mb-2">Target:</label>
                 <div className="space-y-1">
                   {combatState.combatants.filter(c => c.id !== selected.id).map(c => {
-                    const mob = c.type === 'mob' ? (mobsProp ?? []).find(m => m.id === c.id) : null;
+                    const mobId = c.sourceId || c.id;
+                    const mob = c.type === 'mob' ? (mobsProp ?? []).find(m => m.id === mobId) : null;
+                    const displayHP = c.currentHP ?? mob?.hitPoints;
                     const crawler = c.type === 'crawler' ? crawlers.find(cr => cr.id === c.id) : null;
                     return (
                       <button
@@ -2021,8 +2159,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                         }`}
                       >
                         <span className={c.type === 'crawler' ? 'text-primary' : 'text-destructive'}>{c.name}</span>
-                        {mob && mob.hitPoints != null && (
-                          <span className="text-muted-foreground ml-2">({mob.hitPoints} HP)</span>
+                        {mob && displayHP != null && (
+                          <span className="text-muted-foreground ml-2">({displayHP} HP)</span>
                         )}
                         {crawler && (
                           <span className="text-muted-foreground ml-2">({crawler.hp}/{crawler.maxHP} HP)</span>
