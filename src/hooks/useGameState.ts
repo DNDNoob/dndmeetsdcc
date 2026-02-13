@@ -660,7 +660,7 @@ export const useGameState = () => {
     return stored.find(s => s.id === 'current') ?? null;
   }, [getCollection, isLoaded]);
 
-  const startCombat = async (crawlerIds: string[], mobEntries: { combatId: string; mobId: string; name: string }[]) => {
+  const startCombat = async (crawlerIds: string[], mobEntries: { combatId: string; mobId: string; name: string }[], episodeId?: string) => {
     const combatants: CombatantEntry[] = [
       ...crawlerIds.map(id => {
         const crawler = crawlers.find(c => c.id === id);
@@ -699,6 +699,7 @@ export const useGameState = () => {
       combatants,
       currentTurnIndex: 0,
       combatRound: 1,
+      episodeId: episodeId || undefined,
     };
 
     const current = combatState;

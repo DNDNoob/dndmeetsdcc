@@ -369,17 +369,26 @@ const PingPanel: React.FC<PingPanelProps> = ({
                   ))}
                 </div>
                 {isAdmin && (
-                  <button
-                    onClick={handleConfirmInitiative}
-                    disabled={!combatState.combatants.every(c => c.hasRolledInitiative)}
-                    className={`w-full font-display text-xs py-2 rounded transition-colors ${
-                      combatState.combatants.every(c => c.hasRolledInitiative)
-                        ? 'bg-accent text-accent-foreground hover:bg-accent/90'
-                        : 'bg-muted text-muted-foreground cursor-not-allowed'
-                    }`}
-                  >
-                    START COMBAT
-                  </button>
+                  <div className="space-y-2">
+                    <button
+                      onClick={handleConfirmInitiative}
+                      disabled={!combatState.combatants.every(c => c.hasRolledInitiative)}
+                      className={`w-full font-display text-xs py-2 rounded transition-colors ${
+                        combatState.combatants.every(c => c.hasRolledInitiative)
+                          ? 'bg-accent text-accent-foreground hover:bg-accent/90'
+                          : 'bg-muted text-muted-foreground cursor-not-allowed'
+                      }`}
+                    >
+                      START COMBAT
+                    </button>
+                    <button
+                      onClick={() => onEndCombat?.()}
+                      className="w-full flex items-center justify-center gap-1 bg-muted text-muted-foreground font-display text-xs py-2 rounded hover:bg-destructive/20 hover:text-destructive transition-colors"
+                    >
+                      <XCircle className="w-3 h-3" />
+                      CANCEL COMBAT
+                    </button>
+                  </div>
                 )}
               </div>
             )}

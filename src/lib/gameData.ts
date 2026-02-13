@@ -191,6 +191,7 @@ export interface CombatState {
   combatants: CombatantEntry[];
   currentTurnIndex: number;
   combatRound: number;
+  episodeId?: string; // ties combat to a specific episode
 }
 
 export interface Episode {

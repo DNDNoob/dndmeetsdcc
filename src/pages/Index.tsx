@@ -330,6 +330,16 @@ const Index = () => {
 
   const isAdmin = currentPlayer?.type === "ai";
 
+  // Filter combat state to only show for the matching episode
+  const activeCombatState = useMemo(() => {
+    if (!combatState?.active) return combatState;
+    // If combat has an episodeId, only show it when the matching episode is active
+    if (combatState.episodeId && activeEpisode?.id && combatState.episodeId !== activeEpisode.id) {
+      return null;
+    }
+    return combatState;
+  }, [combatState, activeEpisode]);
+
   return (
     <div className="min-h-screen">
       <AnimatePresence mode="wait">
@@ -384,7 +394,7 @@ const Index = () => {
                 recordNoncombatRoll={recordNoncombatRoll}
                 currentPlayerId={currentPlayer?.id}
                 isShowtimeActive={isShowtimeActive}
-                combatState={combatState}
+                combatState={activeCombatState}
                 onRecordCombatInitiative={recordCombatInitiative}
                 onRecordCombatAction={recordCombatAction}
                 onApplyCombatDamage={applyCombatDamage}
@@ -467,7 +477,7 @@ const Index = () => {
                 onSetGameClock={setGameClock}
                 noncombatTurnState={noncombatTurnState}
                 resetNoncombatTurns={resetNoncombatTurns}
-                combatState={combatState}
+                combatState={activeCombatState}
               />
             )}
             {currentView === "sounds" && <SoundEffectsView />}
@@ -492,8 +502,10 @@ const Index = () => {
               onPerformShortRest={performShortRest}
               onPerformLongRest={performLongRest}
               activeEpisode={activeEpisode}
-              combatState={combatState}
-              onStartCombat={startCombat}
+              combatState={activeCombatState}
+              onStartCombat={async (crawlerIds, mobEntries) => {
+                await startCombat(crawlerIds, mobEntries, activeEpisode?.id);
+              }}
               onConfirmInitiative={confirmInitiative}
               onAdvanceCombatTurn={advanceCombatTurn}
               onEndCombat={endCombat}
