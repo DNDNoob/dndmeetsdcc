@@ -171,7 +171,8 @@ export interface GameClockState {
 export type CombatPhase = 'initiative' | 'combat' | 'ended';
 
 export interface CombatantEntry {
-  id: string; // crawlerId or mobId
+  id: string; // crawlerId or mob combatant ID (e.g. 'mobId:0' for duplicates)
+  sourceId?: string; // original mob/crawler document ID for data lookups (defaults to id)
   type: 'crawler' | 'mob';
   name: string;
   initiative: number; // d20 roll result + modifier
@@ -179,6 +180,7 @@ export interface CombatantEntry {
   hasUsedAction: boolean;
   hasUsedBonusAction: boolean;
   avatar?: string; // cached avatar/image for display
+  currentHP?: number; // per-combatant HP tracking (used for mob instances)
 }
 
 // Combat state - synced via Firebase (singleton doc, id = 'current')

@@ -14,8 +14,7 @@ interface PingPanelProps {
   onPerformLongRest?: (crawlerIds: string[]) => Promise<void>;
   activeEpisode?: Episode | null;
   combatState?: CombatState | null;
-  onStartCombat?: (crawlerIds: string[], mobIds: string[]) => Promise<void>;
-  onRollMobInitiatives?: () => Promise<void>;
+  onStartCombat?: (crawlerIds: string[], mobEntries: { combatId: string; mobId: string; name: string }[]) => Promise<void>;
   onConfirmInitiative?: () => Promise<void>;
   onAdvanceCombatTurn?: () => Promise<void>;
   onEndCombat?: () => Promise<void>;
@@ -35,7 +34,6 @@ const PingPanel: React.FC<PingPanelProps> = ({
   activeEpisode,
   combatState,
   onStartCombat,
-  onRollMobInitiatives,
   onConfirmInitiative,
   onAdvanceCombatTurn,
   onEndCombat,
@@ -98,11 +96,30 @@ const PingPanel: React.FC<PingPanelProps> = ({
     return true;
   });
 
-  // Get mobs on the current episode map
-  const episodeMobIds = activeEpisode?.mobPlacements
-    ? [...new Set(activeEpisode.mobPlacements.map(p => p.mobId))]
-    : [];
-  const episodeMobs = (mobs ?? []).filter(m => episodeMobIds.includes(m.id) && !m.hidden);
+  // Build placement-based mob entries (each placement is a separate selectable combatant)
+  const mobCombatEntries = (() => {
+    if (!activeEpisode?.mobPlacements) return [];
+    // Count occurrences of each mobId
+    const mobCounts: Record<string, number> = {};
+    activeEpisode.mobPlacements.forEach(p => {
+      mobCounts[p.mobId] = (mobCounts[p.mobId] ?? 0) + 1;
+    });
+    const mobIndices: Record<string, number> = {};
+    return activeEpisode.mobPlacements.map((p, placementIdx) => {
+      const mob = (mobs ?? []).find(m => m.id === p.mobId);
+      if (!mob || mob.hidden) return null;
+      const count = mobCounts[p.mobId];
+      const currentIndex = mobIndices[p.mobId] ?? 0;
+      mobIndices[p.mobId] = currentIndex + 1;
+      const suffix = count > 1 ? ` ${String.fromCharCode(65 + currentIndex)}` : '';
+      return {
+        combatId: count > 1 ? `${p.mobId}:${placementIdx}` : p.mobId,
+        mobId: p.mobId,
+        name: `${mob.name}${suffix}`,
+        hitPoints: mob.hitPoints,
+      };
+    }).filter((e): e is NonNullable<typeof e> => e !== null);
+  })();
 
   const allPlayersSpent = noncombatTurnState != null && playerCrawlers.length > 0 && playerCrawlers.every(c => {
     const used = noncombatTurnState.rollsUsed[c.id] ?? 0;
@@ -121,7 +138,7 @@ const PingPanel: React.FC<PingPanelProps> = ({
     setSelectedCombatCrawlers(crawlerSel);
 
     const mobSel: Record<string, boolean> = {};
-    episodeMobs.forEach(m => { mobSel[m.id] = true; });
+    mobCombatEntries.forEach(e => { mobSel[e.combatId] = true; });
     setSelectedCombatMobs(mobSel);
 
     setShowCombatSetup(true);
@@ -131,14 +148,15 @@ const PingPanel: React.FC<PingPanelProps> = ({
     const crawlerIds = Object.entries(selectedCombatCrawlers)
       .filter(([, checked]) => checked)
       .map(([id]) => id);
-    const mobIds = Object.entries(selectedCombatMobs)
-      .filter(([, checked]) => checked)
-      .map(([id]) => id);
-    if (crawlerIds.length === 0 && mobIds.length === 0) return;
+    const selectedMobIds = new Set(
+      Object.entries(selectedCombatMobs)
+        .filter(([, checked]) => checked)
+        .map(([id]) => id)
+    );
+    const mobEntries = mobCombatEntries.filter(e => selectedMobIds.has(e.combatId));
+    if (crawlerIds.length === 0 && mobEntries.length === 0) return;
 
-    await onStartCombat?.(crawlerIds, mobIds);
-    // Roll mob initiatives automatically
-    await onRollMobInitiatives?.();
+    await onStartCombat?.(crawlerIds, mobEntries);
     setShowCombatSetup(false);
   };
 
@@ -166,7 +184,7 @@ const PingPanel: React.FC<PingPanelProps> = ({
   })();
 
   return (
-    <div ref={panelRef} className="fixed bottom-4 left-2 sm:left-4 z-[99] flex flex-col items-start">
+    <div ref={panelRef} className="fixed bottom-10 left-2 sm:left-4 z-[99] flex flex-col items-start">
       {/* Expanded panel - appears above the toggle button */}
       <AnimatePresence>
         {isExpanded && (
@@ -174,7 +192,7 @@ const PingPanel: React.FC<PingPanelProps> = ({
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            className="bg-background border-2 border-accent p-4 w-[calc(100vw-1rem)] sm:w-80 shadow-lg shadow-accent/20 mb-2 max-h-[70vh] overflow-y-auto"
+            className="bg-background border-2 border-accent p-4 w-[calc(100vw-1rem)] sm:w-80 shadow-lg shadow-accent/20 mb-2 max-h-[calc(100vh-7rem)] overflow-y-auto"
           >
             <h3 className="font-display text-accent text-lg mb-3 flex items-center gap-2 shrink-0">
               <Clock className="w-5 h-5" /> GAME CLOCK
@@ -289,24 +307,24 @@ const PingPanel: React.FC<PingPanelProps> = ({
                 )}
 
                 {/* Mobs */}
-                {episodeMobs.length > 0 && (
+                {mobCombatEntries.length > 0 && (
                   <div>
                     <span className="text-[10px] text-destructive font-display block mb-1">MOBS</span>
                     <div className="space-y-1">
-                      {episodeMobs.map(m => (
-                        <label key={m.id} className="flex items-center gap-2 text-xs cursor-pointer">
+                      {mobCombatEntries.map(entry => (
+                        <label key={entry.combatId} className="flex items-center gap-2 text-xs cursor-pointer">
                           <input
                             type="checkbox"
-                            checked={selectedCombatMobs[m.id] ?? false}
+                            checked={selectedCombatMobs[entry.combatId] ?? false}
                             onChange={(e) => setSelectedCombatMobs(prev => ({
                               ...prev,
-                              [m.id]: e.target.checked,
+                              [entry.combatId]: e.target.checked,
                             }))}
                             className="w-4 h-4"
                           />
-                          <span>{m.name}</span>
-                          {m.hitPoints != null && (
-                            <span className="text-muted-foreground">({m.hitPoints} HP)</span>
+                          <span>{entry.name}</span>
+                          {entry.hitPoints != null && (
+                            <span className="text-muted-foreground">({entry.hitPoints} HP)</span>
                           )}
                         </label>
                       ))}
@@ -380,7 +398,9 @@ const PingPanel: React.FC<PingPanelProps> = ({
                 <div className="space-y-1">
                   {combatState.combatants.map((c, i) => {
                     const isCurrent = i === combatState.currentTurnIndex;
-                    const mob = c.type === 'mob' ? (mobs ?? []).find(m => m.id === c.id) : null;
+                    const mobId = c.sourceId || c.id;
+                    const mob = c.type === 'mob' ? (mobs ?? []).find(m => m.id === mobId) : null;
+                    const displayHP = c.currentHP ?? mob?.hitPoints;
                     return (
                       <div key={c.id} className={`flex items-center justify-between text-xs px-2 py-1 rounded ${
                         isCurrent ? 'bg-accent/20 border border-accent/50' : ''
@@ -419,14 +439,14 @@ const PingPanel: React.FC<PingPanelProps> = ({
                                   onClick={() => {
                                     if (isAdmin) {
                                       setShowMobHealthOverride(c.id);
-                                      setMobHealthValue(String(mob.hitPoints ?? 0));
+                                      setMobHealthValue(String(displayHP ?? 0));
                                     }
                                   }}
                                   className="text-destructive/80 hover:text-destructive text-[10px] flex items-center gap-0.5"
                                   title={isAdmin ? "Click to override HP" : undefined}
                                 >
                                   <Heart className="w-3 h-3" />
-                                  {mob.hitPoints ?? '?'}
+                                  {displayHP ?? '?'}
                                 </button>
                               )}
                             </>

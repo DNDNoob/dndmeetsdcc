@@ -660,7 +660,7 @@ export const useGameState = () => {
     return stored.find(s => s.id === 'current') ?? null;
   }, [getCollection, isLoaded]);
 
-  const startCombat = async (crawlerIds: string[], mobIds: string[]) => {
+  const startCombat = async (crawlerIds: string[], mobEntries: { combatId: string; mobId: string; name: string }[]) => {
     const combatants: CombatantEntry[] = [
       ...crawlerIds.map(id => {
         const crawler = crawlers.find(c => c.id === id);
@@ -675,17 +675,20 @@ export const useGameState = () => {
           avatar: crawler?.avatar,
         };
       }),
-      ...mobIds.map(id => {
-        const mob = mobs.find(m => m.id === id);
+      ...mobEntries.map(entry => {
+        const mob = mobs.find(m => m.id === entry.mobId);
+        const roll = Math.floor(Math.random() * 20) + 1;
         return {
-          id,
+          id: entry.combatId,
+          sourceId: entry.mobId,
           type: 'mob' as const,
-          name: mob?.name ?? 'Unknown',
-          initiative: 0,
-          hasRolledInitiative: false,
+          name: entry.name,
+          initiative: roll,
+          hasRolledInitiative: true,
           hasUsedAction: false,
           hasUsedBonusAction: false,
           avatar: mob?.image,
+          currentHP: mob?.hitPoints,
         };
       }),
     ];
@@ -704,7 +707,7 @@ export const useGameState = () => {
     } else {
       await addItem('combatState', { id: 'current', ...combatData });
     }
-    console.log('[GameState] ⚔️ Combat started with', combatants.length, 'combatants');
+    console.log('[GameState] ⚔️ Combat started with', combatants.length, 'combatants (mobs auto-rolled)');
   };
 
   const rollMobInitiatives = async () => {
@@ -785,18 +788,42 @@ export const useGameState = () => {
         console.log('[GameState] ⚔️ Damage applied to crawler', crawler.name, ':', damage, '→ HP:', newHP);
       }
     } else {
-      const mob = mobs.find(m => m.id === targetId);
+      const combatant = combatState?.combatants.find(c => c.id === targetId);
+      const mobId = combatant?.sourceId || targetId;
+      const mob = mobs.find(m => m.id === mobId);
       if (mob) {
-        const newHP = Math.max(0, (mob.hitPoints || 0) - damage);
-        await updateItem('mobs', targetId, { hitPoints: newHP } as Record<string, unknown>);
-        console.log('[GameState] ⚔️ Damage applied to mob', mob.name, ':', damage, '→ HP:', newHP);
+        const hpBefore = combatant?.currentHP ?? mob.hitPoints ?? 0;
+        const newHP = Math.max(0, hpBefore - damage);
+        // Update per-combatant HP in combat state
+        if (combatState) {
+          const updatedCombatants = combatState.combatants.map(c =>
+            c.id === targetId ? { ...c, currentHP: newHP } : c
+          );
+          await updateItem('combatState', 'current', { combatants: updatedCombatants } as Record<string, unknown>);
+        }
+        // Also update mob document
+        await updateItem('mobs', mobId, { hitPoints: newHP } as Record<string, unknown>);
+        console.log('[GameState] ⚔️ Damage applied to mob', combatant?.name ?? mob.name, ':', damage, '→ HP:', newHP);
       }
     }
   };
 
-  const overrideMobHealth = async (mobId: string, newHP: number) => {
-    await updateItem('mobs', mobId, { hitPoints: newHP } as Record<string, unknown>);
-    console.log('[GameState] ⚔️ DM override: mob HP set to', newHP);
+  const overrideMobHealth = async (combatantId: string, newHP: number) => {
+    // Update per-combatant HP in combat state
+    if (combatState) {
+      const combatant = combatState.combatants.find(c => c.id === combatantId);
+      const updatedCombatants = combatState.combatants.map(c =>
+        c.id === combatantId ? { ...c, currentHP: newHP } : c
+      );
+      await updateItem('combatState', 'current', { combatants: updatedCombatants } as Record<string, unknown>);
+      // Also update mob document
+      const mobId = combatant?.sourceId || combatantId;
+      await updateItem('mobs', mobId, { hitPoints: newHP } as Record<string, unknown>);
+    } else {
+      // Fallback: direct mob document update
+      await updateItem('mobs', combatantId, { hitPoints: newHP } as Record<string, unknown>);
+    }
+    console.log('[GameState] ⚔️ DM override: combatant HP set to', newHP);
   };
 
   const endCombat = async () => {

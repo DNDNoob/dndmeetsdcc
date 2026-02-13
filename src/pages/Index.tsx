@@ -494,7 +494,6 @@ const Index = () => {
               activeEpisode={activeEpisode}
               combatState={combatState}
               onStartCombat={startCombat}
-              onRollMobInitiatives={rollMobInitiatives}
               onConfirmInitiative={confirmInitiative}
               onAdvanceCombatTurn={advanceCombatTurn}
               onEndCombat={endCombat}
@@ -508,7 +507,7 @@ const Index = () => {
             onClose={() => setShowChangelog(false)}
           />
 
-          <footer className="fixed bottom-0 left-0 right-0 text-center py-2 bg-background/80 border-t border-border text-xs text-muted-foreground">
+          <footer className="fixed bottom-0 left-0 right-0 z-10 text-center py-2 bg-background/80 border-t border-border text-xs text-muted-foreground">
             [ DUNGEON CRAWLER CARL - SYSTEM HUB v1.0 ]
           </footer>
         </>
