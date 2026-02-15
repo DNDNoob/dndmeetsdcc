@@ -158,6 +158,7 @@ const Index = () => {
     applyCombatDamage,
     overrideMobHealth,
     endCombat,
+    cancelCombat,
     removeCombatant,
     isLoaded
   } = useGameState();
@@ -510,6 +511,7 @@ const Index = () => {
               onConfirmInitiative={confirmInitiative}
               onAdvanceCombatTurn={advanceCombatTurn}
               onEndCombat={endCombat}
+              onCancelCombat={cancelCombat}
               onOverrideMobHealth={overrideMobHealth}
               onRemoveCombatant={removeCombatant}
             />

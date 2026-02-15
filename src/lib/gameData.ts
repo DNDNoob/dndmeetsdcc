@@ -34,6 +34,31 @@ export interface Crawler {
 
 export type StatModifiers = Partial<Record<'str' | 'dex' | 'con' | 'int' | 'cha' | 'hp' | 'maxHP' | 'mana' | 'maxMana', number>>;
 
+// Weapon system types
+export const DAMAGE_TYPES = ['Basic', 'Poison', 'Disease', 'Spiritual', 'Radiation', 'Fire', 'Electric', 'Emotional'] as const;
+export type DamageType = typeof DAMAGE_TYPES[number];
+
+export const WEAPON_TYPES = ['Arcane', 'Body Upgrade', 'Bows', 'Crossbows', 'Firearms', 'Heavy weapons', 'Improvised', 'Light weapons', 'Mechanical', 'Polearms', 'Throwing', 'Whips'] as const;
+export type WeaponType = typeof WEAPON_TYPES[number];
+
+export interface WeaponDie {
+  count: number; // number of dice (e.g. 2 for 2d6)
+  sides: number; // sides per die (e.g. 6 for d6)
+}
+
+export interface WeaponData {
+  hitDie?: WeaponDie; // bonus die added to the d20 attack roll
+  damageDice: WeaponDie[]; // one or more damage dice
+  hitModifiers?: StatModifiers; // stat modifiers applied to hit roll
+  damageModifiers?: StatModifiers; // stat modifiers applied to damage roll
+  damageType: DamageType;
+  weaponType: WeaponType;
+  isRanged: boolean;
+  normalRange?: number; // feet, only if ranged
+  maxRange?: number; // feet, only if ranged
+  specialEffect?: string; // optional text for special effects
+}
+
 export interface InventoryItem {
   id: string;
   name: string;
@@ -43,6 +68,8 @@ export interface InventoryItem {
   equipped?: boolean; // Deprecated - use equippedItems in Crawler instead
   statModifiers?: StatModifiers; // Stat adjustments when equipped
   tags?: string[]; // Custom tags for filtering (e.g., "magic", "cursed", "quest")
+  weaponData?: WeaponData; // Weapon-specific data (only for items with "weapon" tag or weapon equipSlot)
+  isUpgraded?: boolean; // Whether this item has been upgraded by a crawler
 }
 
 // Compute total stat modifiers from all equipped items on a crawler
@@ -192,6 +219,7 @@ export interface CombatState {
   currentTurnIndex: number;
   combatRound: number;
   episodeId?: string; // ties combat to a specific episode
+  combatCount?: number; // how many times combat has been started (cumulative counter)
 }
 
 export interface Episode {

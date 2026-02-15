@@ -693,6 +693,9 @@ export const useGameState = () => {
       }),
     ];
 
+    // Increment combat counter
+    const prevCount = combatState?.combatCount ?? 0;
+
     const combatData: Record<string, unknown> = {
       active: true,
       phase: 'initiative',
@@ -700,6 +703,7 @@ export const useGameState = () => {
       currentTurnIndex: 0,
       combatRound: 1,
       episodeId: episodeId || undefined,
+      combatCount: prevCount + 1,
     };
 
     const current = combatState;
@@ -708,7 +712,7 @@ export const useGameState = () => {
     } else {
       await addItem('combatState', { id: 'current', ...combatData });
     }
-    console.log('[GameState] ⚔️ Combat started with', combatants.length, 'combatants (mobs auto-rolled)');
+    console.log('[GameState] ⚔️ Combat started with', combatants.length, 'combatants (mobs auto-rolled). Combat #', prevCount + 1);
   };
 
   const rollMobInitiatives = async () => {
@@ -838,6 +842,20 @@ export const useGameState = () => {
     console.log('[GameState] ⚔️ Combat ended');
   };
 
+  const cancelCombat = async () => {
+    if (!combatState) return;
+    // Cancel reverts combat count (it wasn't a real combat)
+    const revertedCount = Math.max(0, (combatState.combatCount ?? 1) - 1);
+    await updateItem('combatState', 'current', {
+      active: false,
+      phase: 'ended',
+      combatants: [],
+      currentTurnIndex: 0,
+      combatCount: revertedCount,
+    } as Record<string, unknown>);
+    console.log('[GameState] ⚔️ Combat cancelled (count reverted to', revertedCount, ')');
+  };
+
   const removeCombatant = async (combatantId: string) => {
     if (!combatState) return;
     const updatedCombatants = combatState.combatants.filter(c => c.id !== combatantId);
@@ -907,6 +925,7 @@ export const useGameState = () => {
     applyCombatDamage,
     overrideMobHealth,
     endCombat,
+    cancelCombat,
     removeCombatant,
     isLoaded,
   };

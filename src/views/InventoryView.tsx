@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
-import { Crawler, InventoryItem, EquipmentSlot as SlotType, StatModifiers } from "@/lib/gameData";
-import { Coins, Package, Sword, Shield, Plus, Trash2, Edit2, Save, HardHat, Search, BookOpen, Gem, Footprints, Shirt, Hand } from "lucide-react";
+import { Crawler, InventoryItem, EquipmentSlot as SlotType, StatModifiers, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType } from "@/lib/gameData";
+import { Coins, Package, Sword, Shield, Plus, Trash2, Edit2, Save, HardHat, Search, BookOpen, Gem, Footprints, Shirt, Hand, Crosshair, ChevronDown, ChevronUp } from "lucide-react";
 
 // Inline SVG for legs/pants slot
 const LegsIcon: React.FC<{ className?: string }> = ({ className = "w-4 h-4" }) => (
@@ -89,9 +89,10 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   const [editMode, setEditMode] = useState(false);
 
   // Library item form state
-  const [newLibraryItem, setNewLibraryItem] = useState<{ name: string; description: string; equipSlot?: SlotType; goldValue?: number; statModifiers?: StatModifiers }>({
-    name: "", description: "", equipSlot: undefined, goldValue: undefined, statModifiers: undefined,
+  const [newLibraryItem, setNewLibraryItem] = useState<{ name: string; description: string; equipSlot?: SlotType; goldValue?: number; statModifiers?: StatModifiers; weaponData?: WeaponData }>({
+    name: "", description: "", equipSlot: undefined, goldValue: undefined, statModifiers: undefined, weaponData: undefined,
   });
+  const [showWeaponConfig, setShowWeaponConfig] = useState(false);
   // Track which library item is being edited (null = adding new)
   const [editingLibraryItemId, setEditingLibraryItemId] = useState<string | null>(null);
   // Per-crawler search queries
@@ -153,7 +154,9 @@ const InventoryView: React.FC<InventoryViewProps> = ({
       equipSlot: item.equipSlot,
       goldValue: item.goldValue,
       statModifiers: item.statModifiers,
+      weaponData: item.weaponData,
     });
+    setShowWeaponConfig(!!item.weaponData);
   };
 
   const handleSaveOrAddLibraryItem = () => {
@@ -162,6 +165,10 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     const mods = newLibraryItem.statModifiers
       ? Object.fromEntries(Object.entries(newLibraryItem.statModifiers).filter(([, v]) => v !== 0 && v !== undefined))
       : undefined;
+
+    const weaponFields = newLibraryItem.weaponData
+      ? { weaponData: newLibraryItem.weaponData }
+      : { weaponData: undefined };
 
     if (editingLibraryItemId) {
       // Get the old item for matching in crawler inventories
@@ -177,18 +184,21 @@ const InventoryView: React.FC<InventoryViewProps> = ({
               equipSlot: newLibraryItem.equipSlot,
               goldValue: newLibraryItem.goldValue,
               ...(mods && Object.keys(mods).length > 0 ? { statModifiers: mods } : { statModifiers: undefined }),
+              ...weaponFields,
             }
           : item
       );
       onUpdateSharedInventory(updated);
 
-      // Sync edits to all crawler inventories that have copies of this item
+      // Sync edits to all crawler inventories that have NON-UPGRADED copies of this item
       if (oldItem) {
         const oldSig = getItemSignature(oldItem);
         crawlers.forEach(crawler => {
           const crawlerItems = getCrawlerInventory(crawler.id);
           let hasMatch = false;
           const updatedCrawlerItems = crawlerItems.map(ci => {
+            // Don't sync changes to upgraded items - those are crawler-specific
+            if (ci.isUpgraded) return ci;
             const ciSig = getItemSignature(ci);
             if (ciSig === oldSig) {
               hasMatch = true;
@@ -199,6 +209,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 equipSlot: newLibraryItem.equipSlot,
                 goldValue: newLibraryItem.goldValue,
                 ...(mods && Object.keys(mods).length > 0 ? { statModifiers: mods } : { statModifiers: undefined }),
+                ...weaponFields,
               };
             }
             return ci;
@@ -217,16 +228,19 @@ const InventoryView: React.FC<InventoryViewProps> = ({
         equipSlot: newLibraryItem.equipSlot,
         goldValue: newLibraryItem.goldValue,
         ...(mods && Object.keys(mods).length > 0 ? { statModifiers: mods } : {}),
+        ...weaponFields,
       };
       onUpdateSharedInventory([...items, item]);
     }
     setEditingLibraryItemId(null);
-    setNewLibraryItem({ name: "", description: "", equipSlot: undefined, goldValue: undefined, statModifiers: undefined });
+    setNewLibraryItem({ name: "", description: "", equipSlot: undefined, goldValue: undefined, statModifiers: undefined, weaponData: undefined });
+    setShowWeaponConfig(false);
   };
 
   const handleCancelEditLibraryItem = () => {
     setEditingLibraryItemId(null);
-    setNewLibraryItem({ name: "", description: "", equipSlot: undefined, goldValue: undefined, statModifiers: undefined });
+    setNewLibraryItem({ name: "", description: "", equipSlot: undefined, goldValue: undefined, statModifiers: undefined, weaponData: undefined });
+    setShowWeaponConfig(false);
   };
 
   const handleAddLibraryItemToCrawler = (crawlerId: string, libraryItem: InventoryItem, quantity: number = 1) => {
@@ -397,6 +411,192 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                   ))}
                 </div>
               </div>
+
+              {/* Weapon Configuration */}
+              {(newLibraryItem.equipSlot === 'weapon' || newLibraryItem.tags?.includes('weapon')) && (
+                <div className="border border-destructive/30 bg-destructive/5 p-3 rounded space-y-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!showWeaponConfig) {
+                        setShowWeaponConfig(true);
+                        if (!newLibraryItem.weaponData) {
+                          setNewLibraryItem({
+                            ...newLibraryItem,
+                            weaponData: {
+                              damageDice: [{ count: 1, sides: 6 }],
+                              damageType: 'Basic',
+                              weaponType: 'Light weapons',
+                              isRanged: false,
+                            },
+                          });
+                        }
+                      } else {
+                        setShowWeaponConfig(false);
+                      }
+                    }}
+                    className="flex items-center gap-2 text-xs text-destructive font-display w-full"
+                  >
+                    <Crosshair className="w-4 h-4" />
+                    WEAPON CONFIG
+                    {showWeaponConfig ? <ChevronUp className="w-3 h-3 ml-auto" /> : <ChevronDown className="w-3 h-3 ml-auto" />}
+                  </button>
+
+                  {showWeaponConfig && newLibraryItem.weaponData && (() => {
+                    const wd = newLibraryItem.weaponData!;
+                    const updateWD = (updates: Partial<WeaponData>) => {
+                      setNewLibraryItem({ ...newLibraryItem, weaponData: { ...wd, ...updates } });
+                    };
+                    return (
+                      <div className="space-y-3">
+                        {/* Weapon Type & Damage Type */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[10px] text-muted-foreground block mb-0.5">Weapon Type</label>
+                            <select value={wd.weaponType} onChange={(e) => updateWD({ weaponType: e.target.value as WeaponType })}
+                              className="bg-muted border border-border px-2 py-1 text-xs w-full">
+                              {WEAPON_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-muted-foreground block mb-0.5">Damage Type</label>
+                            <select value={wd.damageType} onChange={(e) => updateWD({ damageType: e.target.value as DamageType })}
+                              className="bg-muted border border-border px-2 py-1 text-xs w-full">
+                              {DAMAGE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Hit Die (bonus to attack roll) */}
+                        <div>
+                          <label className="text-[10px] text-muted-foreground block mb-0.5">Bonus Hit Die (added to d20 attack roll)</label>
+                          <div className="flex items-center gap-1">
+                            <input type="number" min={0} max={10} value={wd.hitDie?.count ?? 0}
+                              onChange={(e) => {
+                                const count = parseInt(e.target.value) || 0;
+                                updateWD({ hitDie: count > 0 ? { count, sides: wd.hitDie?.sides ?? 4 } : undefined });
+                              }}
+                              className="w-12 bg-muted border border-border px-1 py-0.5 text-xs text-center" />
+                            <span className="text-xs text-muted-foreground">d</span>
+                            <select value={wd.hitDie?.sides ?? 4}
+                              onChange={(e) => updateWD({ hitDie: (wd.hitDie?.count ?? 0) > 0 ? { count: wd.hitDie!.count, sides: parseInt(e.target.value) } : undefined })}
+                              className="bg-muted border border-border px-1 py-0.5 text-xs">
+                              {[4, 6, 8, 10, 12, 20].map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Damage Dice */}
+                        <div>
+                          <label className="text-[10px] text-muted-foreground block mb-0.5">Damage Dice</label>
+                          {wd.damageDice.map((die, i) => (
+                            <div key={i} className="flex items-center gap-1 mb-1">
+                              <input type="number" min={1} max={20} value={die.count}
+                                onChange={(e) => {
+                                  const updated = [...wd.damageDice];
+                                  updated[i] = { ...die, count: parseInt(e.target.value) || 1 };
+                                  updateWD({ damageDice: updated });
+                                }}
+                                className="w-12 bg-muted border border-border px-1 py-0.5 text-xs text-center" />
+                              <span className="text-xs text-muted-foreground">d</span>
+                              <select value={die.sides}
+                                onChange={(e) => {
+                                  const updated = [...wd.damageDice];
+                                  updated[i] = { ...die, sides: parseInt(e.target.value) };
+                                  updateWD({ damageDice: updated });
+                                }}
+                                className="bg-muted border border-border px-1 py-0.5 text-xs">
+                                {[4, 6, 8, 10, 12, 20].map(s => <option key={s} value={s}>{s}</option>)}
+                              </select>
+                              {wd.damageDice.length > 1 && (
+                                <button onClick={() => {
+                                  const updated = wd.damageDice.filter((_, j) => j !== i);
+                                  updateWD({ damageDice: updated });
+                                }} className="text-destructive text-xs hover:underline">
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                          <button onClick={() => updateWD({ damageDice: [...wd.damageDice, { count: 1, sides: 6 }] })}
+                            className="text-xs text-primary hover:underline flex items-center gap-1">
+                            <Plus className="w-3 h-3" /> Add damage die
+                          </button>
+                        </div>
+
+                        {/* Hit Roll Stat Modifiers */}
+                        <div>
+                          <label className="text-[10px] text-muted-foreground block mb-0.5">Hit Roll Stat Modifiers</label>
+                          <div className="grid grid-cols-5 gap-1">
+                            {(['str', 'dex', 'con', 'int', 'cha'] as const).map((stat) => (
+                              <div key={stat} className="flex flex-col items-center">
+                                <label className="text-[9px] text-muted-foreground uppercase">{stat}</label>
+                                <input type="number" value={wd.hitModifiers?.[stat] ?? ""}
+                                  onChange={(e) => updateWD({
+                                    hitModifiers: { ...wd.hitModifiers, [stat]: e.target.value ? parseInt(e.target.value) : undefined },
+                                  })}
+                                  placeholder="0" className="w-10 bg-muted border border-border px-1 py-0.5 text-[10px] text-center" />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Damage Stat Modifiers */}
+                        <div>
+                          <label className="text-[10px] text-muted-foreground block mb-0.5">Damage Stat Modifiers</label>
+                          <div className="grid grid-cols-5 gap-1">
+                            {(['str', 'dex', 'con', 'int', 'cha'] as const).map((stat) => (
+                              <div key={stat} className="flex flex-col items-center">
+                                <label className="text-[9px] text-muted-foreground uppercase">{stat}</label>
+                                <input type="number" value={wd.damageModifiers?.[stat] ?? ""}
+                                  onChange={(e) => updateWD({
+                                    damageModifiers: { ...wd.damageModifiers, [stat]: e.target.value ? parseInt(e.target.value) : undefined },
+                                  })}
+                                  placeholder="0" className="w-10 bg-muted border border-border px-1 py-0.5 text-[10px] text-center" />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Ranged/Melee Toggle */}
+                        <div>
+                          <label className="flex items-center gap-2 text-xs cursor-pointer">
+                            <input type="checkbox" checked={wd.isRanged}
+                              onChange={(e) => updateWD({ isRanged: e.target.checked })}
+                              className="w-4 h-4" />
+                            <span className="text-muted-foreground">Ranged Weapon</span>
+                          </label>
+                          {wd.isRanged && (
+                            <div className="flex gap-2 mt-1">
+                              <div>
+                                <label className="text-[10px] text-muted-foreground block">Normal Range (ft)</label>
+                                <input type="number" min={0} value={wd.normalRange ?? ""}
+                                  onChange={(e) => updateWD({ normalRange: e.target.value ? parseInt(e.target.value) : undefined })}
+                                  className="w-16 bg-muted border border-border px-1 py-0.5 text-xs text-center" />
+                              </div>
+                              <div>
+                                <label className="text-[10px] text-muted-foreground block">Max Range (ft)</label>
+                                <input type="number" min={0} value={wd.maxRange ?? ""}
+                                  onChange={(e) => updateWD({ maxRange: e.target.value ? parseInt(e.target.value) : undefined })}
+                                  className="w-16 bg-muted border border-border px-1 py-0.5 text-xs text-center" />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Special Effects */}
+                        <div>
+                          <label className="text-[10px] text-muted-foreground block mb-0.5">Special Effects (optional)</label>
+                          <textarea value={wd.specialEffect ?? ""}
+                            onChange={(e) => updateWD({ specialEffect: e.target.value || undefined })}
+                            placeholder="e.g., On critical hit, target is stunned for 1 round"
+                            className="w-full bg-muted border border-border px-2 py-1 text-xs resize-none h-12" />
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
             </div>
           )}
         </div>

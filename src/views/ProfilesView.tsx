@@ -4,7 +4,7 @@ import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import { HealthBar } from "@/components/ui/HealthBar";
 import { EquipmentSlot } from "@/components/ui/EquipmentSlot";
-import { Crawler, Mob, InventoryItem, createEmptyCrawler, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState } from "@/lib/gameData";
+import { Crawler, Mob, InventoryItem, createEmptyCrawler, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie } from "@/lib/gameData";
 import type { DiceRollEntry } from "@/hooks/useGameState";
 import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Backpack, HardHat, Package, Lock, Unlock, ChevronDown, ChevronUp, Check, Search, Send, BookOpen, Filter, X, Gem, Footprints, Shirt, Hand, Target, Swords, RefreshCw, Timer } from "lucide-react";
 
@@ -282,6 +282,13 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   const [damageTargetId, setDamageTargetId] = useState<string>('');
   const [damageTargetType, setDamageTargetType] = useState<'crawler' | 'mob'>('mob');
   const [damageRollResult, setDamageRollResult] = useState<number | null>(null);
+
+  // Weapon advantage/disadvantage menu
+  const [weaponAdvMenu, setWeaponAdvMenu] = useState<{ weaponId: string; x: number; y: number } | null>(null);
+
+  // Weapon upgrade modal
+  const [upgradingWeapon, setUpgradingWeapon] = useState<InventoryItem | null>(null);
+  const [upgradeForm, setUpgradeForm] = useState<WeaponData | null>(null);
 
   // Send items/gold modal state
   const [showSendModal, setShowSendModal] = useState(false);
@@ -1391,10 +1398,17 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                                   return next;
                                 });
                               }}
+                              onContextMenu={(e) => {
+                                if (isOwnProfile && item.weaponData) {
+                                  e.preventDefault();
+                                  setUpgradingWeapon(item);
+                                  setUpgradeForm({ ...item.weaponData });
+                                }
+                              }}
                               className={`bg-muted/50 p-3 rounded-lg border transition-colors select-none ${
                                 isEquipped ? 'border-primary/50' : 'border-border'
                               } ${isOwnProfile && item.equipSlot ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'} hover:bg-muted/70`}
-                              title={isOwnProfile && item.equipSlot ? 'Drag to equip slot, or double-click to equip' : 'Click to expand'}
+                              title={isOwnProfile && item.equipSlot ? 'Drag to equip slot, or double-click to equip' + (item.weaponData ? '. Right-click to upgrade.' : '') : 'Click to expand'}
                             >
                               <div className="flex items-start gap-2">
                                 {getEquipmentIcon(item.equipSlot, "w-4 h-4 shrink-0 mt-0.5")}
@@ -1438,7 +1452,36 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                                           ))}
                                         </div>
                                       )}
+                                      {/* Weapon data display */}
+                                      {item.weaponData && (
+                                        <div className="text-xs text-muted-foreground space-y-0.5 border-t border-border/30 pt-1">
+                                          <div className="flex flex-wrap gap-1">
+                                            <span className="px-1.5 py-0.5 bg-destructive/20 text-destructive rounded">{item.weaponData.weaponType}</span>
+                                            <span className="px-1.5 py-0.5 bg-orange-500/20 text-orange-400 rounded">{item.weaponData.damageType}</span>
+                                            <span className="px-1.5 py-0.5 bg-muted text-muted-foreground rounded">{item.weaponData.isRanged ? 'Ranged' : 'Melee'}</span>
+                                            {item.isUpgraded && <span className="px-1.5 py-0.5 bg-accent/20 text-accent rounded font-bold italic">Upgraded</span>}
+                                          </div>
+                                          <div>Damage: {item.weaponData.damageDice.map(d => `${d.count}d${d.sides}`).join(' + ')}</div>
+                                          {item.weaponData.hitDie && <div>Hit Bonus: +{item.weaponData.hitDie.count}d{item.weaponData.hitDie.sides}</div>}
+                                          {item.weaponData.isRanged && item.weaponData.normalRange && (
+                                            <div>Range: {item.weaponData.normalRange}{item.weaponData.maxRange ? `/${item.weaponData.maxRange}` : ''} ft</div>
+                                          )}
+                                          {item.weaponData.specialEffect && <div className="italic text-accent/70">{item.weaponData.specialEffect}</div>}
+                                        </div>
+                                      )}
                                       <div className="flex gap-2 mt-1">
+                                        {isOwnProfile && item.weaponData && (
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setUpgradingWeapon(item);
+                                              setUpgradeForm({ ...item.weaponData! });
+                                            }}
+                                            className="text-xs text-accent hover:underline flex items-center gap-0.5"
+                                          >
+                                            <Sword className="w-3 h-3" /> Upgrade
+                                          </button>
+                                        )}
                                         {isOwnProfile && (
                                           <button
                                             onClick={(e) => {
@@ -1790,6 +1833,38 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
 
               const combatTargets = combatState?.combatants.filter(c => c.id !== selected.id) ?? [];
 
+              // Get equipped weapons with weaponData
+              const equippedWeapons: { item: InventoryItem; slot: string }[] = [];
+              const equippedMap = selected.equippedItems ?? {};
+              for (const [slot, itemId] of Object.entries(equippedMap)) {
+                if (!itemId) continue;
+                const item = inventory.find(i => i.id === itemId);
+                if (item?.weaponData) {
+                  equippedWeapons.push({ item, slot });
+                }
+              }
+
+              // Helper to format dice notation
+              const formatDice = (dice: WeaponDie[]): string => {
+                return dice.map(d => `${d.count}d${d.sides}`).join(' + ');
+              };
+
+              // Helper to calculate total modifier from weapon stat modifiers
+              const calcWeaponStatMod = (mods: StatModifiers | undefined): number => {
+                if (!mods) return 0;
+                let total = 0;
+                for (const [stat, val] of Object.entries(mods)) {
+                  if (val && ['str', 'dex', 'con', 'int', 'cha'].includes(stat)) {
+                    const baseStat = (selected as Record<string, unknown>)[stat] as number ?? 10;
+                    const equipMod = equippedMods[stat as keyof StatModifiers] ?? 0;
+                    const totalStat = baseStat + equipMod;
+                    const modifier = Math.floor((totalStat - 10) / 2);
+                    total += modifier * val;
+                  }
+                }
+                return total;
+              };
+
               const handleAttackRoll = (attackName: string, stat: 'str' | 'dex', damageDice: string, damageBonus: number) => {
                 if (!canAttack) return;
                 const baseStat = (selected as Record<string, unknown>)[stat] as number;
@@ -1812,16 +1887,101 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                   });
                 }
 
-                // If in combat and attack hits, prompt for damage target
                 if (isCombatPhaseLocal && combatTargets.length > 0) {
                   setPendingDamageRoll({ dice: damageDice, bonus: damageBonus, actionName: attackName });
                   setShowDamageTargetModal(true);
                   setDamageRollResult(null);
                 }
 
-                // Record as combat action
                 if (isCombatPhaseLocal && isMyTurn) {
                   onRecordCombatAction?.(selected.id, 'action');
+                }
+              };
+
+              const handleWeaponAttackRoll = (weapon: InventoryItem, advantage?: 'advantage' | 'disadvantage') => {
+                if (!canAttack || !weapon.weaponData) return;
+                const wd = weapon.weaponData;
+
+                // Base d20 attack roll
+                const roll1 = Math.floor(Math.random() * 20) + 1;
+                const roll2 = advantage ? Math.floor(Math.random() * 20) + 1 : roll1;
+                const rawRoll = advantage === 'advantage' ? Math.max(roll1, roll2) : advantage === 'disadvantage' ? Math.min(roll1, roll2) : roll1;
+
+                // Bonus hit die
+                let hitDieResult = 0;
+                if (wd.hitDie && wd.hitDie.count > 0) {
+                  for (let i = 0; i < wd.hitDie.count; i++) {
+                    hitDieResult += Math.floor(Math.random() * wd.hitDie.sides) + 1;
+                  }
+                }
+
+                // Stat modifiers for hit
+                const hitStatMod = calcWeaponStatMod(wd.hitModifiers);
+                const rollTotal = rawRoll + hitDieResult + hitStatMod;
+
+                const results: { dice: string; result: number }[] = [];
+                if (advantage) {
+                  results.push({ dice: `D20${advantage === 'advantage' ? ' (Adv)' : ' (Dis)'}`, result: rawRoll });
+                  results.push({ dice: 'D20 (other)', result: advantage === 'advantage' ? Math.min(roll1, roll2) : Math.max(roll1, roll2) });
+                } else {
+                  results.push({ dice: 'D20', result: rawRoll });
+                }
+                if (hitDieResult > 0 && wd.hitDie) {
+                  results.push({ dice: `${wd.hitDie.count}d${wd.hitDie.sides} (hit bonus)`, result: hitDieResult });
+                }
+
+                if (addDiceRoll) {
+                  addDiceRoll({
+                    id: crypto.randomUUID(),
+                    crawlerName: selected.name,
+                    crawlerId: selected.id,
+                    timestamp: Date.now(),
+                    results,
+                    total: rollTotal,
+                    statRoll: { stat: `${weapon.name} (Attack)`, modifier: hitDieResult + hitStatMod, rawRoll },
+                  });
+                }
+
+                if (isCombatPhaseLocal && combatTargets.length > 0) {
+                  setPendingDamageRoll({ dice: formatDice(wd.damageDice), bonus: calcWeaponStatMod(wd.damageModifiers), actionName: weapon.name });
+                  setShowDamageTargetModal(true);
+                  setDamageRollResult(null);
+                }
+
+                if (isCombatPhaseLocal && isMyTurn) {
+                  onRecordCombatAction?.(selected.id, 'action');
+                }
+              };
+
+              const handleWeaponDamageRoll = (weapon: InventoryItem) => {
+                if (!weapon.weaponData) return;
+                const wd = weapon.weaponData;
+
+                let totalDamage = 0;
+                const results: { dice: string; result: number }[] = [];
+
+                for (const die of wd.damageDice) {
+                  let dieTotal = 0;
+                  for (let i = 0; i < die.count; i++) {
+                    dieTotal += Math.floor(Math.random() * die.sides) + 1;
+                  }
+                  results.push({ dice: `${die.count}d${die.sides}`, result: dieTotal });
+                  totalDamage += dieTotal;
+                }
+
+                const dmgStatMod = calcWeaponStatMod(wd.damageModifiers);
+                totalDamage += dmgStatMod;
+
+                if (addDiceRoll) {
+                  addDiceRoll({
+                    id: crypto.randomUUID(),
+                    crawlerName: selected.name,
+                    crawlerId: selected.id,
+                    timestamp: Date.now(),
+                    results,
+                    total: totalDamage,
+                    statRoll: { stat: `${weapon.name} (${wd.damageType} Damage)`, modifier: dmgStatMod, rawRoll: totalDamage - dmgStatMod },
+                  });
                 }
               };
 
@@ -1843,7 +2003,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                     </div>
                   )}
 
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                     {/* Unarmed Strike */}
                     <button
                       onClick={() => handleAttackRoll('Unarmed Strike', 'str', 'd4', 0)}
@@ -1858,7 +2018,69 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                       <span className={`text-sm font-display ${canAttack ? 'text-destructive' : 'text-muted-foreground'}`}>Unarmed Strike</span>
                       <span className="text-[10px] text-muted-foreground">STR check, d4 damage on hit</span>
                     </button>
+
+                    {/* Equipped Weapons */}
+                    {equippedWeapons.map(({ item }) => {
+                      const wd = item.weaponData!;
+                      const dmgStr = formatDice(wd.damageDice);
+                      return (
+                        <div key={item.id} className={`flex flex-col border-2 rounded-lg overflow-hidden transition-colors ${
+                          canAttack
+                            ? 'border-destructive/50 bg-destructive/5'
+                            : 'border-border/50 bg-muted/20 opacity-50'
+                        }`}>
+                          {/* Weapon info header */}
+                          <div className="px-3 pt-3 pb-1 text-center">
+                            <Sword className={`w-6 h-6 mx-auto mb-1 ${canAttack ? 'text-destructive' : 'text-muted-foreground'}`} />
+                            <span className={`text-sm font-display block ${canAttack ? 'text-destructive' : 'text-muted-foreground'}`}>
+                              {item.name}
+                              {item.isUpgraded && <span className="text-accent font-bold italic ml-1 text-[10px]">Upgraded</span>}
+                            </span>
+                            <div className="text-[10px] text-muted-foreground space-y-0.5 mt-1">
+                              <div>{wd.weaponType} · {wd.isRanged ? 'Ranged' : 'Melee'} · {wd.damageType}</div>
+                              <div>{dmgStr} damage{wd.hitDie ? ` · +${wd.hitDie.count}d${wd.hitDie.sides} to hit` : ''}</div>
+                              {wd.isRanged && wd.normalRange && <div>Range: {wd.normalRange}{wd.maxRange ? `/${wd.maxRange}` : ''} ft</div>}
+                              {wd.specialEffect && <div className="italic text-accent/70">{wd.specialEffect}</div>}
+                            </div>
+                          </div>
+                          {/* Action buttons */}
+                          <div className="flex gap-1 p-2 mt-auto">
+                            <button
+                              onClick={() => handleWeaponAttackRoll(item)}
+                              onContextMenu={(e) => {
+                                e.preventDefault();
+                                if (!canAttack) return;
+                                // Show advantage/disadvantage menu
+                                const rect = (e.target as HTMLElement).getBoundingClientRect();
+                                setWeaponAdvMenu({ weaponId: item.id, x: rect.left, y: rect.top });
+                              }}
+                              disabled={!canAttack}
+                              className={`flex-1 py-1.5 rounded text-[10px] font-display transition-colors ${
+                                canAttack
+                                  ? 'bg-destructive/20 text-destructive hover:bg-destructive/40'
+                                  : 'bg-muted/30 text-muted-foreground cursor-not-allowed'
+                              }`}
+                              title="Left click: normal roll. Right click: advantage/disadvantage"
+                            >
+                              ATTACK
+                            </button>
+                            <button
+                              onClick={() => handleWeaponDamageRoll(item)}
+                              className={`flex-1 py-1.5 rounded text-[10px] font-display transition-colors ${
+                                'bg-accent/20 text-accent hover:bg-accent/40'
+                              }`}
+                            >
+                              DAMAGE
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
+
+                  {equippedWeapons.length === 0 && (
+                    <p className="text-xs text-muted-foreground italic">Equip weapons from your inventory to see weapon attacks here.</p>
+                  )}
                 </div>
               );
             })()}
@@ -2125,6 +2347,283 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
       )}
 
       {/* Damage Target Modal */}
+      {/* Advantage/Disadvantage context menu for weapon attacks */}
+      {weaponAdvMenu && (() => {
+        const weapon = inventory.find(i => i.id === weaponAdvMenu.weaponId);
+        if (!weapon?.weaponData) return null;
+
+        // Find the handleWeaponAttackRoll in scope - need reference from attacks tab
+        const doRoll = (adv?: 'advantage' | 'disadvantage') => {
+          const wd = weapon.weaponData!;
+          const isCombatPhaseLocal = combatState?.active && combatState.phase === 'combat';
+          const isMyTurn = isCombatPhaseLocal && combatState && combatState.combatants[combatState.currentTurnIndex]?.id === selected.id;
+
+          // Base d20 attack roll
+          const roll1 = Math.floor(Math.random() * 20) + 1;
+          const roll2 = adv ? Math.floor(Math.random() * 20) + 1 : roll1;
+          const rawRoll = adv === 'advantage' ? Math.max(roll1, roll2) : adv === 'disadvantage' ? Math.min(roll1, roll2) : roll1;
+
+          let hitDieResult = 0;
+          if (wd.hitDie && wd.hitDie.count > 0) {
+            for (let i = 0; i < wd.hitDie.count; i++) {
+              hitDieResult += Math.floor(Math.random() * wd.hitDie.sides) + 1;
+            }
+          }
+
+          const calcMod = (mods: StatModifiers | undefined): number => {
+            if (!mods) return 0;
+            let total = 0;
+            for (const [stat, val] of Object.entries(mods)) {
+              if (val && ['str', 'dex', 'con', 'int', 'cha'].includes(stat)) {
+                const baseStat = (selected as Record<string, unknown>)[stat] as number ?? 10;
+                const equipMod = equippedMods[stat as keyof StatModifiers] ?? 0;
+                const totalStat = baseStat + equipMod;
+                total += Math.floor((totalStat - 10) / 2) * val;
+              }
+            }
+            return total;
+          };
+
+          const hitStatMod = calcMod(wd.hitModifiers);
+          const rollTotal = rawRoll + hitDieResult + hitStatMod;
+
+          const results: { dice: string; result: number }[] = [];
+          if (adv) {
+            results.push({ dice: `D20${adv === 'advantage' ? ' (Adv)' : ' (Dis)'}`, result: rawRoll });
+            results.push({ dice: 'D20 (other)', result: adv === 'advantage' ? Math.min(roll1, roll2) : Math.max(roll1, roll2) });
+          } else {
+            results.push({ dice: 'D20', result: rawRoll });
+          }
+          if (hitDieResult > 0 && wd.hitDie) {
+            results.push({ dice: `${wd.hitDie.count}d${wd.hitDie.sides} (hit bonus)`, result: hitDieResult });
+          }
+
+          if (addDiceRoll) {
+            addDiceRoll({
+              id: crypto.randomUUID(),
+              crawlerName: selected.name,
+              crawlerId: selected.id,
+              timestamp: Date.now(),
+              results,
+              total: rollTotal,
+              statRoll: { stat: `${weapon.name} (Attack${adv ? ` - ${adv}` : ''})`, modifier: hitDieResult + hitStatMod, rawRoll },
+            });
+          }
+
+          const combatTargets = combatState?.combatants.filter(c => c.id !== selected.id) ?? [];
+          if (isCombatPhaseLocal && combatTargets.length > 0) {
+            const formatDice = (dice: WeaponDie[]): string => dice.map(d => `${d.count}d${d.sides}`).join(' + ');
+            setPendingDamageRoll({ dice: formatDice(wd.damageDice), bonus: calcMod(wd.damageModifiers), actionName: weapon.name });
+            setShowDamageTargetModal(true);
+            setDamageRollResult(null);
+          }
+
+          if (isCombatPhaseLocal && isMyTurn) {
+            onRecordCombatAction?.(selected.id, 'action');
+          }
+          setWeaponAdvMenu(null);
+        };
+
+        return (
+          <div className="fixed inset-0 z-50" onClick={() => setWeaponAdvMenu(null)}>
+            <div
+              className="absolute bg-background border-2 border-destructive rounded-lg shadow-xl p-2 space-y-1"
+              style={{ left: weaponAdvMenu.x, top: weaponAdvMenu.y - 120 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p className="text-[10px] text-muted-foreground font-display px-2 pb-1 border-b border-border">{weapon.name}</p>
+              <button onClick={() => doRoll('advantage')}
+                className="w-full text-left px-3 py-1.5 text-xs hover:bg-green-500/20 text-green-400 rounded transition-colors">
+                Roll with Advantage (2d20, take highest)
+              </button>
+              <button onClick={() => doRoll('disadvantage')}
+                className="w-full text-left px-3 py-1.5 text-xs hover:bg-destructive/20 text-destructive rounded transition-colors">
+                Roll with Disadvantage (2d20, take lowest)
+              </button>
+              <button onClick={() => doRoll()}
+                className="w-full text-left px-3 py-1.5 text-xs hover:bg-muted/50 text-foreground rounded transition-colors">
+                Normal Roll
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Weapon Upgrade Modal */}
+      {upgradingWeapon && upgradeForm && (() => {
+        const updateUF = (updates: Partial<WeaponData>) => {
+          setUpgradeForm(prev => prev ? { ...prev, ...updates } : prev);
+        };
+
+        const handleSaveUpgrade = () => {
+          if (!upgradingWeapon || !upgradeForm) return;
+          const updatedItems = inventory.map(item => {
+            if (item.id !== upgradingWeapon.id) return item;
+            // Append "Upgraded" if not already upgraded
+            const newName = item.isUpgraded ? item.name : `${item.name} Upgraded`;
+            return { ...item, name: newName, weaponData: upgradeForm, isUpgraded: true };
+          });
+          onUpdateCrawlerInventory(selected.id, updatedItems);
+          setUpgradingWeapon(null);
+          setUpgradeForm(null);
+        };
+
+        return (
+          <div className="fixed inset-0 bg-background/80 z-50 flex items-center justify-center p-4">
+            <div className="bg-background border-2 border-accent rounded-lg p-6 max-w-lg w-full shadow-xl max-h-[80vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-display text-lg text-accent">Upgrade {upgradingWeapon.name}</h3>
+                <button onClick={() => { setUpgradingWeapon(null); setUpgradeForm(null); }}>
+                  <X className="w-5 h-5 text-muted-foreground hover:text-foreground" />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {/* Weapon Type & Damage Type */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] text-muted-foreground block mb-0.5">Weapon Type</label>
+                    <select value={upgradeForm.weaponType} onChange={(e) => updateUF({ weaponType: e.target.value as WeaponType })}
+                      className="bg-muted border border-border px-2 py-1 text-xs w-full">
+                      {WEAPON_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-muted-foreground block mb-0.5">Damage Type</label>
+                    <select value={upgradeForm.damageType} onChange={(e) => updateUF({ damageType: e.target.value as DamageType })}
+                      className="bg-muted border border-border px-2 py-1 text-xs w-full">
+                      {DAMAGE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Hit Die */}
+                <div>
+                  <label className="text-[10px] text-muted-foreground block mb-0.5">Bonus Hit Die</label>
+                  <div className="flex items-center gap-1">
+                    <input type="number" min={0} max={10} value={upgradeForm.hitDie?.count ?? 0}
+                      onChange={(e) => {
+                        const count = parseInt(e.target.value) || 0;
+                        updateUF({ hitDie: count > 0 ? { count, sides: upgradeForm.hitDie?.sides ?? 4 } : undefined });
+                      }}
+                      className="w-12 bg-muted border border-border px-1 py-0.5 text-xs text-center" />
+                    <span className="text-xs text-muted-foreground">d</span>
+                    <select value={upgradeForm.hitDie?.sides ?? 4}
+                      onChange={(e) => updateUF({ hitDie: (upgradeForm.hitDie?.count ?? 0) > 0 ? { count: upgradeForm.hitDie!.count, sides: parseInt(e.target.value) } : undefined })}
+                      className="bg-muted border border-border px-1 py-0.5 text-xs">
+                      {[4, 6, 8, 10, 12, 20].map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Damage Dice */}
+                <div>
+                  <label className="text-[10px] text-muted-foreground block mb-0.5">Damage Dice</label>
+                  {upgradeForm.damageDice.map((die, i) => (
+                    <div key={i} className="flex items-center gap-1 mb-1">
+                      <input type="number" min={1} max={20} value={die.count}
+                        onChange={(e) => {
+                          const updated = [...upgradeForm.damageDice];
+                          updated[i] = { ...die, count: parseInt(e.target.value) || 1 };
+                          updateUF({ damageDice: updated });
+                        }}
+                        className="w-12 bg-muted border border-border px-1 py-0.5 text-xs text-center" />
+                      <span className="text-xs text-muted-foreground">d</span>
+                      <select value={die.sides}
+                        onChange={(e) => {
+                          const updated = [...upgradeForm.damageDice];
+                          updated[i] = { ...die, sides: parseInt(e.target.value) };
+                          updateUF({ damageDice: updated });
+                        }}
+                        className="bg-muted border border-border px-1 py-0.5 text-xs">
+                        {[4, 6, 8, 10, 12, 20].map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                      {upgradeForm.damageDice.length > 1 && (
+                        <button onClick={() => updateUF({ damageDice: upgradeForm.damageDice.filter((_, j) => j !== i) })}
+                          className="text-destructive text-xs"><Trash2 className="w-3 h-3" /></button>
+                      )}
+                    </div>
+                  ))}
+                  <button onClick={() => updateUF({ damageDice: [...upgradeForm.damageDice, { count: 1, sides: 6 }] })}
+                    className="text-xs text-primary hover:underline flex items-center gap-1">
+                    <Plus className="w-3 h-3" /> Add die
+                  </button>
+                </div>
+
+                {/* Hit Stat Modifiers */}
+                <div>
+                  <label className="text-[10px] text-muted-foreground block mb-0.5">Hit Roll Stat Modifiers</label>
+                  <div className="grid grid-cols-5 gap-1">
+                    {(['str', 'dex', 'con', 'int', 'cha'] as const).map((stat) => (
+                      <div key={stat} className="flex flex-col items-center">
+                        <label className="text-[9px] text-muted-foreground uppercase">{stat}</label>
+                        <input type="number" value={upgradeForm.hitModifiers?.[stat] ?? ""}
+                          onChange={(e) => updateUF({ hitModifiers: { ...upgradeForm.hitModifiers, [stat]: e.target.value ? parseInt(e.target.value) : undefined } })}
+                          placeholder="0" className="w-10 bg-muted border border-border px-1 py-0.5 text-[10px] text-center" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Damage Stat Modifiers */}
+                <div>
+                  <label className="text-[10px] text-muted-foreground block mb-0.5">Damage Stat Modifiers</label>
+                  <div className="grid grid-cols-5 gap-1">
+                    {(['str', 'dex', 'con', 'int', 'cha'] as const).map((stat) => (
+                      <div key={stat} className="flex flex-col items-center">
+                        <label className="text-[9px] text-muted-foreground uppercase">{stat}</label>
+                        <input type="number" value={upgradeForm.damageModifiers?.[stat] ?? ""}
+                          onChange={(e) => updateUF({ damageModifiers: { ...upgradeForm.damageModifiers, [stat]: e.target.value ? parseInt(e.target.value) : undefined } })}
+                          placeholder="0" className="w-10 bg-muted border border-border px-1 py-0.5 text-[10px] text-center" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Ranged */}
+                <div>
+                  <label className="flex items-center gap-2 text-xs cursor-pointer">
+                    <input type="checkbox" checked={upgradeForm.isRanged}
+                      onChange={(e) => updateUF({ isRanged: e.target.checked })}
+                      className="w-4 h-4" />
+                    <span className="text-muted-foreground">Ranged Weapon</span>
+                  </label>
+                  {upgradeForm.isRanged && (
+                    <div className="flex gap-2 mt-1">
+                      <div>
+                        <label className="text-[10px] text-muted-foreground">Normal Range (ft)</label>
+                        <input type="number" min={0} value={upgradeForm.normalRange ?? ""}
+                          onChange={(e) => updateUF({ normalRange: e.target.value ? parseInt(e.target.value) : undefined })}
+                          className="w-16 bg-muted border border-border px-1 py-0.5 text-xs text-center" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-muted-foreground">Max Range (ft)</label>
+                        <input type="number" min={0} value={upgradeForm.maxRange ?? ""}
+                          onChange={(e) => updateUF({ maxRange: e.target.value ? parseInt(e.target.value) : undefined })}
+                          className="w-16 bg-muted border border-border px-1 py-0.5 text-xs text-center" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Special Effects */}
+                <div>
+                  <label className="text-[10px] text-muted-foreground block mb-0.5">Special Effects</label>
+                  <textarea value={upgradeForm.specialEffect ?? ""}
+                    onChange={(e) => updateUF({ specialEffect: e.target.value || undefined })}
+                    className="w-full bg-muted border border-border px-2 py-1 text-xs resize-none h-12" />
+                </div>
+
+                <button onClick={handleSaveUpgrade}
+                  className="w-full py-2 bg-accent text-accent-foreground font-display text-sm rounded hover:bg-accent/90 transition-colors">
+                  SAVE UPGRADE
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {showDamageTargetModal && pendingDamageRoll && combatState && (
         <div className="fixed inset-0 bg-background/80 z-50 flex items-center justify-center p-4">
           <div className="bg-background border-2 border-destructive rounded-lg p-6 max-w-md w-full shadow-xl">
@@ -2177,27 +2676,45 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                   {damageRollResult === null ? (
                     <button
                       onClick={() => {
-                        // Roll damage dice
-                        let maxVal = 4;
-                        if (pendingDamageRoll.dice === 'd6') maxVal = 6;
-                        else if (pendingDamageRoll.dice === 'd8') maxVal = 8;
-                        else if (pendingDamageRoll.dice === 'd10') maxVal = 10;
-                        else if (pendingDamageRoll.dice === 'd12') maxVal = 12;
-                        else if (pendingDamageRoll.dice === 'd20') maxVal = 20;
-                        const roll = Math.floor(Math.random() * maxVal) + 1;
-                        const totalDmg = roll + pendingDamageRoll.bonus;
+                        // Parse and roll damage dice (supports "1d6 + 2d4" format)
+                        const diceStr = pendingDamageRoll.dice;
+                        const diceParts = diceStr.split(/\s*\+\s*/);
+                        let totalRoll = 0;
+                        const results: { dice: string; result: number }[] = [];
+
+                        for (const part of diceParts) {
+                          const match = part.trim().match(/^(\d+)?d(\d+)$/i);
+                          if (match) {
+                            const count = parseInt(match[1] || '1');
+                            const sides = parseInt(match[2]);
+                            let dieTotal = 0;
+                            for (let i = 0; i < count; i++) {
+                              dieTotal += Math.floor(Math.random() * sides) + 1;
+                            }
+                            results.push({ dice: `${count}d${sides}`.toUpperCase(), result: dieTotal });
+                            totalRoll += dieTotal;
+                          } else {
+                            // Fallback for simple dice like "d6"
+                            const simpleMatch = part.trim().match(/^d(\d+)$/i);
+                            const sides = simpleMatch ? parseInt(simpleMatch[1]) : 4;
+                            const roll = Math.floor(Math.random() * sides) + 1;
+                            results.push({ dice: `D${sides}`, result: roll });
+                            totalRoll += roll;
+                          }
+                        }
+
+                        const totalDmg = totalRoll + pendingDamageRoll.bonus;
                         setDamageRollResult(totalDmg);
 
-                        // Add to dice history
                         if (addDiceRoll) {
                           addDiceRoll({
                             id: crypto.randomUUID(),
                             crawlerName: selected.name,
                             crawlerId: selected.id,
                             timestamp: Date.now(),
-                            results: [{ dice: pendingDamageRoll.dice.toUpperCase(), result: roll }],
+                            results,
                             total: totalDmg,
-                            statRoll: { stat: `${pendingDamageRoll.actionName} (Damage)`, modifier: pendingDamageRoll.bonus, rawRoll: roll },
+                            statRoll: { stat: `${pendingDamageRoll.actionName} (Damage)`, modifier: pendingDamageRoll.bonus, rawRoll: totalRoll },
                           });
                         }
                       }}

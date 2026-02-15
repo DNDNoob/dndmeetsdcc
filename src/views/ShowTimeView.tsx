@@ -2374,6 +2374,21 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                     mob={mob}
                     size={64}
                     isDragging={isDragging}
+                    inCombat={(() => {
+                      if (!combatState?.active || combatState.phase === 'ended') return false;
+                      // Find matching combatant for this mob placement
+                      const totalSameId = currentMapMobPlacements.filter(p => p.mobId === placement.mobId).length;
+                      const combatId = totalSameId > 1 ? `${placement.mobId}:${globalIndex}` : placement.mobId;
+                      return combatState.combatants.some(c => c.id === combatId);
+                    })()}
+                    combatHP={(() => {
+                      if (!combatState?.active || combatState.phase === 'ended') return undefined;
+                      const totalSameId = currentMapMobPlacements.filter(p => p.mobId === placement.mobId).length;
+                      const combatId = totalSameId > 1 ? `${placement.mobId}:${globalIndex}` : placement.mobId;
+                      const combatant = combatState.combatants.find(c => c.id === combatId);
+                      return combatant?.currentHP;
+                    })()}
+                    maxHP={mob.hitPoints}
                   />
                   {letter && (
                     <div className="absolute -top-1 -right-1 w-6 h-6 bg-accent text-background rounded-full flex items-center justify-center text-sm font-bold shadow-lg">
@@ -2554,7 +2569,21 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                 }}
               >
                 <div className="relative">
-                  <MobIcon mob={mob} size={64} isDragging={isDragging} />
+                  <MobIcon
+                    mob={mob}
+                    size={64}
+                    isDragging={isDragging}
+                    inCombat={(() => {
+                      if (!combatState?.active || combatState.phase === 'ended') return false;
+                      return combatState.combatants.some(c => (c.sourceId || c.id) === placement.mobId);
+                    })()}
+                    combatHP={(() => {
+                      if (!combatState?.active || combatState.phase === 'ended') return undefined;
+                      const combatant = combatState.combatants.find(c => (c.sourceId || c.id) === placement.mobId);
+                      return combatant?.currentHP;
+                    })()}
+                    maxHP={mob.hitPoints}
+                  />
                   {/* Letter badge - only show if there are duplicates */}
                   {letter && (
                     <div className="absolute -top-1 -left-1 w-6 h-6 bg-accent text-background rounded-full flex items-center justify-center text-sm font-bold shadow-lg">
