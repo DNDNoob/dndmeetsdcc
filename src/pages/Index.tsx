@@ -318,6 +318,17 @@ const Index = () => {
     prevLootBoxes.current = lootBoxes;
   }, [lootBoxes, currentPlayer]);
 
+  // Filter combat state to only show for the matching episode
+  // Must be before the early return to maintain consistent hook order
+  const activeCombatState = useMemo(() => {
+    if (!combatState?.active) return combatState;
+    // If combat has an episodeId, only show it when the matching episode is active
+    if (combatState.episodeId && activeEpisode?.id && combatState.episodeId !== activeEpisode.id) {
+      return null;
+    }
+    return combatState;
+  }, [combatState, activeEpisode]);
+
   if (!isLoaded) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -329,16 +340,6 @@ const Index = () => {
   }
 
   const isAdmin = currentPlayer?.type === "ai";
-
-  // Filter combat state to only show for the matching episode
-  const activeCombatState = useMemo(() => {
-    if (!combatState?.active) return combatState;
-    // If combat has an episodeId, only show it when the matching episode is active
-    if (combatState.episodeId && activeEpisode?.id && combatState.episodeId !== activeEpisode.id) {
-      return null;
-    }
-    return combatState;
-  }, [combatState, activeEpisode]);
 
   return (
     <div className="min-h-screen">
