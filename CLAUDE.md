@@ -288,6 +288,31 @@ const [name, setName] = useState('');
 
 ---
 
+## Testing & Verification
+
+### Required Before Every Commit
+
+1. **Build check**: Run `npm run build` — must succeed with no new errors
+2. **Lint check**: Run `npm run lint` — must not introduce new errors (pre-existing warnings are OK)
+3. **Screenshot verification**: After any edit that alters the UI, take a screenshot of the affected page/component to verify the UI renders correctly. Compare against the expected layout and fix any visual regressions before committing.
+
+### Screenshot Workflow
+
+- Start the dev server: `npm run dev`
+- Navigate to the affected page and take a screenshot
+- Verify: no blank pages, no layout breaks, no missing elements, no overlapping components
+- If something looks wrong, fix it and re-screenshot before committing
+- Pay special attention to: ShowTime map rendering, PingPanel combat UI, health bars, mob/crawler icons
+
+### What to Look For
+
+- **Blank pages**: Usually a runtime error (check browser console for `ReferenceError`, `TypeError`, etc.)
+- **Broken layouts**: CSS/Tailwind class issues, missing flex containers, z-index problems
+- **Missing data**: Props not wired correctly, collections not synced, stale memoization
+- **Health bar issues**: Verify `combatId` matching between ShowTimeView and PingPanel is consistent
+
+---
+
 ## Common Mistakes to Avoid
 
 | Mistake | Consequence | Fix |
