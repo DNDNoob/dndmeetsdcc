@@ -6,25 +6,44 @@ interface MobIconProps {
   size?: number;
   isDragging?: boolean;
   onClick?: () => void;
+  /** Whether this mob is currently in combat (shows health bar) */
+  inCombat?: boolean;
+  /** Current HP for this combatant instance (from CombatState) */
+  combatHP?: number;
+  /** Max HP for this mob (from mob.hitPoints or original value) */
+  maxHP?: number;
 }
 
-export const MobIcon: React.FC<MobIconProps> = ({ mob, size = 40, isDragging = false, onClick }) => {
+export const MobIcon: React.FC<MobIconProps> = ({ mob, size = 40, isDragging = false, onClick, inCombat = false, combatHP, maxHP }) => {
+  const displayMaxHP = maxHP ?? mob.hitPoints ?? 0;
+  const displayCurrentHP = combatHP ?? mob.hitPoints ?? 0;
+  const hpPercentage = displayMaxHP > 0 ? Math.min(100, Math.max(0, (displayCurrentHP / displayMaxHP) * 100)) : 0;
+
+  // Health bar color based on percentage
+  const getBarColor = () => {
+    if (hpPercentage > 50) return 'bg-green-500';
+    if (hpPercentage > 25) return 'bg-yellow-500';
+    return 'bg-destructive';
+  };
+
   return (
     <div
       onClick={onClick}
       className={`relative cursor-move transition-all ${isDragging ? "opacity-50 scale-110" : "hover:scale-110"}`}
       style={{
         width: size,
-        height: size,
+        height: inCombat ? size + 12 : size,
       }}
     >
       {/* Circular container */}
       <div
-        className="absolute inset-0 rounded-full border-2 border-primary shadow-lg overflow-hidden bg-muted"
+        className="absolute inset-x-0 top-0 rounded-full border-2 border-primary shadow-lg overflow-hidden bg-muted"
         style={{
+          width: size,
+          height: size,
           backgroundImage: mob.image ? `url(${mob.image})` : undefined,
           backgroundSize: "cover",
-          backgroundPosition: "center 20%", // Position towards head
+          backgroundPosition: "center 20%",
           filter: isDragging ? "brightness(0.7)" : "brightness(1)",
         }}
       >
@@ -37,10 +56,21 @@ export const MobIcon: React.FC<MobIconProps> = ({ mob, size = 40, isDragging = f
         )}
       </div>
 
-      {/* Hit points indicator */}
-      {mob.hitPoints && !mob.hideHitPoints && (
-        <div className="absolute -bottom-1 -right-1 bg-destructive text-destructive-foreground text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-          {mob.hitPoints}
+      {/* Health bar - shown only when in combat */}
+      {inCombat && displayMaxHP > 0 && (
+        <div
+          className="absolute bottom-0 left-1/2 -translate-x-1/2"
+          style={{ width: Math.max(size, 36) }}
+        >
+          <div className="h-3 border border-muted-foreground/40 bg-background/80 overflow-hidden rounded-sm relative">
+            <div
+              className={`h-full transition-all duration-300 ${getBarColor()}`}
+              style={{ width: `${hpPercentage}%` }}
+            />
+            <span className="absolute inset-0 flex items-center justify-center text-[8px] font-bold text-foreground drop-shadow-[0_1px_1px_rgba(0,0,0,0.9)] leading-none">
+              {displayCurrentHP}
+            </span>
+          </div>
         </div>
       )}
 

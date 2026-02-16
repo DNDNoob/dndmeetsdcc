@@ -18,6 +18,7 @@ interface PingPanelProps {
   onConfirmInitiative?: () => Promise<void>;
   onAdvanceCombatTurn?: () => Promise<void>;
   onEndCombat?: () => Promise<void>;
+  onCancelCombat?: () => Promise<void>;
   onOverrideMobHealth?: (mobId: string, newHP: number) => Promise<void>;
   onRemoveCombatant?: (combatantId: string) => Promise<void>;
 }
@@ -37,6 +38,7 @@ const PingPanel: React.FC<PingPanelProps> = ({
   onConfirmInitiative,
   onAdvanceCombatTurn,
   onEndCombat,
+  onCancelCombat,
   onOverrideMobHealth,
   onRemoveCombatant,
 }) => {
@@ -222,12 +224,27 @@ const PingPanel: React.FC<PingPanelProps> = ({
               </div>
             )}
 
-            {/* Noncombat Turn Info - visible to all players */}
+            {/* Turn Counters - noncombat + combat */}
+            {(noncombatTurnState || (combatState?.combatCount && combatState.combatCount > 0)) && playerCrawlers.length > 0 && (
+              <div className="mb-3 flex items-center justify-center gap-4">
+                {noncombatTurnState && !isCombatActive && (
+                  <div className="text-center border border-border bg-muted/20 px-3 py-1.5 rounded">
+                    <span className="text-[10px] text-muted-foreground font-display block">NC TURNS</span>
+                    <span className="font-display text-primary text-sm">{noncombatTurnState.turnNumber}</span>
+                  </div>
+                )}
+                {(combatState?.combatCount ?? 0) > 0 && (
+                  <div className="text-center border border-destructive/30 bg-destructive/5 px-3 py-1.5 rounded">
+                    <span className="text-[10px] text-muted-foreground font-display block">COMBATS</span>
+                    <span className="font-display text-destructive text-sm">{combatState?.combatCount ?? 0}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Noncombat Turn Details - visible to all players */}
             {noncombatTurnState && playerCrawlers.length > 0 && !isCombatActive && (
               <div className="mb-3">
-                <div className="text-center mb-2">
-                  <span className="text-[10px] text-muted-foreground font-display">TURN {noncombatTurnState.turnNumber}</span>
-                </div>
                 <div className="text-[10px] text-muted-foreground space-y-0.5">
                   {playerCrawlers.map(c => {
                     const used = noncombatTurnState.rollsUsed[c.id] ?? 0;
@@ -382,7 +399,7 @@ const PingPanel: React.FC<PingPanelProps> = ({
                       START COMBAT
                     </button>
                     <button
-                      onClick={() => onEndCombat?.()}
+                      onClick={() => onCancelCombat?.()}
                       className="w-full flex items-center justify-center gap-1 bg-muted text-muted-foreground font-display text-xs py-2 rounded hover:bg-destructive/20 hover:text-destructive transition-colors"
                     >
                       <XCircle className="w-3 h-3" />
@@ -477,20 +494,29 @@ const PingPanel: React.FC<PingPanelProps> = ({
 
                 {/* DM: Advance turn and end combat */}
                 {isAdmin && (
-                  <div className="flex gap-2 pt-1">
+                  <div className="space-y-2 pt-1">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => onAdvanceCombatTurn?.()}
+                        className="flex-1 flex items-center justify-center gap-1 bg-accent text-accent-foreground font-display text-xs py-2 rounded hover:bg-accent/90 transition-colors"
+                      >
+                        <SkipForward className="w-3 h-3" />
+                        NEXT TURN
+                      </button>
+                      <button
+                        onClick={() => onEndCombat?.()}
+                        className="flex-1 flex items-center justify-center gap-1 bg-muted text-muted-foreground font-display text-xs py-2 rounded hover:bg-destructive/20 hover:text-destructive transition-colors"
+                      >
+                        <XCircle className="w-3 h-3" />
+                        END COMBAT
+                      </button>
+                    </div>
                     <button
-                      onClick={() => onAdvanceCombatTurn?.()}
-                      className="flex-1 flex items-center justify-center gap-1 bg-accent text-accent-foreground font-display text-xs py-2 rounded hover:bg-accent/90 transition-colors"
-                    >
-                      <SkipForward className="w-3 h-3" />
-                      NEXT TURN
-                    </button>
-                    <button
-                      onClick={() => onEndCombat?.()}
-                      className="flex-1 flex items-center justify-center gap-1 bg-muted text-muted-foreground font-display text-xs py-2 rounded hover:bg-destructive/20 hover:text-destructive transition-colors"
+                      onClick={() => onCancelCombat?.()}
+                      className="w-full flex items-center justify-center gap-1 bg-muted/50 text-muted-foreground font-display text-[10px] py-1.5 rounded hover:bg-destructive/10 hover:text-destructive transition-colors"
                     >
                       <XCircle className="w-3 h-3" />
-                      END COMBAT
+                      CANCEL COMBAT
                     </button>
                   </div>
                 )}
