@@ -8,7 +8,7 @@ import RulerOverlay from "@/components/ui/RulerOverlay";
 import { MobIcon } from "@/components/ui/MobIcon";
 import { FogOfWar } from "@/components/ui/FogOfWar";
 import { Episode, Mob, MapSettings, Crawler, CrawlerPlacement, EpisodeMobPlacement, SentLootBox, LootBoxTemplate, getLootBoxTierColor, InventoryItem, CombatState, getEquippedModifiers } from "@/lib/gameData";
-import { Map, X, Eye, Layers, ChevronLeft, ChevronRight, PlayCircle, Grid3x3, CloudFog, Eraser, Trash2, Target, ZoomIn, ZoomOut, Package, Lock, Unlock, Search, Plus } from "lucide-react";
+import { Map as MapIcon, X, Eye, Layers, ChevronLeft, ChevronRight, PlayCircle, Grid3x3, CloudFog, Eraser, Trash2, Target, ZoomIn, ZoomOut, Package, Lock, Unlock, Search, Plus } from "lucide-react";
 import { PingEffect, Ping } from "@/components/ui/PingEffect";
 import { MapBox, MapBoxData, ShapeType } from "@/components/ui/MapBox";
 import { MapToolsMenu } from "@/components/ui/MapToolsMenu";
@@ -1845,7 +1845,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
         {isAdmin ? (
           <DungeonCard className="max-w-4xl mx-auto">
             <h2 className="font-display text-2xl text-accent text-glow-gold mb-6 flex items-center gap-3">
-              <Map className="w-6 h-6" />
+              <MapIcon className="w-6 h-6" />
               SHOW TIME - SELECT EPISODE
             </h2>
 
@@ -1873,7 +1873,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
                       <div className="space-y-2 text-xs mb-4">
                         <div className="flex items-center gap-2">
-                          <Map className="w-4 h-4 text-primary" />
+                          <MapIcon className="w-4 h-4 text-primary" />
                           <span>
                             {episode.mapIds.length} map{episode.mapIds.length !== 1 ? "s" : ""}
                           </span>
