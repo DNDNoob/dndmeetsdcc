@@ -17,7 +17,7 @@ import SoundEffectsView from "@/views/SoundEffectsView";
 
 import { useGameState, DiceRollEntry } from "@/hooks/useGameState";
 import { toast } from "sonner";
-import type { Episode, Mob } from "@/lib/gameData";
+import type { Episode, Mob, CrawlerPlacement, EpisodeMobPlacement } from "@/lib/gameData";
 
 type AppScreen = "splash" | "menu" | "game";
 type GameView = "profiles" | "maps" | "inventory" | "mobs" | "dungeonai" | "showtime" | "sounds";
@@ -96,6 +96,8 @@ const Index = () => {
 
   const [isShowtimeActive, setIsShowtimeActive] = useState(false);
   const [activeEpisode, setActiveEpisode] = useState<Episode | null>(null);
+  const [runtimeCrawlerPlacements, setRuntimeCrawlerPlacements] = useState<CrawlerPlacement[]>([]);
+  const [runtimeMobPlacements, setRuntimeMobPlacements] = useState<EpisodeMobPlacement[]>([]);
 
   const [previousPlayer, setPreviousPlayer] = useState<{
     id: string;
@@ -160,6 +162,7 @@ const Index = () => {
     endCombat,
     cancelCombat,
     removeCombatant,
+    addCombatant,
     isLoaded
   } = useGameState();
 
@@ -468,10 +471,20 @@ const Index = () => {
                 onEndEpisode={() => {
                   setIsShowtimeActive(false);
                   setActiveEpisode(null);
+                  setRuntimeCrawlerPlacements([]);
+                  setRuntimeMobPlacements([]);
                 }}
                 onShowtimeActiveChange={(active, episode) => {
                   setIsShowtimeActive(active);
                   setActiveEpisode(episode ?? null);
+                  if (!active) {
+                    setRuntimeCrawlerPlacements([]);
+                    setRuntimeMobPlacements([]);
+                  }
+                }}
+                onRuntimePlacementsChange={(cp, mp) => {
+                  setRuntimeCrawlerPlacements(cp);
+                  setRuntimeMobPlacements(mp);
                 }}
                 getCrawlerInventory={getCrawlerInventory}
                 onUpdateCrawlerInventory={updateCrawlerInventory}
@@ -514,6 +527,9 @@ const Index = () => {
               onCancelCombat={cancelCombat}
               onOverrideMobHealth={overrideMobHealth}
               onRemoveCombatant={removeCombatant}
+              runtimeCrawlerPlacements={runtimeCrawlerPlacements}
+              runtimeMobPlacements={runtimeMobPlacements}
+              onAddCombatant={addCombatant}
             />
           )}
 

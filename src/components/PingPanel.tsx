@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Clock, ChevronUp, ChevronDown, RotateCcw, Sun, Moon, Swords, Zap, SkipForward, XCircle, Heart } from "lucide-react";
-import { type Crawler, type Mob, type NoncombatTurnState, type GameClockState, type Episode, type CombatState } from "@/lib/gameData";
+import { Clock, ChevronUp, ChevronDown, RotateCcw, Sun, Moon, Swords, Zap, SkipForward, XCircle, Heart, Plus } from "lucide-react";
+import { type Crawler, type Mob, type NoncombatTurnState, type GameClockState, type Episode, type CombatState, type CrawlerPlacement, type EpisodeMobPlacement, type CombatantEntry } from "@/lib/gameData";
 
 interface PingPanelProps {
   isAdmin?: boolean;
@@ -21,6 +21,9 @@ interface PingPanelProps {
   onCancelCombat?: () => Promise<void>;
   onOverrideMobHealth?: (mobId: string, newHP: number) => Promise<void>;
   onRemoveCombatant?: (combatantId: string) => Promise<void>;
+  runtimeCrawlerPlacements?: CrawlerPlacement[];
+  runtimeMobPlacements?: EpisodeMobPlacement[];
+  onAddCombatant?: (combatants: CombatantEntry[]) => Promise<void>;
 }
 
 const PingPanel: React.FC<PingPanelProps> = ({
@@ -41,6 +44,9 @@ const PingPanel: React.FC<PingPanelProps> = ({
   onCancelCombat,
   onOverrideMobHealth,
   onRemoveCombatant,
+  runtimeCrawlerPlacements,
+  runtimeMobPlacements,
+  onAddCombatant,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showRestDropdown, setShowRestDropdown] = useState<'short' | 'long' | null>(null);
@@ -53,6 +59,8 @@ const PingPanel: React.FC<PingPanelProps> = ({
   const [selectedCombatMobs, setSelectedCombatMobs] = useState<Record<string, boolean>>({});
   const [showMobHealthOverride, setShowMobHealthOverride] = useState<string | null>(null);
   const [mobHealthValue, setMobHealthValue] = useState('');
+  const [showAddCombatant, setShowAddCombatant] = useState(false);
+  const [selectedNewCombatants, setSelectedNewCombatants] = useState<Record<string, boolean>>({});
 
   // Click outside to minimize
   useEffect(() => {
@@ -88,26 +96,36 @@ const PingPanel: React.FC<PingPanelProps> = ({
     setShowRestDropdown(null);
   };
 
-  // Filter to only crawlers loaded in the active episode
-  const episodeCrawlerIds = activeEpisode?.crawlerPlacements
-    ? [...new Set(activeEpisode.crawlerPlacements.map(p => p.crawlerId))]
-    : null;
-  const playerCrawlers = (crawlers ?? []).filter(c => {
-    if (c.id === 'dungeonai') return false;
-    if (episodeCrawlerIds) return episodeCrawlerIds.includes(c.id);
-    return true;
-  });
+  // Filter to only crawlers loaded in the active episode (merge episode + runtime placements)
+  const episodeCrawlerIds = useMemo(() => {
+    const ids = new Set<string>();
+    // From episode's pre-placed crawlers (all maps)
+    activeEpisode?.crawlerPlacements?.forEach(p => ids.add(p.crawlerId));
+    // From runtime placements (crawlers added during ShowTime)
+    runtimeCrawlerPlacements?.forEach(p => ids.add(p.crawlerId));
+    return ids.size > 0 ? ids : null;
+  }, [activeEpisode?.crawlerPlacements, runtimeCrawlerPlacements]);
 
-  // Build placement-based mob entries (each placement is a separate selectable combatant)
-  const mobCombatEntries = (() => {
-    if (!activeEpisode?.mobPlacements) return [];
-    // Count occurrences of each mobId
+  const playerCrawlers = useMemo(() => (crawlers ?? []).filter(c => {
+    if (c.id === 'dungeonai') return false;
+    if (episodeCrawlerIds) return episodeCrawlerIds.has(c.id);
+    return true;
+  }), [crawlers, episodeCrawlerIds]);
+
+  // Build placement-based mob entries (merge episode + runtime placements)
+  const mobCombatEntries = useMemo(() => {
+    const episodePlacements = activeEpisode?.mobPlacements ?? [];
+    const runtimePlacements = runtimeMobPlacements ?? [];
+    const allPlacements = [...episodePlacements, ...runtimePlacements];
+    if (allPlacements.length === 0) return [];
+
+    // Count occurrences of each mobId across all placements
     const mobCounts: Record<string, number> = {};
-    activeEpisode.mobPlacements.forEach(p => {
+    allPlacements.forEach(p => {
       mobCounts[p.mobId] = (mobCounts[p.mobId] ?? 0) + 1;
     });
     const mobIndices: Record<string, number> = {};
-    return activeEpisode.mobPlacements.map((p, placementIdx) => {
+    return allPlacements.map((p, placementIdx) => {
       const mob = (mobs ?? []).find(m => m.id === p.mobId);
       if (!mob || mob.hidden) return null;
       const count = mobCounts[p.mobId];
@@ -121,7 +139,7 @@ const PingPanel: React.FC<PingPanelProps> = ({
         hitPoints: mob.hitPoints,
       };
     }).filter((e): e is NonNullable<typeof e> => e !== null);
-  })();
+  }, [activeEpisode?.mobPlacements, runtimeMobPlacements, mobs]);
 
   const allPlayersSpent = noncombatTurnState != null && playerCrawlers.length > 0 && playerCrawlers.every(c => {
     const used = noncombatTurnState.rollsUsed[c.id] ?? 0;
@@ -132,6 +150,63 @@ const PingPanel: React.FC<PingPanelProps> = ({
   const isCombatActive = combatState?.active && combatState.phase !== 'ended';
   const isInitiativePhase = combatState?.active && combatState.phase === 'initiative';
   const isCombatPhase = combatState?.active && combatState.phase === 'combat';
+
+  // Crawlers/mobs not yet in combat (for mid-combat add)
+  const availableToAdd = useMemo(() => {
+    if (!combatState?.active) return { crawlers: [] as Crawler[], mobs: [] as typeof mobCombatEntries };
+    const inCombatIds = new Set(combatState.combatants.map(c => c.id));
+    const availCrawlers = playerCrawlers.filter(c => !inCombatIds.has(c.id));
+    const availMobs = mobCombatEntries.filter(e => !inCombatIds.has(e.combatId));
+    return { crawlers: availCrawlers, mobs: availMobs };
+  }, [combatState, playerCrawlers, mobCombatEntries]);
+
+  const handleAddCombatants = async () => {
+    if (!combatState || !onAddCombatant) return;
+    const selectedIds = new Set(
+      Object.entries(selectedNewCombatants)
+        .filter(([, checked]) => checked)
+        .map(([id]) => id)
+    );
+    if (selectedIds.size === 0) return;
+
+    const newEntries: CombatantEntry[] = [];
+    // Add selected crawlers
+    for (const c of availableToAdd.crawlers) {
+      if (!selectedIds.has(c.id)) continue;
+      newEntries.push({
+        id: c.id,
+        type: 'crawler',
+        name: c.name,
+        initiative: 0,
+        hasRolledInitiative: false,
+        hasUsedAction: false,
+        hasUsedBonusAction: false,
+        avatar: c.avatar,
+      });
+    }
+    // Add selected mobs (auto-roll initiative)
+    for (const entry of availableToAdd.mobs) {
+      if (!selectedIds.has(entry.combatId)) continue;
+      const mob = (mobs ?? []).find(m => m.id === entry.mobId);
+      const roll = Math.floor(Math.random() * 20) + 1;
+      newEntries.push({
+        id: entry.combatId,
+        sourceId: entry.mobId,
+        type: 'mob',
+        name: entry.name,
+        initiative: roll,
+        hasRolledInitiative: true,
+        hasUsedAction: false,
+        hasUsedBonusAction: false,
+        avatar: mob?.image,
+        currentHP: entry.hitPoints,
+      });
+    }
+
+    await onAddCombatant(newEntries);
+    setShowAddCombatant(false);
+    setSelectedNewCombatants({});
+  };
 
   // Open combat setup with all mobs/crawlers pre-selected
   const openCombatSetup = () => {
@@ -167,7 +242,7 @@ const PingPanel: React.FC<PingPanelProps> = ({
   };
 
   const handleMobHealthOverride = async (mobId: string) => {
-    const hp = parseInt(mobHealthValue);
+    const hp = parseInt(mobHealthValue, 10);
     if (isNaN(hp) || hp < 0) return;
     await onOverrideMobHealth?.(mobId, hp);
     setShowMobHealthOverride(null);
@@ -387,6 +462,85 @@ const PingPanel: React.FC<PingPanelProps> = ({
                 </div>
                 {isAdmin && (
                   <div className="space-y-2">
+                    {/* Add combatant during initiative */}
+                    {onAddCombatant && (availableToAdd.crawlers.length > 0 || availableToAdd.mobs.length > 0) && (
+                      <div>
+                        <button
+                          onClick={() => {
+                            if (showAddCombatant) {
+                              setShowAddCombatant(false);
+                            } else {
+                              const sel: Record<string, boolean> = {};
+                              availableToAdd.crawlers.forEach(c => { sel[c.id] = true; });
+                              availableToAdd.mobs.forEach(e => { sel[e.combatId] = true; });
+                              setSelectedNewCombatants(sel);
+                              setShowAddCombatant(true);
+                            }
+                          }}
+                          className="w-full flex items-center justify-center gap-1 bg-primary/10 text-primary font-display text-[10px] py-1.5 rounded border border-primary/30 hover:bg-primary/20 transition-colors"
+                        >
+                          <Plus className="w-3 h-3" />
+                          ADD TO COMBAT
+                        </button>
+                        {showAddCombatant && (
+                          <div className="mt-2 border border-primary/30 bg-primary/5 p-2 rounded space-y-2">
+                            {availableToAdd.crawlers.length > 0 && (
+                              <div>
+                                <span className="text-[10px] text-primary font-display block mb-1">CRAWLERS</span>
+                                <div className="space-y-1">
+                                  {availableToAdd.crawlers.map(c => (
+                                    <label key={c.id} className="flex items-center gap-2 text-xs cursor-pointer">
+                                      <input
+                                        type="checkbox"
+                                        checked={selectedNewCombatants[c.id] ?? false}
+                                        onChange={(e) => setSelectedNewCombatants(prev => ({ ...prev, [c.id]: e.target.checked }))}
+                                        className="w-3 h-3"
+                                      />
+                                      <span>{c.name}</span>
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {availableToAdd.mobs.length > 0 && (
+                              <div>
+                                <span className="text-[10px] text-destructive font-display block mb-1">MOBS</span>
+                                <div className="space-y-1">
+                                  {availableToAdd.mobs.map(entry => (
+                                    <label key={entry.combatId} className="flex items-center gap-2 text-xs cursor-pointer">
+                                      <input
+                                        type="checkbox"
+                                        checked={selectedNewCombatants[entry.combatId] ?? false}
+                                        onChange={(e) => setSelectedNewCombatants(prev => ({ ...prev, [entry.combatId]: e.target.checked }))}
+                                        className="w-3 h-3"
+                                      />
+                                      <span>{entry.name}</span>
+                                      {entry.hitPoints != null && (
+                                        <span className="text-muted-foreground">({entry.hitPoints} HP)</span>
+                                      )}
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            <div className="flex gap-2">
+                              <button
+                                onClick={handleAddCombatants}
+                                className="flex-1 bg-primary text-primary-foreground font-display text-[10px] py-1 rounded hover:bg-primary/90 transition-colors"
+                              >
+                                CONFIRM
+                              </button>
+                              <button
+                                onClick={() => { setShowAddCombatant(false); setSelectedNewCombatants({}); }}
+                                className="flex-1 bg-muted text-muted-foreground font-display text-[10px] py-1 rounded hover:bg-muted/80 transition-colors"
+                              >
+                                CANCEL
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                     <button
                       onClick={handleConfirmInitiative}
                       disabled={!combatState.combatants.every(c => c.hasRolledInitiative)}
@@ -491,6 +645,86 @@ const PingPanel: React.FC<PingPanelProps> = ({
                     );
                   })}
                 </div>
+
+                {/* DM: Add combatant mid-combat */}
+                {isAdmin && onAddCombatant && (availableToAdd.crawlers.length > 0 || availableToAdd.mobs.length > 0) && (
+                  <div className="pt-1">
+                    <button
+                      onClick={() => {
+                        if (showAddCombatant) {
+                          setShowAddCombatant(false);
+                        } else {
+                          const sel: Record<string, boolean> = {};
+                          availableToAdd.crawlers.forEach(c => { sel[c.id] = true; });
+                          availableToAdd.mobs.forEach(e => { sel[e.combatId] = true; });
+                          setSelectedNewCombatants(sel);
+                          setShowAddCombatant(true);
+                        }
+                      }}
+                      className="w-full flex items-center justify-center gap-1 bg-primary/10 text-primary font-display text-[10px] py-1.5 rounded border border-primary/30 hover:bg-primary/20 transition-colors"
+                    >
+                      <Plus className="w-3 h-3" />
+                      ADD TO COMBAT
+                    </button>
+                    {showAddCombatant && (
+                      <div className="mt-2 border border-primary/30 bg-primary/5 p-2 rounded space-y-2">
+                        {availableToAdd.crawlers.length > 0 && (
+                          <div>
+                            <span className="text-[10px] text-primary font-display block mb-1">CRAWLERS</span>
+                            <div className="space-y-1">
+                              {availableToAdd.crawlers.map(c => (
+                                <label key={c.id} className="flex items-center gap-2 text-xs cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedNewCombatants[c.id] ?? false}
+                                    onChange={(e) => setSelectedNewCombatants(prev => ({ ...prev, [c.id]: e.target.checked }))}
+                                    className="w-3 h-3"
+                                  />
+                                  <span>{c.name}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {availableToAdd.mobs.length > 0 && (
+                          <div>
+                            <span className="text-[10px] text-destructive font-display block mb-1">MOBS</span>
+                            <div className="space-y-1">
+                              {availableToAdd.mobs.map(entry => (
+                                <label key={entry.combatId} className="flex items-center gap-2 text-xs cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedNewCombatants[entry.combatId] ?? false}
+                                    onChange={(e) => setSelectedNewCombatants(prev => ({ ...prev, [entry.combatId]: e.target.checked }))}
+                                    className="w-3 h-3"
+                                  />
+                                  <span>{entry.name}</span>
+                                  {entry.hitPoints != null && (
+                                    <span className="text-muted-foreground">({entry.hitPoints} HP)</span>
+                                  )}
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleAddCombatants}
+                            className="flex-1 bg-primary text-primary-foreground font-display text-[10px] py-1 rounded hover:bg-primary/90 transition-colors"
+                          >
+                            CONFIRM
+                          </button>
+                          <button
+                            onClick={() => { setShowAddCombatant(false); setSelectedNewCombatants({}); }}
+                            className="flex-1 bg-muted text-muted-foreground font-display text-[10px] py-1 rounded hover:bg-muted/80 transition-colors"
+                          >
+                            CANCEL
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* DM: Advance turn and end combat */}
                 {isAdmin && (

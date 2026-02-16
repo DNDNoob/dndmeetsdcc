@@ -27,8 +27,11 @@ export const ResizableMobDisplay: React.FC<ResizableMobDisplayProps> = ({
   const cardWidth = 140;
   const cardSpacing = 8;
 
-  // Minimized: stack to the left of the dice button
-  const minimizedRight = baseRight + (index * (cardWidth + cardSpacing));
+  // Minimized: stack to the left of the dice button, clamped to viewport
+  const rawMinimizedRight = baseRight + (index * (cardWidth + cardSpacing));
+  // Clamp so the card doesn't overflow the left edge of the viewport
+  const maxRight = typeof window !== 'undefined' ? window.innerWidth - cardWidth - 8 : rawMinimizedRight;
+  const minimizedRight = Math.min(rawMinimizedRight, maxRight);
 
   return (
     <div

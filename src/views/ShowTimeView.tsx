@@ -7,7 +7,7 @@ import { GridOverlay } from "@/components/ui/GridOverlay";
 import RulerOverlay from "@/components/ui/RulerOverlay";
 import { MobIcon } from "@/components/ui/MobIcon";
 import { FogOfWar } from "@/components/ui/FogOfWar";
-import { Episode, Mob, MapSettings, Crawler, CrawlerPlacement, EpisodeMobPlacement, SentLootBox, LootBoxTemplate, getLootBoxTierColor, InventoryItem, CombatState } from "@/lib/gameData";
+import { Episode, Mob, MapSettings, Crawler, CrawlerPlacement, EpisodeMobPlacement, SentLootBox, LootBoxTemplate, getLootBoxTierColor, InventoryItem, CombatState, getEquippedModifiers } from "@/lib/gameData";
 import { Map, X, Eye, Layers, ChevronLeft, ChevronRight, PlayCircle, Grid3x3, CloudFog, Eraser, Trash2, Target, ZoomIn, ZoomOut, Package, Lock, Unlock, Search, Plus } from "lucide-react";
 import { PingEffect, Ping } from "@/components/ui/PingEffect";
 import { MapBox, MapBoxData, ShapeType } from "@/components/ui/MapBox";
@@ -43,6 +43,7 @@ interface ShowTimeViewProps {
   noncombatTurnState?: import("@/lib/gameData").NoncombatTurnState | null;
   resetNoncombatTurns?: (episodeId: string) => Promise<void>;
   combatState?: CombatState | null;
+  onRuntimePlacementsChange?: (crawlerPlacements: CrawlerPlacement[], runtimeMobPlacements: EpisodeMobPlacement[]) => void;
 }
 
 const SHOWTIME_STORAGE_KEY = 'dcc_showtime_state';
@@ -356,7 +357,7 @@ const InventoryPanel: React.FC<{
   );
 };
 
-const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock, noncombatTurnState, resetNoncombatTurns, combatState }) => {
+const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock, noncombatTurnState, resetNoncombatTurns, combatState, onRuntimePlacementsChange }) => {
   const { roomId } = useFirebaseStore();
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
   const [currentMapIndex, setCurrentMapIndex] = useState(0);
@@ -433,6 +434,10 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   const [panStart, setPanStart] = useState<{ x: number; y: number; panX: number; panY: number } | null>(null);
   const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
+  // Accumulated runtime placements across all visited maps (for combat/rest integration)
+  const allMapCrawlerPlacementsRef = useRef<Map<string, CrawlerPlacement[]>>(new Map());
+  const allMapRuntimeMobPlacementsRef = useRef<Map<string, EpisodeMobPlacement[]>>(new Map());
+
   // Keep selectedEpisode in sync with latest episode data from Firebase
   // This ensures changes made in the DM console (e.g., map scale) are reflected
   useEffect(() => {
@@ -454,6 +459,25 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   useEffect(() => {
     onShowtimeActiveChange?.(!!selectedEpisode, selectedEpisode);
   }, [selectedEpisode, onShowtimeActiveChange]);
+
+  // Report runtime placements to parent (for PingPanel combat/rest integration)
+  // Accumulates across all visited maps so switching maps doesn't lose data
+  useEffect(() => {
+    if (!currentMapId || !selectedEpisode) {
+      // Episode closed — clear accumulated refs
+      if (!selectedEpisode) {
+        allMapCrawlerPlacementsRef.current.clear();
+        allMapRuntimeMobPlacementsRef.current.clear();
+        onRuntimePlacementsChange?.([], []);
+      }
+      return;
+    }
+    allMapCrawlerPlacementsRef.current.set(currentMapId, crawlerPlacements);
+    allMapRuntimeMobPlacementsRef.current.set(currentMapId, runtimeMobPlacements);
+    const allCrawler = Array.from(allMapCrawlerPlacementsRef.current.values()).flat();
+    const allMob = Array.from(allMapRuntimeMobPlacementsRef.current.values()).flat();
+    onRuntimePlacementsChange?.(allCrawler, allMob);
+  }, [crawlerPlacements, runtimeMobPlacements, currentMapId, selectedEpisode, onRuntimePlacementsChange]);
 
   // Keep draggingMobId ref in sync with state (avoids listener re-subscription)
   useEffect(() => {
@@ -2395,13 +2419,13 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                       {letter}
                     </div>
                   )}
-                  {/* Name label */}
+                  {/* Name label - shifted down to avoid overlapping health bar */}
                   {(() => {
                     const nameKey = `mob-ep-${placement.mobId}-${localIndex}`;
                     const displayName = nameOverrides[nameKey] ?? mob.name;
                     return editingNameId === nameKey ? (
                       <input
-                        className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-background/90 border border-border rounded px-1 py-0.5 text-xs text-center text-foreground w-20 z-20"
+                        className="absolute top-full left-1/2 -translate-x-1/2 mt-3 bg-background/90 border border-border rounded px-1 py-0.5 text-xs text-center text-foreground w-20 z-20"
                         defaultValue={displayName}
                         autoFocus
                         onClick={(e) => e.stopPropagation()}
@@ -2421,7 +2445,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                       />
                     ) : (
                       <div
-                        className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-background/80 border border-border rounded px-1.5 py-0.5 text-xs text-foreground whitespace-nowrap cursor-text z-10"
+                        className="absolute top-full left-1/2 -translate-x-1/2 mt-3 bg-background/80 border border-border rounded px-1.5 py-0.5 text-xs text-foreground whitespace-nowrap cursor-text z-10"
                         onClick={(e) => { e.stopPropagation(); setEditingNameId(nameKey); }}
                         onMouseDown={(e) => e.stopPropagation()}
                       >
@@ -2471,7 +2495,25 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                 }}
               >
                 <div className="relative">
-                  <CrawlerIcon crawler={crawler} size={64} isDragging={isDragging} />
+                  {(() => {
+                    const crawlerInv = getCrawlerInventory?.(crawler.id) ?? [];
+                    const mods = getEquippedModifiers(crawler, crawlerInv);
+                    const hpMod = mods.hp ?? 0;
+                    const maxHPMod = mods.maxHP ?? 0;
+                    const effectiveHP = (crawler.hp ?? 0) + hpMod;
+                    const effectiveMaxHP = (crawler.maxHP ?? 0) + maxHPMod;
+                    const baseMaxHP = crawler.maxHP ?? 0;
+                    return (
+                      <CrawlerIcon
+                        crawler={crawler}
+                        size={64}
+                        isDragging={isDragging}
+                        effectiveHP={effectiveHP}
+                        effectiveMaxHP={effectiveMaxHP}
+                        baseMaxHP={maxHPMod !== 0 ? baseMaxHP : undefined}
+                      />
+                    );
+                  })()}
                   {/* Letter badge - only show if there are duplicates */}
                   {letter && (
                     <div className="absolute -top-1 -left-1 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-bold shadow-lg">
@@ -2489,13 +2531,13 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                       <X className="w-3 h-3" />
                     </button>
                   )}
-                  {/* Name label */}
+                  {/* Name label - shifted down to avoid overlapping health bar */}
                   {(() => {
                     const nameKey = `crawler-${placement.crawlerId}-${index}`;
                     const displayName = nameOverrides[nameKey] ?? crawler.name;
                     return editingNameId === nameKey ? (
                       <input
-                        className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-background/90 border border-border rounded px-1 py-0.5 text-xs text-center text-foreground w-20 z-20"
+                        className="absolute top-full left-1/2 -translate-x-1/2 mt-3 bg-background/90 border border-border rounded px-1 py-0.5 text-xs text-center text-foreground w-20 z-20"
                         defaultValue={displayName}
                         autoFocus
                         onClick={(e) => e.stopPropagation()}
@@ -2515,7 +2557,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                       />
                     ) : (
                       <div
-                        className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-background/80 border border-border rounded px-1.5 py-0.5 text-xs text-foreground whitespace-nowrap cursor-text z-10"
+                        className="absolute top-full left-1/2 -translate-x-1/2 mt-3 bg-background/80 border border-border rounded px-1.5 py-0.5 text-xs text-foreground whitespace-nowrap cursor-text z-10"
                         onClick={(e) => { e.stopPropagation(); setEditingNameId(nameKey); }}
                         onMouseDown={(e) => e.stopPropagation()}
                       >
@@ -2546,6 +2588,13 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             const isDragging = draggingRuntimeId === `mob-${index}`;
             const canInteract = isPointVisible(placement.x, placement.y);
 
+            // Compute placement-based combatId matching PingPanel's logic
+            // Runtime placements come after episode placements in the merged array
+            const episodePlacementCount = selectedEpisode?.mobPlacements?.length ?? 0;
+            const runtimePlacementIdx = episodePlacementCount + index;
+            const totalSameIdAll = episodeMobCount + filteredArr.filter(p => p.mobId === placement.mobId).length;
+            const runtimeCombatId = totalSameIdAll > 1 ? `${placement.mobId}:${runtimePlacementIdx}` : placement.mobId;
+
             return (
               <motion.div
                 key={`runtime-mob-${placement.mobId}-${index}`}
@@ -2575,11 +2624,11 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                     isDragging={isDragging}
                     inCombat={(() => {
                       if (!combatState?.active || combatState.phase === 'ended') return false;
-                      return combatState.combatants.some(c => (c.sourceId || c.id) === placement.mobId);
+                      return combatState.combatants.some(c => c.id === runtimeCombatId);
                     })()}
                     combatHP={(() => {
                       if (!combatState?.active || combatState.phase === 'ended') return undefined;
-                      const combatant = combatState.combatants.find(c => (c.sourceId || c.id) === placement.mobId);
+                      const combatant = combatState.combatants.find(c => c.id === runtimeCombatId);
                       return combatant?.currentHP;
                     })()}
                     maxHP={mob.hitPoints}
@@ -2601,13 +2650,13 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                       <X className="w-3 h-3" />
                     </button>
                   )}
-                  {/* Name label */}
+                  {/* Name label - shifted down to avoid overlapping health bar */}
                   {(() => {
                     const nameKey = `mob-rt-${placement.mobId}-${index}`;
                     const displayName = nameOverrides[nameKey] ?? mob.name;
                     return editingNameId === nameKey ? (
                       <input
-                        className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-background/90 border border-border rounded px-1 py-0.5 text-xs text-center text-foreground w-20 z-20"
+                        className="absolute top-full left-1/2 -translate-x-1/2 mt-3 bg-background/90 border border-border rounded px-1 py-0.5 text-xs text-center text-foreground w-20 z-20"
                         defaultValue={displayName}
                         autoFocus
                         onClick={(e) => e.stopPropagation()}
@@ -2627,7 +2676,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                       />
                     ) : (
                       <div
-                        className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-background/80 border border-border rounded px-1.5 py-0.5 text-xs text-foreground whitespace-nowrap cursor-text z-10"
+                        className="absolute top-full left-1/2 -translate-x-1/2 mt-3 bg-background/80 border border-border rounded px-1.5 py-0.5 text-xs text-foreground whitespace-nowrap cursor-text z-10"
                         onClick={(e) => { e.stopPropagation(); setEditingNameId(nameKey); }}
                         onMouseDown={(e) => e.stopPropagation()}
                       >

@@ -184,11 +184,13 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
       className="fixed right-0 z-50 max-w-[100vw]"
       style={{
         top: isNavVisible ? '100px' : '0px',
+        maxHeight: isNavVisible ? 'calc(100vh - 120px)' : 'calc(100vh - 20px)',
         transition: 'top 0.2s ease',
       }}
     >
       <motion.div
-        className="bg-background/95 backdrop-blur-sm border border-border rounded-lg shadow-lg overflow-hidden m-2"
+        className="bg-background/95 backdrop-blur-sm border border-border rounded-lg shadow-lg overflow-hidden overflow-y-auto m-2"
+        style={{ maxHeight: isNavVisible ? 'calc(100vh - 140px)' : 'calc(100vh - 40px)' }}
         initial={{ x: 10, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
       >

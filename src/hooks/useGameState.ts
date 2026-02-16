@@ -406,7 +406,7 @@ export const useGameState = () => {
         crawlerId,
         name: template.name,
         tier: template.tier,
-        items: template.items.map(item => ({ ...item, id: crypto.randomUUID() })),
+        items: (template.items ?? []).map(item => ({ ...item, id: crypto.randomUUID() })),
         gold: template.gold,
         locked: true,
         sentAt: new Date().toISOString(),
@@ -421,7 +421,10 @@ export const useGameState = () => {
 
   const claimLootBoxItems = async (lootBoxId: string, crawlerId: string, itemIds: string[], claimGold = false) => {
     const box = lootBoxes.find(b => b.id === lootBoxId);
-    if (!box) return;
+    if (!box) {
+      console.warn('[GameState] Attempted to claim loot from non-existent box:', lootBoxId);
+      return;
+    }
 
     const itemsToClaim = box.items.filter(i => itemIds.includes(i.id));
 
@@ -712,6 +715,21 @@ export const useGameState = () => {
     } else {
       await addItem('combatState', { id: 'current', ...combatData });
     }
+
+    // Log mob initiative rolls to dice panel
+    const mobCombatants = combatants.filter(c => c.type === 'mob' && c.hasRolledInitiative);
+    for (const mc of mobCombatants) {
+      await addDiceRoll({
+        id: crypto.randomUUID(),
+        crawlerName: mc.name,
+        crawlerId: mc.id,
+        timestamp: Date.now(),
+        results: [{ dice: 'D20', result: mc.initiative }],
+        total: mc.initiative,
+        statRoll: { stat: 'Initiative', modifier: 0, rawRoll: mc.initiative },
+      });
+    }
+
     console.log('[GameState] ⚔️ Combat started with', combatants.length, 'combatants (mobs auto-rolled). Combat #', prevCount + 1);
   };
 
@@ -753,7 +771,7 @@ export const useGameState = () => {
   };
 
   const advanceCombatTurn = async () => {
-    if (!combatState) return;
+    if (!combatState || combatState.combatants.length === 0) return;
     const nextIndex = combatState.currentTurnIndex + 1;
     const isNewRound = nextIndex >= combatState.combatants.length;
     // Reset action flags for the combatant whose turn just ended
@@ -799,33 +817,30 @@ export const useGameState = () => {
       if (mob) {
         const hpBefore = combatant?.currentHP ?? mob.hitPoints ?? 0;
         const newHP = Math.max(0, hpBefore - damage);
-        // Update per-combatant HP in combat state
+        // Update per-combatant HP in combat state (independent per instance)
         if (combatState) {
           const updatedCombatants = combatState.combatants.map(c =>
             c.id === targetId ? { ...c, currentHP: newHP } : c
           );
           await updateItem('combatState', 'current', { combatants: updatedCombatants } as Record<string, unknown>);
         }
-        // Also update mob document
-        await updateItem('mobs', mobId, { hitPoints: newHP } as Record<string, unknown>);
+        // Do NOT update the shared mob document — each combatant instance tracks HP independently
+        // The mob document's hitPoints represents the base/max HP for the mob type
         console.log('[GameState] ⚔️ Damage applied to mob', combatant?.name ?? mob.name, ':', damage, '→ HP:', newHP);
       }
     }
   };
 
   const overrideMobHealth = async (combatantId: string, newHP: number) => {
-    // Update per-combatant HP in combat state
+    // Update per-combatant HP in combat state (independent per instance)
     if (combatState) {
-      const combatant = combatState.combatants.find(c => c.id === combatantId);
       const updatedCombatants = combatState.combatants.map(c =>
         c.id === combatantId ? { ...c, currentHP: newHP } : c
       );
       await updateItem('combatState', 'current', { combatants: updatedCombatants } as Record<string, unknown>);
-      // Also update mob document
-      const mobId = combatant?.sourceId || combatantId;
-      await updateItem('mobs', mobId, { hitPoints: newHP } as Record<string, unknown>);
+      // Do NOT update the shared mob document — each combatant instance tracks HP independently
     } else {
-      // Fallback: direct mob document update
+      // Fallback when not in combat: direct mob document update
       await updateItem('mobs', combatantId, { hitPoints: newHP } as Record<string, unknown>);
     }
     console.log('[GameState] ⚔️ DM override: combatant HP set to', newHP);
@@ -871,6 +886,44 @@ export const useGameState = () => {
       combatants: updatedCombatants,
       currentTurnIndex: newIndex,
     } as Record<string, unknown>);
+  };
+
+  const addCombatant = async (newCombatants: CombatantEntry[]) => {
+    if (!combatState || newCombatants.length === 0) return;
+    const existing = combatState.combatants;
+    // Filter out any that are already in combat
+    const existingIds = new Set(existing.map(c => c.id));
+    const toAdd = newCombatants.filter(c => !existingIds.has(c.id));
+    if (toAdd.length === 0) return;
+
+    let updatedCombatants: CombatantEntry[];
+    if (combatState.phase === 'combat') {
+      // During combat phase, insert sorted by initiative
+      updatedCombatants = [...existing, ...toAdd].sort((a, b) => b.initiative - a.initiative);
+    } else {
+      // During initiative phase, just append
+      updatedCombatants = [...existing, ...toAdd];
+    }
+
+    await updateItem('combatState', 'current', {
+      combatants: updatedCombatants,
+    } as Record<string, unknown>);
+
+    // Log mob initiative rolls to dice panel
+    const mobsAdded = toAdd.filter(c => c.type === 'mob' && c.hasRolledInitiative);
+    for (const mc of mobsAdded) {
+      await addDiceRoll({
+        id: crypto.randomUUID(),
+        crawlerName: mc.name,
+        crawlerId: mc.id,
+        timestamp: Date.now(),
+        results: [{ dice: 'D20', result: mc.initiative }],
+        total: mc.initiative,
+        statRoll: { stat: 'Initiative', modifier: 0, rawRoll: mc.initiative },
+      });
+    }
+
+    console.log('[GameState] ➕ Added', toAdd.length, 'combatant(s) to active combat');
   };
 
   return {
@@ -927,6 +980,7 @@ export const useGameState = () => {
     endCombat,
     cancelCombat,
     removeCombatant,
+    addCombatant,
     isLoaded,
   };
 };
