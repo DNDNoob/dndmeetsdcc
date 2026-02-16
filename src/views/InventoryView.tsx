@@ -88,6 +88,24 @@ const InventoryView: React.FC<InventoryViewProps> = ({
 }) => {
   const [editMode, setEditMode] = useState(false);
 
+  // Individual item editing state
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editingItemData, setEditingItemData] = useState<{ name: string; description: string }>({ name: '', description: '' });
+
+  const handleStartEditItem = (crawlerId: string, item: InventoryItem) => {
+    setEditingItemId(`${crawlerId}:${item.id}`);
+    setEditingItemData({ name: item.name, description: item.description });
+  };
+
+  const handleSaveEditItem = (crawlerId: string, itemId: string) => {
+    const items = getCrawlerInventory(crawlerId);
+    const updatedItems = items.map(item =>
+      item.id === itemId ? { ...item, name: editingItemData.name.trim() || item.name, description: editingItemData.description } : item
+    );
+    onUpdateInventory(crawlerId, updatedItems);
+    setEditingItemId(null);
+  };
+
   // Library item form state
   const [newLibraryItem, setNewLibraryItem] = useState<{ name: string; description: string; equipSlot?: SlotType; goldValue?: number; statModifiers?: StatModifiers; weaponData?: WeaponData }>({
     name: "", description: "", equipSlot: undefined, goldValue: undefined, statModifiers: undefined, weaponData: undefined,
@@ -267,7 +285,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
             CRAWLER INVENTORY
           </h2>
           <DungeonButton
-            variant="admin"
+            variant="default"
             size="sm"
             onClick={() => setEditMode(!editMode)}
           >
@@ -708,41 +726,84 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                             >
                               {/* Item type icon */}
                               {getEquipmentIcon(item.equipSlot)}
-                              <div className="flex flex-col flex-1">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  {consolidated.count > 1 && (
-                                    <span className="text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded font-bold">
-                                      x{consolidated.count}
-                                    </span>
-                                  )}
-                                  <span className="text-foreground">{item.name}</span>
-                                  {item.equipSlot && (
-                                    <span className="text-xs bg-accent/20 text-accent px-2 py-0.5 rounded">
-                                      {item.equipSlot === 'weapon' ? 'Weapon' :
-                                       item.equipSlot === 'leftHand' ? 'Left Hand' :
-                                       item.equipSlot === 'rightHand' ? 'Right Hand' :
-                                       item.equipSlot === 'ringFinger' ? 'Ring' :
-                                       item.equipSlot.charAt(0).toUpperCase() + item.equipSlot.slice(1)}
-                                    </span>
-                                  )}
-                                  {item.goldValue !== undefined && item.goldValue > 0 && (
-                                    <span className="text-xs bg-accent/10 text-accent px-2 py-0.5 rounded flex items-center gap-1">
-                                      <Coins className="w-3 h-3" /> {item.goldValue}G
-                                    </span>
+                              {editingItemId === `${crawler.id}:${item.id}` ? (
+                                <div className="flex flex-col flex-1 gap-1">
+                                  <input
+                                    type="text"
+                                    value={editingItemData.name}
+                                    onChange={(e) => setEditingItemData(prev => ({ ...prev, name: e.target.value }))}
+                                    className="bg-muted border border-border px-2 py-1 text-sm w-full"
+                                    placeholder="Item name"
+                                    autoFocus
+                                  />
+                                  <input
+                                    type="text"
+                                    value={editingItemData.description}
+                                    onChange={(e) => setEditingItemData(prev => ({ ...prev, description: e.target.value }))}
+                                    className="bg-muted border border-border px-2 py-1 text-xs w-full"
+                                    placeholder="Description"
+                                  />
+                                  <div className="flex gap-1">
+                                    <button
+                                      onClick={() => handleSaveEditItem(crawler.id, item.id)}
+                                      className="text-primary hover:text-primary/80 text-xs flex items-center gap-0.5"
+                                    >
+                                      <Save className="w-3 h-3" /> Save
+                                    </button>
+                                    <button
+                                      onClick={() => setEditingItemId(null)}
+                                      className="text-muted-foreground hover:text-foreground text-xs"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="flex flex-col flex-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    {consolidated.count > 1 && (
+                                      <span className="text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded font-bold">
+                                        x{consolidated.count}
+                                      </span>
+                                    )}
+                                    <span className="text-foreground">{item.name}</span>
+                                    {item.equipSlot && (
+                                      <span className="text-xs bg-accent/20 text-accent px-2 py-0.5 rounded">
+                                        {item.equipSlot === 'weapon' ? 'Weapon' :
+                                         item.equipSlot === 'leftHand' ? 'Left Hand' :
+                                         item.equipSlot === 'rightHand' ? 'Right Hand' :
+                                         item.equipSlot === 'ringFinger' ? 'Ring' :
+                                         item.equipSlot.charAt(0).toUpperCase() + item.equipSlot.slice(1)}
+                                      </span>
+                                    )}
+                                    {item.goldValue !== undefined && item.goldValue > 0 && (
+                                      <span className="text-xs bg-accent/10 text-accent px-2 py-0.5 rounded flex items-center gap-1">
+                                        <Coins className="w-3 h-3" /> {item.goldValue}G
+                                      </span>
+                                    )}
+                                  </div>
+                                  {item.description && (
+                                    <span className="text-muted-foreground text-xs">({item.description})</span>
                                   )}
                                 </div>
-                                {item.description && (
-                                  <span className="text-muted-foreground text-xs">({item.description})</span>
-                                )}
-                              </div>
-                              {editMode && (
-                                <button
-                                  onClick={() => handleRemoveItem(crawler.id, consolidated.ids[0])}
-                                  className="text-destructive hover:text-destructive/80"
-                                  title={consolidated.count > 1 ? "Remove one" : "Remove"}
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
+                              )}
+                              {editMode && editingItemId !== `${crawler.id}:${item.id}` && (
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <button
+                                    onClick={() => handleStartEditItem(crawler.id, item)}
+                                    className="text-primary hover:text-primary/80"
+                                    title="Edit item"
+                                  >
+                                    <Edit2 className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleRemoveItem(crawler.id, consolidated.ids[0])}
+                                    className="text-destructive hover:text-destructive/80"
+                                    title={consolidated.count > 1 ? "Remove one" : "Remove"}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
                               )}
                             </li>
                           );

@@ -406,7 +406,7 @@ export const useGameState = () => {
         crawlerId,
         name: template.name,
         tier: template.tier,
-        items: template.items.map(item => ({ ...item, id: crypto.randomUUID() })),
+        items: (template.items ?? []).map(item => ({ ...item, id: crypto.randomUUID() })),
         gold: template.gold,
         locked: true,
         sentAt: new Date().toISOString(),
@@ -421,7 +421,10 @@ export const useGameState = () => {
 
   const claimLootBoxItems = async (lootBoxId: string, crawlerId: string, itemIds: string[], claimGold = false) => {
     const box = lootBoxes.find(b => b.id === lootBoxId);
-    if (!box) return;
+    if (!box) {
+      console.warn('[GameState] Attempted to claim loot from non-existent box:', lootBoxId);
+      return;
+    }
 
     const itemsToClaim = box.items.filter(i => itemIds.includes(i.id));
 
@@ -768,7 +771,7 @@ export const useGameState = () => {
   };
 
   const advanceCombatTurn = async () => {
-    if (!combatState) return;
+    if (!combatState || combatState.combatants.length === 0) return;
     const nextIndex = combatState.currentTurnIndex + 1;
     const isNewRound = nextIndex >= combatState.combatants.length;
     // Reset action flags for the combatant whose turn just ended

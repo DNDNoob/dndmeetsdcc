@@ -289,6 +289,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   // Weapon upgrade modal
   const [upgradingWeapon, setUpgradingWeapon] = useState<InventoryItem | null>(null);
   const [upgradeForm, setUpgradeForm] = useState<WeaponData | null>(null);
+  const [upgradeWeaponName, setUpgradeWeaponName] = useState('');
 
   // Send items/gold modal state
   const [showSendModal, setShowSendModal] = useState(false);
@@ -1403,6 +1404,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                                   e.preventDefault();
                                   setUpgradingWeapon(item);
                                   setUpgradeForm({ ...item.weaponData });
+                                  setUpgradeWeaponName(item.isUpgraded ? item.name : `${item.name} Upgraded`);
                                 }
                               }}
                               className={`bg-muted/50 p-3 rounded-lg border transition-colors select-none ${
@@ -1476,6 +1478,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                                               e.stopPropagation();
                                               setUpgradingWeapon(item);
                                               setUpgradeForm({ ...item.weaponData! });
+                                              setUpgradeWeaponName(item.isUpgraded ? item.name : `${item.name} Upgraded`);
                                             }}
                                             className="text-xs text-accent hover:underline flex items-center gap-0.5"
                                           >
@@ -1946,6 +1949,31 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                   setPendingDamageRoll({ dice: formatDice(wd.damageDice), bonus: calcWeaponStatMod(wd.damageModifiers), actionName: weapon.name });
                   setShowDamageTargetModal(true);
                   setDamageRollResult(null);
+                } else if (!isCombatPhaseLocal) {
+                  // Outside combat: auto-roll damage alongside attack for convenience
+                  let totalDamage = 0;
+                  const dmgResults: { dice: string; result: number }[] = [];
+                  for (const die of wd.damageDice) {
+                    let dieTotal = 0;
+                    for (let i = 0; i < die.count; i++) {
+                      dieTotal += Math.floor(Math.random() * die.sides) + 1;
+                    }
+                    dmgResults.push({ dice: `${die.count}d${die.sides}`, result: dieTotal });
+                    totalDamage += dieTotal;
+                  }
+                  const dmgStatMod = calcWeaponStatMod(wd.damageModifiers);
+                  totalDamage += dmgStatMod;
+                  if (addDiceRoll) {
+                    addDiceRoll({
+                      id: crypto.randomUUID(),
+                      crawlerName: selected.name,
+                      crawlerId: selected.id,
+                      timestamp: Date.now(),
+                      results: dmgResults,
+                      total: totalDamage,
+                      statRoll: { stat: `${weapon.name} (${wd.damageType} Damage)`, modifier: dmgStatMod, rawRoll: totalDamage - dmgStatMod },
+                    });
+                  }
                 }
 
                 if (isCombatPhaseLocal && isMyTurn) {
@@ -2416,6 +2444,31 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             setPendingDamageRoll({ dice: formatDice(wd.damageDice), bonus: calcMod(wd.damageModifiers), actionName: weapon.name });
             setShowDamageTargetModal(true);
             setDamageRollResult(null);
+          } else if (!isCombatPhaseLocal) {
+            // Outside combat: auto-roll damage alongside attack for convenience
+            let totalDamage = 0;
+            const dmgResults: { dice: string; result: number }[] = [];
+            for (const die of wd.damageDice) {
+              let dieTotal = 0;
+              for (let i = 0; i < die.count; i++) {
+                dieTotal += Math.floor(Math.random() * die.sides) + 1;
+              }
+              dmgResults.push({ dice: `${die.count}d${die.sides}`, result: dieTotal });
+              totalDamage += dieTotal;
+            }
+            const dmgStatMod = calcMod(wd.damageModifiers);
+            totalDamage += dmgStatMod;
+            if (addDiceRoll) {
+              addDiceRoll({
+                id: crypto.randomUUID(),
+                crawlerName: selected.name,
+                crawlerId: selected.id,
+                timestamp: Date.now(),
+                results: dmgResults,
+                total: totalDamage,
+                statRoll: { stat: `${weapon.name} (${wd.damageType} Damage)`, modifier: dmgStatMod, rawRoll: totalDamage - dmgStatMod },
+              });
+            }
           }
 
           if (isCombatPhaseLocal && isMyTurn) {
@@ -2459,13 +2512,13 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
           if (!upgradingWeapon || !upgradeForm) return;
           const updatedItems = inventory.map(item => {
             if (item.id !== upgradingWeapon.id) return item;
-            // Append "Upgraded" if not already upgraded
-            const newName = item.isUpgraded ? item.name : `${item.name} Upgraded`;
+            const newName = upgradeWeaponName.trim() || item.name;
             return { ...item, name: newName, weaponData: upgradeForm, isUpgraded: true };
           });
           onUpdateCrawlerInventory(selected.id, updatedItems);
           setUpgradingWeapon(null);
           setUpgradeForm(null);
+          setUpgradeWeaponName('');
         };
 
         return (
@@ -2473,12 +2526,23 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             <div className="bg-background border-2 border-accent rounded-lg p-6 max-w-lg w-full shadow-xl max-h-[80vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-display text-lg text-accent">Upgrade {upgradingWeapon.name}</h3>
-                <button onClick={() => { setUpgradingWeapon(null); setUpgradeForm(null); }}>
+                <button onClick={() => { setUpgradingWeapon(null); setUpgradeForm(null); setUpgradeWeaponName(''); }}>
                   <X className="w-5 h-5 text-muted-foreground hover:text-foreground" />
                 </button>
               </div>
 
               <div className="space-y-3">
+                {/* Weapon Name */}
+                <div>
+                  <label className="text-[10px] text-muted-foreground block mb-0.5">Weapon Name</label>
+                  <input
+                    type="text"
+                    value={upgradeWeaponName}
+                    onChange={(e) => setUpgradeWeaponName(e.target.value)}
+                    className="bg-muted border border-border px-2 py-1 text-xs w-full"
+                    placeholder={upgradingWeapon.name}
+                  />
+                </div>
                 {/* Weapon Type & Damage Type */}
                 <div className="grid grid-cols-2 gap-2">
                   <div>

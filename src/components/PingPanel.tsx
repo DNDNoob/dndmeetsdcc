@@ -242,7 +242,7 @@ const PingPanel: React.FC<PingPanelProps> = ({
   };
 
   const handleMobHealthOverride = async (mobId: string) => {
-    const hp = parseInt(mobHealthValue);
+    const hp = parseInt(mobHealthValue, 10);
     if (isNaN(hp) || hp < 0) return;
     await onOverrideMobHealth?.(mobId, hp);
     setShowMobHealthOverride(null);

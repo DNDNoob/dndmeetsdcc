@@ -1,5 +1,99 @@
 [
   {
+    "date": "2026-02-16",
+    "changes": [
+      "❤️ Health bars on all map icons: mob and crawler icons now always display green/red health bars with currentHP/maxHP text",
+      "🛡️ Crawler health bars show equipment modifier bonus as orange bar portion (matching profile view)",
+      "🐛 Fixed independent mob health tracking: duplicate mobs (Greg A, Greg B) now take damage independently instead of sharing HP",
+      "🎲 Mob initiative rolls now appear in the dice panel so players can see what each mob rolled",
+      "📦 Players can now edit inventory items (name, description) on the inventory page — edit button accessible to all users",
+      "⚔️ Weapon upgrade modal now lets players edit the weapon name during upgrade",
+      "🎯 Weapon ATTACK button now auto-rolls damage dice alongside the d20 attack roll when outside of combat",
+      "🐛 Fixed DM overlay panels getting pushed off screen: DiceRoller, MapToolsMenu, and mob display cards now clamp to viewport",
+      "🐛 Fixed runtime mob combat ID matching so duplicate runtime mobs display correct per-instance health"
+    ]
+  },
+  {
+    "date": "2026-02-15",
+    "changes": [
+      "🎮 Runtime-added mobs and crawlers (placed during ShowTime) now appear in combat setup and rest selection",
+      "➕ New 'Add to Combat' button allows adding combatants mid-combat during both initiative and combat phases",
+      "⚔️ Mobs auto-roll initiative when added to combat; crawlers wait for player roll"
+    ]
+  },
+  {
+    "date": "2026-02-14",
+    "changes": [
+      "⚔️ MAJOR: Full weapon system with configurable damage types and weapon types",
+      "Weapon config UI in item library: hit die, damage dice, stat modifiers, ranged/melee, range, special effects",
+      "Equipped weapons appear as attack cards in crawler Attacks tab with ATTACK and DAMAGE buttons",
+      "Right-click weapon attack for advantage/disadvantage rolls (2d20 take highest/lowest)",
+      "Weapon upgrade system: right-click weapon in inventory to upgrade stats, marked with 'Upgraded' label",
+      "⚔️ Combat turn counter displayed next to noncombat turn counter",
+      "Cancel combat button during both initiative and combat phases",
+      "🐛 Fixed React error #310: moved useMemo before early return to fix hooks ordering"
+    ]
+  },
+  {
+    "date": "2026-02-12",
+    "changes": [
+      "⚔️ MAJOR: Combat system with initiative, turn order, and damage",
+      "DM starts combat from PingPanel: select crawlers and mobs to enter combat",
+      "Initiative phase: crawlers roll d20 for initiative, mobs auto-roll",
+      "Combat phase: turn-based order sorted by initiative, action/bonus action tracking",
+      "Damage target modal: select target, roll damage dice, apply damage with HP tracking",
+      "Per-combatant HP tracking for duplicate mobs (Greg A, Greg B with separate health)",
+      "Bonus actions tab: Off-hand Attack, Dash, Disengage, Hide",
+      "Combat order display bar at top of map during active combat",
+      "Episode-scoped combat state: switching episodes hides unrelated combat"
+    ]
+  },
+  {
+    "date": "2026-02-10",
+    "changes": [
+      "🐛 Fixed DM view panel visibility: overlays raised above footer, PingPanel shows with noncombat turns",
+      "🐛 Fixed map blocker scoped to map container only (no longer blocks entire screen)",
+      "🗺️ Client-side URL routing: browser back/forward works without reload",
+      "📦 Firebase Storage for large map uploads: bypasses Firestore 1MB field limit"
+    ]
+  },
+  {
+    "date": "2026-02-07",
+    "changes": [
+      "📦 MAJOR: Loot box system — DM creates templates, sends to crawlers, unlocks when ready, players claim items",
+      "Loot box tiers: Dirt, Copper, Silver, Gold with tier-colored UI",
+      "Dedicated 'Loot Boxes' tab in DM Console with quantity selector",
+      "Toast notifications for new and unlocked loot boxes",
+      "'Claim All' button on profile to instantly claim all unlocked items",
+      "Loot box sends appear in dice roller history",
+      "📦 Loot boxes now include gold rewards",
+      "🎴 Mob cards sync to all players via Firebase, simplified expand/collapse UI",
+      "💰 Gold field added to loot boxes (create/send/claim)",
+      "📦 Consolidated duplicate inventory items with count badges (×3)",
+      "✏️ Added edit functionality for inventory library items",
+      "🐛 Fixed map container not expanding with scale"
+    ]
+  },
+  {
+    "date": "2026-02-04",
+    "changes": [
+      "🗺️ Full-screen map designer popout for episode editor with drag positioning",
+      "💰 Send gold and items between crawlers from profile page",
+      "🎒 Inventory improvements: library-only item creation, consolidated count badges",
+      "🔒 Hidden loot box gold until DM unlocks",
+      "🐛 Fixed noncombat button crash caused by React event leaking into Firebase",
+      "🐛 Fixed map container width fallback when image not yet loaded"
+    ]
+  },
+  {
+    "date": "2026-02-03",
+    "changes": [
+      "⏰ Game clock is now episode-dependent",
+      "🐛 Fixed noncombat rolls, episode close, equipment slots, inventory panel, and image limit issues",
+      "🐛 Fixed inventory duplicate items and cleaned up unused imports"
+    ]
+  },
+  {
     "date": "2026-02-02",
     "changes": [
       "📏 Ruler tool now visible to all players in real-time - users can see each other's measurements",
