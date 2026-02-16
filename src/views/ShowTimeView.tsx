@@ -438,6 +438,12 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   const allMapCrawlerPlacementsRef = useRef<Map<string, CrawlerPlacement[]>>(new Map());
   const allMapRuntimeMobPlacementsRef = useRef<Map<string, EpisodeMobPlacement[]>>(new Map());
 
+  // Get current map ID for fog of war storage - MUST be defined before useEffects that use it
+  const currentMapId = useMemo(() => {
+    if (!selectedEpisode || selectedEpisode.mapIds.length === 0) return null;
+    return selectedEpisode.mapIds[currentMapIndex];
+  }, [selectedEpisode, currentMapIndex]);
+
   // Keep selectedEpisode in sync with latest episode data from Firebase
   // This ensures changes made in the DM console (e.g., map scale) are reflected
   useEffect(() => {
@@ -556,12 +562,6 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
     return () => unsubscribe();
   }, [isAdmin, roomId, episodes]);
-
-  // Get current map ID for fog of war storage - MUST be defined before useEffects that use it
-  const currentMapId = useMemo(() => {
-    if (!selectedEpisode || selectedEpisode.mapIds.length === 0) return null;
-    return selectedEpisode.mapIds[currentMapIndex];
-  }, [selectedEpisode, currentMapIndex]);
 
   // Get the episode's configured base scale for the current map
   // This scales the map image itself (making it physically larger/smaller),
