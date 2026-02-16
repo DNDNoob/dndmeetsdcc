@@ -7,25 +7,52 @@ interface CrawlerIconProps {
   size?: number;
   isDragging?: boolean;
   onClick?: () => void;
+  /** Effective current HP (base + equipment modifier) */
+  effectiveHP?: number;
+  /** Effective max HP (base + equipment modifier) */
+  effectiveMaxHP?: number;
+  /** Base max HP without modifiers (to show orange modifier portion) */
+  baseMaxHP?: number;
 }
 
-export const CrawlerIcon: React.FC<CrawlerIconProps> = ({ crawler, size = 40, isDragging = false, onClick }) => {
+export const CrawlerIcon: React.FC<CrawlerIconProps> = ({
+  crawler,
+  size = 40,
+  isDragging = false,
+  onClick,
+  effectiveHP,
+  effectiveMaxHP,
+  baseMaxHP,
+}) => {
+  const currentHP = effectiveHP ?? crawler.hp ?? 0;
+  const maxHP = effectiveMaxHP ?? crawler.maxHP ?? 1;
+  const hasModifier = baseMaxHP !== undefined && baseMaxHP !== maxHP;
+
+  const hpPercentage = maxHP > 0 ? Math.min(100, Math.max(0, (currentHP / maxHP) * 100)) : 0;
+  // Base portion: the part of the bar that represents base max HP (without modifier)
+  const basePercentage = hasModifier
+    ? Math.min(100, Math.max(0, (Math.min(currentHP, baseMaxHP) / maxHP) * 100))
+    : hpPercentage;
+  const modifierPercentage = hasModifier ? Math.max(0, hpPercentage - basePercentage) : 0;
+
   return (
     <div
       onClick={onClick}
       className={`relative cursor-move transition-all ${isDragging ? "opacity-50 scale-110" : "hover:scale-110"}`}
       style={{
         width: size,
-        height: size,
+        height: size + 14,
       }}
     >
       {/* Circular container with blue border for crawlers */}
       <div
-        className="absolute inset-0 rounded-full border-2 border-blue-400 shadow-lg overflow-hidden bg-muted"
+        className="absolute inset-x-0 top-0 rounded-full border-2 border-blue-400 shadow-lg overflow-hidden bg-muted"
         style={{
+          width: size,
+          height: size,
           backgroundImage: crawler.avatar ? `url(${crawler.avatar})` : undefined,
           backgroundSize: "cover",
-          backgroundPosition: "center 20%", // Position towards head
+          backgroundPosition: "center 20%",
           filter: isDragging ? "brightness(0.7)" : "brightness(1)",
         }}
       >
@@ -36,12 +63,28 @@ export const CrawlerIcon: React.FC<CrawlerIconProps> = ({ crawler, size = 40, is
         )}
       </div>
 
-      {/* HP bar */}
-      <div className="absolute -bottom-3 left-0 right-0 h-1 bg-gray-700 rounded-full overflow-hidden mx-1">
-        <div
-          className="h-full bg-green-500 transition-all"
-          style={{ width: `${(crawler.hp / crawler.maxHP) * 100}%` }}
-        />
+      {/* Health bar */}
+      <div
+        className="absolute bottom-0 left-1/2 -translate-x-1/2"
+        style={{ width: Math.max(size, 48) }}
+      >
+        <div className="h-3.5 border border-muted-foreground/40 bg-destructive/60 overflow-hidden rounded-sm relative flex">
+          {/* Base HP portion (green) */}
+          <div
+            className="h-full transition-all duration-300 bg-green-500"
+            style={{ width: `${basePercentage}%` }}
+          />
+          {/* Equipment modifier portion (orange) */}
+          {modifierPercentage > 0 && (
+            <div
+              className="h-full transition-all duration-300 bg-orange-500"
+              style={{ width: `${modifierPercentage}%` }}
+            />
+          )}
+          <span className="absolute inset-0 flex items-center justify-center text-[8px] font-bold text-foreground drop-shadow-[0_1px_1px_rgba(0,0,0,0.9)] leading-none">
+            {currentHP}/{maxHP}
+          </span>
+        </div>
       </div>
 
       {/* Tooltip on hover */}

@@ -6,7 +6,7 @@ interface MobIconProps {
   size?: number;
   isDragging?: boolean;
   onClick?: () => void;
-  /** Whether this mob is currently in combat (shows health bar) */
+  /** Whether this mob is currently in combat (uses combatHP for current) */
   inCombat?: boolean;
   /** Current HP for this combatant instance (from CombatState) */
   combatHP?: number;
@@ -16,15 +16,9 @@ interface MobIconProps {
 
 export const MobIcon: React.FC<MobIconProps> = ({ mob, size = 40, isDragging = false, onClick, inCombat = false, combatHP, maxHP }) => {
   const displayMaxHP = maxHP ?? mob.hitPoints ?? 0;
-  const displayCurrentHP = combatHP ?? mob.hitPoints ?? 0;
+  const displayCurrentHP = inCombat ? (combatHP ?? mob.hitPoints ?? 0) : displayMaxHP;
   const hpPercentage = displayMaxHP > 0 ? Math.min(100, Math.max(0, (displayCurrentHP / displayMaxHP) * 100)) : 0;
-
-  // Health bar color based on percentage
-  const getBarColor = () => {
-    if (hpPercentage > 50) return 'bg-green-500';
-    if (hpPercentage > 25) return 'bg-yellow-500';
-    return 'bg-destructive';
-  };
+  const showBar = displayMaxHP > 0;
 
   return (
     <div
@@ -32,7 +26,7 @@ export const MobIcon: React.FC<MobIconProps> = ({ mob, size = 40, isDragging = f
       className={`relative cursor-move transition-all ${isDragging ? "opacity-50 scale-110" : "hover:scale-110"}`}
       style={{
         width: size,
-        height: inCombat ? size + 12 : size,
+        height: showBar ? size + 14 : size,
       }}
     >
       {/* Circular container */}
@@ -56,19 +50,19 @@ export const MobIcon: React.FC<MobIconProps> = ({ mob, size = 40, isDragging = f
         )}
       </div>
 
-      {/* Health bar - shown only when in combat */}
-      {inCombat && displayMaxHP > 0 && (
+      {/* Health bar - always shown when mob has HP */}
+      {showBar && (
         <div
           className="absolute bottom-0 left-1/2 -translate-x-1/2"
-          style={{ width: Math.max(size, 36) }}
+          style={{ width: Math.max(size, 48) }}
         >
-          <div className="h-3 border border-muted-foreground/40 bg-background/80 overflow-hidden rounded-sm relative">
+          <div className="h-3.5 border border-muted-foreground/40 bg-destructive/60 overflow-hidden rounded-sm relative">
             <div
-              className={`h-full transition-all duration-300 ${getBarColor()}`}
+              className="h-full transition-all duration-300 bg-green-500"
               style={{ width: `${hpPercentage}%` }}
             />
             <span className="absolute inset-0 flex items-center justify-center text-[8px] font-bold text-foreground drop-shadow-[0_1px_1px_rgba(0,0,0,0.9)] leading-none">
-              {displayCurrentHP}
+              {displayCurrentHP}/{displayMaxHP}
             </span>
           </div>
         </div>

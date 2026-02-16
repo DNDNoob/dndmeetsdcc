@@ -712,6 +712,21 @@ export const useGameState = () => {
     } else {
       await addItem('combatState', { id: 'current', ...combatData });
     }
+
+    // Log mob initiative rolls to dice panel
+    const mobCombatants = combatants.filter(c => c.type === 'mob' && c.hasRolledInitiative);
+    for (const mc of mobCombatants) {
+      await addDiceRoll({
+        id: crypto.randomUUID(),
+        crawlerName: mc.name,
+        crawlerId: mc.id,
+        timestamp: Date.now(),
+        results: [{ dice: 'D20', result: mc.initiative }],
+        total: mc.initiative,
+        statRoll: { stat: 'Initiative', modifier: 0, rawRoll: mc.initiative },
+      });
+    }
+
     console.log('[GameState] ⚔️ Combat started with', combatants.length, 'combatants (mobs auto-rolled). Combat #', prevCount + 1);
   };
 
@@ -799,33 +814,30 @@ export const useGameState = () => {
       if (mob) {
         const hpBefore = combatant?.currentHP ?? mob.hitPoints ?? 0;
         const newHP = Math.max(0, hpBefore - damage);
-        // Update per-combatant HP in combat state
+        // Update per-combatant HP in combat state (independent per instance)
         if (combatState) {
           const updatedCombatants = combatState.combatants.map(c =>
             c.id === targetId ? { ...c, currentHP: newHP } : c
           );
           await updateItem('combatState', 'current', { combatants: updatedCombatants } as Record<string, unknown>);
         }
-        // Also update mob document
-        await updateItem('mobs', mobId, { hitPoints: newHP } as Record<string, unknown>);
+        // Do NOT update the shared mob document — each combatant instance tracks HP independently
+        // The mob document's hitPoints represents the base/max HP for the mob type
         console.log('[GameState] ⚔️ Damage applied to mob', combatant?.name ?? mob.name, ':', damage, '→ HP:', newHP);
       }
     }
   };
 
   const overrideMobHealth = async (combatantId: string, newHP: number) => {
-    // Update per-combatant HP in combat state
+    // Update per-combatant HP in combat state (independent per instance)
     if (combatState) {
-      const combatant = combatState.combatants.find(c => c.id === combatantId);
       const updatedCombatants = combatState.combatants.map(c =>
         c.id === combatantId ? { ...c, currentHP: newHP } : c
       );
       await updateItem('combatState', 'current', { combatants: updatedCombatants } as Record<string, unknown>);
-      // Also update mob document
-      const mobId = combatant?.sourceId || combatantId;
-      await updateItem('mobs', mobId, { hitPoints: newHP } as Record<string, unknown>);
+      // Do NOT update the shared mob document — each combatant instance tracks HP independently
     } else {
-      // Fallback: direct mob document update
+      // Fallback when not in combat: direct mob document update
       await updateItem('mobs', combatantId, { hitPoints: newHP } as Record<string, unknown>);
     }
     console.log('[GameState] ⚔️ DM override: combatant HP set to', newHP);
@@ -893,6 +905,21 @@ export const useGameState = () => {
     await updateItem('combatState', 'current', {
       combatants: updatedCombatants,
     } as Record<string, unknown>);
+
+    // Log mob initiative rolls to dice panel
+    const mobsAdded = toAdd.filter(c => c.type === 'mob' && c.hasRolledInitiative);
+    for (const mc of mobsAdded) {
+      await addDiceRoll({
+        id: crypto.randomUUID(),
+        crawlerName: mc.name,
+        crawlerId: mc.id,
+        timestamp: Date.now(),
+        results: [{ dice: 'D20', result: mc.initiative }],
+        total: mc.initiative,
+        statRoll: { stat: 'Initiative', modifier: 0, rawRoll: mc.initiative },
+      });
+    }
+
     console.log('[GameState] ➕ Added', toAdd.length, 'combatant(s) to active combat');
   };
 
