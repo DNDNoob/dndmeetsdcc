@@ -873,6 +873,29 @@ export const useGameState = () => {
     } as Record<string, unknown>);
   };
 
+  const addCombatant = async (newCombatants: CombatantEntry[]) => {
+    if (!combatState || newCombatants.length === 0) return;
+    const existing = combatState.combatants;
+    // Filter out any that are already in combat
+    const existingIds = new Set(existing.map(c => c.id));
+    const toAdd = newCombatants.filter(c => !existingIds.has(c.id));
+    if (toAdd.length === 0) return;
+
+    let updatedCombatants: CombatantEntry[];
+    if (combatState.phase === 'combat') {
+      // During combat phase, insert sorted by initiative
+      updatedCombatants = [...existing, ...toAdd].sort((a, b) => b.initiative - a.initiative);
+    } else {
+      // During initiative phase, just append
+      updatedCombatants = [...existing, ...toAdd];
+    }
+
+    await updateItem('combatState', 'current', {
+      combatants: updatedCombatants,
+    } as Record<string, unknown>);
+    console.log('[GameState] ➕ Added', toAdd.length, 'combatant(s) to active combat');
+  };
+
   return {
     crawlers,
     updateCrawler,
@@ -927,6 +950,7 @@ export const useGameState = () => {
     endCombat,
     cancelCombat,
     removeCombatant,
+    addCombatant,
     isLoaded,
   };
 };

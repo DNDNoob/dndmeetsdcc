@@ -43,6 +43,7 @@ interface ShowTimeViewProps {
   noncombatTurnState?: import("@/lib/gameData").NoncombatTurnState | null;
   resetNoncombatTurns?: (episodeId: string) => Promise<void>;
   combatState?: CombatState | null;
+  onRuntimePlacementsChange?: (crawlerPlacements: CrawlerPlacement[], runtimeMobPlacements: EpisodeMobPlacement[]) => void;
 }
 
 const SHOWTIME_STORAGE_KEY = 'dcc_showtime_state';
@@ -356,7 +357,7 @@ const InventoryPanel: React.FC<{
   );
 };
 
-const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock, noncombatTurnState, resetNoncombatTurns, combatState }) => {
+const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock, noncombatTurnState, resetNoncombatTurns, combatState, onRuntimePlacementsChange }) => {
   const { roomId } = useFirebaseStore();
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
   const [currentMapIndex, setCurrentMapIndex] = useState(0);
@@ -433,6 +434,10 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   const [panStart, setPanStart] = useState<{ x: number; y: number; panX: number; panY: number } | null>(null);
   const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
+  // Accumulated runtime placements across all visited maps (for combat/rest integration)
+  const allMapCrawlerPlacementsRef = useRef<Map<string, CrawlerPlacement[]>>(new Map());
+  const allMapRuntimeMobPlacementsRef = useRef<Map<string, EpisodeMobPlacement[]>>(new Map());
+
   // Keep selectedEpisode in sync with latest episode data from Firebase
   // This ensures changes made in the DM console (e.g., map scale) are reflected
   useEffect(() => {
@@ -454,6 +459,25 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   useEffect(() => {
     onShowtimeActiveChange?.(!!selectedEpisode, selectedEpisode);
   }, [selectedEpisode, onShowtimeActiveChange]);
+
+  // Report runtime placements to parent (for PingPanel combat/rest integration)
+  // Accumulates across all visited maps so switching maps doesn't lose data
+  useEffect(() => {
+    if (!currentMapId || !selectedEpisode) {
+      // Episode closed — clear accumulated refs
+      if (!selectedEpisode) {
+        allMapCrawlerPlacementsRef.current.clear();
+        allMapRuntimeMobPlacementsRef.current.clear();
+        onRuntimePlacementsChange?.([], []);
+      }
+      return;
+    }
+    allMapCrawlerPlacementsRef.current.set(currentMapId, crawlerPlacements);
+    allMapRuntimeMobPlacementsRef.current.set(currentMapId, runtimeMobPlacements);
+    const allCrawler = Array.from(allMapCrawlerPlacementsRef.current.values()).flat();
+    const allMob = Array.from(allMapRuntimeMobPlacementsRef.current.values()).flat();
+    onRuntimePlacementsChange?.(allCrawler, allMob);
+  }, [crawlerPlacements, runtimeMobPlacements, currentMapId, selectedEpisode, onRuntimePlacementsChange]);
 
   // Keep draggingMobId ref in sync with state (avoids listener re-subscription)
   useEffect(() => {
