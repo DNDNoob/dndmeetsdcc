@@ -13,6 +13,8 @@ interface CrawlerIconProps {
   effectiveMaxHP?: number;
   /** Base max HP without modifiers (to show orange modifier portion) */
   baseMaxHP?: number;
+  /** Whether to show the health bar (default true) */
+  showHealthBar?: boolean;
 }
 
 export const CrawlerIcon: React.FC<CrawlerIconProps> = ({
@@ -23,6 +25,7 @@ export const CrawlerIcon: React.FC<CrawlerIconProps> = ({
   effectiveHP,
   effectiveMaxHP,
   baseMaxHP,
+  showHealthBar = true,
 }) => {
   const currentHP = effectiveHP ?? crawler.hp ?? 0;
   const maxHP = effectiveMaxHP ?? crawler.maxHP ?? 1;
@@ -41,7 +44,7 @@ export const CrawlerIcon: React.FC<CrawlerIconProps> = ({
       className={`relative cursor-move transition-all ${isDragging ? "opacity-50 scale-110" : "hover:scale-110"}`}
       style={{
         width: size,
-        height: size + 14,
+        height: showHealthBar ? size + 14 : size,
       }}
     >
       {/* Circular container with blue border for crawlers */}
@@ -64,28 +67,30 @@ export const CrawlerIcon: React.FC<CrawlerIconProps> = ({
       </div>
 
       {/* Health bar */}
-      <div
-        className="absolute bottom-0 left-1/2 -translate-x-1/2"
-        style={{ width: Math.max(size, 48) }}
-      >
-        <div className="h-3.5 border border-muted-foreground/40 bg-destructive/60 overflow-hidden rounded-sm relative flex">
-          {/* Base HP portion (green) */}
-          <div
-            className="h-full transition-all duration-300 bg-green-500"
-            style={{ width: `${basePercentage}%` }}
-          />
-          {/* Equipment modifier portion (orange) */}
-          {modifierPercentage > 0 && (
+      {showHealthBar && (
+        <div
+          className="absolute bottom-0 left-1/2 -translate-x-1/2"
+          style={{ width: Math.max(size, 48) }}
+        >
+          <div className="h-3.5 border border-muted-foreground/40 bg-destructive/60 overflow-hidden rounded-sm relative flex">
+            {/* Base HP portion (green) */}
             <div
-              className="h-full transition-all duration-300 bg-orange-500"
-              style={{ width: `${modifierPercentage}%` }}
+              className="h-full transition-all duration-300 bg-green-500"
+              style={{ width: `${basePercentage}%` }}
             />
-          )}
-          <span className="absolute inset-0 flex items-center justify-center text-[8px] font-bold text-foreground drop-shadow-[0_1px_1px_rgba(0,0,0,0.9)] leading-none">
-            {currentHP}/{maxHP}
-          </span>
+            {/* Equipment modifier portion (orange) */}
+            {modifierPercentage > 0 && (
+              <div
+                className="h-full transition-all duration-300 bg-orange-500"
+                style={{ width: `${modifierPercentage}%` }}
+              />
+            )}
+            <span className="absolute inset-0 flex items-center justify-center text-[8px] font-bold text-foreground drop-shadow-[0_1px_1px_rgba(0,0,0,0.9)] leading-none">
+              {currentHP}/{maxHP}
+            </span>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Tooltip on hover */}
       <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-background border border-border rounded px-2 py-1 text-xs text-foreground opacity-0 hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
