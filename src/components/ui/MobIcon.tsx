@@ -18,7 +18,8 @@ export const MobIcon: React.FC<MobIconProps> = ({ mob, size = 40, isDragging = f
   const displayMaxHP = maxHP ?? mob.hitPoints ?? 0;
   const displayCurrentHP = inCombat ? (combatHP ?? mob.hitPoints ?? 0) : displayMaxHP;
   const hpPercentage = displayMaxHP > 0 ? Math.min(100, Math.max(0, (displayCurrentHP / displayMaxHP) * 100)) : 0;
-  const showBar = displayMaxHP > 0;
+  // Only show health bar during active combat
+  const showBar = inCombat && displayMaxHP > 0;
 
   return (
     <div

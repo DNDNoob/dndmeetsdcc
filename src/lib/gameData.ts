@@ -57,6 +57,7 @@ export interface WeaponData {
   normalRange?: number; // feet, only if ranged
   maxRange?: number; // feet, only if ranged
   specialEffect?: string; // optional text for special effects
+  splashDamage?: boolean; // if true, damage can target multiple enemies
 }
 
 export interface InventoryItem {
