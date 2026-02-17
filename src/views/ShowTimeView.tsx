@@ -430,6 +430,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   // Cursor follower state for ping/box mode
   const [cursorPosition, setCursorPosition] = useState<{ x: number; y: number } | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
+  const needsCentering = useRef(true);
 
   // Dragging state for runtime crawlers/mobs
   const [draggingRuntimeId, setDraggingRuntimeId] = useState<string | null>(null);
@@ -660,7 +661,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     if (!selectedEpisode || currentMapId === null) return;
     // Always start at 100% zoom
     setMapScale(100);
-    // Reset pan offset when map changes
+    // Center map in viewport — computed after image loads via the onLoad handler
     setPanOffset({ x: 0, y: 0 });
     // Reset per-map state so old map data doesn't bleed into new map
     setPings([]);
@@ -674,7 +675,29 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     setEditingNameId(null);
     // Reset fog initial load flag so Firebase listener will reload fog for new map
     fogInitialLoadDone.current = null;
+    // Reset natural image size so centering recalculates for new map
+    setNaturalImageSize(null);
+    setMapImageDimensions(null);
+    // Flag that we need to center the map once dimensions are known
+    needsCentering.current = true;
   }, [currentMapId]);
+
+  // Center the map in the viewport when image dimensions become known (only on initial load)
+  useEffect(() => {
+    if (!needsCentering.current) return;
+    if (!mapImageDimensions || !containerSize.width || !containerSize.height) return;
+    needsCentering.current = false;
+    const scaledW = mapImageDimensions.width * mapBaseScale / 100;
+    const scaledH = mapImageDimensions.height * mapBaseScale / 100;
+    const cw = containerSize.width;
+    const ch = containerSize.height;
+    // If the scaled map is taller/wider than the container, offset to center
+    const offsetX = scaledW > cw ? -(scaledW - cw) / 2 : 0;
+    const offsetY = scaledH > ch ? -(scaledH - ch) / 2 : 0;
+    if (offsetX !== 0 || offsetY !== 0) {
+      setPanOffset({ x: offsetX, y: offsetY });
+    }
+  }, [mapImageDimensions, containerSize, mapBaseScale]);
 
   // Debug logging
   if (selectedEpisode && currentMapId) {
