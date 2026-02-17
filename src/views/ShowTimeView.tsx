@@ -1382,6 +1382,10 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     if (!selectedMap) return;
 
     const handleWheel = (e: WheelEvent) => {
+      // Don't intercept scroll if the cursor is over a scrollable UI panel (e.g. PingPanel game clock)
+      const target = e.target as HTMLElement;
+      if (target.closest('[data-allow-scroll]')) return;
+
       e.preventDefault();
       e.stopPropagation();
       // Proportional zoom: step scales with current zoom level for smooth feel

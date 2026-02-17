@@ -271,6 +271,7 @@ const PingPanel: React.FC<PingPanelProps> = ({
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             className="bg-background border-2 border-accent p-4 w-[calc(100vw-1rem)] sm:w-80 shadow-lg shadow-accent/20 mb-2 max-h-[calc(100vh-7rem)] overflow-y-auto ping-panel-scroll"
             style={{ scrollbarWidth: 'none' }}
+            data-allow-scroll
           >
             <style>{`.ping-panel-scroll::-webkit-scrollbar { display: none; }`}</style>
             <h3 className="font-display text-accent text-lg mb-3 flex items-center gap-2 shrink-0">
