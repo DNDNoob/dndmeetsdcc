@@ -136,7 +136,7 @@ const PingPanel: React.FC<PingPanelProps> = ({
         combatId: count > 1 ? `${p.mobId}:${placementIdx}` : p.mobId,
         mobId: p.mobId,
         name: `${mob.name}${suffix}`,
-        hitPoints: mob.hitPoints,
+        hitPoints: p.currentHP ?? mob.hitPoints,
       };
     }).filter((e): e is NonNullable<typeof e> => e !== null);
   }, [activeEpisode?.mobPlacements, runtimeMobPlacements, mobs]);

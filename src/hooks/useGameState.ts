@@ -681,6 +681,26 @@ export const useGameState = () => {
       ...mobEntries.map(entry => {
         const mob = mobs.find(m => m.id === entry.mobId);
         const roll = Math.floor(Math.random() * 20) + 1;
+
+        // Use persisted HP from episode if available (from previous combat)
+        let initialHP = mob?.hitPoints;
+        if (episodeId) {
+          const episode = episodes.find(e => e.id === episodeId);
+          if (episode) {
+            const colonIdx = entry.combatId.indexOf(':');
+            if (colonIdx > 0) {
+              const placementIdx = parseInt(entry.combatId.substring(colonIdx + 1), 10);
+              if (!isNaN(placementIdx) && placementIdx < episode.mobPlacements.length) {
+                const placement = episode.mobPlacements[placementIdx];
+                if (placement.currentHP !== undefined) initialHP = placement.currentHP;
+              }
+            } else {
+              const placement = episode.mobPlacements.find(p => p.mobId === entry.mobId);
+              if (placement?.currentHP !== undefined) initialHP = placement.currentHP;
+            }
+          }
+        }
+
         return {
           id: entry.combatId,
           sourceId: entry.mobId,
@@ -691,7 +711,7 @@ export const useGameState = () => {
           hasUsedAction: false,
           hasUsedBonusAction: false,
           avatar: mob?.image,
-          currentHP: mob?.hitPoints,
+          currentHP: initialHP,
         };
       }),
     ];
@@ -848,6 +868,42 @@ export const useGameState = () => {
 
   const endCombat = async () => {
     if (!combatState) return;
+
+    // Persist mob HP changes to the episode before clearing combat state
+    if (combatState.episodeId) {
+      const episode = episodes.find(e => e.id === combatState.episodeId);
+      if (episode && episode.mobPlacements.length > 0) {
+        const updatedPlacements = [...episode.mobPlacements];
+        let changed = false;
+
+        for (const c of combatState.combatants) {
+          if (c.type !== 'mob' || c.currentHP === undefined) continue;
+          const mobDocId = c.sourceId || c.id;
+
+          // Check if this is an indexed combatId (e.g., "mobId:3")
+          if (c.sourceId && c.id !== c.sourceId && c.id.startsWith(c.sourceId + ':')) {
+            const placementIdx = parseInt(c.id.substring(c.sourceId.length + 1), 10);
+            if (!isNaN(placementIdx) && placementIdx < updatedPlacements.length) {
+              updatedPlacements[placementIdx] = { ...updatedPlacements[placementIdx], currentHP: c.currentHP };
+              changed = true;
+            }
+          } else {
+            // Non-indexed: find the first episode placement with this mobId
+            const idx = updatedPlacements.findIndex(p => p.mobId === mobDocId);
+            if (idx >= 0) {
+              updatedPlacements[idx] = { ...updatedPlacements[idx], currentHP: c.currentHP };
+              changed = true;
+            }
+          }
+        }
+
+        if (changed) {
+          await updateEpisode(episode.id, { mobPlacements: updatedPlacements });
+          console.log('[GameState] ⚔️ Persisted mob HP to episode', episode.id);
+        }
+      }
+    }
+
     await updateItem('combatState', 'current', {
       active: false,
       phase: 'ended',

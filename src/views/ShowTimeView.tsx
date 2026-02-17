@@ -1567,6 +1567,16 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     );
   }, [selectedEpisode, currentMapId]);
 
+  // Count mob occurrences across ALL placements (episode + runtime) to match PingPanel's combatId logic
+  const allPlacementsMobCounts = useMemo(() => {
+    const episodePlacements = selectedEpisode?.mobPlacements ?? [];
+    const runtimePlacements = runtimeMobPlacements ?? [];
+    const allPlacements = [...episodePlacements, ...runtimePlacements];
+    const counts: Record<string, number> = {};
+    allPlacements.forEach(p => { counts[p.mobId] = (counts[p.mobId] ?? 0) + 1; });
+    return counts;
+  }, [selectedEpisode?.mobPlacements, runtimeMobPlacements]);
+
   // Get the current map URL
   const currentMapUrl = useMemo(() => {
     if (!selectedEpisode || selectedEpisode.mapIds.length === 0) return null;
@@ -2399,18 +2409,24 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                     size={64}
                     isDragging={isDragging}
                     inCombat={(() => {
-                      if (!combatState?.active || combatState.phase === 'ended') return false;
-                      // Find matching combatant for this mob placement
-                      const totalSameId = currentMapMobPlacements.filter(p => p.mobId === placement.mobId).length;
-                      const combatId = totalSameId > 1 ? `${placement.mobId}:${globalIndex}` : placement.mobId;
-                      return combatState.combatants.some(c => c.id === combatId);
+                      // Use allPlacementsMobCounts (all maps) to match PingPanel's combatId logic
+                      const totalAll = allPlacementsMobCounts[placement.mobId] ?? 0;
+                      const combatId = totalAll > 1 ? `${placement.mobId}:${globalIndex}` : placement.mobId;
+                      if (combatState?.active && combatState.phase !== 'ended') {
+                        return combatState.combatants.some(c => c.id === combatId);
+                      }
+                      // Outside combat, show health bar if mob has persisted damage
+                      return placement.currentHP !== undefined;
                     })()}
                     combatHP={(() => {
-                      if (!combatState?.active || combatState.phase === 'ended') return undefined;
-                      const totalSameId = currentMapMobPlacements.filter(p => p.mobId === placement.mobId).length;
-                      const combatId = totalSameId > 1 ? `${placement.mobId}:${globalIndex}` : placement.mobId;
-                      const combatant = combatState.combatants.find(c => c.id === combatId);
-                      return combatant?.currentHP;
+                      const totalAll = allPlacementsMobCounts[placement.mobId] ?? 0;
+                      const combatId = totalAll > 1 ? `${placement.mobId}:${globalIndex}` : placement.mobId;
+                      if (combatState?.active && combatState.phase !== 'ended') {
+                        const combatant = combatState.combatants.find(c => c.id === combatId);
+                        return combatant?.currentHP;
+                      }
+                      // Outside combat, use persisted HP from episode
+                      return placement.currentHP;
                     })()}
                     maxHP={mob.hitPoints}
                   />
@@ -2623,13 +2639,18 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                     size={64}
                     isDragging={isDragging}
                     inCombat={(() => {
-                      if (!combatState?.active || combatState.phase === 'ended') return false;
-                      return combatState.combatants.some(c => c.id === runtimeCombatId);
+                      if (combatState?.active && combatState.phase !== 'ended') {
+                        return combatState.combatants.some(c => c.id === runtimeCombatId);
+                      }
+                      // Runtime mobs also support persisted HP
+                      return placement.currentHP !== undefined;
                     })()}
                     combatHP={(() => {
-                      if (!combatState?.active || combatState.phase === 'ended') return undefined;
-                      const combatant = combatState.combatants.find(c => c.id === runtimeCombatId);
-                      return combatant?.currentHP;
+                      if (combatState?.active && combatState.phase !== 'ended') {
+                        const combatant = combatState.combatants.find(c => c.id === runtimeCombatId);
+                        return combatant?.currentHP;
+                      }
+                      return placement.currentHP;
                     })()}
                     maxHP={mob.hitPoints}
                   />

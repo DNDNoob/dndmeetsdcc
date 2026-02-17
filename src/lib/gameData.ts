@@ -109,6 +109,7 @@ export interface EpisodeMobPlacement {
   x: number; // Percentage of map width (0-100)
   y: number; // Percentage of map height (0-100)
   scale?: number; // Optional scale multiplier for display (1 = normal size)
+  currentHP?: number; // Per-placement HP override (persisted after combat, episode-specific)
 }
 
 export interface CrawlerPlacement {
