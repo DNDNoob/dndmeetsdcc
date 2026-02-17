@@ -269,11 +269,15 @@ const PingPanel: React.FC<PingPanelProps> = ({
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            className="bg-background border-2 border-accent p-4 w-[calc(100vw-1rem)] sm:w-80 shadow-lg shadow-accent/20 mb-2 max-h-[calc(100vh-7rem)] overflow-y-auto ping-panel-scroll"
-            style={{ scrollbarWidth: 'none' }}
-            data-allow-scroll
+            className="bg-background border-2 border-accent p-4 w-[calc(100vw-1rem)] sm:w-80 shadow-lg shadow-accent/20 mb-2 max-h-[calc(100vh-7rem)] overflow-y-auto hide-scrollbar"
+            ref={(el) => {
+              if (el && !(el as HTMLElement & { _wheelAttached?: boolean })._wheelAttached) {
+                (el as HTMLElement & { _wheelAttached?: boolean })._wheelAttached = true;
+                el.addEventListener('wheel', (e) => { e.stopPropagation(); }, { passive: false });
+              }
+            }}
           >
-            <style>{`.ping-panel-scroll::-webkit-scrollbar { display: none; }`}</style>
+            <style>{`.hide-scrollbar { scrollbar-width: none; -ms-overflow-style: none; } .hide-scrollbar::-webkit-scrollbar { display: none; }`}</style>
             <h3 className="font-display text-accent text-lg mb-3 flex items-center gap-2 shrink-0">
               <Clock className="w-5 h-5" /> GAME CLOCK
             </h3>

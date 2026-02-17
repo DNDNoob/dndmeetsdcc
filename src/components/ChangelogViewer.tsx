@@ -38,7 +38,16 @@ const ChangelogViewer: React.FC<ChangelogViewerProps> = ({ isOpen, onClose }) =>
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6">
+            <style>{`.changelog-scroll { scrollbar-width: none; -ms-overflow-style: none; } .changelog-scroll::-webkit-scrollbar { display: none; }`}</style>
+            <div
+              className="flex-1 overflow-y-auto p-6 changelog-scroll"
+              ref={(el) => {
+                if (el && !(el as HTMLElement & { _wheelAttached?: boolean })._wheelAttached) {
+                  (el as HTMLElement & { _wheelAttached?: boolean })._wheelAttached = true;
+                  el.addEventListener('wheel', (e) => { e.stopPropagation(); }, { passive: false });
+                }
+              }}
+            >
               <div className="space-y-6 max-w-3xl">
                 {changelogData.map((entry, index) => (
                   <div key={index} className="border-l-2 border-primary pl-4">

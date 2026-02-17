@@ -1405,12 +1405,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     if (!selectedMap) return;
 
     const handleWheel = (e: WheelEvent) => {
-      // Don't intercept scroll if the cursor is over a scrollable UI panel (e.g. PingPanel game clock)
-      const target = e.target as HTMLElement;
-      if (target.closest('[data-allow-scroll]')) return;
-
       e.preventDefault();
-      e.stopPropagation();
       // Proportional zoom: step scales with current zoom level for smooth feel
       // At 100% → step ~3, at 50% → step ~1.5, at 200% → step ~6
       setMapScale(prev => {
@@ -2284,7 +2279,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             <ZoomIn className="w-4 h-4" />
           </DungeonButton>
           <div className="text-xs text-center text-muted-foreground bg-background/80 px-2 py-1 rounded border border-border">
-            {mapScale}%
+            {Math.round(mapScale)}%
           </div>
           <DungeonButton
             variant="default"

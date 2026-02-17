@@ -146,7 +146,12 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
             exit={{ opacity: 0, x: 20, scale: 0.95 }}
             className="bg-background border-2 border-primary p-4 w-[calc(100vw-1rem)] sm:w-72 shadow-lg shadow-primary/20 flex flex-col"
             style={{ maxHeight: 'calc(100vh - 5rem)' }}
-            onWheel={(e) => e.stopPropagation()}
+            ref={(el) => {
+              if (el && !(el as HTMLElement & { _wheelAttached?: boolean })._wheelAttached) {
+                (el as HTMLElement & { _wheelAttached?: boolean })._wheelAttached = true;
+                el.addEventListener('wheel', (e) => { e.stopPropagation(); }, { passive: false });
+              }
+            }}
           >
             <h3 className="font-display text-primary text-glow-cyan text-lg mb-3 flex items-center gap-2 shrink-0">
               <Dices className="w-5 h-5" /> DICE ROLLER
