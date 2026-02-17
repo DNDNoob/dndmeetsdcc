@@ -634,53 +634,12 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     });
   }, [fogOfWarEnabled, isAdmin, revealedAreas]);
 
-  // Auto-select first episode and first map when episodes load (only once)
-  // Or restore from localStorage if available
+  // Non-admin players: wait for DM's Firebase broadcast to set episode
   useEffect(() => {
-    if (episodes.length > 0 && !selectedEpisode && !hasAutoLoaded.current) {
-      // Non-admin players get their state from the DM's Firebase broadcast
-      if (!isAdmin) {
-        hasAutoLoaded.current = true;
-        return;
-      }
-      // Try to restore from localStorage (admin only)
-      try {
-        const savedState = localStorage.getItem(SHOWTIME_STORAGE_KEY);
-        if (savedState) {
-          const parsed = JSON.parse(savedState);
-          const { episodeId, mapIndex, mapScale: savedScale, fogOfWarEnabled: savedFog, revealedAreas: savedAreas } = parsed;
-          const savedEpisode = episodes.find(e => e.id === episodeId);
-          if (savedEpisode) {
-            setSelectedEpisode(savedEpisode);
-            const validMapIndex = Math.min(mapIndex || 0, savedEpisode.mapIds.length - 1);
-            setCurrentMapIndex(validMapIndex);
-            if (savedEpisode.mapIds.length > 0) {
-              const mapIdxNum = parseInt(savedEpisode.mapIds[validMapIndex], 10);
-              setSelectedMap(maps[mapIdxNum] || null);
-              // Always start at 100% zoom - fog state will be loaded from Firebase listener
-              setMapScale(100);
-            }
-            hasAutoLoaded.current = true;
-            return;
-          }
-        }
-      } catch (e) {
-        console.error('[ShowTime] Failed to restore state from localStorage:', e);
-      }
-
-      // Fall back to first episode
-      const firstEpisode = episodes[0];
-      setSelectedEpisode(firstEpisode);
-      if (firstEpisode.mapIds.length > 0) {
-        const mapIndex = parseInt(firstEpisode.mapIds[0], 10);
-        setSelectedMap(maps[mapIndex] || null);
-        setCurrentMapIndex(0);
-        // Always start at 100% zoom - fog state will be loaded from Firebase listener
-        setMapScale(100);
-      }
+    if (episodes.length > 0 && !selectedEpisode && !hasAutoLoaded.current && !isAdmin) {
       hasAutoLoaded.current = true;
     }
-  }, [episodes, maps, isAdmin]);
+  }, [episodes, isAdmin]);
 
   // Save episode/map selection to localStorage (fog state is persisted in Firebase, zoom always starts at 100%)
   useEffect(() => {

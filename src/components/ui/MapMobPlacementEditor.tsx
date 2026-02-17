@@ -1,10 +1,10 @@
 import React, { useState, useRef } from "react";
-import { Mob, EpisodeMobPlacement, Crawler, CrawlerPlacement } from "@/lib/gameData";
+import { Mob, EpisodeMobPlacement, Crawler, CrawlerPlacement, InventoryItem } from "@/lib/gameData";
 import MobIcon from "@/components/ui/MobIcon";
 import { CrawlerIcon } from "@/components/ui/CrawlerIcon";
 import GridOverlay from "@/components/ui/GridOverlay";
 import { DungeonButton } from "@/components/ui/DungeonButton";
-import { Grid3x3, Trash2, RotateCcw } from "lucide-react";
+import { Grid3x3, Trash2, RotateCcw, Package, Plus, Search, X } from "lucide-react";
 
 interface MapMobPlacementEditorProps {
   mapUrl: string;
@@ -20,6 +20,8 @@ interface MapMobPlacementEditorProps {
   onCrawlerPlacementsChange?: (placements: CrawlerPlacement[]) => void;
   // Scale preview
   mapScale?: number;
+  // Shared inventory for adding items to mob placements
+  getSharedInventory?: () => InventoryItem[];
 }
 
 const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
@@ -34,8 +36,11 @@ const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
   crawlerPlacements,
   onCrawlerPlacementsChange,
   mapScale = 100,
+  getSharedInventory,
 }) => {
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
+  const [editingInventoryIndex, setEditingInventoryIndex] = useState<number | null>(null);
+  const [mobInvSearch, setMobInvSearch] = useState('');
   const [draggingCrawlerIndex, setDraggingCrawlerIndex] = useState<number | null>(null);
   const [showGrid, setShowGrid] = useState(false);
   const baseGridSize = 51; // Base grid size in pixels
@@ -378,35 +383,149 @@ const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
       {currentMapPlacements.length > 0 && (
         <div className="bg-muted/30 border border-border rounded p-4">
           <h5 className="font-display text-sm text-primary mb-3">Mobs on This Map</h5>
-          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-2">
+          <div className="space-y-2">
             {currentMapPlacements.map((placement, index) => {
               const mob = mobs.find(m => m.id === placement.mobId);
               if (!mob) return null;
+              const fullIndex = getFullArrayIndex(index);
 
               // Count how many times this mob appears before this index on this map
               const sameIdBefore = currentMapPlacements.slice(0, index).filter(p => p.mobId === placement.mobId).length;
               const letter = sameIdBefore > 0 ? String.fromCharCode(65 + sameIdBefore) : '';
+              const isEditingInv = editingInventoryIndex === index;
+              const mobItems = placement.inventoryOverride ?? mob.defaultInventory ?? [];
+              const mobGold = placement.goldOverride ?? mob.defaultGold ?? 0;
 
               return (
                 <div
                   key={`${placement.mobId}-${mapId}-${index}`}
-                  className="flex items-center justify-between bg-background border border-border rounded p-2"
+                  className="bg-background border border-border rounded p-2"
                 >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold truncate">
-                      {mob.name}{letter && ` (${letter})`}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      ({placement.x.toFixed(0)}%, {placement.y.toFixed(0)}%)
-                    </p>
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold truncate">
+                        {mob.name}{letter && ` (${letter})`}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        ({placement.x.toFixed(0)}%, {placement.y.toFixed(0)}%)
+                        {mobItems.length > 0 && <span className="ml-1 text-accent">· {mobItems.length} items</span>}
+                        {mobGold > 0 && <span className="ml-1 text-accent">· {mobGold}g</span>}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1 ml-2">
+                      <button
+                        onClick={() => {
+                          setEditingInventoryIndex(isEditingInv ? null : index);
+                          setMobInvSearch('');
+                        }}
+                        className={`p-1 rounded transition-colors ${isEditingInv ? 'bg-accent/20 text-accent' : 'hover:bg-accent/10 text-muted-foreground'}`}
+                        title="Edit inventory"
+                      >
+                        <Package className="w-3 h-3" />
+                      </button>
+                      <button
+                        onClick={() => handleRemoveMob(index)}
+                        className="p-1 hover:bg-destructive/10 rounded transition-colors"
+                        title="Remove mob"
+                      >
+                        <Trash2 className="w-3 h-3 text-destructive" />
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    onClick={() => handleRemoveMob(index)}
-                    className="ml-2 p-1 hover:bg-destructive/10 rounded transition-colors"
-                    title="Remove mob"
-                  >
-                    <Trash2 className="w-3 h-3 text-destructive" />
-                  </button>
+
+                  {/* Inline inventory editor */}
+                  {isEditingInv && (
+                    <div className="mt-2 border-t border-border pt-2 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <label className="text-[10px] text-muted-foreground">Gold:</label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={mobGold}
+                          onChange={(e) => {
+                            if (fullIndex === -1) return;
+                            const val = parseInt(e.target.value) || 0;
+                            const updated = placements.map((p, i) =>
+                              i === fullIndex ? { ...p, goldOverride: val } : p
+                            );
+                            onPlacementsChange(updated);
+                          }}
+                          className="w-16 bg-muted border border-border px-1.5 py-0.5 text-xs text-center"
+                        />
+                      </div>
+                      {/* Search items */}
+                      {getSharedInventory && (
+                        <div className="relative">
+                          <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                          <input
+                            type="text"
+                            placeholder="Search items..."
+                            value={mobInvSearch}
+                            onChange={(e) => setMobInvSearch(e.target.value)}
+                            className="w-full pl-7 pr-2 py-1 bg-muted border border-border text-xs"
+                          />
+                        </div>
+                      )}
+                      {mobInvSearch && getSharedInventory && (() => {
+                        const allItems = getSharedInventory();
+                        const filtered = allItems.filter(item =>
+                          item.name.toLowerCase().includes(mobInvSearch.toLowerCase()) &&
+                          !mobItems.some(mi => mi.id === item.id)
+                        ).slice(0, 5);
+                        if (filtered.length === 0) return <p className="text-[10px] text-muted-foreground italic">No matching items</p>;
+                        return (
+                          <div className="space-y-1 max-h-20 overflow-y-auto">
+                            {filtered.map(item => (
+                              <div key={item.id} className="flex items-center justify-between bg-muted/30 border border-border rounded px-2 py-0.5">
+                                <span className="text-[10px] text-primary truncate">{item.name}</span>
+                                <button
+                                  onClick={() => {
+                                    if (fullIndex === -1) return;
+                                    const updatedItems = [...mobItems, { ...item }];
+                                    const updated = placements.map((p, i) =>
+                                      i === fullIndex ? { ...p, inventoryOverride: updatedItems } : p
+                                    );
+                                    onPlacementsChange(updated);
+                                  }}
+                                  className="text-[10px] px-1.5 py-0.5 bg-primary text-primary-foreground rounded shrink-0 ml-1"
+                                >
+                                  <Plus className="w-3 h-3 inline" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                      {/* Current items */}
+                      {mobItems.length > 0 ? (
+                        <div className="space-y-1 max-h-24 overflow-y-auto">
+                          {mobItems.map((item, idx) => (
+                            <div key={`${item.id}-${idx}`} className="flex items-center justify-between bg-muted/30 border border-border rounded px-2 py-0.5">
+                              <div className="min-w-0">
+                                <span className="text-[10px] text-primary truncate block">{item.name}</span>
+                                {item.equipSlot && <span className="text-[9px] text-accent">{item.equipSlot}</span>}
+                              </div>
+                              <button
+                                onClick={() => {
+                                  if (fullIndex === -1) return;
+                                  const updatedItems = mobItems.filter((_, i) => i !== idx);
+                                  const updated = placements.map((p, i) =>
+                                    i === fullIndex ? { ...p, inventoryOverride: updatedItems.length > 0 ? updatedItems : undefined } : p
+                                  );
+                                  onPlacementsChange(updated);
+                                }}
+                                className="p-0.5 hover:bg-destructive/10 rounded shrink-0 ml-1"
+                              >
+                                <X className="w-3 h-3 text-destructive" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-[10px] text-muted-foreground italic">No items</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}

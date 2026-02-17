@@ -102,6 +102,8 @@ export interface Mob {
   hideWeaknesses?: boolean;
   hideStrengths?: boolean;
   hideHitPoints?: boolean;
+  defaultInventory?: InventoryItem[]; // Default items this mob type carries
+  defaultGold?: number; // Default gold this mob type carries
 }
 
 export interface EpisodeMobPlacement {
@@ -111,6 +113,8 @@ export interface EpisodeMobPlacement {
   y: number; // Percentage of map height (0-100)
   scale?: number; // Optional scale multiplier for display (1 = normal size)
   currentHP?: number; // Per-placement HP override (persisted after combat, episode-specific)
+  inventoryOverride?: InventoryItem[]; // Per-placement inventory override (episode-specific)
+  goldOverride?: number; // Per-placement gold override (episode-specific)
 }
 
 export interface CrawlerPlacement {

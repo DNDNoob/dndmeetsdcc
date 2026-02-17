@@ -79,13 +79,8 @@ const Index = () => {
     return [];
   });
 
-  const [mapNames, setMapNames] = useState<string[]>(() => {
-    const saved = localStorage.getItem('dcc_map_names');
-    if (saved) {
-      try { return JSON.parse(saved); } catch { return []; }
-    }
-    return [];
-  });
+  // Map names come from Firestore via useGameState
+  const mapNames = firestoreMapNames;
 
   const [isNavVisible, setIsNavVisible] = useState(true);
   const [isDiceExpanded, setIsDiceExpanded] = useState(false);
@@ -122,6 +117,8 @@ const Index = () => {
     mobs,
     setMobs,
     maps,
+    mapNames: firestoreMapNames,
+    updateMapName,
     setMaps,
     cleanupEmptyMaps,
     episodes,
@@ -264,13 +261,7 @@ const Index = () => {
   };
 
   const handleUpdateMapName = (index: number, name: string) => {
-    setMapNames((prev) => {
-      const newNames = [...prev];
-      newNames[index] = name;
-      // Persist to localStorage
-      localStorage.setItem('dcc_map_names', JSON.stringify(newNames));
-      return newNames;
-    });
+    updateMapName(index, name);
   };
 
   useEffect(() => {

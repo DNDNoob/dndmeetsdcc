@@ -64,6 +64,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   const mapImageRef = useRef<HTMLInputElement>(null);
   const [editingMobId, setEditingMobId] = useState<string | null>(null);
   const [editedMobData, setEditedMobData] = useState<Mob | null>(null);
+  const [mobDefaultInvSearch, setMobDefaultInvSearch] = useState('');
   const [editingMapIndex, setEditingMapIndex] = useState<number | null>(null);
   const [editingMapName, setEditingMapName] = useState<string>('');
 
@@ -110,6 +111,8 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
       hideHitPoints: false,
       hideWeaknesses: false,
       hideStrengths: false,
+      defaultInventory: newMob.defaultInventory,
+      defaultGold: newMob.defaultGold,
     };
     console.log('[DungeonAI] ➕ Add Mob clicked', mob);
     try {
@@ -216,6 +219,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   const handleStartEdit = (mob: Mob) => {
     setEditingMobId(mob.id);
     setEditedMobData(mob);
+    setMobDefaultInvSearch('');
   };
 
   const handleCancelEdit = () => {
@@ -493,7 +497,10 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
       mapId: p.mapId || episode.mapIds[0] || '0', // Default to first map if no mapId
       x: p.x,
       y: p.y,
-      scale: p.scale
+      scale: p.scale,
+      currentHP: p.currentHP,
+      inventoryOverride: p.inventoryOverride,
+      goldOverride: p.goldOverride,
     })));
 
     // Load crawler placements
@@ -860,6 +867,92 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                           </div>
                         </div>
 
+                        {/* Default Mob Inventory */}
+                        <div className="bg-muted/40 border border-border p-2 mt-3 rounded">
+                          <p className="text-xs text-muted-foreground font-semibold mb-2">Default Inventory:</p>
+                          <div className="flex items-center gap-2 mb-2">
+                            <label className="text-xs text-muted-foreground">Gold:</label>
+                            <input
+                              type="number"
+                              min={0}
+                              value={editedMob.defaultGold ?? 0}
+                              onChange={(e) => setEditedMobData(prev => prev ? { ...prev, defaultGold: parseInt(e.target.value) || 0 } : prev)}
+                              className="w-20 bg-muted border border-border px-2 py-0.5 text-sm text-center"
+                            />
+                          </div>
+                          {/* Search and add items from shared inventory */}
+                          {(() => {
+                            const allItems = getSharedInventory?.() ?? [];
+                            const mobItems = editedMob.defaultInventory ?? [];
+                            return (
+                              <>
+                                <div className="relative mb-2">
+                                  <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                                  <input
+                                    type="text"
+                                    placeholder="Search items to add..."
+                                    value={mobDefaultInvSearch}
+                                    onChange={(e) => setMobDefaultInvSearch(e.target.value)}
+                                    className="w-full pl-7 pr-2 py-1 bg-muted border border-border text-xs"
+                                  />
+                                </div>
+                                {(() => {
+                                  const searchVal = mobDefaultInvSearch.toLowerCase();
+                                  if (!searchVal) return null;
+                                  const filtered = allItems.filter(item =>
+                                    item.name.toLowerCase().includes(searchVal) &&
+                                    !mobItems.some(mi => mi.id === item.id)
+                                  ).slice(0, 5);
+                                  if (filtered.length === 0) return <p className="text-[10px] text-muted-foreground italic mb-2">No matching items</p>;
+                                  return (
+                                    <div className="space-y-1 mb-2 max-h-24 overflow-y-auto">
+                                      {filtered.map(item => (
+                                        <div key={item.id} className="flex items-center justify-between bg-muted/30 border border-border rounded px-2 py-1">
+                                          <span className="text-xs text-primary truncate">{item.name}</span>
+                                          <button
+                                            onClick={() => {
+                                              const updated = [...mobItems, { ...item }];
+                                              setEditedMobData(prev => prev ? { ...prev, defaultInventory: updated } : prev);
+                                            }}
+                                            className="text-[10px] px-2 py-0.5 bg-primary text-primary-foreground rounded hover:bg-primary/90 shrink-0 ml-2"
+                                          >
+                                            <Plus className="w-3 h-3 inline" /> Add
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  );
+                                })()}
+                                {/* Current mob inventory */}
+                                {mobItems.length > 0 ? (
+                                  <div className="space-y-1 max-h-32 overflow-y-auto">
+                                    {mobItems.map((item, idx) => (
+                                      <div key={`${item.id}-${idx}`} className="flex items-center justify-between bg-muted/30 border border-border rounded px-2 py-1">
+                                        <div className="min-w-0">
+                                          <span className="text-xs font-display text-primary block truncate">{item.name}</span>
+                                          {item.equipSlot && <span className="text-[10px] text-accent">{item.equipSlot}</span>}
+                                          {item.goldValue ? <span className="text-[10px] text-accent ml-1">{item.goldValue}g</span> : null}
+                                        </div>
+                                        <button
+                                          onClick={() => {
+                                            const updated = mobItems.filter((_, i) => i !== idx);
+                                            setEditedMobData(prev => prev ? { ...prev, defaultInventory: updated.length > 0 ? updated : undefined } : prev);
+                                          }}
+                                          className="p-0.5 hover:bg-destructive/10 rounded shrink-0 ml-2"
+                                        >
+                                          <Trash2 className="w-3 h-3 text-destructive" />
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <p className="text-[10px] text-muted-foreground italic">No items</p>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </div>
+
                         <div className="flex gap-2">
                           <DungeonButton
                             variant="admin"
@@ -915,6 +1008,13 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                             <p className="text-xs text-muted-foreground">
                               <span className="text-primary">Strengths:</span> {mob.strengths}
                             </p>
+                          )}
+                          {((mob.defaultInventory && mob.defaultInventory.length > 0) || (mob.defaultGold && mob.defaultGold > 0)) && (
+                            <div className="text-xs text-muted-foreground mt-1">
+                              <span className="text-accent">Inventory:</span>{' '}
+                              {mob.defaultInventory?.map(i => i.name).join(', ')}
+                              {mob.defaultGold ? ` · ${mob.defaultGold} gold` : ''}
+                            </div>
                           )}
                         </div>
                         <div className="flex flex-wrap gap-2 mt-2 md:mt-0">
@@ -1240,6 +1340,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                       crawlerPlacements={selectedCrawlersForEpisode}
                       mapScale={mapSettingsForEpisode[selectedMapsForEpisode[currentMapIndexForEditor]]?.scale ?? 100}
                       onCrawlerPlacementsChange={setSelectedCrawlersForEpisode}
+                      getSharedInventory={getSharedInventory}
                     />
 
                     {/* Crawler placement section */}
