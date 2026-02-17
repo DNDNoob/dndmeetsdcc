@@ -2756,6 +2756,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                         effectiveHP={effectiveHP}
                         effectiveMaxHP={effectiveMaxHP}
                         baseMaxHP={maxHPMod !== 0 ? baseMaxHP : undefined}
+                        showHealthBar={!!(combatState?.active && combatState.phase !== 'ended')}
                       />
                     );
                   })()}
@@ -2995,7 +2996,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
       {/* Right-click context menu for mob/crawler deletion */}
       {contextMenu && isAdmin && (() => {
-        // Resolve mob HP info for display
+        // Resolve mob HP info for display/editing
         let mobHPInfo: { currentHP: number; maxHP: number; name: string } | null = null;
         if (contextMenu.type === 'episode-mob') {
           const placement = selectedEpisode?.mobPlacements[contextMenu.index];
@@ -3018,16 +3019,65 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
           }
         }
         const inCombat = combatState?.active && combatState.phase !== 'ended';
+
+        const handleContextHPChange = (newHP: number) => {
+          if (contextMenu.type === 'episode-mob' && selectedEpisode && onUpdateEpisode) {
+            const updated = selectedEpisode.mobPlacements.map((p, i) =>
+              i === contextMenu.index ? { ...p, currentHP: newHP } : p
+            );
+            const updatedEpisode = { ...selectedEpisode, mobPlacements: updated };
+            setSelectedEpisode(updatedEpisode);
+            onUpdateEpisode(selectedEpisode.id, { mobPlacements: updated });
+          } else if (contextMenu.type === 'runtime-mob') {
+            const filteredIndices: number[] = [];
+            runtimeMobPlacements.forEach((p, i) => { if (p.mapId === currentMapId) filteredIndices.push(i); });
+            const realIndex = filteredIndices[contextMenu.index];
+            if (realIndex !== undefined) {
+              const updated = runtimeMobPlacements.map((p, i) =>
+                i === realIndex ? { ...p, currentHP: newHP } : p
+              );
+              setRuntimeMobPlacements(updated);
+              broadcastRuntimeMobPlacements(updated);
+            }
+          }
+        };
+
         return (
         <div
-          className="fixed z-[200] bg-background border-2 border-destructive rounded shadow-lg py-1 min-w-[140px]"
+          className="fixed z-[200] bg-background border-2 border-destructive rounded shadow-lg py-1 min-w-[160px]"
           style={{ left: contextMenu.x, top: contextMenu.y }}
           onClick={(e) => e.stopPropagation()}
         >
           {mobHPInfo && !inCombat && (
-            <div className="px-4 py-2 text-sm text-muted-foreground border-b border-border flex items-center gap-2">
-              <Heart className="w-4 h-4 text-destructive" />
-              <span>{mobHPInfo.currentHP} / {mobHPInfo.maxHP} HP</span>
+            <div className="px-4 py-2 text-sm text-muted-foreground border-b border-border">
+              <div className="flex items-center gap-2 mb-1">
+                <Heart className="w-4 h-4 text-destructive shrink-0" />
+                <span className="font-display text-xs">HP</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  defaultValue={mobHPInfo.currentHP}
+                  min={0}
+                  max={9999}
+                  className="w-14 bg-muted border border-border rounded px-1.5 py-0.5 text-sm text-foreground text-center"
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => {
+                    e.stopPropagation();
+                    if (e.key === 'Enter') {
+                      const val = parseInt((e.target as HTMLInputElement).value);
+                      if (!isNaN(val)) handleContextHPChange(Math.max(0, val));
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const val = parseInt(e.target.value);
+                    if (!isNaN(val)) handleContextHPChange(Math.max(0, val));
+                  }}
+                  autoFocus
+                />
+                <span className="text-sm text-muted-foreground">/ {mobHPInfo.maxHP}</span>
+              </div>
             </div>
           )}
           <button
