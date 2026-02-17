@@ -121,6 +121,31 @@ export const useGameState = () => {
     return normalized as string[];
   }, [getCollection, isLoaded]);
 
+  // Extract map names from Firestore documents (parallel array to maps)
+  const mapNames = useMemo(() => {
+    const docs = getStableCollection<Record<string, unknown>>('maps');
+    return (docs || [])
+      .filter((m) => {
+        const img = typeof m === 'string' ? m : (m?.image as string) || (m?.imageUrl as string) || (m?.url as string) || (m?.value as string) || '';
+        return !!img;
+      })
+      .map((m) => (m?.name as string) || '');
+  }, [getCollection, isLoaded]);
+
+  // Update a map's name in Firestore by its positional index
+  const updateMapName = async (index: number, name: string) => {
+    const docs = getCollection('maps') as Record<string, unknown>[];
+    // Filter to non-empty docs (same filtering as maps useMemo)
+    const nonEmptyDocs = (docs || []).filter((m) => {
+      const img = typeof m === 'string' ? m : (m?.image as string) || (m?.imageUrl as string) || (m?.url as string) || (m?.value as string) || '';
+      return !!img;
+    });
+    const doc = nonEmptyDocs[index];
+    if (doc?.id) {
+      await updateItem('maps', doc.id as string, { name } as Record<string, unknown>);
+    }
+  };
+
   const episodes = useMemo(() => {
     return getStableCollection<Episode>('episodes');
   }, [getCollection, isLoaded]);
@@ -995,6 +1020,8 @@ export const useGameState = () => {
     mobs,
     setMobs,
     maps,
+    mapNames,
+    updateMapName,
     setMaps,
     cleanupEmptyMaps,
     episodes,
