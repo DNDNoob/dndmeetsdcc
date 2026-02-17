@@ -407,6 +407,14 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   const lastBoxBroadcastTime = useRef<number>(0);
   const pendingBoxBroadcast = useRef<MapBoxData[] | null>(null);
 
+  // Natural image dimensions for responsive sizing (no black bars)
+  const [naturalImageSize, setNaturalImageSize] = useState<{ width: number; height: number } | null>(null);
+  const [containerSize, setContainerSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+
+  // Selected map entity for keyboard/right-click delete
+  const [selectedMapEntity, setSelectedMapEntity] = useState<{ type: 'episode-mob' | 'runtime-mob' | 'crawler'; index: number } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; type: 'episode-mob' | 'runtime-mob' | 'crawler'; index: number } | null>(null);
+
   // Crawler and Mob placement state (DM can add during ShowTime)
   const [crawlerPlacements, setCrawlerPlacements] = useState<CrawlerPlacement[]>([]);
   const [runtimeMobPlacements, setRuntimeMobPlacements] = useState<EpisodeMobPlacement[]>([]);
@@ -577,6 +585,40 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   // Fixed zoom limits - 1% minimum so users can always zoom out on any scale
   const zoomMin = 1;
   const zoomMax = 500;
+
+  // Track map container size for responsive image sizing (no black bars)
+  useEffect(() => {
+    if (!mapContainerRef.current) return;
+    const ro = new ResizeObserver(entries => {
+      const { width, height } = entries[0].contentRect;
+      setContainerSize({ width, height });
+    });
+    ro.observe(mapContainerRef.current);
+    return () => ro.disconnect();
+  }, []);
+
+  // Calculate image display dimensions to fill container without black bars
+  const mapDisplaySize = useMemo(() => {
+    if (!naturalImageSize || !containerSize.width || !containerSize.height) return null;
+    const cw = containerSize.width;
+    const ch = containerSize.height;
+    const aspectRatio = naturalImageSize.width / naturalImageSize.height;
+    // Fit image to container (contain mode)
+    let h = ch;
+    let w = h * aspectRatio;
+    if (w > cw) {
+      w = cw;
+      h = w / aspectRatio;
+    }
+    return { width: Math.round(w), height: Math.round(h) };
+  }, [naturalImageSize, containerSize]);
+
+  // Update mapImageDimensions when display size changes (container resize)
+  useEffect(() => {
+    if (mapDisplaySize && naturalImageSize) {
+      setMapImageDimensions(mapDisplaySize);
+    }
+  }, [mapDisplaySize, naturalImageSize]);
 
   // Check if a point is visible (not completely obscured by fog)
   const isPointVisible = useCallback((x: number, y: number): boolean => {
@@ -1275,6 +1317,56 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     broadcastRuntimeMobPlacements(updated);
   }, [runtimeMobPlacements, broadcastRuntimeMobPlacements]);
 
+  // Handle removing an episode mob from the map (persists to episode)
+  const handleRemoveEpisodeMob = useCallback((globalIndex: number) => {
+    if (!selectedEpisode || !onUpdateEpisode) return;
+    const updated = selectedEpisode.mobPlacements.filter((_, i) => i !== globalIndex);
+    const updatedEpisode = { ...selectedEpisode, mobPlacements: updated };
+    setSelectedEpisode(updatedEpisode);
+    onUpdateEpisode(selectedEpisode.id, { mobPlacements: updated });
+  }, [selectedEpisode, onUpdateEpisode]);
+
+  // Handle delete for selected map entity (Delete key or context menu)
+  const handleDeleteSelectedEntity = useCallback(() => {
+    if (!isAdmin || !selectedMapEntity) return;
+    if (selectedMapEntity.type === 'episode-mob') {
+      handleRemoveEpisodeMob(selectedMapEntity.index);
+    } else if (selectedMapEntity.type === 'runtime-mob') {
+      handleRemoveRuntimeMob(selectedMapEntity.index);
+    } else if (selectedMapEntity.type === 'crawler') {
+      handleRemoveCrawlerFromMap(selectedMapEntity.index);
+    }
+    setSelectedMapEntity(null);
+    setContextMenu(null);
+  }, [isAdmin, selectedMapEntity, handleRemoveEpisodeMob, handleRemoveRuntimeMob, handleRemoveCrawlerFromMap]);
+
+  // Keyboard listener for Delete/Backspace to remove selected entity
+  useEffect(() => {
+    if (!selectedMap || !isAdmin) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedMapEntity) {
+          e.preventDefault();
+          handleDeleteSelectedEntity();
+        }
+      }
+      if (e.key === 'Escape') {
+        setSelectedMapEntity(null);
+        setContextMenu(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedMap, isAdmin, selectedMapEntity, handleDeleteSelectedEntity]);
+
+  // Close context menu on click anywhere
+  useEffect(() => {
+    if (!contextMenu) return;
+    const handleClick = () => setContextMenu(null);
+    window.addEventListener('click', handleClick);
+    return () => window.removeEventListener('click', handleClick);
+  }, [contextMenu]);
+
   // Handle map click for ping/box/crawlers/mobs
   const handleMapClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (!mapImageRef.current) return;
@@ -1333,13 +1425,16 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      if (e.deltaY < 0) {
-        // Scroll up = zoom in
-        setMapScale(prev => Math.min(prev + 2, zoomMax));
-      } else {
-        // Scroll down = zoom out
-        setMapScale(prev => Math.max(prev - 2, zoomMin));
-      }
+      // Proportional zoom: step scales with current zoom level for smooth feel
+      // At 100% → step ~3, at 50% → step ~1.5, at 200% → step ~6
+      setMapScale(prev => {
+        const step = Math.max(1, prev * 0.03);
+        if (e.deltaY < 0) {
+          return Math.min(prev + step, zoomMax);
+        } else {
+          return Math.max(prev - step, zoomMin);
+        }
+      });
     };
 
     // Prevent page scroll and apply zoom globally
@@ -1786,6 +1881,91 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     }
   };
 
+  // Touch event handlers for mobile support
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (isPingMode || isBoxMode || isRulerMode || isAddCrawlerMode || isAddMobMode || fogEraserActive || fogPaintActive) return;
+    if ((e.target as HTMLElement).closest('button, [data-draggable]')) return;
+    if (e.touches.length !== 1) return; // Only handle single touch for panning
+
+    const touch = e.touches[0];
+    setIsPanning(true);
+    setPanStart({
+      x: touch.clientX,
+      y: touch.clientY,
+      panX: panOffset.x,
+      panY: panOffset.y,
+    });
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length !== 1) return;
+    const touch = e.touches[0];
+
+    // Handle panning
+    if (isPanning && panStart) {
+      e.preventDefault(); // Prevent page scroll while panning
+      const dx = touch.clientX - panStart.x;
+      const dy = touch.clientY - panStart.y;
+      setPanOffset({
+        x: panStart.panX + dx,
+        y: panStart.panY + dy,
+      });
+    }
+
+    // Handle runtime crawler/mob dragging
+    if (draggingRuntimeId && mapImageRef.current) {
+      e.preventDefault();
+      const rect = mapImageRef.current.getBoundingClientRect();
+      const rawX = ((touch.clientX - rect.left) / rect.width) * 100;
+      const rawY = ((touch.clientY - rect.top) / rect.height) * 100;
+      const x = Math.max(0, Math.min(100, rawX));
+      const y = Math.max(0, Math.min(100, rawY));
+
+      if (draggingRuntimeId.startsWith('crawler-')) {
+        const index = parseInt(draggingRuntimeId.split('-')[1], 10);
+        handleRuntimeCrawlerDrag(index, x, y);
+      } else if (draggingRuntimeId.startsWith('mob-')) {
+        const index = parseInt(draggingRuntimeId.split('-')[1], 10);
+        handleRuntimeMobDrag(index, x, y);
+      }
+      return;
+    }
+
+    // Handle episode mob dragging
+    if (draggingMobId && mapImageRef.current && selectedEpisode) {
+      e.preventDefault();
+      const rect = mapImageRef.current.getBoundingClientRect();
+      const rawX = ((touch.clientX - rect.left) / rect.width) * 100;
+      const rawY = ((touch.clientY - rect.top) / rect.height) * 100;
+      const x = Math.max(0, Math.min(100, rawX));
+      const y = Math.max(0, Math.min(100, rawY));
+      const index = parseInt(draggingMobId.split('-').pop() || '0', 10);
+
+      setLocalDragPosition({ index, x, y });
+      pendingBroadcast.current = { index, x, y };
+
+      const now = Date.now();
+      if (now - lastBroadcastTime.current >= BROADCAST_THROTTLE_MS) {
+        lastBroadcastTime.current = now;
+        pendingBroadcast.current = null;
+        broadcastDragState(index, x, y);
+        setSelectedEpisode(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            mobPlacements: prev.mobPlacements.map((p, i) =>
+              i === index ? { ...p, x, y } : p
+            ),
+          };
+        });
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    handleMouseUp();
+  };
+
   const handleMouseUp = () => {
     // Stop panning
     if (isPanning) {
@@ -2183,7 +2363,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       {/* Map display */}
       <div
         ref={mapContainerRef}
-        className="flex-1 flex items-center justify-center p-4 select-none overflow-hidden relative"
+        className="flex-1 flex items-center justify-center p-1 select-none overflow-hidden relative"
         style={{ cursor: isPanning ? 'grabbing' : (isPingMode || isBoxMode || isRulerMode || isAddCrawlerMode || isAddMobMode) ? 'crosshair' : 'grab' }}
         onMouseDown={handlePanStart}
         onMouseMove={handleMouseMove}
@@ -2192,6 +2372,9 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
           setCursorPosition(null);
           handleMouseUp();
         }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
       >
         {/* Map interaction blocker during initiative (non-admin) - scoped to map container */}
         {combatState?.active && combatState.phase === 'initiative' && !isAdmin && (
@@ -2301,11 +2484,18 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             className="relative"
             data-map-scale-spacer
             style={{
-              // This wrapper reserves layout space based on the scaled size
-              // The actual image is 80vh tall, scaled by mapBaseScale
-              // Use 16:10 aspect ratio fallback (128vh) until image loads
-              width: mapImageDimensions ? `${mapImageDimensions.width * mapBaseScale / 100}px` : `calc(128vh * ${mapBaseScale / 100})`,
-              height: `calc(80vh * ${mapBaseScale / 100})`,
+              // Reserves layout space based on the scaled size
+              // Uses responsive dimensions computed from container size (no black bars)
+              width: mapImageDimensions
+                ? `${mapImageDimensions.width * mapBaseScale / 100}px`
+                : mapDisplaySize
+                  ? `${mapDisplaySize.width * mapBaseScale / 100}px`
+                  : `calc(80vh * 1.6 * ${mapBaseScale / 100})`,
+              height: mapImageDimensions
+                ? `${mapImageDimensions.height * mapBaseScale / 100}px`
+                : mapDisplaySize
+                  ? `${mapDisplaySize.height * mapBaseScale / 100}px`
+                  : `calc(80vh * ${mapBaseScale / 100})`,
             }}
           >
           <div
@@ -2320,15 +2510,17 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             ref={mapImageRef}
             src={selectedMap}
             alt="Current Map"
-            className="object-contain pointer-events-none border-2 border-primary shadow-[0_0_15px_rgba(0,200,255,0.5)]"
+            className="pointer-events-none border-2 border-primary shadow-[0_0_15px_rgba(0,200,255,0.5)]"
             style={{
-              height: '80vh',
-              width: 'auto',
+              // Responsive: fill container without black bars
+              height: mapDisplaySize ? `${mapDisplaySize.height}px` : '80vh',
+              width: mapDisplaySize ? `${mapDisplaySize.width}px` : 'auto',
               display: 'block',
             }}
             draggable={false}
             onLoad={(e) => {
               const img = e.currentTarget;
+              setNaturalImageSize({ width: img.naturalWidth, height: img.naturalHeight });
               setMapImageDimensions({ width: img.clientWidth, height: img.clientHeight });
             }}
           />
@@ -2399,24 +2591,43 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                   e.stopPropagation();
                   handleMobMouseDown(`${placement.mobId}-${globalIndex}`);
                 }}
+                onClick={(e) => {
+                  if (!isDragging && isAdmin) {
+                    e.stopPropagation();
+                    setSelectedMapEntity({ type: 'episode-mob', index: globalIndex });
+                    setContextMenu(null);
+                  }
+                }}
+                onContextMenu={(e) => {
+                  if (!isAdmin) return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setSelectedMapEntity({ type: 'episode-mob', index: globalIndex });
+                  setContextMenu({ x: e.clientX, y: e.clientY, type: 'episode-mob', index: globalIndex });
+                }}
+                onTouchStart={(e) => {
+                  if (!canInteract) return;
+                  e.stopPropagation();
+                  const touch = e.touches[0];
+                  handleMobMouseDown(`${placement.mobId}-${globalIndex}`);
+                  // Store touch start for drag
+                  (e.currentTarget as HTMLElement).dataset.touchStartX = String(touch.clientX);
+                  (e.currentTarget as HTMLElement).dataset.touchStartY = String(touch.clientY);
+                }}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: canInteract ? 1 : 0.5 }}
                 transition={{ opacity: { duration: 0.2 } }}
               >
-                <div className="relative">
+                <div className={`relative ${selectedMapEntity?.type === 'episode-mob' && selectedMapEntity?.index === globalIndex ? 'ring-2 ring-accent ring-offset-2 ring-offset-background rounded-full' : ''}`}>
                   <MobIcon
                     mob={mob}
                     size={64}
                     isDragging={isDragging}
                     inCombat={(() => {
-                      // Use allPlacementsMobCounts (all maps) to match PingPanel's combatId logic
+                      if (!combatState?.active || combatState.phase === 'ended') return false;
                       const totalAll = allPlacementsMobCounts[placement.mobId] ?? 0;
                       const combatId = totalAll > 1 ? `${placement.mobId}:${globalIndex}` : placement.mobId;
-                      if (combatState?.active && combatState.phase !== 'ended') {
-                        return combatState.combatants.some(c => c.id === combatId);
-                      }
-                      // Outside combat, show health bar if mob has persisted damage
-                      return placement.currentHP !== undefined;
+                      return combatState.combatants.some(c => c.id === combatId);
                     })()}
                     combatHP={(() => {
                       const totalAll = allPlacementsMobCounts[placement.mobId] ?? 0;
@@ -2425,7 +2636,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                         const combatant = combatState.combatants.find(c => c.id === combatId);
                         return combatant?.currentHP;
                       }
-                      // Outside combat, use persisted HP from episode
+                      // Outside combat, pass persisted HP (used when next combat starts)
                       return placement.currentHP;
                     })()}
                     maxHP={mob.hitPoints}
@@ -2504,13 +2715,31 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                 animate={{ opacity: canInteract ? 1 : 0.5 }}
                 transition={{ opacity: { duration: 0.2 } }}
                 onMouseDown={(e) => {
-                  // All users can move crawlers if visible
+                  if (!canInteract) return;
+                  e.stopPropagation();
+                  setDraggingRuntimeId(`crawler-${index}`);
+                }}
+                onClick={(e) => {
+                  if (!isDragging && isAdmin) {
+                    e.stopPropagation();
+                    setSelectedMapEntity({ type: 'crawler', index });
+                    setContextMenu(null);
+                  }
+                }}
+                onContextMenu={(e) => {
+                  if (!isAdmin) return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setSelectedMapEntity({ type: 'crawler', index });
+                  setContextMenu({ x: e.clientX, y: e.clientY, type: 'crawler', index });
+                }}
+                onTouchStart={(e) => {
                   if (!canInteract) return;
                   e.stopPropagation();
                   setDraggingRuntimeId(`crawler-${index}`);
                 }}
               >
-                <div className="relative">
+                <div className={`relative ${selectedMapEntity?.type === 'crawler' && selectedMapEntity?.index === index ? 'ring-2 ring-accent ring-offset-2 ring-offset-background rounded-full' : ''}`}>
                   {(() => {
                     const crawlerInv = getCrawlerInventory?.(crawler.id) ?? [];
                     const mods = getEquippedModifiers(crawler, crawlerInv);
@@ -2535,17 +2764,6 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                     <div className="absolute -top-1 -left-1 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-bold shadow-lg">
                       {letter}
                     </div>
-                  )}
-                  {isAdmin && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRemoveCrawlerFromMap(index);
-                      }}
-                      className="absolute -top-2 -right-2 w-5 h-5 bg-destructive text-white rounded-full flex items-center justify-center hover:bg-destructive/80 transition-colors z-10"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
                   )}
                   {/* Name label - shifted down to avoid overlapping health bar */}
                   {(() => {
@@ -2627,23 +2845,38 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                 animate={{ opacity: canInteract ? 1 : 0.5 }}
                 transition={{ opacity: { duration: 0.2 } }}
                 onMouseDown={(e) => {
-                  // All users can move runtime mobs if visible
+                  if (!canInteract) return;
+                  e.stopPropagation();
+                  setDraggingRuntimeId(`mob-${index}`);
+                }}
+                onClick={(e) => {
+                  if (!isDragging && isAdmin) {
+                    e.stopPropagation();
+                    setSelectedMapEntity({ type: 'runtime-mob', index });
+                    setContextMenu(null);
+                  }
+                }}
+                onContextMenu={(e) => {
+                  if (!isAdmin) return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setSelectedMapEntity({ type: 'runtime-mob', index });
+                  setContextMenu({ x: e.clientX, y: e.clientY, type: 'runtime-mob', index });
+                }}
+                onTouchStart={(e) => {
                   if (!canInteract) return;
                   e.stopPropagation();
                   setDraggingRuntimeId(`mob-${index}`);
                 }}
               >
-                <div className="relative">
+                <div className={`relative ${selectedMapEntity?.type === 'runtime-mob' && selectedMapEntity?.index === index ? 'ring-2 ring-accent ring-offset-2 ring-offset-background rounded-full' : ''}`}>
                   <MobIcon
                     mob={mob}
                     size={64}
                     isDragging={isDragging}
                     inCombat={(() => {
-                      if (combatState?.active && combatState.phase !== 'ended') {
-                        return combatState.combatants.some(c => c.id === runtimeCombatId);
-                      }
-                      // Runtime mobs also support persisted HP
-                      return placement.currentHP !== undefined;
+                      if (!combatState?.active || combatState.phase === 'ended') return false;
+                      return combatState.combatants.some(c => c.id === runtimeCombatId);
                     })()}
                     combatHP={(() => {
                       if (combatState?.active && combatState.phase !== 'ended') {
@@ -2659,17 +2892,6 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                     <div className="absolute -top-1 -left-1 w-6 h-6 bg-accent text-background rounded-full flex items-center justify-center text-sm font-bold shadow-lg">
                       {letter}
                     </div>
-                  )}
-                  {isAdmin && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRemoveRuntimeMob(index);
-                      }}
-                      className="absolute -top-2 -right-2 w-5 h-5 bg-destructive text-white rounded-full flex items-center justify-center hover:bg-destructive/80 transition-colors z-10"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
                   )}
                   {/* Name label - shifted down to avoid overlapping health bar */}
                   {(() => {
@@ -2768,6 +2990,23 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
         <div className="text-center py-4 text-muted-foreground text-sm">
           <Layers className="w-4 h-4 inline mr-2" />
           Dungeon Master is presenting: {selectedEpisode.name}
+        </div>
+      )}
+
+      {/* Right-click context menu for mob/crawler deletion */}
+      {contextMenu && isAdmin && (
+        <div
+          className="fixed z-[200] bg-background border-2 border-destructive rounded shadow-lg py-1 min-w-[140px]"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={() => handleDeleteSelectedEntity()}
+            className="w-full text-left px-4 py-2 text-sm text-destructive hover:bg-destructive/10 font-display flex items-center gap-2"
+          >
+            <Trash2 className="w-4 h-4" />
+            Delete
+          </button>
         </div>
       )}
     </motion.div>
