@@ -8,7 +8,7 @@ import RulerOverlay from "@/components/ui/RulerOverlay";
 import { MobIcon } from "@/components/ui/MobIcon";
 import { FogOfWar } from "@/components/ui/FogOfWar";
 import { Episode, Mob, MapSettings, Crawler, CrawlerPlacement, EpisodeMobPlacement, SentLootBox, LootBoxTemplate, getLootBoxTierColor, InventoryItem, CombatState, getEquippedModifiers } from "@/lib/gameData";
-import { Map as MapIcon, X, Eye, Layers, ChevronLeft, ChevronRight, PlayCircle, Grid3x3, CloudFog, Eraser, Trash2, Target, ZoomIn, ZoomOut, Package, Lock, Unlock, Search, Plus } from "lucide-react";
+import { Map as MapIcon, X, Eye, Layers, ChevronLeft, ChevronRight, PlayCircle, Grid3x3, CloudFog, Eraser, Trash2, Target, ZoomIn, ZoomOut, Package, Lock, Unlock, Search, Plus, Heart } from "lucide-react";
 import { PingEffect, Ping } from "@/components/ui/PingEffect";
 import { MapBox, MapBoxData, ShapeType } from "@/components/ui/MapBox";
 import { MapToolsMenu } from "@/components/ui/MapToolsMenu";
@@ -2994,12 +2994,42 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       )}
 
       {/* Right-click context menu for mob/crawler deletion */}
-      {contextMenu && isAdmin && (
+      {contextMenu && isAdmin && (() => {
+        // Resolve mob HP info for display
+        let mobHPInfo: { currentHP: number; maxHP: number; name: string } | null = null;
+        if (contextMenu.type === 'episode-mob') {
+          const placement = selectedEpisode?.mobPlacements[contextMenu.index];
+          if (placement) {
+            const mob = mobs.find(m => m.id === placement.mobId);
+            if (mob && mob.hitPoints) {
+              const hp = placement.currentHP ?? mob.hitPoints;
+              mobHPInfo = { currentHP: hp, maxHP: mob.hitPoints, name: mob.name };
+            }
+          }
+        } else if (contextMenu.type === 'runtime-mob') {
+          const filtered = runtimeMobPlacements.filter(p => p.mapId === currentMapId);
+          const placement = filtered[contextMenu.index];
+          if (placement) {
+            const mob = mobs.find(m => m.id === placement.mobId);
+            if (mob && mob.hitPoints) {
+              const hp = placement.currentHP ?? mob.hitPoints;
+              mobHPInfo = { currentHP: hp, maxHP: mob.hitPoints, name: mob.name };
+            }
+          }
+        }
+        const inCombat = combatState?.active && combatState.phase !== 'ended';
+        return (
         <div
           className="fixed z-[200] bg-background border-2 border-destructive rounded shadow-lg py-1 min-w-[140px]"
           style={{ left: contextMenu.x, top: contextMenu.y }}
           onClick={(e) => e.stopPropagation()}
         >
+          {mobHPInfo && !inCombat && (
+            <div className="px-4 py-2 text-sm text-muted-foreground border-b border-border flex items-center gap-2">
+              <Heart className="w-4 h-4 text-destructive" />
+              <span>{mobHPInfo.currentHP} / {mobHPInfo.maxHP} HP</span>
+            </div>
+          )}
           <button
             onClick={() => handleDeleteSelectedEntity()}
             className="w-full text-left px-4 py-2 text-sm text-destructive hover:bg-destructive/10 font-display flex items-center gap-2"
@@ -3008,7 +3038,8 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             Delete
           </button>
         </div>
-      )}
+        );
+      })()}
     </motion.div>
   );
 };
