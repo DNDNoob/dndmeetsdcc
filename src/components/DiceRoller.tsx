@@ -195,7 +195,7 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
                               <span className="text-[10px] text-muted-foreground/60">{formatTimestamp(entry.timestamp)}</span>
                               {entry.statRoll ? (
                                 <span className="text-xs">
-                                  {entry.statRoll.stat} Check: d20({entry.statRoll.rawRoll}) {entry.statRoll.modifier >= 0 ? '+' : ''}{entry.statRoll.modifier} = <span className="font-bold text-primary">{entry.total}</span>
+                                  {entry.statRoll.stat} {entry.statRoll.rollType || 'Check'}: {entry.statRoll.diceLabel || 'd20'}({entry.statRoll.rawRoll}) {entry.statRoll.modifier >= 0 ? '+' : ''}{entry.statRoll.modifier} = <span className="font-bold text-primary">{entry.total}</span>
                                 </span>
                               ) : (
                                 <span className="text-xs">{entry.results.map(r => r.dice).join(', ')} — Total: <span className="font-bold text-primary">{entry.total}</span></span>

@@ -27,7 +27,7 @@ export interface DiceRollEntry {
   timestamp: number;
   results: { dice: string; result: number }[];
   total: number;
-  statRoll?: { stat: string; modifier: number; rawRoll: number };
+  statRoll?: { stat: string; modifier: number; rawRoll: number; diceLabel?: string; rollType?: string };
   // For loot box notifications
   lootBoxNotification?: {
     boxName: string;

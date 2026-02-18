@@ -1888,7 +1888,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                     timestamp: Date.now(),
                     results: [{ dice: 'D20', result: rawRoll }],
                     total: rollTotal,
-                    statRoll: { stat: `${attackName} (Attack)`, modifier, rawRoll },
+                    statRoll: { stat: `${attackName} (Attack)`, modifier, rawRoll, rollType: 'Attack roll' },
                   });
                 }
 
@@ -1944,7 +1944,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                     timestamp: Date.now(),
                     results,
                     total: rollTotal,
-                    statRoll: { stat: `${weapon.name} (Attack)`, modifier: hitDieResult + hitStatMod, rawRoll },
+                    statRoll: { stat: `${weapon.name} (Attack)`, modifier: hitDieResult + hitStatMod, rawRoll, rollType: 'Attack roll' },
                   });
                 }
 
@@ -1968,17 +1968,18 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 let totalDamage = 0;
                 const results: { dice: string; result: number }[] = [];
 
+                // Break out individual die results
                 for (const die of wd.damageDice) {
-                  let dieTotal = 0;
                   for (let i = 0; i < die.count; i++) {
-                    dieTotal += Math.floor(Math.random() * die.sides) + 1;
+                    const roll = Math.floor(Math.random() * die.sides) + 1;
+                    results.push({ dice: `d${die.sides}`, result: roll });
+                    totalDamage += roll;
                   }
-                  results.push({ dice: `${die.count}d${die.sides}`, result: dieTotal });
-                  totalDamage += dieTotal;
                 }
 
                 const dmgStatMod = calcWeaponStatMod(wd.damageModifiers);
                 totalDamage += dmgStatMod;
+                const diceLabel = formatDice(wd.damageDice);
 
                 if (addDiceRoll) {
                   addDiceRoll({
@@ -1988,7 +1989,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                     timestamp: Date.now(),
                     results,
                     total: totalDamage,
-                    statRoll: { stat: `${weapon.name} (${wd.damageType} Damage)`, modifier: dmgStatMod, rawRoll: totalDamage - dmgStatMod },
+                    statRoll: { stat: `${weapon.name} (${wd.damageType} Damage)`, modifier: dmgStatMod, rawRoll: totalDamage - dmgStatMod, diceLabel, rollType: 'Damage' },
                   });
                 }
               };
@@ -2415,7 +2416,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
               timestamp: Date.now(),
               results,
               total: rollTotal,
-              statRoll: { stat: `${weapon.name} (Attack${adv ? ` - ${adv}` : ''})`, modifier: hitDieResult + hitStatMod, rawRoll },
+              statRoll: { stat: `${weapon.name} (Attack${adv ? ` - ${adv}` : ''})`, modifier: hitDieResult + hitStatMod, rawRoll, rollType: 'Attack roll' },
             });
           }
 
@@ -2430,16 +2431,17 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             // Outside combat: auto-roll damage alongside attack for convenience
             let totalDamage = 0;
             const dmgResults: { dice: string; result: number }[] = [];
+            // Break out individual die results
             for (const die of wd.damageDice) {
-              let dieTotal = 0;
               for (let i = 0; i < die.count; i++) {
-                dieTotal += Math.floor(Math.random() * die.sides) + 1;
+                const roll = Math.floor(Math.random() * die.sides) + 1;
+                dmgResults.push({ dice: `d${die.sides}`, result: roll });
+                totalDamage += roll;
               }
-              dmgResults.push({ dice: `${die.count}d${die.sides}`, result: dieTotal });
-              totalDamage += dieTotal;
             }
             const dmgStatMod = calcMod(wd.damageModifiers);
             totalDamage += dmgStatMod;
+            const dmgDiceLabel = wd.damageDice.map(d => `${d.count}d${d.sides}`).join(' + ');
             if (addDiceRoll) {
               addDiceRoll({
                 id: crypto.randomUUID(),
@@ -2448,7 +2450,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 timestamp: Date.now(),
                 results: dmgResults,
                 total: totalDamage,
-                statRoll: { stat: `${weapon.name} (${wd.damageType} Damage)`, modifier: dmgStatMod, rawRoll: totalDamage - dmgStatMod },
+                statRoll: { stat: `${weapon.name} (${wd.damageType} Damage)`, modifier: dmgStatMod, rawRoll: totalDamage - dmgStatMod, diceLabel: dmgDiceLabel, rollType: 'Damage' },
               });
             }
           }
@@ -2768,18 +2770,18 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                           if (match) {
                             const count = parseInt(match[1] || '1');
                             const sides = parseInt(match[2]);
-                            let dieTotal = 0;
+                            // Break out individual die results
                             for (let i = 0; i < count; i++) {
-                              dieTotal += Math.floor(Math.random() * sides) + 1;
+                              const roll = Math.floor(Math.random() * sides) + 1;
+                              results.push({ dice: `d${sides}`, result: roll });
+                              totalRoll += roll;
                             }
-                            results.push({ dice: `${count}d${sides}`.toUpperCase(), result: dieTotal });
-                            totalRoll += dieTotal;
                           } else {
                             // Fallback for simple dice like "d6"
                             const simpleMatch = part.trim().match(/^d(\d+)$/i);
                             const sides = simpleMatch ? parseInt(simpleMatch[1]) : 4;
                             const roll = Math.floor(Math.random() * sides) + 1;
-                            results.push({ dice: `D${sides}`, result: roll });
+                            results.push({ dice: `d${sides}`, result: roll });
                             totalRoll += roll;
                           }
                         }
@@ -2798,7 +2800,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                             timestamp: Date.now(),
                             results,
                             total: totalDmg,
-                            statRoll: { stat: `${pendingDamageRoll.actionName} (Damage → ${targetLabel})`, modifier: pendingDamageRoll.bonus, rawRoll: totalRoll },
+                            statRoll: { stat: `${pendingDamageRoll.actionName} (Damage → ${targetLabel})`, modifier: pendingDamageRoll.bonus, rawRoll: totalRoll, diceLabel: pendingDamageRoll.dice, rollType: 'Damage' },
                           });
                         }
                       }}
