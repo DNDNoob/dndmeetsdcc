@@ -612,6 +612,16 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                           )}
                         </div>
 
+                        {/* Splash Damage */}
+                        <div>
+                          <label className="flex items-center gap-2 text-xs cursor-pointer">
+                            <input type="checkbox" checked={wd.splashDamage ?? false}
+                              onChange={(e) => updateWD({ splashDamage: e.target.checked || undefined })}
+                              className="w-4 h-4" />
+                            <span className="text-muted-foreground">Splash Damage (targets multiple enemies)</span>
+                          </label>
+                        </div>
+
                         {/* Special Effects */}
                         <div>
                           <label className="text-[10px] text-muted-foreground block mb-0.5">Special Effects (optional)</label>
