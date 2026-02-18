@@ -87,6 +87,16 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   onUpdateSharedInventory,
 }) => {
   const [editMode, setEditMode] = useState(false);
+  // Expanded item details state
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const toggleItemExpanded = (key: string) => {
+    setExpandedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
   // Individual item editing state
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -766,7 +776,17 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                                         x{consolidated.count}
                                       </span>
                                     )}
-                                    <span className="text-foreground">{item.name}</span>
+                                    <button
+                                      onClick={() => toggleItemExpanded(`${crawler.id}:${item.id}`)}
+                                      className="text-foreground hover:text-primary transition-colors text-left flex items-center gap-1"
+                                    >
+                                      {item.name}
+                                      {(item.description || item.statModifiers || item.weaponData || item.tags) && (
+                                        expandedItems.has(`${crawler.id}:${item.id}`)
+                                          ? <ChevronUp className="w-3 h-3 text-muted-foreground" />
+                                          : <ChevronDown className="w-3 h-3 text-muted-foreground" />
+                                      )}
+                                    </button>
                                     {item.equipSlot && (
                                       <span className="text-xs bg-accent/20 text-accent px-2 py-0.5 rounded">
                                         {item.equipSlot === 'weapon' ? 'Weapon' :
@@ -782,8 +802,81 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                                       </span>
                                     )}
                                   </div>
-                                  {item.description && (
+                                  {!expandedItems.has(`${crawler.id}:${item.id}`) && item.description && (
                                     <span className="text-muted-foreground text-xs">({item.description})</span>
+                                  )}
+                                  {expandedItems.has(`${crawler.id}:${item.id}`) && (
+                                    <div className="mt-2 space-y-1.5 text-xs border-l-2 border-primary/30 pl-3">
+                                      {item.description && (
+                                        <div>
+                                          <span className="text-muted-foreground">Description: </span>
+                                          <span className="text-foreground">{item.description}</span>
+                                        </div>
+                                      )}
+                                      {item.goldValue !== undefined && item.goldValue > 0 && (
+                                        <div>
+                                          <span className="text-muted-foreground">Value: </span>
+                                          <span className="text-accent">{item.goldValue}G</span>
+                                        </div>
+                                      )}
+                                      {item.equipSlot && (
+                                        <div>
+                                          <span className="text-muted-foreground">Slot: </span>
+                                          <span className="text-foreground">
+                                            {item.equipSlot === 'weapon' ? 'Weapon' :
+                                             item.equipSlot === 'leftHand' ? 'Left Hand' :
+                                             item.equipSlot === 'rightHand' ? 'Right Hand' :
+                                             item.equipSlot === 'ringFinger' ? 'Ring' :
+                                             item.equipSlot.charAt(0).toUpperCase() + item.equipSlot.slice(1)}
+                                          </span>
+                                        </div>
+                                      )}
+                                      {item.tags && item.tags.length > 0 && (
+                                        <div className="flex items-center gap-1 flex-wrap">
+                                          <span className="text-muted-foreground">Tags: </span>
+                                          {item.tags.map(tag => (
+                                            <span key={tag} className="bg-primary/10 text-primary px-1.5 py-0.5 rounded text-[10px]">{tag}</span>
+                                          ))}
+                                        </div>
+                                      )}
+                                      {item.statModifiers && Object.keys(item.statModifiers).length > 0 && (
+                                        <div>
+                                          <span className="text-muted-foreground">Stat Modifiers: </span>
+                                          <div className="flex flex-wrap gap-1 mt-0.5">
+                                            {Object.entries(item.statModifiers).filter(([,v]) => v !== 0).map(([stat, val]) => (
+                                              <span key={stat} className={`px-1.5 py-0.5 rounded ${(val as number) > 0 ? 'text-green-400 bg-green-400/10' : 'text-red-400 bg-red-400/10'}`}>
+                                                {stat.toUpperCase()} {(val as number) > 0 ? '+' : ''}{val}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                      {item.weaponData && (
+                                        <div className="border border-destructive/20 bg-destructive/5 p-2 rounded space-y-1">
+                                          <span className="text-destructive font-display text-[10px]">WEAPON DATA</span>
+                                          <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
+                                            <div><span className="text-muted-foreground">Type: </span><span>{item.weaponData.weaponType}</span></div>
+                                            <div><span className="text-muted-foreground">Damage: </span><span className="text-destructive">{item.weaponData.damageType}</span></div>
+                                            <div><span className="text-muted-foreground">Dice: </span><span>{item.weaponData.damageDice.map(d => `${d.count}d${d.sides}`).join(' + ')}</span></div>
+                                            <div><span className="text-muted-foreground">Range: </span><span>{item.weaponData.isRanged ? `${item.weaponData.normalRange ?? '?'}/${item.weaponData.maxRange ?? '?'} ft` : 'Melee'}</span></div>
+                                            {item.weaponData.hitDie && (
+                                              <div><span className="text-muted-foreground">Hit Die: </span><span>{item.weaponData.hitDie.count}d{item.weaponData.hitDie.sides}</span></div>
+                                            )}
+                                            {item.weaponData.splashDamage && (
+                                              <div><span className="text-muted-foreground">Splash: </span><span className="text-accent">Yes</span></div>
+                                            )}
+                                          </div>
+                                          {item.weaponData.specialEffect && (
+                                            <div className="mt-1"><span className="text-muted-foreground">Special: </span><span className="text-accent italic">{item.weaponData.specialEffect}</span></div>
+                                          )}
+                                        </div>
+                                      )}
+                                      {item.isUpgraded && (
+                                        <div>
+                                          <span className="text-accent text-[10px] font-display">UPGRADED</span>
+                                        </div>
+                                      )}
+                                    </div>
                                   )}
                                 </div>
                               )}
