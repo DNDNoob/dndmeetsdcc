@@ -90,6 +90,8 @@ const Index = () => {
   const [activeEpisode, setActiveEpisode] = useState<Episode | null>(null);
   const [runtimeCrawlerPlacements, setRuntimeCrawlerPlacements] = useState<CrawlerPlacement[]>([]);
   const [runtimeMobPlacements, setRuntimeMobPlacements] = useState<EpisodeMobPlacement[]>([]);
+  const [isGameActive, setIsGameActive] = useState(false);
+  const setGameActiveRef = useRef<((active: boolean) => Promise<void>) | null>(null);
 
   const [previousPlayer, setPreviousPlayer] = useState<{
     id: string;
@@ -313,6 +315,25 @@ const Index = () => {
     prevLootBoxes.current = lootBoxes;
   }, [lootBoxes, currentPlayer]);
 
+  // Game start/stop notifications for players (detect system dice roll messages)
+  const seenSystemRollIds = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!currentPlayer || currentPlayer.type === 'ai') return;
+    const systemRolls = diceRolls.filter(r => r.crawlerId === '__system__' && r.lootBoxNotification);
+    // Initialize seen on first load
+    if (seenSystemRollIds.current.size === 0 && systemRolls.length > 0) {
+      systemRolls.forEach(r => seenSystemRollIds.current.add(r.id));
+      return;
+    }
+    for (const roll of systemRolls) {
+      if (!seenSystemRollIds.current.has(roll.id)) {
+        seenSystemRollIds.current.add(roll.id);
+        const isStart = roll.lootBoxNotification!.tier === 'Gold';
+        toast(roll.lootBoxNotification!.boxName, { icon: isStart ? '⚔️' : '🏁', duration: Infinity });
+      }
+    }
+  }, [diceRolls, currentPlayer]);
+
   // Filter combat state to only show for the matching episode
   // Must be before the early return to maintain consistent hook order
   const activeCombatState = useMemo(() => {
@@ -370,6 +391,10 @@ const Index = () => {
             playerType={currentPlayer.type}
             autoCollapse={currentView === "showtime"}
             onVisibilityChange={setIsNavVisible}
+            crawlers={crawlers}
+            onSwitchPlayer={(id, name, type) => {
+              setCurrentPlayer({ id, name, type });
+            }}
           />
 
           <main className="pb-16 sm:pb-12">
@@ -477,6 +502,8 @@ const Index = () => {
                   setRuntimeCrawlerPlacements(cp);
                   setRuntimeMobPlacements(mp);
                 }}
+                onGameActiveChange={(active) => setIsGameActive(active)}
+                onRegisterGameToggle={(fn) => { setGameActiveRef.current = fn; }}
                 getCrawlerInventory={getCrawlerInventory}
                 onUpdateCrawlerInventory={updateCrawlerInventory}
                 getSharedInventory={getSharedInventory}
@@ -502,6 +529,33 @@ const Index = () => {
               isAdmin={isAdmin}
               noncombatTurnState={noncombatTurnState}
               onStartNoncombatTurn={() => startNoncombatTurn()}
+              isGameActive={isGameActive}
+              onToggleGameActive={async (active) => {
+                if (setGameActiveRef.current) {
+                  await setGameActiveRef.current(active);
+                }
+                setIsGameActive(active);
+                // Push dice roll notification
+                const entry: DiceRollEntry = {
+                  id: crypto.randomUUID(),
+                  crawlerName: 'SYSTEM',
+                  crawlerId: '__system__',
+                  timestamp: Date.now(),
+                  results: [],
+                  total: 0,
+                  lootBoxNotification: {
+                    boxName: active
+                      ? `${activeEpisode?.name ?? 'Episode'} has begun!`
+                      : `${activeEpisode?.name ?? 'Episode'} has ended.`,
+                    tier: active ? 'Gold' : 'Dirt',
+                    recipientNames: active ? ['The adventure awaits...'] : ['The adventure is over.'],
+                  },
+                };
+                await addDiceRoll(entry);
+                if (active) {
+                  toast(`${activeEpisode?.name ?? 'Episode'} has started!`, { icon: '⚔️', duration: Infinity });
+                }
+              }}
               crawlers={crawlers}
               mobs={mobs}
               gameClockState={gameClockState}

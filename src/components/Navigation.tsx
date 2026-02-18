@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DungeonButton } from "./ui/DungeonButton";
-import { Home, User, Map, Backpack, Skull, Presentation, Volume2, FileText, Brain, Pin, PinOff } from "lucide-react";
+import { Home, User, Map, Backpack, Skull, Presentation, Volume2, FileText, Brain, Pin, PinOff, ChevronDown } from "lucide-react";
+import { Crawler } from "@/lib/gameData";
 
 interface NavigationProps {
   onNavigate: (view: string) => void;
@@ -12,6 +13,8 @@ interface NavigationProps {
   playerType: "crawler" | "ai" | "npc";
   autoCollapse?: boolean; // Whether navigation should auto-collapse
   onVisibilityChange?: (visible: boolean) => void; // Called when nav visibility changes
+  crawlers?: Crawler[];
+  onSwitchPlayer?: (playerId: string, playerName: string, playerType: "crawler" | "ai" | "npc") => void;
 }
 
 const navItems = [
@@ -30,9 +33,13 @@ const Navigation: React.FC<NavigationProps> = ({
   playerType,
   autoCollapse = false,
   onVisibilityChange,
+  crawlers,
+  onSwitchPlayer,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
+  const [showPlayerDropdown, setShowPlayerDropdown] = useState(false);
+  const playerDropdownRef = useRef<HTMLDivElement>(null);
 
   const getPlayerColor = () => {
     if (playerType === "ai") return "text-accent text-glow-gold";
@@ -41,6 +48,18 @@ const Navigation: React.FC<NavigationProps> = ({
   };
 
   const shouldCollapse = autoCollapse && !isPinned && !isHovered;
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!showPlayerDropdown) return;
+    const handleClick = (e: MouseEvent) => {
+      if (playerDropdownRef.current && !playerDropdownRef.current.contains(e.target as Node)) {
+        setShowPlayerDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showPlayerDropdown]);
 
   // Notify parent of visibility changes
   useEffect(() => {
@@ -70,11 +89,66 @@ const Navigation: React.FC<NavigationProps> = ({
       >
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <User className="w-4 h-4 text-muted-foreground" />
-            <span className={`text-xs md:text-sm font-display ${getPlayerColor()}`}>
-              {playerType === "ai" ? "DUNGEON AI" : playerName}
-            </span>
+          <div className="relative" ref={playerDropdownRef}>
+            <button
+              onClick={() => onSwitchPlayer && setShowPlayerDropdown(!showPlayerDropdown)}
+              className={`flex items-center gap-1.5 hover:opacity-80 transition-opacity ${onSwitchPlayer ? 'cursor-pointer' : 'cursor-default'}`}
+            >
+              <User className="w-4 h-4 text-muted-foreground" />
+              <span className={`text-xs md:text-sm font-display ${getPlayerColor()}`}>
+                {playerType === "ai" ? "DUNGEON AI" : playerName}
+              </span>
+              {onSwitchPlayer && <ChevronDown className={`w-3 h-3 text-muted-foreground transition-transform ${showPlayerDropdown ? 'rotate-180' : ''}`} />}
+            </button>
+            <AnimatePresence>
+              {showPlayerDropdown && onSwitchPlayer && (
+                <motion.div
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  className="absolute top-full left-0 mt-1 w-56 bg-background border-2 border-primary shadow-lg shadow-primary/20 z-[70] max-h-64 overflow-y-auto"
+                  style={{ scrollbarWidth: 'none' }}
+                >
+                  <div className="py-1">
+                    <div className="px-3 py-1 text-[10px] text-muted-foreground font-display">CRAWLERS</div>
+                    {(crawlers ?? []).filter(c => c.id !== 'dungeonai').map(c => (
+                      <button
+                        key={c.id}
+                        onClick={() => {
+                          onSwitchPlayer(c.id, c.name, 'crawler');
+                          setShowPlayerDropdown(false);
+                        }}
+                        className={`w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 hover:bg-primary/10 transition-colors ${
+                          playerType === 'crawler' && playerName === c.name ? 'text-primary bg-primary/5' : 'text-foreground'
+                        }`}
+                      >
+                        {c.avatar ? (
+                          <img src={c.avatar} alt="" className="w-5 h-5 rounded-full object-cover" />
+                        ) : (
+                          <User className="w-4 h-4 text-muted-foreground" />
+                        )}
+                        <span>{c.name}</span>
+                        <span className="text-muted-foreground ml-auto text-[10px]">Lvl {c.level}</span>
+                      </button>
+                    ))}
+                    <div className="border-t border-border my-1" />
+                    <div className="px-3 py-1 text-[10px] text-muted-foreground font-display">SPECTATORS</div>
+                    <button
+                      onClick={() => {
+                        onSwitchPlayer('npc', 'Just a Boring NPC', 'npc');
+                        setShowPlayerDropdown(false);
+                      }}
+                      className={`w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 hover:bg-primary/10 transition-colors ${
+                        playerType === 'npc' ? 'text-muted-foreground bg-primary/5' : 'text-foreground'
+                      }`}
+                    >
+                      <User className="w-4 h-4 text-muted-foreground" />
+                      <span>Just a Boring NPC</span>
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
           <div className="flex items-center gap-2">
             {autoCollapse && (

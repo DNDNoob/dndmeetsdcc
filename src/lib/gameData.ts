@@ -104,6 +104,7 @@ export interface Mob {
   hideHitPoints?: boolean;
   defaultInventory?: InventoryItem[]; // Default items this mob type carries
   defaultGold?: number; // Default gold this mob type carries
+  equippedItems?: EquippedItems; // Equipment mapping (slot → item ID)
 }
 
 export interface EpisodeMobPlacement {

@@ -1,11 +1,11 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import MapMobPlacementEditor from "@/components/ui/MapMobPlacementEditor";
 import MapDesignerPopout from "@/components/ui/MapDesignerPopout";
-import { Mob, Episode, EpisodeMobPlacement, Crawler, CrawlerPlacement, InventoryItem, LootBoxTemplate, LootBoxTier, getLootBoxTierColor } from "@/lib/gameData";
-import { Brain, Upload, Plus, Trash2, Map, Skull, Image as ImageIcon, Save, Edit2, X, Layers, ChevronLeft, ChevronRight, User, Package, Search, Maximize2 } from "lucide-react";
+import { Mob, Episode, EpisodeMobPlacement, Crawler, CrawlerPlacement, InventoryItem, LootBoxTemplate, LootBoxTier, getLootBoxTierColor, type EquipmentSlot, type EquippedItems } from "@/lib/gameData";
+import { Brain, Upload, Plus, Trash2, Map, Skull, Image as ImageIcon, Save, Edit2, X, Layers, ChevronLeft, ChevronRight, User, Package, Search, Maximize2, Shield, ChevronDown as ChevronDownIcon } from "lucide-react";
 import { storage } from "@/lib/firebase";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 
@@ -65,6 +65,8 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   const [editingMobId, setEditingMobId] = useState<string | null>(null);
   const [editedMobData, setEditedMobData] = useState<Mob | null>(null);
   const [mobDefaultInvSearch, setMobDefaultInvSearch] = useState('');
+  const [expandedMobItems, setExpandedMobItems] = useState<Set<string>>(new Set());
+  const [mobItemContextMenu, setMobItemContextMenu] = useState<{ x: number; y: number; itemIdx: number; item: InventoryItem } | null>(null);
   const [editingMapIndex, setEditingMapIndex] = useState<number | null>(null);
   const [editingMapName, setEditingMapName] = useState<string>('');
 
@@ -93,6 +95,36 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   const [lootBoxItemQuantity, setLootBoxItemQuantity] = useState(1);
   const [newLootBoxGold, setNewLootBoxGold] = useState(0);
   const [editingLootBoxId, setEditingLootBoxId] = useState<string | null>(null);
+
+  // Close mob item context menu on outside click
+  useEffect(() => {
+    if (!mobItemContextMenu) return;
+    const close = () => setMobItemContextMenu(null);
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [mobItemContextMenu]);
+
+  // Helper: check if a mob inventory item is equipped
+  const isMobItemEquipped = (equippedItems: EquippedItems | undefined, itemId: string): EquipmentSlot | null => {
+    if (!equippedItems) return null;
+    for (const [slot, eqId] of Object.entries(equippedItems)) {
+      if (eqId === itemId) return slot as EquipmentSlot;
+    }
+    return null;
+  };
+
+  // Helper: toggle equip for a mob inventory item
+  const toggleMobItemEquip = (item: InventoryItem) => {
+    if (!editedMobData || !item.equipSlot) return;
+    const equipped = { ...(editedMobData.equippedItems ?? {}) };
+    const currentSlot = isMobItemEquipped(equipped, item.id);
+    if (currentSlot) {
+      delete equipped[currentSlot];
+    } else {
+      equipped[item.equipSlot] = item.id;
+    }
+    setEditedMobData(prev => prev ? { ...prev, equippedItems: Object.keys(equipped).length > 0 ? equipped : undefined } : prev);
+  };
 
   const handleAddMob = async () => {
     if (!newMob.name?.trim()) return;
@@ -925,28 +957,159 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                                 })()}
                                 {/* Current mob inventory */}
                                 {mobItems.length > 0 ? (
-                                  <div className="space-y-1 max-h-32 overflow-y-auto">
-                                    {mobItems.map((item, idx) => (
-                                      <div key={`${item.id}-${idx}`} className="flex items-center justify-between bg-muted/30 border border-border rounded px-2 py-1">
-                                        <div className="min-w-0">
-                                          <span className="text-xs font-display text-primary block truncate">{item.name}</span>
-                                          {item.equipSlot && <span className="text-[10px] text-accent">{item.equipSlot}</span>}
-                                          {item.goldValue ? <span className="text-[10px] text-accent ml-1">{item.goldValue}g</span> : null}
-                                        </div>
-                                        <button
-                                          onClick={() => {
-                                            const updated = mobItems.filter((_, i) => i !== idx);
-                                            setEditedMobData(prev => prev ? { ...prev, defaultInventory: updated.length > 0 ? updated : undefined } : prev);
+                                  <div className="space-y-1 max-h-64 overflow-y-auto">
+                                    {mobItems.map((item, idx) => {
+                                      const equippedSlot = isMobItemEquipped(editedMob.equippedItems, item.id);
+                                      const isExpanded = expandedMobItems.has(`${editedMob.id}-${idx}`);
+                                      return (
+                                        <div
+                                          key={`${item.id}-${idx}`}
+                                          className={`bg-muted/30 border rounded px-2 py-1 ${equippedSlot ? 'border-accent bg-accent/10' : 'border-border'}`}
+                                          onDoubleClick={() => {
+                                            if (item.equipSlot) toggleMobItemEquip(item);
                                           }}
-                                          className="p-0.5 hover:bg-destructive/10 rounded shrink-0 ml-2"
+                                          onContextMenu={(e) => {
+                                            e.preventDefault();
+                                            setMobItemContextMenu({ x: e.clientX, y: e.clientY, itemIdx: idx, item });
+                                          }}
                                         >
-                                          <Trash2 className="w-3 h-3 text-destructive" />
-                                        </button>
-                                      </div>
-                                    ))}
+                                          <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                              {equippedSlot && <Shield className="w-3 h-3 text-accent shrink-0" />}
+                                              <span className={`text-xs font-display block truncate ${equippedSlot ? 'text-accent' : 'text-primary'}`}>{item.name}</span>
+                                              {item.equipSlot && <span className="text-[10px] text-muted-foreground shrink-0">({item.equipSlot})</span>}
+                                              {equippedSlot && <span className="text-[10px] text-accent font-bold shrink-0">EQUIPPED</span>}
+                                            </div>
+                                            <div className="flex items-center gap-1 shrink-0 ml-2">
+                                              <button
+                                                onClick={() => {
+                                                  const key = `${editedMob.id}-${idx}`;
+                                                  setExpandedMobItems(prev => {
+                                                    const next = new Set(prev);
+                                                    if (next.has(key)) next.delete(key); else next.add(key);
+                                                    return next;
+                                                  });
+                                                }}
+                                                className="p-0.5 hover:bg-primary/10 rounded"
+                                                title="Toggle details"
+                                              >
+                                                <ChevronDownIcon className={`w-3 h-3 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                              </button>
+                                              <button
+                                                onClick={() => {
+                                                  // Unequip if equipped before removing
+                                                  if (equippedSlot) {
+                                                    const equipped = { ...(editedMob.equippedItems ?? {}) };
+                                                    delete equipped[equippedSlot];
+                                                    const updated = mobItems.filter((_, i) => i !== idx);
+                                                    setEditedMobData(prev => prev ? { ...prev, defaultInventory: updated.length > 0 ? updated : undefined, equippedItems: Object.keys(equipped).length > 0 ? equipped : undefined } : prev);
+                                                  } else {
+                                                    const updated = mobItems.filter((_, i) => i !== idx);
+                                                    setEditedMobData(prev => prev ? { ...prev, defaultInventory: updated.length > 0 ? updated : undefined } : prev);
+                                                  }
+                                                }}
+                                                className="p-0.5 hover:bg-destructive/10 rounded"
+                                              >
+                                                <Trash2 className="w-3 h-3 text-destructive" />
+                                              </button>
+                                            </div>
+                                          </div>
+                                          {/* Expanded item details */}
+                                          {isExpanded && (
+                                            <div className="mt-1.5 pt-1.5 border-t border-border/50 text-[10px] text-muted-foreground space-y-1">
+                                              {item.description && <p>{item.description}</p>}
+                                              <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+                                                {item.goldValue != null && <span>Value: <span className="text-accent">{item.goldValue}g</span></span>}
+                                                {item.equipSlot && <span>Slot: <span className="text-primary">{item.equipSlot}</span></span>}
+                                                {item.tags && item.tags.length > 0 && <span>Tags: {item.tags.join(', ')}</span>}
+                                              </div>
+                                              {item.statModifiers && Object.keys(item.statModifiers).length > 0 && (
+                                                <div className="flex flex-wrap gap-x-2">
+                                                  <span className="text-primary">Stats:</span>
+                                                  {Object.entries(item.statModifiers).map(([stat, val]) => (
+                                                    <span key={stat} className={Number(val) >= 0 ? 'text-green-400' : 'text-destructive'}>
+                                                      {stat} {Number(val) >= 0 ? '+' : ''}{val}
+                                                    </span>
+                                                  ))}
+                                                </div>
+                                              )}
+                                              {item.weaponData && (
+                                                <div className="space-y-0.5">
+                                                  <span className="text-destructive">Weapon:</span>
+                                                  <span className="ml-1">{item.weaponData.weaponType} · {item.weaponData.damageType}</span>
+                                                  <span className="ml-1">
+                                                    {item.weaponData.damageDice.map(d => `${d.count}d${d.sides}`).join(' + ')}
+                                                  </span>
+                                                  {item.weaponData.isRanged && item.weaponData.normalRange && (
+                                                    <span className="ml-1">Range: {item.weaponData.normalRange}/{item.weaponData.maxRange}ft</span>
+                                                  )}
+                                                  {item.weaponData.specialEffect && <p className="italic">{item.weaponData.specialEffect}</p>}
+                                                </div>
+                                              )}
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
                                   </div>
                                 ) : (
                                   <p className="text-[10px] text-muted-foreground italic">No items</p>
+                                )}
+                                {/* Context menu for mob inventory items */}
+                                {mobItemContextMenu && (
+                                  <div
+                                    className="fixed bg-background border-2 border-primary shadow-lg z-[200] py-1 min-w-[140px]"
+                                    style={{ left: mobItemContextMenu.x, top: mobItemContextMenu.y }}
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                  >
+                                    {mobItemContextMenu.item.equipSlot && (
+                                      <button
+                                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-primary/10 flex items-center gap-2"
+                                        onClick={() => {
+                                          toggleMobItemEquip(mobItemContextMenu.item);
+                                          setMobItemContextMenu(null);
+                                        }}
+                                      >
+                                        <Shield className="w-3 h-3" />
+                                        {isMobItemEquipped(editedMob.equippedItems, mobItemContextMenu.item.id)
+                                          ? 'Unequip Item'
+                                          : `Equip to ${mobItemContextMenu.item.equipSlot}`}
+                                      </button>
+                                    )}
+                                    <button
+                                      className="w-full text-left px-3 py-1.5 text-xs hover:bg-primary/10 flex items-center gap-2"
+                                      onClick={() => {
+                                        const key = `${editedMob.id}-${mobItemContextMenu.itemIdx}`;
+                                        setExpandedMobItems(prev => {
+                                          const next = new Set(prev);
+                                          if (next.has(key)) next.delete(key); else next.add(key);
+                                          return next;
+                                        });
+                                        setMobItemContextMenu(null);
+                                      }}
+                                    >
+                                      <ChevronDownIcon className="w-3 h-3" />
+                                      {expandedMobItems.has(`${editedMob.id}-${mobItemContextMenu.itemIdx}`) ? 'Collapse Details' : 'Expand Details'}
+                                    </button>
+                                    <button
+                                      className="w-full text-left px-3 py-1.5 text-xs hover:bg-destructive/10 text-destructive flex items-center gap-2"
+                                      onClick={() => {
+                                        const equippedSlot = isMobItemEquipped(editedMob.equippedItems, mobItemContextMenu.item.id);
+                                        const updated = mobItems.filter((_, i) => i !== mobItemContextMenu.itemIdx);
+                                        if (equippedSlot) {
+                                          const equipped = { ...(editedMob.equippedItems ?? {}) };
+                                          delete equipped[equippedSlot];
+                                          setEditedMobData(prev => prev ? { ...prev, defaultInventory: updated.length > 0 ? updated : undefined, equippedItems: Object.keys(equipped).length > 0 ? equipped : undefined } : prev);
+                                        } else {
+                                          setEditedMobData(prev => prev ? { ...prev, defaultInventory: updated.length > 0 ? updated : undefined } : prev);
+                                        }
+                                        setMobItemContextMenu(null);
+                                      }}
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                      Remove Item
+                                    </button>
+                                  </div>
                                 )}
                               </>
                             );
@@ -1012,7 +1175,10 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                           {((mob.defaultInventory && mob.defaultInventory.length > 0) || (mob.defaultGold && mob.defaultGold > 0)) && (
                             <div className="text-xs text-muted-foreground mt-1">
                               <span className="text-accent">Inventory:</span>{' '}
-                              {mob.defaultInventory?.map(i => i.name).join(', ')}
+                              {mob.defaultInventory?.map(i => {
+                                const equipped = isMobItemEquipped(mob.equippedItems, i.id);
+                                return equipped ? `[E] ${i.name}` : i.name;
+                              }).join(', ')}
                               {mob.defaultGold ? ` · ${mob.defaultGold} gold` : ''}
                             </div>
                           )}
