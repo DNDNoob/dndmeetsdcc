@@ -79,9 +79,6 @@ const Index = () => {
     return [];
   });
 
-  // Map names come from Firestore via useGameState
-  const mapNames = firestoreMapNames;
-
   const [isNavVisible, setIsNavVisible] = useState(true);
   const [isDiceExpanded, setIsDiceExpanded] = useState(false);
 
@@ -162,6 +159,9 @@ const Index = () => {
     addCombatant,
     isLoaded
   } = useGameState();
+
+  // Map names come from Firestore via useGameState
+  const mapNames = firestoreMapNames;
 
   // Route guards — redirect invalid navigation states
   useEffect(() => {

@@ -294,7 +294,8 @@ const [name, setName] = useState('');
 
 1. **Build check**: Run `npm run build` — must succeed with no new errors
 2. **Lint check**: Run `npm run lint` — must not introduce new errors (pre-existing warnings are OK)
-3. **Screenshot verification**: After any edit that alters the UI, take a screenshot of the affected page/component to verify the UI renders correctly. Compare against the expected layout and fix any visual regressions before committing.
+3. **TDZ / variable-ordering check**: After editing any component file, verify that no `const` or `let` variable is referenced before its declaration in the same scope. Pay special attention to `Index.tsx` where aliases like `const mapNames = firestoreMapNames` must come **after** the `useGameState()` destructuring that declares `firestoreMapNames`. TDZ errors cause blank pages in production builds but may be silently hidden by the dev server (esbuild).
+4. **Screenshot verification**: After any edit that alters the UI, take a screenshot of the affected page/component to verify the UI renders correctly. Compare against the expected layout and fix any visual regressions before committing.
 
 ### Screenshot Workflow
 
@@ -327,6 +328,7 @@ const [name, setName] = useState('');
 | Forgetting effective stats in rest/heal calcs | Healing ignores equipment bonuses | Always use `getEquippedModifiers()` |
 | Not adding collection to `collections` array | New collection won't be synced in real-time | Add to array in useFirebaseStore.ts |
 | Storing maps as objects instead of strings | Map rendering breaks (`<img src={map}>` expects string) | Maps normalize to `string[]` via useGameState |
+| Referencing a `const`/`let` variable before its declaration | TDZ error: "Cannot access X before initialization" — blank page in production (Rollup preserves TDZ; esbuild dev may hide it) | Ensure variables are declared before first use. In `Index.tsx`, all aliases of `useGameState()` return values must come **after** the destructuring |
 
 ---
 
