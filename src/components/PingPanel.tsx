@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Clock, ChevronUp, ChevronDown, RotateCcw, Sun, Moon, Swords, Zap, SkipForward, XCircle, Heart, Plus } from "lucide-react";
+import { Clock, ChevronUp, ChevronDown, RotateCcw, Sun, Moon, Swords, Zap, SkipForward, XCircle, Heart, Plus, Play, Square } from "lucide-react";
 import { type Crawler, type Mob, type NoncombatTurnState, type GameClockState, type Episode, type CombatState, type CrawlerPlacement, type EpisodeMobPlacement, type CombatantEntry } from "@/lib/gameData";
 
 interface PingPanelProps {
@@ -24,6 +24,8 @@ interface PingPanelProps {
   runtimeCrawlerPlacements?: CrawlerPlacement[];
   runtimeMobPlacements?: EpisodeMobPlacement[];
   onAddCombatant?: (combatants: CombatantEntry[]) => Promise<void>;
+  isGameActive?: boolean;
+  onToggleGameActive?: (active: boolean) => Promise<void>;
 }
 
 const PingPanel: React.FC<PingPanelProps> = ({
@@ -47,6 +49,8 @@ const PingPanel: React.FC<PingPanelProps> = ({
   runtimeCrawlerPlacements,
   runtimeMobPlacements,
   onAddCombatant,
+  isGameActive,
+  onToggleGameActive,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showRestDropdown, setShowRestDropdown] = useState<'short' | 'long' | null>(null);
@@ -303,6 +307,32 @@ const PingPanel: React.FC<PingPanelProps> = ({
               <div className="mb-3 text-center border border-border bg-muted/20 px-3 py-2">
                 <span className="text-[10px] text-muted-foreground font-display block mb-0.5">DAYS SINCE START</span>
                 <span className="font-display text-accent text-lg">{daysSinceStart}</span>
+              </div>
+            )}
+
+            {/* DM: Play the Game / Game Over button */}
+            {isAdmin && activeEpisode && onToggleGameActive && (
+              <div className="mb-3">
+                <button
+                  onClick={() => onToggleGameActive(!isGameActive)}
+                  className={`w-full flex items-center justify-center gap-2 px-4 py-3 font-display text-sm border-2 rounded transition-all ${
+                    isGameActive
+                      ? 'bg-destructive/10 border-destructive text-destructive hover:bg-destructive/20'
+                      : 'bg-accent/20 border-accent text-accent hover:bg-accent/30 animate-pulse'
+                  }`}
+                >
+                  {isGameActive ? (
+                    <>
+                      <Square className="w-4 h-4" />
+                      GAME OVER
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-4 h-4" />
+                      PLAY THE GAME
+                    </>
+                  )}
+                </button>
               </div>
             )}
 

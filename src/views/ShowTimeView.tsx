@@ -44,6 +44,8 @@ interface ShowTimeViewProps {
   resetNoncombatTurns?: (episodeId: string) => Promise<void>;
   combatState?: CombatState | null;
   onRuntimePlacementsChange?: (crawlerPlacements: CrawlerPlacement[], runtimeMobPlacements: EpisodeMobPlacement[]) => void;
+  onGameActiveChange?: (active: boolean) => void;
+  onRegisterGameToggle?: (toggleFn: (active: boolean) => Promise<void>) => void;
 }
 
 const SHOWTIME_STORAGE_KEY = 'dcc_showtime_state';
@@ -357,7 +359,7 @@ const InventoryPanel: React.FC<{
   );
 };
 
-const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock, noncombatTurnState, resetNoncombatTurns, combatState, onRuntimePlacementsChange }) => {
+const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock, noncombatTurnState, resetNoncombatTurns, combatState, onRuntimePlacementsChange, onGameActiveChange, onRegisterGameToggle }) => {
   const { roomId } = useFirebaseStore();
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
   const [currentMapIndex, setCurrentMapIndex] = useState(0);
@@ -371,6 +373,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   const mapImageRef = useRef<HTMLImageElement>(null);
   const [mapImageDimensions, setMapImageDimensions] = useState<{ width: number; height: number } | null>(null);
   const hasAutoLoaded = useRef(false);
+  const [gameStarted, setGameStarted] = useState(false);
   const mountTime = useRef(Timestamp.now());
   const lastBroadcastTime = useRef<number>(0);
   const pendingBroadcast = useRef<{ index: number; x: number; y: number } | null>(null);
@@ -473,7 +476,12 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   // Notify parent when episode active state changes
   useEffect(() => {
     onShowtimeActiveChange?.(!!selectedEpisode, selectedEpisode);
-  }, [selectedEpisode, onShowtimeActiveChange]);
+    // If DM deselected episode, reset gameStarted
+    if (!selectedEpisode && gameStarted) {
+      setGameStarted(false);
+      onGameActiveChange?.(false);
+    }
+  }, [selectedEpisode, onShowtimeActiveChange, gameStarted, onGameActiveChange]);
 
   // Report runtime placements to parent (for PingPanel combat/rest integration)
   // Accumulates across all visited maps so switching maps doesn't lose data
@@ -503,7 +511,8 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   const broadcastShowtimeState = useCallback(async (
     episodeId: string | null,
     mapIdx: number,
-    mapUrl: string | null
+    mapUrl: string | null,
+    started?: boolean
   ) => {
     if (!isAdmin) return; // Only DM broadcasts
 
@@ -517,12 +526,13 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
         currentMapIndex: mapIdx,
         selectedMapUrl: mapUrl,
         isActive: episodeId !== null && mapUrl !== null,
+        gameStarted: started ?? gameStarted,
         updatedAt: serverTimestamp(),
       });
     } catch (error) {
       console.error('[ShowTime] Failed to broadcast showtime state:', error);
     }
-  }, [isAdmin, roomId]);
+  }, [isAdmin, roomId, gameStarted]);
 
   // Listen for showtime state updates (for players)
   useEffect(() => {
@@ -539,11 +549,24 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
         // No showtime state - show waiting screen
         setSelectedEpisode(null);
         setSelectedMap(null);
+        setGameStarted(false);
         return;
       }
 
       const data = snapshot.data();
       console.log('[ShowTime] Received showtime state update:', data);
+
+      // Track game started state
+      const isStarted = data.gameStarted === true;
+      setGameStarted(isStarted);
+
+      // Only show episode content to players when DM has started the game
+      if (!isStarted) {
+        setSelectedEpisode(null);
+        setSelectedMap(null);
+        localStorage.removeItem(SHOWTIME_STORAGE_KEY);
+        return;
+      }
 
       // Update episode if changed
       if (data.episodeId) {
@@ -1740,11 +1763,29 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     setCrawlerPlacements([]);
     setRuntimeMobPlacements([]);
     // Broadcast end of episode
-    broadcastShowtimeState(null, 0, null);
+    setGameStarted(false);
+    broadcastShowtimeState(null, 0, null, false);
     localStorage.removeItem(SHOWTIME_STORAGE_KEY);
     // Notify parent to close showtime view
     onEndEpisodeCallback?.();
-  }, [broadcastShowtimeState, onEndEpisodeCallback]);
+    onGameActiveChange?.(false);
+  }, [broadcastShowtimeState, onEndEpisodeCallback, onGameActiveChange]);
+
+  // DM: Start or end the game for players
+  const handleSetGameActive = useCallback(async (active: boolean) => {
+    setGameStarted(active);
+    if (selectedEpisode && selectedMap) {
+      await broadcastShowtimeState(selectedEpisode.id, currentMapIndex, selectedMap, active);
+    } else if (!active) {
+      await broadcastShowtimeState(null, 0, null, false);
+    }
+    onGameActiveChange?.(active);
+  }, [selectedEpisode, selectedMap, currentMapIndex, broadcastShowtimeState, onGameActiveChange]);
+
+  // Register toggle function with parent so PingPanel can call it
+  useEffect(() => {
+    onRegisterGameToggle?.(handleSetGameActive);
+  }, [handleSetGameActive, onRegisterGameToggle]);
 
   const handleMobMouseDown = (placementKey: string) => {
     // All users can move mobs
@@ -2108,8 +2149,10 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             </div>
             <DungeonButton variant="default" onClick={() => {
               setSelectedEpisode(null);
-              broadcastShowtimeState(null, 0, null);
+              setGameStarted(false);
+              broadcastShowtimeState(null, 0, null, false);
               localStorage.removeItem(SHOWTIME_STORAGE_KEY);
+              onGameActiveChange?.(false);
             }}>
               <X className="w-4 h-4 mr-2" /> Back to Episodes
             </DungeonButton>
