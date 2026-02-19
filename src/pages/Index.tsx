@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import SplashScreen from "@/components/SplashScreen";
@@ -149,7 +149,6 @@ const Index = () => {
     performLongRest,
     combatState,
     startCombat,
-    rollMobInitiatives,
     recordCombatInitiative,
     confirmInitiative,
     advanceCombatTurn,
@@ -163,6 +162,7 @@ const Index = () => {
     wikiPages,
     addWikiPage,
     updateWikiPage,
+    roomId,
     isLoaded
   } = useGameState();
 
@@ -344,6 +344,36 @@ const Index = () => {
     return combatState;
   }, [combatState, activeEpisode]);
 
+  // Stable callbacks for ShowTimeView to avoid re-triggering effects on every render
+  const handleShowtimeActiveChange = useCallback((active: boolean, episode?: Episode | null) => {
+    setIsShowtimeActive(active);
+    setActiveEpisode(episode ?? null);
+    if (!active) {
+      setRuntimeCrawlerPlacements([]);
+      setRuntimeMobPlacements([]);
+    }
+  }, []);
+
+  const handleEndEpisode = useCallback(() => {
+    setIsShowtimeActive(false);
+    setActiveEpisode(null);
+    setRuntimeCrawlerPlacements([]);
+    setRuntimeMobPlacements([]);
+  }, []);
+
+  const handleRuntimePlacementsChange = useCallback((cp: CrawlerPlacement[], mp: EpisodeMobPlacement[]) => {
+    setRuntimeCrawlerPlacements(cp);
+    setRuntimeMobPlacements(mp);
+  }, []);
+
+  const handleGameActiveChange = useCallback((active: boolean) => {
+    setIsGameActive(active);
+  }, []);
+
+  const handleRegisterGameToggle = useCallback((fn: (active: boolean) => Promise<void>) => {
+    setGameActiveRef.current = fn;
+  }, []);
+
   if (!isLoaded) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -483,26 +513,11 @@ const Index = () => {
                 unlockLootBox={unlockLootBox}
                 deleteLootBox={deleteLootBox}
                 addDiceRoll={addDiceRoll}
-                onEndEpisode={() => {
-                  setIsShowtimeActive(false);
-                  setActiveEpisode(null);
-                  setRuntimeCrawlerPlacements([]);
-                  setRuntimeMobPlacements([]);
-                }}
-                onShowtimeActiveChange={(active, episode) => {
-                  setIsShowtimeActive(active);
-                  setActiveEpisode(episode ?? null);
-                  if (!active) {
-                    setRuntimeCrawlerPlacements([]);
-                    setRuntimeMobPlacements([]);
-                  }
-                }}
-                onRuntimePlacementsChange={(cp, mp) => {
-                  setRuntimeCrawlerPlacements(cp);
-                  setRuntimeMobPlacements(mp);
-                }}
-                onGameActiveChange={(active) => setIsGameActive(active)}
-                onRegisterGameToggle={(fn) => { setGameActiveRef.current = fn; }}
+                onEndEpisode={handleEndEpisode}
+                onShowtimeActiveChange={handleShowtimeActiveChange}
+                onRuntimePlacementsChange={handleRuntimePlacementsChange}
+                onGameActiveChange={handleGameActiveChange}
+                onRegisterGameToggle={handleRegisterGameToggle}
                 getCrawlerInventory={getCrawlerInventory}
                 onUpdateCrawlerInventory={updateCrawlerInventory}
                 getSharedInventory={getSharedInventory}
@@ -510,6 +525,7 @@ const Index = () => {
                 noncombatTurnState={noncombatTurnState}
                 resetNoncombatTurns={resetNoncombatTurns}
                 combatState={activeCombatState}
+                roomId={roomId}
               />
             )}
             {currentView === "sounds" && <SoundEffectsView />}

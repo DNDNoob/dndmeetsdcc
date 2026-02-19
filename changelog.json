@@ -13,7 +13,22 @@
       "⚔️ Added splash damage checkbox to weapon configuration in item library",
       "👤 Player identity switcher moved to top-right corner of navigation bar for easier access",
       "🌫️ Increased fog of war precision: consolidation threshold raised from 1000 to 3000 circles",
-      "🌫️ Fog brush minimum size increased to match crawler/mob icon size on the map"
+      "🌫️ Fog brush minimum size increased to match crawler/mob icon size on the map",
+      "🐛 Added null checks to all Firebase Firestore calls to prevent crashes when db is unavailable",
+      "🐛 Removed direct useFirebaseStore() call from ShowTimeView (now receives roomId as a prop)",
+      "🐛 Fixed stale closure in player showtime listener that could miss episode changes",
+      "🐛 Fixed stale closure in avatar upload that could lose concurrent form edits",
+      "🐛 Fixed stale mapBoxes closure in box add/update/delete handlers causing lost updates during rapid interaction",
+      "🐛 Fixed episode sync effect overwriting local drag positions during mob drag operations",
+      "🐛 Fixed DiceRoller interval not being cleaned up on component unmount",
+      "🐛 Removed debug console.log from ShowTimeView render path (was running every render cycle)",
+      "🐛 Removed unused consolidateFogCircles dependency from handleFogReveal callback",
+      "🐛 Removed unused rollMobInitiatives destructured variable from Index.tsx",
+      "⚡ Stabilized ShowTimeView callback props with useCallback to prevent excessive effect re-firing",
+      "⚡ Optimized getStableCollection to cache serialized hashes instead of double-stringifying on every call",
+      "⚡ Memoized inventory reference in ProfilesView to prevent cascading recomputation of dependent memos",
+      "⚡ All async Firebase calls in useGameState now properly return promises for error propagation",
+      "📝 Fixed MAX_IMAGE_LENGTH documentation in CLAUDE.md (was incorrectly listed as 15 MB, actual limit is ~1 MB)"
     ]
   },
   {

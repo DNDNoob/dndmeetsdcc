@@ -50,32 +50,36 @@ export const useGameState = () => {
     updateItem,
     deleteItem,
     batchWrite,
-    isLoaded
+    isLoaded,
+    roomId,
   } = useGame();
 
-  // Cache for memoization - store previous collection values
-  const collectionsCache = useRef<Record<string, unknown[]>>({});
+  // Cache for memoization - store previous collection values and their serialized forms
+  const collectionsCache = useRef<Record<string, { items: unknown[]; hash: string }>>({});
 
   // Helper to get stable collection reference (avoids breaking memoization)
   const getStableCollection = <T,>(name: string): T[] => {
     const current = getCollection(name) as T[];
-    const cached = collectionsCache.current[name] as T[] | undefined;
+    const cached = collectionsCache.current[name];
 
-    // If same length and same IDs, return cached to preserve reference
-    if (cached && cached.length === current.length) {
+    // Quick check: same array length and same IDs (cheap shallow comparison)
+    if (cached && cached.items.length === current.length) {
       const currentIds = current.map((item: unknown) => (item as Record<string, unknown>)?.id);
-      const cachedIds = cached.map((item: unknown) => (item as Record<string, unknown>)?.id);
+      const cachedIds = (cached.items as unknown[]).map((item: unknown) => (item as Record<string, unknown>)?.id);
       if (currentIds.every((id, i) => id === cachedIds[i])) {
         // Deep check: compare stringified versions for actual changes
+        // Only stringify current (not cached) since we store the cached hash
         const currentStr = JSON.stringify(current);
-        const cachedStr = JSON.stringify(cached);
-        if (currentStr === cachedStr) {
-          return cached;
+        if (currentStr === cached.hash) {
+          return cached.items as T[];
         }
+        // Update cache with new data and hash
+        collectionsCache.current[name] = { items: current, hash: currentStr };
+        return current;
       }
     }
 
-    collectionsCache.current[name] = current;
+    collectionsCache.current[name] = { items: current, hash: JSON.stringify(current) };
     return current;
   };
 
@@ -354,22 +358,22 @@ export const useGameState = () => {
     console.log('[GameState] ✅ Cleanup complete');
   };
 
-  const updateCrawler = (id: string, updates: Partial<Crawler>) => {
+  const updateCrawler = async (id: string, updates: Partial<Crawler>) => {
     console.log('[GameState] 📝 Updating crawler:', { id, updates });
-    updateItem('crawlers', id, updates as Record<string, unknown>);
+    return updateItem('crawlers', id, updates as Record<string, unknown>);
   };
 
-  const addCrawler = (crawler: Crawler) => {
+  const addCrawler = async (crawler: Crawler) => {
     console.log('[GameState] ➕ Adding crawler:', crawler);
-    addItem('crawlers', { ...crawler } as Record<string, unknown>);
-    addItem('inventory', { crawlerId: crawler.id, items: [] });
+    await addItem('crawlers', { ...crawler } as Record<string, unknown>);
+    await addItem('inventory', { crawlerId: crawler.id, items: [] });
   };
 
-  const deleteCrawler = (id: string) => {
-    deleteItem('crawlers', id);
+  const deleteCrawler = async (id: string) => {
+    await deleteItem('crawlers', id);
     const invToDelete = inventory.find((i) => i.crawlerId === id) as InventoryEntry | undefined;
     if (invToDelete && invToDelete.id) {
-      deleteItem('inventory', invToDelete.id);
+      await deleteItem('inventory', invToDelete.id);
     }
   };
 
@@ -381,40 +385,40 @@ export const useGameState = () => {
     return inventory.find((i) => i.crawlerId === '__shared__')?.items || [];
   };
 
-  const updateSharedInventory = (items: InventoryItem[]) => {
-    updateCrawlerInventory('__shared__', items);
+  const updateSharedInventory = async (items: InventoryItem[]) => {
+    return updateCrawlerInventory('__shared__', items);
   };
 
-  const updateCrawlerInventory = (crawlerId: string, items: InventoryItem[]) => {
+  const updateCrawlerInventory = async (crawlerId: string, items: InventoryItem[]) => {
     const existing = inventory.find((i) => i.crawlerId === crawlerId) as InventoryEntry | undefined;
 
     if (existing && existing.id) {
       // Update existing inventory in Firebase using the document ID
-      updateItem('inventory', existing.id, { crawlerId, items });
+      return updateItem('inventory', existing.id, { crawlerId, items });
     } else {
       // Add new inventory entry to Firebase
-      addItem('inventory', { crawlerId, items });
+      return addItem('inventory', { crawlerId, items });
     }
   };
 
   // Episode management
-  const addEpisode = (episode: Episode) => {
-    addItem('episodes', {
+  const addEpisode = async (episode: Episode) => {
+    return addItem('episodes', {
       ...episode,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     });
   };
 
-  const updateEpisode = (id: string, updates: Partial<Episode>) => {
-    updateItem('episodes', id, {
+  const updateEpisode = async (id: string, updates: Partial<Episode>) => {
+    return updateItem('episodes', id, {
       ...updates,
       updatedAt: new Date().toISOString()
     });
   };
 
-  const deleteEpisode = (id: string) => {
-    deleteItem('episodes', id);
+  const deleteEpisode = async (id: string) => {
+    return deleteItem('episodes', id);
   };
 
   // --- Loot Boxes ---
@@ -442,7 +446,7 @@ export const useGameState = () => {
   };
 
   const unlockLootBox = async (lootBoxId: string) => {
-    updateItem('lootBoxes', lootBoxId, { locked: false, unlockedAt: new Date().toISOString() });
+    return updateItem('lootBoxes', lootBoxId, { locked: false, unlockedAt: new Date().toISOString() });
   };
 
   const claimLootBoxItems = async (lootBoxId: string, crawlerId: string, itemIds: string[], claimGold = false) => {
@@ -483,8 +487,8 @@ export const useGameState = () => {
     }
   };
 
-  const deleteLootBox = (lootBoxId: string) => {
-    deleteItem('lootBoxes', lootBoxId);
+  const deleteLootBox = async (lootBoxId: string) => {
+    return deleteItem('lootBoxes', lootBoxId);
   };
 
   const getCrawlerLootBoxes = (crawlerId: string) => {
@@ -496,16 +500,16 @@ export const useGameState = () => {
     return getStableCollection<LootBoxTemplate>('lootBoxTemplates');
   }, [getCollection, isLoaded]);
 
-  const addLootBoxTemplate = (template: LootBoxTemplate) => {
-    addItem('lootBoxTemplates', { ...template } as Record<string, unknown>);
+  const addLootBoxTemplate = async (template: LootBoxTemplate) => {
+    return addItem('lootBoxTemplates', { ...template } as Record<string, unknown>);
   };
 
-  const updateLootBoxTemplate = (id: string, updates: Partial<LootBoxTemplate>) => {
-    updateItem('lootBoxTemplates', id, updates as Record<string, unknown>);
+  const updateLootBoxTemplate = async (id: string, updates: Partial<LootBoxTemplate>) => {
+    return updateItem('lootBoxTemplates', id, updates as Record<string, unknown>);
   };
 
-  const deleteLootBoxTemplate = (id: string) => {
-    deleteItem('lootBoxTemplates', id);
+  const deleteLootBoxTemplate = async (id: string) => {
+    return deleteItem('lootBoxTemplates', id);
   };
 
   // --- Dice Rolls ---
@@ -1081,6 +1085,7 @@ export const useGameState = () => {
     wikiPages,
     addWikiPage,
     updateWikiPage,
+    roomId,
     isLoaded,
   };
 };

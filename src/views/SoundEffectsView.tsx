@@ -89,6 +89,7 @@ const SoundEffectsView: React.FC = () => {
   }, [uploaded.length]);
 
   useEffect(() => {
+    if (!db) return; // Guard against null db
     // Listen for sound broadcasts
     const broadcastCollectionName = roomId ? `rooms/${roomId}/sound-broadcast` : 'sound-broadcast';
     const q = query(collection(db, broadcastCollectionName), where('createdAt', '>', mountTime.current));
@@ -259,6 +260,7 @@ const SoundEffectsView: React.FC = () => {
   };
 
   const broadcastSound = async (sound: SoundEffect) => {
+    if (!db) return; // Guard against null db
     const broadcastCollectionName = roomId ? `rooms/${roomId}/sound-broadcast` : 'sound-broadcast';
     try {
       console.log('[SoundEffectsView] Broadcasting sound:', sound, 'to collection:', broadcastCollectionName, 'roomId:', roomId);

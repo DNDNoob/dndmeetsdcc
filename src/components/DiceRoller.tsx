@@ -66,6 +66,18 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
     setDiceQueue((prev) => prev.filter((d) => d.id !== id));
   };
 
+  const rollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Clean up interval on unmount to prevent setState on unmounted component
+  useEffect(() => {
+    return () => {
+      if (rollIntervalRef.current) {
+        clearInterval(rollIntervalRef.current);
+        rollIntervalRef.current = null;
+      }
+    };
+  }, []);
+
   const rollAllDice = () => {
     if (diceQueue.length === 0) return;
 
@@ -77,6 +89,7 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
       iterations++;
       if (iterations >= maxIterations) {
         clearInterval(interval);
+        rollIntervalRef.current = null;
 
         const finalResults = diceQueue.map((dice) => {
           const result = Math.floor(Math.random() * dice.sides) + 1;
@@ -101,6 +114,7 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
         setDiceQueue([]);
       }
     }, 50);
+    rollIntervalRef.current = interval;
   };
 
   // Auto-scroll roll history to bottom when new rolls arrive or panel opens
