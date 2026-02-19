@@ -16,6 +16,9 @@ export type CollectionName =
   | 'lootBoxes'
   | 'lootBoxTemplates'
   | 'combatState'
+  | 'noncombatTurns'
+  | 'gameClock'
+  | 'wiki'
   // Add new collections below:
   | 'quests'
   | 'npcs'

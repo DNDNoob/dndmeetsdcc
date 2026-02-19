@@ -389,7 +389,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   const lastFogBroadcastTime = useRef<number>(0);
   const FOG_BROADCAST_THROTTLE_MS = 50; // Faster fog sync for better real-time experience
   const pendingFogBroadcast = useRef<{ x: number; y: number; radius: number }[] | null>(null);
-  const CONSOLIDATION_THRESHOLD = 1000; // Only consolidate when array gets very large
+  const CONSOLIDATION_THRESHOLD = 3000; // Higher threshold preserves fog precision
 
   // Ping and Box state
   const [pings, setPings] = useState<Ping[]>([]);

@@ -1,5 +1,45 @@
 [
   {
+    "date": "2026-02-19",
+    "changes": [
+      "📖 MAJOR: Added Wiki system accessible from the main navigation bar",
+      "Wiki features: full-text search, category navigation, table of contents, and subpage structure",
+      "Any user can edit wiki pages directly from the browser (content saves to Firebase in real-time)",
+      "Wiki ships with pre-written documentation covering all game features and mechanics",
+      "📋 Added expandable item details on the inventory page (click any item name to see full stats, weapon data, and modifiers)",
+      "🎲 Fixed weapon dice display in dice roller: now shows actual weapon dice instead of always 'd20'",
+      "Individual die results are broken out for multi-die weapon rolls (e.g., d12 5, d12 7 instead of 2d12 12)",
+      "Attack rolls labeled 'Attack roll:' and damage rolls labeled 'Damage:' instead of generic 'Check:'",
+      "⚔️ Added splash damage checkbox to weapon configuration in item library",
+      "👤 Player identity switcher moved to top-right corner of navigation bar for easier access",
+      "🌫️ Increased fog of war precision: consolidation threshold raised from 1000 to 3000 circles",
+      "🌫️ Fog brush minimum size increased to match crawler/mob icon size on the map"
+    ]
+  },
+  {
+    "date": "2026-02-18",
+    "changes": [
+      "⚔️ Added equip/unequip system for mob inventory items (double-click or right-click to equip)",
+      "Right-click context menu on mob inventory items with equip, expand details, and remove options",
+      "Expandable item detail panels for mob inventory showing description, gold value, slot, tags, stat modifiers, and weapon data",
+      "Equipped mob items highlighted with gold border and shield icon"
+    ]
+  },
+  {
+    "date": "2026-02-17",
+    "changes": [
+      "👤 Added player identity switching via dropdown in the navigation bar",
+      "🎮 Added Play the Game / Game Over button for DMs in the game clock panel",
+      "Players see a waiting screen until the DM clicks Play the Game",
+      "Game start/stop notifications pushed to dice roll history and as toast notifications",
+      "🔧 Fixed game clock panel mouse scrolling (no longer blocked by map zoom handler)",
+      "🔧 Fixed changelog window scrolling with same native wheel handler approach",
+      "Hidden scrollbar in game clock panel for cleaner appearance",
+      "📏 Rounded zoom percentage display to whole numbers",
+      "🐛 Fixed TDZ (Temporal Dead Zone) error causing blank page in production builds"
+    ]
+  },
+  {
     "date": "2026-02-16",
     "changes": [
       "❤️ Health bars on all map icons: mob and crawler icons now always display green/red health bars with currentHP/maxHP text",

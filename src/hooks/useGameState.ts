@@ -10,6 +10,7 @@ import {
   GameClockState,
   CombatState,
   CombatantEntry,
+  WikiPage,
   getEquippedModifiers,
   defaultCrawlers,
   defaultInventory,
@@ -1007,6 +1008,19 @@ export const useGameState = () => {
     console.log('[GameState] ➕ Added', toAdd.length, 'combatant(s) to active combat');
   };
 
+  // ======== Wiki ========
+  const wikiPages = useMemo(() => {
+    return getStableCollection<WikiPage>('wiki');
+  }, [getCollection, isLoaded]);
+
+  const addWikiPage = async (page: WikiPage) => {
+    await addItem('wiki', page as unknown as Record<string, unknown>);
+  };
+
+  const updateWikiPage = async (id: string, updates: Partial<WikiPage>) => {
+    await updateItem('wiki', id, updates as unknown as Record<string, unknown>);
+  };
+
   return {
     crawlers,
     updateCrawler,
@@ -1064,6 +1078,9 @@ export const useGameState = () => {
     cancelCombat,
     removeCombatant,
     addCombatant,
+    wikiPages,
+    addWikiPage,
+    updateWikiPage,
     isLoaded,
   };
 };

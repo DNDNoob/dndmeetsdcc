@@ -14,15 +14,16 @@ import MobsView from "@/views/MobsView";
 import DungeonAIView from "@/views/DungeonAIView";
 import ShowTimeView from "@/views/ShowTimeView";
 import SoundEffectsView from "@/views/SoundEffectsView";
+import WikiView from "@/views/WikiView";
 
 import { useGameState, DiceRollEntry } from "@/hooks/useGameState";
 import { toast } from "sonner";
 import type { Episode, Mob, CrawlerPlacement, EpisodeMobPlacement } from "@/lib/gameData";
 
 type AppScreen = "splash" | "menu" | "game";
-type GameView = "profiles" | "maps" | "inventory" | "mobs" | "dungeonai" | "showtime" | "sounds";
+type GameView = "profiles" | "maps" | "inventory" | "mobs" | "dungeonai" | "showtime" | "sounds" | "wiki";
 
-const GAME_VIEWS: readonly string[] = ["profiles", "maps", "inventory", "mobs", "dungeonai", "showtime", "sounds"];
+const GAME_VIEWS: readonly string[] = ["profiles", "maps", "inventory", "mobs", "dungeonai", "showtime", "sounds", "wiki"];
 
 const STORAGE_KEY_PLAYER = "dcc_current_player";
 const STORAGE_KEY_MAP_VISIBILITY = "dcc_map_visibility";
@@ -159,6 +160,9 @@ const Index = () => {
     cancelCombat,
     removeCombatant,
     addCombatant,
+    wikiPages,
+    addWikiPage,
+    updateWikiPage,
     isLoaded
   } = useGameState();
 
@@ -272,12 +276,7 @@ const Index = () => {
     } else if (maps.length < mapVisibility.length) {
       setMapVisibility((prev) => prev.slice(0, maps.length));
     }
-    if (maps.length > mapNames.length) {
-      setMapNames((prev) => [...prev, ...Array(maps.length - prev.length).fill(undefined).map((_, i) => `Map ${prev.length + i + 1}`)]);
-    } else if (maps.length < mapNames.length) {
-      setMapNames((prev) => prev.slice(0, maps.length));
-    }
-  }, [maps.length, mapVisibility.length, mapNames.length]);
+  }, [maps.length, mapVisibility.length]);
 
   // Loot box notifications
   const seenLootBoxIds = useRef<Set<string>>(new Set());
@@ -514,6 +513,14 @@ const Index = () => {
               />
             )}
             {currentView === "sounds" && <SoundEffectsView />}
+            {currentView === "wiki" && (
+              <WikiView
+                wikiPages={wikiPages}
+                onUpdateWikiPage={updateWikiPage}
+                onAddWikiPage={addWikiPage}
+                playerName={currentPlayer.name}
+              />
+            )}
           </main>
 
           <DiceRoller
