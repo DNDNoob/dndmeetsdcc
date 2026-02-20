@@ -245,6 +245,17 @@ export interface Episode {
   updatedAt?: string;
 }
 
+export interface WikiPage {
+  id: string;
+  slug: string;
+  title: string;
+  content: string;
+  category: string;
+  order: number;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
 export const defaultCrawlers: Crawler[] = [
   {
     id: "1",

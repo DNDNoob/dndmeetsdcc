@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DungeonButton } from "./ui/DungeonButton";
-import { Home, User, Map, Backpack, Skull, Presentation, Volume2, FileText, Brain, Pin, PinOff, ChevronDown } from "lucide-react";
+import { Home, User, Map, Backpack, Skull, Presentation, Volume2, FileText, Brain, Pin, PinOff, ChevronDown, BookOpen } from "lucide-react";
 import { Crawler } from "@/lib/gameData";
 
 interface NavigationProps {
@@ -89,6 +89,28 @@ const Navigation: React.FC<NavigationProps> = ({
       >
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            {autoCollapse && (
+              <DungeonButton
+                variant={isPinned ? "admin" : "ghost"}
+                size="sm"
+                onClick={() => setIsPinned(!isPinned)}
+                className="flex items-center gap-1"
+                title={isPinned ? "Unpin navigation" : "Pin navigation"}
+              >
+                {isPinned ? <Pin className="w-3 h-3" /> : <PinOff className="w-3 h-3" />}
+              </DungeonButton>
+            )}
+            <DungeonButton
+              variant="ghost"
+              size="sm"
+              onClick={onShowChangelog}
+              className="flex items-center gap-1"
+            >
+              <FileText className="w-3 h-3" />
+              <span className="hidden sm:inline text-xs">Changelog</span>
+            </DungeonButton>
+          </div>
           <div className="relative" ref={playerDropdownRef}>
             <button
               onClick={() => onSwitchPlayer && setShowPlayerDropdown(!showPlayerDropdown)}
@@ -106,7 +128,7 @@ const Navigation: React.FC<NavigationProps> = ({
                   initial={{ opacity: 0, y: -4 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -4 }}
-                  className="absolute top-full left-0 mt-1 w-56 bg-background border-2 border-primary shadow-lg shadow-primary/20 z-[70] max-h-64 overflow-y-auto"
+                  className="absolute top-full right-0 mt-1 w-56 bg-background border-2 border-primary shadow-lg shadow-primary/20 z-[70] max-h-64 overflow-y-auto"
                   style={{ scrollbarWidth: 'none' }}
                 >
                   <div className="py-1">
@@ -149,28 +171,6 @@ const Navigation: React.FC<NavigationProps> = ({
                 </motion.div>
               )}
             </AnimatePresence>
-          </div>
-          <div className="flex items-center gap-2">
-            {autoCollapse && (
-              <DungeonButton
-                variant={isPinned ? "admin" : "ghost"}
-                size="sm"
-                onClick={() => setIsPinned(!isPinned)}
-                className="flex items-center gap-1"
-                title={isPinned ? "Unpin navigation" : "Pin navigation"}
-              >
-                {isPinned ? <Pin className="w-3 h-3" /> : <PinOff className="w-3 h-3" />}
-              </DungeonButton>
-            )}
-            <DungeonButton
-              variant="ghost"
-              size="sm"
-              onClick={onShowChangelog}
-              className="flex items-center gap-1"
-            >
-              <FileText className="w-3 h-3" />
-              <span className="hidden sm:inline text-xs">Changelog</span>
-            </DungeonButton>
           </div>
         </div>
 
@@ -216,6 +216,16 @@ const Navigation: React.FC<NavigationProps> = ({
           >
             <Volume2 className="w-4 h-4" />
             <span className="hidden sm:inline">Sounds</span>
+          </DungeonButton>
+
+          <DungeonButton
+            variant={currentView === "wiki" ? "default" : "nav"}
+            size="sm"
+            onClick={() => onNavigate("wiki")}
+            className={`flex items-center gap-2 ${currentView === "wiki" ? "border-4" : ""}`}
+          >
+            <BookOpen className="w-4 h-4" />
+            <span className="hidden sm:inline">Wiki</span>
           </DungeonButton>
 
           {playerType === "ai" && (

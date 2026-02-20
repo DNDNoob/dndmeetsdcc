@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import SplashScreen from "@/components/SplashScreen";
@@ -14,15 +14,16 @@ import MobsView from "@/views/MobsView";
 import DungeonAIView from "@/views/DungeonAIView";
 import ShowTimeView from "@/views/ShowTimeView";
 import SoundEffectsView from "@/views/SoundEffectsView";
+import WikiView from "@/views/WikiView";
 
 import { useGameState, DiceRollEntry } from "@/hooks/useGameState";
 import { toast } from "sonner";
 import type { Episode, Mob, CrawlerPlacement, EpisodeMobPlacement } from "@/lib/gameData";
 
 type AppScreen = "splash" | "menu" | "game";
-type GameView = "profiles" | "maps" | "inventory" | "mobs" | "dungeonai" | "showtime" | "sounds";
+type GameView = "profiles" | "maps" | "inventory" | "mobs" | "dungeonai" | "showtime" | "sounds" | "wiki";
 
-const GAME_VIEWS: readonly string[] = ["profiles", "maps", "inventory", "mobs", "dungeonai", "showtime", "sounds"];
+const GAME_VIEWS: readonly string[] = ["profiles", "maps", "inventory", "mobs", "dungeonai", "showtime", "sounds", "wiki"];
 
 const STORAGE_KEY_PLAYER = "dcc_current_player";
 const STORAGE_KEY_MAP_VISIBILITY = "dcc_map_visibility";
@@ -148,7 +149,6 @@ const Index = () => {
     performLongRest,
     combatState,
     startCombat,
-    rollMobInitiatives,
     recordCombatInitiative,
     confirmInitiative,
     advanceCombatTurn,
@@ -159,6 +159,10 @@ const Index = () => {
     cancelCombat,
     removeCombatant,
     addCombatant,
+    wikiPages,
+    addWikiPage,
+    updateWikiPage,
+    roomId,
     isLoaded
   } = useGameState();
 
@@ -272,12 +276,7 @@ const Index = () => {
     } else if (maps.length < mapVisibility.length) {
       setMapVisibility((prev) => prev.slice(0, maps.length));
     }
-    if (maps.length > mapNames.length) {
-      setMapNames((prev) => [...prev, ...Array(maps.length - prev.length).fill(undefined).map((_, i) => `Map ${prev.length + i + 1}`)]);
-    } else if (maps.length < mapNames.length) {
-      setMapNames((prev) => prev.slice(0, maps.length));
-    }
-  }, [maps.length, mapVisibility.length, mapNames.length]);
+  }, [maps.length, mapVisibility.length]);
 
   // Loot box notifications
   const seenLootBoxIds = useRef<Set<string>>(new Set());
@@ -344,6 +343,36 @@ const Index = () => {
     }
     return combatState;
   }, [combatState, activeEpisode]);
+
+  // Stable callbacks for ShowTimeView to avoid re-triggering effects on every render
+  const handleShowtimeActiveChange = useCallback((active: boolean, episode?: Episode | null) => {
+    setIsShowtimeActive(active);
+    setActiveEpisode(episode ?? null);
+    if (!active) {
+      setRuntimeCrawlerPlacements([]);
+      setRuntimeMobPlacements([]);
+    }
+  }, []);
+
+  const handleEndEpisode = useCallback(() => {
+    setIsShowtimeActive(false);
+    setActiveEpisode(null);
+    setRuntimeCrawlerPlacements([]);
+    setRuntimeMobPlacements([]);
+  }, []);
+
+  const handleRuntimePlacementsChange = useCallback((cp: CrawlerPlacement[], mp: EpisodeMobPlacement[]) => {
+    setRuntimeCrawlerPlacements(cp);
+    setRuntimeMobPlacements(mp);
+  }, []);
+
+  const handleGameActiveChange = useCallback((active: boolean) => {
+    setIsGameActive(active);
+  }, []);
+
+  const handleRegisterGameToggle = useCallback((fn: (active: boolean) => Promise<void>) => {
+    setGameActiveRef.current = fn;
+  }, []);
 
   if (!isLoaded) {
     return (
@@ -484,26 +513,11 @@ const Index = () => {
                 unlockLootBox={unlockLootBox}
                 deleteLootBox={deleteLootBox}
                 addDiceRoll={addDiceRoll}
-                onEndEpisode={() => {
-                  setIsShowtimeActive(false);
-                  setActiveEpisode(null);
-                  setRuntimeCrawlerPlacements([]);
-                  setRuntimeMobPlacements([]);
-                }}
-                onShowtimeActiveChange={(active, episode) => {
-                  setIsShowtimeActive(active);
-                  setActiveEpisode(episode ?? null);
-                  if (!active) {
-                    setRuntimeCrawlerPlacements([]);
-                    setRuntimeMobPlacements([]);
-                  }
-                }}
-                onRuntimePlacementsChange={(cp, mp) => {
-                  setRuntimeCrawlerPlacements(cp);
-                  setRuntimeMobPlacements(mp);
-                }}
-                onGameActiveChange={(active) => setIsGameActive(active)}
-                onRegisterGameToggle={(fn) => { setGameActiveRef.current = fn; }}
+                onEndEpisode={handleEndEpisode}
+                onShowtimeActiveChange={handleShowtimeActiveChange}
+                onRuntimePlacementsChange={handleRuntimePlacementsChange}
+                onGameActiveChange={handleGameActiveChange}
+                onRegisterGameToggle={handleRegisterGameToggle}
                 getCrawlerInventory={getCrawlerInventory}
                 onUpdateCrawlerInventory={updateCrawlerInventory}
                 getSharedInventory={getSharedInventory}
@@ -511,9 +525,18 @@ const Index = () => {
                 noncombatTurnState={noncombatTurnState}
                 resetNoncombatTurns={resetNoncombatTurns}
                 combatState={activeCombatState}
+                roomId={roomId}
               />
             )}
             {currentView === "sounds" && <SoundEffectsView />}
+            {currentView === "wiki" && (
+              <WikiView
+                wikiPages={wikiPages}
+                onUpdateWikiPage={updateWikiPage}
+                onAddWikiPage={addWikiPage}
+                playerName={currentPlayer.name}
+              />
+            )}
           </main>
 
           <DiceRoller

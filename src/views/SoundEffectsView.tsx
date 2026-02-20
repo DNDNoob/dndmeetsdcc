@@ -17,6 +17,16 @@ interface SoundEffect extends Record<string, unknown> {
   source?: string;
 }
 
+// Shape of results from sound search APIs
+interface SoundSearchResult {
+  id: string | number;
+  name: string;
+  url?: string;
+  tags?: string[];
+  source?: string;
+  previews?: Record<string, string>;
+}
+
 const LOCAL_SOUNDS: SoundEffect[] = [
   { id: "1", name: "Sword Slash", url: "https://assets.mixkit.co/active_storage/sfx/2792/2792.wav", tags: ["combat", "weapon", "sword"], source: "local" },
   { id: "2", name: "Magic Spell", url: "https://assets.mixkit.co/active_storage/sfx/2566/2566.wav", tags: ["magic", "spell", "casting"], source: "local" },
@@ -42,7 +52,7 @@ function cleanSoundName(name: string): string {
   cleaned = cleaned.replace(/\.(wav|mp3|ogg|flac)$/i, '');
   
   // Replace underscores and hyphens with spaces
-  cleaned = cleaned.replace(/[_\-]/g, ' ');
+  cleaned = cleaned.replace(/[_-]/g, ' ');
   
   // Capitalize first letter of each word
   cleaned = cleaned.replace(/\b\w/g, (char) => char.toUpperCase());
@@ -89,6 +99,7 @@ const SoundEffectsView: React.FC = () => {
   }, [uploaded.length]);
 
   useEffect(() => {
+    if (!db) return; // Guard against null db
     // Listen for sound broadcasts
     const broadcastCollectionName = roomId ? `rooms/${roomId}/sound-broadcast` : 'sound-broadcast';
     const q = query(collection(db, broadcastCollectionName), where('createdAt', '>', mountTime.current));
@@ -116,7 +127,7 @@ const SoundEffectsView: React.FC = () => {
 
   useEffect(() => {
     let active = true;
-    let timer: any = null;
+    let timer: ReturnType<typeof setTimeout> | null = null;
     const doSearch = async () => {
       const q = searchQuery.trim();
 
@@ -138,10 +149,10 @@ const SoundEffectsView: React.FC = () => {
           }
           const json = await res.json();
           if (!active) return;
-          const mapped: SoundEffect[] = (json.results || []).map((r: any) => ({
-            id: r.id,
+          const mapped: SoundEffect[] = (json.results || []).map((r: SoundSearchResult) => ({
+            id: String(r.id),
             name: r.name,
-            url: r.url,
+            url: r.url || '',
             tags: r.tags || [],
             source: r.source || json.source || 'proxy'
           }));
@@ -171,7 +182,7 @@ const SoundEffectsView: React.FC = () => {
           if (!res.ok) throw new Error(`Freesound API ${res.status}`);
           const json = await res.json();
           if (!active) return;
-          const mapped: SoundEffect[] = (json.results || []).map((r: any) => ({
+          const mapped: SoundEffect[] = (json.results || []).map((r: SoundSearchResult) => ({
             id: `freesound-${r.id}`,
             name: r.name,
             url: r.previews?.['preview-hq-mp3'] || r.previews?.['preview-lq-mp3'] || '',
@@ -259,6 +270,7 @@ const SoundEffectsView: React.FC = () => {
   };
 
   const broadcastSound = async (sound: SoundEffect) => {
+    if (!db) return; // Guard against null db
     const broadcastCollectionName = roomId ? `rooms/${roomId}/sound-broadcast` : 'sound-broadcast';
     try {
       console.log('[SoundEffectsView] Broadcasting sound:', sound, 'to collection:', broadcastCollectionName, 'roomId:', roomId);

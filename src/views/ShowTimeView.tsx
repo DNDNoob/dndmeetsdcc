@@ -15,7 +15,6 @@ import { MapToolsMenu } from "@/components/ui/MapToolsMenu";
 import { CrawlerIcon } from "@/components/ui/CrawlerIcon";
 import { db } from "@/lib/firebase";
 import { doc, setDoc, onSnapshot, serverTimestamp, Timestamp } from "firebase/firestore";
-import { useFirebaseStore } from "@/hooks/useFirebaseStore";
 import { useThrottledCallback } from "@/hooks/useDebounce";
 
 interface ShowTimeViewProps {
@@ -46,6 +45,7 @@ interface ShowTimeViewProps {
   onRuntimePlacementsChange?: (crawlerPlacements: CrawlerPlacement[], runtimeMobPlacements: EpisodeMobPlacement[]) => void;
   onGameActiveChange?: (active: boolean) => void;
   onRegisterGameToggle?: (toggleFn: (active: boolean) => Promise<void>) => void;
+  roomId?: string | null;
 }
 
 const SHOWTIME_STORAGE_KEY = 'dcc_showtime_state';
@@ -359,9 +359,9 @@ const InventoryPanel: React.FC<{
   );
 };
 
-const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock, noncombatTurnState, resetNoncombatTurns, combatState, onRuntimePlacementsChange, onGameActiveChange, onRegisterGameToggle }) => {
-  const { roomId } = useFirebaseStore();
+const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock, noncombatTurnState, resetNoncombatTurns, combatState, onRuntimePlacementsChange, onGameActiveChange, onRegisterGameToggle, roomId }) => {
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
+  const selectedEpisodeIdRef = useRef<string | null>(null);
   const [currentMapIndex, setCurrentMapIndex] = useState(0);
   const [displayedMobIds, setDisplayedMobIds] = useState<string[]>([]);
   const [selectedMap, setSelectedMap] = useState<string | null>(null);
@@ -389,7 +389,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   const lastFogBroadcastTime = useRef<number>(0);
   const FOG_BROADCAST_THROTTLE_MS = 50; // Faster fog sync for better real-time experience
   const pendingFogBroadcast = useRef<{ x: number; y: number; radius: number }[] | null>(null);
-  const CONSOLIDATION_THRESHOLD = 1000; // Only consolidate when array gets very large
+  const CONSOLIDATION_THRESHOLD = 3000; // Higher threshold preserves fog precision
 
   // Ping and Box state
   const [pings, setPings] = useState<Ping[]>([]);
@@ -458,8 +458,10 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
   // Keep selectedEpisode in sync with latest episode data from Firebase
   // This ensures changes made in the DM console (e.g., map scale) are reflected
+  // Skip sync during active drag to prevent overwriting local drag position
   useEffect(() => {
     if (!selectedEpisode) return;
+    if (draggingMobIdRef.current) return; // Don't overwrite during active drag
     const updated = episodes.find(e => e.id === selectedEpisode.id);
     if (updated) {
       // Use JSON comparison since getStableCollection may return same reference
@@ -467,7 +469,6 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       const currentJson = JSON.stringify(selectedEpisode);
       const updatedJson = JSON.stringify(updated);
       if (currentJson !== updatedJson) {
-        console.log('[ShowTime] Episode data updated, syncing. mapSettings:', updated.mapSettings);
         setSelectedEpisode(updated);
       }
     }
@@ -502,10 +503,14 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     onRuntimePlacementsChange?.(allCrawler, allMob);
   }, [crawlerPlacements, runtimeMobPlacements, currentMapId, selectedEpisode, onRuntimePlacementsChange]);
 
-  // Keep draggingMobId ref in sync with state (avoids listener re-subscription)
+  // Keep refs in sync with state (avoids listener re-subscription / stale closures)
   useEffect(() => {
     draggingMobIdRef.current = draggingMobId;
   }, [draggingMobId]);
+
+  useEffect(() => {
+    selectedEpisodeIdRef.current = selectedEpisode?.id ?? null;
+  }, [selectedEpisode?.id]);
 
   // Broadcast showtime state to sync with other players
   const broadcastShowtimeState = useCallback(async (
@@ -514,7 +519,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     mapUrl: string | null,
     started?: boolean
   ) => {
-    if (!isAdmin) return; // Only DM broadcasts
+    if (!isAdmin || !db) return; // Only DM broadcasts; guard against null db
 
     const showtimeDocPath = roomId
       ? `rooms/${roomId}/showtime-state/current`
@@ -536,7 +541,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
   // Listen for showtime state updates (for players)
   useEffect(() => {
-    if (isAdmin) return; // DM doesn't need to listen - they control the state
+    if (isAdmin || !db) return; // DM doesn't need to listen; guard against null db
 
     const showtimeDocPath = roomId
       ? `rooms/${roomId}/showtime-state/current`
@@ -568,10 +573,10 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
         return;
       }
 
-      // Update episode if changed
+      // Update episode if changed (use ref to avoid stale closure)
       if (data.episodeId) {
         const episode = episodes.find(e => e.id === data.episodeId);
-        if (episode && episode.id !== selectedEpisode?.id) {
+        if (episode && episode.id !== selectedEpisodeIdRef.current) {
           setSelectedEpisode(episode);
         }
       } else {
@@ -722,24 +727,9 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     }
   }, [mapImageDimensions, containerSize, mapBaseScale]);
 
-  // Debug logging
-  if (selectedEpisode && currentMapId) {
-    console.log('[ShowTime] Map display:', {
-      episode: selectedEpisode.name,
-      currentMapId,
-      mapBaseScale,
-      hasMapSettings: !!selectedEpisode.mapSettings,
-      mapSettingsKeys: selectedEpisode.mapSettings ? Object.keys(selectedEpisode.mapSettings) : 'none',
-      mapSettingsRaw: JSON.stringify(selectedEpisode.mapSettings),
-      scaleForCurrentMap: selectedEpisode.mapSettings?.[currentMapId]?.scale ?? 'not set',
-      mapIds: selectedEpisode.mapIds,
-      allEpisodeKeys: Object.keys(selectedEpisode),
-    });
-  }
-
   // Listen for real-time drag updates from other players
   useEffect(() => {
-    if (!selectedEpisode) return;
+    if (!selectedEpisode || !db) return;
 
     const episodeId = selectedEpisode.id;
 
@@ -795,7 +785,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
   // Broadcast drag state to other players (all users can broadcast)
   const broadcastDragState = useCallback(async (placementIndex: number, x: number, y: number) => {
-    if (!selectedEpisode) return;
+    if (!selectedEpisode || !db) return;
 
     const dragDocPath = roomId
       ? `rooms/${roomId}/mob-drag-state/${selectedEpisode.id}`
@@ -819,7 +809,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
   // Listen for fog of war updates
   useEffect(() => {
-    if (!selectedEpisode || !currentMapId) return;
+    if (!selectedEpisode || !currentMapId || !db) return;
 
     const fogDocPath = roomId
       ? `rooms/${roomId}/fog-of-war/${selectedEpisode.id}-${currentMapId}`
@@ -918,7 +908,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     areas: { x: number; y: number; radius: number }[],
     scale: number
   ) => {
-    if (!selectedEpisode || !currentMapId || !isAdmin) return;
+    if (!selectedEpisode || !currentMapId || !isAdmin || !db) return;
 
     const fogDocPath = roomId
       ? `rooms/${roomId}/fog-of-war/${selectedEpisode.id}-${currentMapId}`
@@ -974,7 +964,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
       return newAreas;
     });
-  }, [fogOfWarEnabled, mapScale, broadcastFogState, consolidateFogCircles]);
+  }, [fogOfWarEnabled, mapScale, broadcastFogState]);
 
   // Handle painting fog back over previously cleared areas
   const handleFogPaint = useCallback((x: number, y: number, radius: number) => {
@@ -1025,7 +1015,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
   // Listen for ping updates
   useEffect(() => {
-    if (!selectedEpisode || !currentMapId) return;
+    if (!selectedEpisode || !currentMapId || !db) return;
 
     const pingDocPath = roomId
       ? `rooms/${roomId}/pings/${selectedEpisode.id}-${currentMapId}`
@@ -1053,7 +1043,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
   // Listen for box updates
   useEffect(() => {
-    if (!selectedEpisode || !currentMapId) return;
+    if (!selectedEpisode || !currentMapId || !db) return;
 
     const boxDocPath = roomId
       ? `rooms/${roomId}/map-boxes/${selectedEpisode.id}-${currentMapId}`
@@ -1076,7 +1066,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
   // Broadcast a ping
   const broadcastPing = useCallback(async (x: number, y: number, color: string) => {
-    if (!selectedEpisode || !currentMapId) return;
+    if (!selectedEpisode || !currentMapId || !db) return;
 
     const pingDocPath = roomId
       ? `rooms/${roomId}/pings/${selectedEpisode.id}-${currentMapId}`
@@ -1106,7 +1096,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
   // Broadcast box updates
   const broadcastBoxes = useCallback(async (boxes: MapBoxData[]) => {
-    if (!selectedEpisode || !currentMapId) return;
+    if (!selectedEpisode || !currentMapId || !db) return;
 
     const boxDocPath = roomId
       ? `rooms/${roomId}/map-boxes/${selectedEpisode.id}-${currentMapId}`
@@ -1129,7 +1119,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
   // Broadcast ruler state to other players
   const broadcastRulerState = useCallback(async (start: { x: number; y: number } | null, end: { x: number; y: number } | null) => {
-    if (!selectedEpisode || !currentMapId) return;
+    if (!selectedEpisode || !currentMapId || !db) return;
 
     const rulerDocPath = roomId
       ? `rooms/${roomId}/ruler-state/${selectedEpisode.id}-${currentMapId}`
@@ -1157,7 +1147,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
   // Listen for ruler state updates
   useEffect(() => {
-    if (!selectedEpisode || !currentMapId) return;
+    if (!selectedEpisode || !currentMapId || !db) return;
 
     const rulerDocPath = roomId
       ? `rooms/${roomId}/ruler-state/${selectedEpisode.id}-${currentMapId}`
@@ -1172,7 +1162,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       }
       const data = snapshot.data();
       // Filter out our own ruler
-      const others = (data.rulers ?? []).filter((r: any) => r.id !== rulerSessionId.current);
+      const others = (data.rulers ?? []).filter((r: { id: string; start: { x: number; y: number }; end: { x: number; y: number } }) => r.id !== rulerSessionId.current);
       setRemoteRulers(others);
     });
 
@@ -1199,29 +1189,34 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       createdBy: isAdmin ? 'admin' : 'user',
       shape,
     };
-    const updatedBoxes = [...mapBoxes, newBox];
-    setMapBoxes(updatedBoxes);
-    broadcastBoxes(updatedBoxes);
+    setMapBoxes(prev => {
+      const updatedBoxes = [...prev, newBox];
+      broadcastBoxes(updatedBoxes);
+      return updatedBoxes;
+    });
     // Deselect shape mode after placing
     setIsBoxMode(false);
-  }, [mapBoxes, broadcastBoxes, isAdmin]);
+  }, [broadcastBoxes, isAdmin]);
 
   // Handle updating a box with throttled broadcast
   const handleUpdateBox = useCallback((updatedBox: MapBoxData) => {
-    const updatedBoxes = mapBoxes.map(b => b.id === updatedBox.id ? updatedBox : b);
-    setMapBoxes(updatedBoxes);
+    setMapBoxes(prev => {
+      const updatedBoxes = prev.map(b => b.id === updatedBox.id ? updatedBox : b);
 
-    // Track pending broadcast for final sync
-    pendingBoxBroadcast.current = updatedBoxes;
+      // Track pending broadcast for final sync
+      pendingBoxBroadcast.current = updatedBoxes;
 
-    // Throttle broadcasts to prevent lag during drag/resize/rotate
-    const now = Date.now();
-    if (now - lastBoxBroadcastTime.current >= BROADCAST_THROTTLE_MS) {
-      lastBoxBroadcastTime.current = now;
-      pendingBoxBroadcast.current = null;
-      broadcastBoxes(updatedBoxes);
-    }
-  }, [mapBoxes, broadcastBoxes]);
+      // Throttle broadcasts to prevent lag during drag/resize/rotate
+      const now = Date.now();
+      if (now - lastBoxBroadcastTime.current >= BROADCAST_THROTTLE_MS) {
+        lastBoxBroadcastTime.current = now;
+        pendingBoxBroadcast.current = null;
+        broadcastBoxes(updatedBoxes);
+      }
+
+      return updatedBoxes;
+    });
+  }, [broadcastBoxes]);
 
   // Handle box manipulation end - ensure final state is broadcast
   const handleBoxManipulationEnd = useCallback(() => {
@@ -1233,14 +1228,16 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
   // Handle deleting a box
   const handleDeleteBox = useCallback((id: string) => {
-    const updatedBoxes = mapBoxes.filter(b => b.id !== id);
-    setMapBoxes(updatedBoxes);
-    broadcastBoxes(updatedBoxes);
-  }, [mapBoxes, broadcastBoxes]);
+    setMapBoxes(prev => {
+      const updatedBoxes = prev.filter(b => b.id !== id);
+      broadcastBoxes(updatedBoxes);
+      return updatedBoxes;
+    });
+  }, [broadcastBoxes]);
 
   // Broadcast crawler placements (all users can broadcast)
   const broadcastCrawlerPlacements = useCallback(async (placements: CrawlerPlacement[]) => {
-    if (!selectedEpisode || !currentMapId) return;
+    if (!selectedEpisode || !currentMapId || !db) return;
 
     const crawlerDocPath = roomId
       ? `rooms/${roomId}/crawler-placements/${selectedEpisode.id}-${currentMapId}`
@@ -1260,7 +1257,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
   // Broadcast runtime mob placements (all users can broadcast)
   const broadcastRuntimeMobPlacements = useCallback(async (placements: EpisodeMobPlacement[]) => {
-    if (!selectedEpisode || !currentMapId) return;
+    if (!selectedEpisode || !currentMapId || !db) return;
 
     const mobDocPath = roomId
       ? `rooms/${roomId}/runtime-mob-placements/${selectedEpisode.id}-${currentMapId}`
@@ -1514,7 +1511,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
   // Listen for crawler placement updates
   useEffect(() => {
-    if (!selectedEpisode || !currentMapId) return;
+    if (!selectedEpisode || !currentMapId || !db) return;
 
     const crawlerDocPath = roomId
       ? `rooms/${roomId}/crawler-placements/${selectedEpisode.id}-${currentMapId}`
@@ -1541,7 +1538,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
   // Listen for runtime mob placement updates
   useEffect(() => {
-    if (!selectedEpisode || !currentMapId) return;
+    if (!selectedEpisode || !currentMapId || !db) return;
 
     const mobDocPath = roomId
       ? `rooms/${roomId}/runtime-mob-placements/${selectedEpisode.id}-${currentMapId}`
@@ -1564,7 +1561,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
   // Broadcast displayed mob IDs so players can see mob cards
   const broadcastDisplayedMobs = useCallback(async (mobIds: string[]) => {
-    if (!selectedEpisode || !isAdmin) return;
+    if (!selectedEpisode || !isAdmin || !db) return;
 
     const displayDocPath = roomId
       ? `rooms/${roomId}/displayed-mobs/${selectedEpisode.id}`
@@ -1582,7 +1579,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
   // Listen for displayed mob updates (for players)
   useEffect(() => {
-    if (isAdmin || !selectedEpisode) return;
+    if (isAdmin || !selectedEpisode || !db) return;
 
     const displayDocPath = roomId
       ? `rooms/${roomId}/displayed-mobs/${selectedEpisode.id}`
@@ -1604,7 +1601,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
   // Broadcast name overrides
   const broadcastNameOverrides = useCallback(async (overrides: Record<string, string>) => {
-    if (!selectedEpisode || !currentMapId) return;
+    if (!selectedEpisode || !currentMapId || !db) return;
 
     const nameDocPath = roomId
       ? `rooms/${roomId}/name-overrides/${selectedEpisode.id}-${currentMapId}`
@@ -1622,7 +1619,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
   // Listen for name override updates
   useEffect(() => {
-    if (!selectedEpisode || !currentMapId) return;
+    if (!selectedEpisode || !currentMapId || !db) return;
 
     const nameDocPath = roomId
       ? `rooms/${roomId}/name-overrides/${selectedEpisode.id}-${currentMapId}`

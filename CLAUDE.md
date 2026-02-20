@@ -130,7 +130,7 @@ const { addItem } = useGame(); // Only Index.tsx should use this
 Defined in `useFirebaseStore.ts`:
 ```
 crawlers, mobs, maps, inventory, episodes, soundEffects, diceRolls,
-lootBoxes, lootBoxTemplates, noncombatTurns, gameClock
+lootBoxes, lootBoxTemplates, noncombatTurns, gameClock, combatState, wiki
 ```
 
 ### Adding a New Collection
@@ -233,7 +233,7 @@ if (operations.length > 0) await batchWrite(operations);
 
 | Field | Max Size | Behavior If Exceeded |
 |-------|----------|---------------------|
-| `image` (maps) | 15 MB string length (`MAX_IMAGE_LENGTH`) | Silently stripped before save |
+| `image` (maps) | ~1 MB string length (`MAX_IMAGE_LENGTH`) | Silently stripped before save |
 | `image` (mobs) | Compressed to ~800 KB | Resized to 512px max, JPEG quality reduced |
 | `avatar` (crawlers) | 500 KB string length (`MAX_AVATAR_LENGTH`) | Resized to 512px max, JPEG quality reduced |
 | Firestore document | 1 MB total | Write fails |
@@ -242,11 +242,11 @@ if (operations.length > 0) await batchWrite(operations);
 
 The goal is to save Firebase storage space **without reducing resolution where high-res display is needed**:
 
-- **Map images**: Uploaded at **full resolution** — no compression or resizing. Maps are displayed at large sizes and need high resolution. The 15 MB limit in `useFirebaseStore.ts` is the only constraint.
+- **Map images**: Uploaded at **full resolution** — no compression or resizing. Maps are displayed at large sizes and need high resolution. The ~1 MB `MAX_IMAGE_LENGTH` in `useFirebaseStore.ts` strips inline base64 images exceeding the Firestore field limit; large maps are uploaded to Firebase Storage instead (see `DungeonAIView.tsx`).
 - **Mob images**: Compressed client-side in `DungeonAIView.tsx` via `resizeImage()` (512px max, JPEG quality 0.7). Mobs are displayed at small sizes on the map.
 - **Avatar/profile images**: Compressed client-side in `ProfilesView.tsx` (512px max, JPEG quality 0.8). Avatars are displayed as small thumbnails.
 
-**Never add compression to map uploads.** If a map image exceeds 15 MB, it will be silently stripped by `useFirebaseStore` — the user should be informed to use a smaller image.
+**Never add compression to map uploads.** Maps exceeding the ~1 MB Firestore field limit are uploaded to Firebase Storage automatically by `DungeonAIView.tsx`. If a map image is too large for both paths, the user should be informed to use a smaller image.
 
 - `cleanObject()` in useFirebaseStore automatically strips `undefined` values before every write
 - You do **not** need to manually call cleanObject — it's applied in addItem, updateItem, and batchWrite
@@ -296,6 +296,8 @@ const [name, setName] = useState('');
 2. **Lint check**: Run `npm run lint` — must not introduce new errors (pre-existing warnings are OK)
 3. **TDZ / variable-ordering check**: After editing any component file, verify that no `const` or `let` variable is referenced before its declaration in the same scope. Pay special attention to `Index.tsx` where aliases like `const mapNames = firestoreMapNames` must come **after** the `useGameState()` destructuring that declares `firestoreMapNames`. TDZ errors cause blank pages in production builds but may be silently hidden by the dev server (esbuild).
 4. **Screenshot verification**: After any edit that alters the UI, take a screenshot of the affected page/component to verify the UI renders correctly. Compare against the expected layout and fix any visual regressions before committing.
+5. **Changelog update**: Add a new entry to `changelog.json` for every commit that introduces user-facing changes. Group changes under today's date (or merge with an existing entry for today). Use emoji prefixes to categorize changes (e.g., `🐛` for bugs, `⚔️` for combat, `🗺️` for maps). See the existing changelog for format examples.
+6. **Wiki update**: If the commit adds or modifies a user-facing feature, update the corresponding wiki page(s) in `src/lib/wikiDefaults.ts`. The wiki content covers all game features and mechanics. If you add a new feature, add a new wiki page for it. The wiki content uses Markdown format.
 
 ### Screenshot Workflow
 
