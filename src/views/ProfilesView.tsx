@@ -301,15 +301,15 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
 
   const selected = crawlers.find((c) => c.id === selectedId) || crawlers[0];
   const isOwnProfile = !currentPlayerId || currentPlayerId === selected?.id;
-  const rawInventory = selected ? getCrawlerInventory(selected.id) : [];
   // Memoize inventory to prevent cascading recomputation of dependent useMemos
   const inventoryRef = useRef<InventoryItem[]>([]);
   const inventory = useMemo(() => {
-    if (JSON.stringify(rawInventory) !== JSON.stringify(inventoryRef.current)) {
-      inventoryRef.current = rawInventory;
+    const raw = selected ? getCrawlerInventory(selected.id) : [];
+    if (JSON.stringify(raw) !== JSON.stringify(inventoryRef.current)) {
+      inventoryRef.current = raw;
     }
     return inventoryRef.current;
-  }, [rawInventory]);
+  }, [selected, getCrawlerInventory]);
 
   // Get all unique tags from inventory (dynamic)
   const availableTags = useMemo(() => {
@@ -1097,14 +1097,15 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 { key: "int", label: "INT", icon: Brain },
                 { key: "cha", label: "CHA", icon: Sparkles },
               ].map(({ key, label }) => {
-                const base = (selected as any)[key] as number;
+                const statKey = key as keyof Pick<Crawler, 'str' | 'dex' | 'con' | 'int' | 'cha'>;
+                const base = selected[statKey];
                 const mod = equippedMods[key as keyof StatModifiers] ?? 0;
                 return editMode ? (
                   <div key={key} className="flex items-center justify-between bg-muted/50 px-4 py-3 rounded">
                     <span className="text-muted-foreground text-base">{label}</span>
                     <input
                       type="number"
-                      value={(editData as any)[key] ?? (selected as any)[key]}
+                      value={editData?.[statKey] ?? selected[statKey]}
                       onChange={(e) =>
                         setEditData({ ...editData, [key]: parseInt(e.target.value) || 0 })
                       }

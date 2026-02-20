@@ -1162,7 +1162,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       }
       const data = snapshot.data();
       // Filter out our own ruler
-      const others = (data.rulers ?? []).filter((r: any) => r.id !== rulerSessionId.current);
+      const others = (data.rulers ?? []).filter((r: { id: string; start: { x: number; y: number }; end: { x: number; y: number } }) => r.id !== rulerSessionId.current);
       setRemoteRulers(others);
     });
 
