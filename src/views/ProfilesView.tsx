@@ -2437,33 +2437,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             setShowDamageTargetModal(true);
             setDamageRollResult(null);
             setSplashTargetIds([]);
-          } else if (!isCombatPhaseLocal) {
-            // Outside combat: auto-roll damage alongside attack for convenience
-            let totalDamage = 0;
-            const dmgResults: { dice: string; result: number }[] = [];
-            // Break out individual die results
-            for (const die of wd.damageDice) {
-              for (let i = 0; i < die.count; i++) {
-                const roll = Math.floor(Math.random() * die.sides) + 1;
-                dmgResults.push({ dice: `d${die.sides}`, result: roll });
-                totalDamage += roll;
-              }
-            }
-            const dmgStatMod = calcMod(wd.damageModifiers);
-            totalDamage += dmgStatMod;
-            const dmgDiceLabel = wd.damageDice.map(d => `${d.count}d${d.sides}`).join(' + ');
-            if (addDiceRoll) {
-              addDiceRoll({
-                id: crypto.randomUUID(),
-                crawlerName: selected.name,
-                crawlerId: selected.id,
-                timestamp: Date.now(),
-                results: dmgResults,
-                total: totalDamage,
-                statRoll: { stat: `${weapon.name} (${wd.damageType} Damage)`, modifier: dmgStatMod, rawRoll: totalDamage - dmgStatMod, diceLabel: dmgDiceLabel, rollType: 'Damage' },
-              });
-            }
           }
+          // Damage is NOT auto-rolled — player clicks the DAMAGE button manually
 
           if (isCombatPhaseLocal && isMyTurn) {
             onRecordCombatAction?.(selected.id, 'action');
