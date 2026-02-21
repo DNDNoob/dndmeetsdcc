@@ -478,7 +478,7 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
                     </div>
                     <input
                       type="range"
-                      min="4"
+                      min="1"
                       max="15"
                       step="1"
                       value={fogBrushSize}
