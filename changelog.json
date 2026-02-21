@@ -1,5 +1,14 @@
 [
   {
+    "date": "2026-02-21",
+    "changes": [
+      "👤 Player identity switcher dropdown now available on the Main Menu screen",
+      "👤 Dungeon AI (DM) login option added to the player switcher dropdown on all pages",
+      "Crawlers can now switch to DM mode directly from the navigation bar without returning to the main menu",
+      "Password-protected DM access with inline password prompt in the dropdown"
+    ]
+  },
+  {
     "date": "2026-02-19",
     "changes": [
       "📖 MAJOR: Added Wiki system accessible from the main navigation bar",
