@@ -199,7 +199,9 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
                             <span className="font-display" style={{ color: getLootBoxTierColor(entry.lootBoxNotification.tier as 'Dirt' | 'Copper' | 'Silver' | 'Gold') }}>
                               {entry.lootBoxNotification.boxName}
                             </span>
-                            <span className="text-muted-foreground"> sent to </span>
+                            {entry.crawlerId !== '__system__' && (
+                              <span className="text-muted-foreground"> sent to </span>
+                            )}
                             <span className="text-primary">{entry.lootBoxNotification.recipientNames.join(', ')}</span>
                           </div>
                           <span className="text-[10px] text-muted-foreground/60 ml-auto">{formatTimestamp(entry.timestamp)}</span>
