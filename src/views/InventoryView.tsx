@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
@@ -127,6 +127,9 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   const [searchQueries, setSearchQueries] = useState<Record<string, string>>({});
   // Quantity to add per library item
   const [addQuantities, setAddQuantities] = useState<Record<string, number>>({});
+  // Library search and filter state
+  const [librarySearchQuery, setLibrarySearchQuery] = useState("");
+  const [librarySlotFilter, setLibrarySlotFilter] = useState<string>("all");
 
   // Local gold state for immediate UI updates (avoids lag while typing)
   const [localGold, setLocalGold] = useState<Record<string, number>>({});
@@ -282,6 +285,106 @@ const InventoryView: React.FC<InventoryViewProps> = ({
 
   const libraryItems = getSharedInventory();
 
+  // Shared renderer for expanded item details (used by both library and crawler items)
+  const renderExpandedItemDetails = (item: InventoryItem) => (
+    <div className="mt-2 space-y-1.5 text-xs border-l-2 border-primary/30 pl-3">
+      {item.description && (
+        <div>
+          <span className="text-muted-foreground">Description: </span>
+          <span className="text-foreground">{item.description}</span>
+        </div>
+      )}
+      {item.goldValue !== undefined && item.goldValue > 0 && (
+        <div>
+          <span className="text-muted-foreground">Value: </span>
+          <span className="text-accent">{item.goldValue}G</span>
+        </div>
+      )}
+      {item.equipSlot && (
+        <div>
+          <span className="text-muted-foreground">Slot: </span>
+          <span className="text-foreground">
+            {item.equipSlot === 'weapon' ? 'Weapon' :
+             item.equipSlot === 'leftHand' ? 'Left Hand' :
+             item.equipSlot === 'rightHand' ? 'Right Hand' :
+             item.equipSlot === 'ringFinger' ? 'Ring' :
+             item.equipSlot.charAt(0).toUpperCase() + item.equipSlot.slice(1)}
+          </span>
+        </div>
+      )}
+      {item.tags && item.tags.length > 0 && (
+        <div className="flex items-center gap-1 flex-wrap">
+          <span className="text-muted-foreground">Tags: </span>
+          {item.tags.map(tag => (
+            <span key={tag} className="bg-primary/10 text-primary px-1.5 py-0.5 rounded text-[10px]">{tag}</span>
+          ))}
+        </div>
+      )}
+      {item.statModifiers && Object.keys(item.statModifiers).length > 0 && (
+        <div>
+          <span className="text-muted-foreground">Stat Modifiers: </span>
+          <div className="flex flex-wrap gap-1 mt-0.5">
+            {Object.entries(item.statModifiers).filter(([,v]) => v !== 0).map(([stat, val]) => (
+              <span key={stat} className={`px-1.5 py-0.5 rounded ${(val as number) > 0 ? 'text-green-400 bg-green-400/10' : 'text-red-400 bg-red-400/10'}`}>
+                {stat.toUpperCase()} {(val as number) > 0 ? '+' : ''}{val}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      {item.weaponData && (
+        <div className="border border-destructive/20 bg-destructive/5 p-2 rounded space-y-1">
+          <span className="text-destructive font-display text-[10px]">WEAPON DATA</span>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
+            <div><span className="text-muted-foreground">Type: </span><span>{item.weaponData.weaponType}</span></div>
+            <div><span className="text-muted-foreground">Damage: </span><span className="text-destructive">{item.weaponData.damageType}</span></div>
+            <div><span className="text-muted-foreground">Dice: </span><span>{item.weaponData.damageDice.map(d => `${d.count}d${d.sides}`).join(' + ')}</span></div>
+            <div><span className="text-muted-foreground">Range: </span><span>{item.weaponData.isRanged ? `${item.weaponData.normalRange ?? '?'}/${item.weaponData.maxRange ?? '?'} ft` : 'Melee'}</span></div>
+            {item.weaponData.hitDie && (
+              <div><span className="text-muted-foreground">Hit Die: </span><span>{item.weaponData.hitDie.count}d{item.weaponData.hitDie.sides}</span></div>
+            )}
+            {item.weaponData.splashDamage && (
+              <div><span className="text-muted-foreground">Splash: </span><span className="text-accent">Yes</span></div>
+            )}
+          </div>
+          {item.weaponData.specialEffect && (
+            <div className="mt-1"><span className="text-muted-foreground">Special: </span><span className="text-accent italic">{item.weaponData.specialEffect}</span></div>
+          )}
+        </div>
+      )}
+      {item.isUpgraded && (
+        <div>
+          <span className="text-accent text-[10px] font-display">UPGRADED</span>
+        </div>
+      )}
+    </div>
+  );
+
+  // Filter and sort library items for display
+  const filteredLibraryItems = useMemo(() => {
+    let items = [...libraryItems];
+    // Apply slot filter
+    if (librarySlotFilter !== "all") {
+      if (librarySlotFilter === "none") {
+        items = items.filter(i => !i.equipSlot);
+      } else {
+        items = items.filter(i => i.equipSlot === librarySlotFilter);
+      }
+    }
+    // Apply search - pull top 10 matching results to front
+    if (librarySearchQuery.trim()) {
+      const query = librarySearchQuery.toLowerCase();
+      const isMatch = (i: InventoryItem) =>
+        i.name.toLowerCase().includes(query) ||
+        i.description?.toLowerCase().includes(query) ||
+        i.tags?.some(t => t.toLowerCase().includes(query));
+      const matching = items.filter(isMatch);
+      const nonMatching = items.filter(i => !isMatch(i));
+      items = [...matching.slice(0, 10), ...nonMatching];
+    }
+    return items;
+  }, [libraryItems, librarySearchQuery, librarySlotFilter]);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -329,56 +432,114 @@ const InventoryView: React.FC<InventoryViewProps> = ({
             <BookOpen className="w-5 h-5" />
             ITEM LIBRARY
           </h3>
-          {libraryItems.length === 0 ? (
-            <p className="text-muted-foreground text-sm italic mb-3">No items in library</p>
+          {/* Search and filters */}
+          <div className="flex flex-col sm:flex-row gap-2 mb-3">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Search items..."
+                value={librarySearchQuery}
+                onChange={(e) => setLibrarySearchQuery(e.target.value)}
+                className="bg-muted border border-border px-2 py-1 pl-8 text-sm w-full"
+              />
+            </div>
+            <select
+              value={librarySlotFilter}
+              onChange={(e) => setLibrarySlotFilter(e.target.value)}
+              className="bg-muted border border-border px-2 py-1 text-sm"
+            >
+              <option value="all">All Slots</option>
+              <option value="none">No Slot</option>
+              <option value="weapon">Weapon</option>
+              <option value="head">Head</option>
+              <option value="chest">Chest</option>
+              <option value="legs">Legs</option>
+              <option value="feet">Feet</option>
+              <option value="leftHand">Left Hand</option>
+              <option value="rightHand">Right Hand</option>
+              <option value="ringFinger">Ring</option>
+            </select>
+          </div>
+          {filteredLibraryItems.length === 0 ? (
+            <p className="text-muted-foreground text-sm italic mb-3">
+              {librarySearchQuery || librarySlotFilter !== "all" ? "No matching items" : "No items in library"}
+            </p>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-3">
-              {libraryItems.map((item) => (
-                <div key={item.id} className={`flex items-start gap-2 text-sm py-2 px-3 border bg-background/50 ${editingLibraryItemId === item.id ? 'border-accent' : 'border-border/50'}`}>
-                  {getEquipmentIcon(item.equipSlot, "w-4 h-4 shrink-0 mt-0.5")}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1 flex-wrap">
-                      <span className="text-foreground font-medium">{item.name}</span>
-                      {item.equipSlot && (
-                        <span className="text-xs bg-accent/20 text-accent px-1.5 py-0.5 rounded">
-                          {item.equipSlot === 'weapon' ? 'Weapon' :
-                           item.equipSlot === 'leftHand' ? 'Left Hand' :
-                           item.equipSlot === 'rightHand' ? 'Right Hand' :
-                           item.equipSlot === 'ringFinger' ? 'Ring' :
-                           item.equipSlot.charAt(0).toUpperCase() + item.equipSlot.slice(1)}
-                        </span>
-                      )}
-                      {item.goldValue !== undefined && item.goldValue > 0 && (
-                        <span className="text-xs bg-accent/10 text-accent px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                          <Coins className="w-3 h-3" /> {item.goldValue}G
-                        </span>
-                      )}
-                    </div>
-                    {item.description && (
-                      <span className="text-muted-foreground text-xs block">({item.description})</span>
-                    )}
-                    {item.statModifiers && Object.keys(item.statModifiers).length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {Object.entries(item.statModifiers).filter(([,v]) => v !== 0).map(([stat, val]) => (
-                          <span key={stat} className={`text-xs px-1 rounded ${(val as number) > 0 ? 'text-green-400 bg-green-400/10' : 'text-red-400 bg-red-400/10'}`}>
-                            {stat.toUpperCase()} {(val as number) > 0 ? '+' : ''}{val}
-                          </span>
-                        ))}
+            <div className="max-h-[28rem] overflow-y-auto pr-1 mb-3" style={{ scrollbarWidth: 'thin' }}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {filteredLibraryItems.map((item, idx) => {
+                  const expansionKey = `library:${item.id}`;
+                  const isExpanded = expandedItems.has(expansionKey);
+                  const isSearchHighlight = librarySearchQuery.trim() && idx < 10 && (
+                    item.name.toLowerCase().includes(librarySearchQuery.toLowerCase()) ||
+                    item.description?.toLowerCase().includes(librarySearchQuery.toLowerCase()) ||
+                    item.tags?.some(t => t.toLowerCase().includes(librarySearchQuery.toLowerCase()))
+                  );
+                  return (
+                    <div key={item.id} className={`flex flex-col text-sm py-2 px-3 border bg-background/50 ${
+                      editingLibraryItemId === item.id ? 'border-accent' :
+                      isSearchHighlight ? 'border-primary/50' : 'border-border/50'
+                    }`}>
+                      <div className="flex items-start gap-2">
+                        {getEquipmentIcon(item.equipSlot, "w-4 h-4 shrink-0 mt-0.5")}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <button
+                              onClick={() => toggleItemExpanded(expansionKey)}
+                              className="text-foreground hover:text-primary transition-colors text-left flex items-center gap-1"
+                            >
+                              {item.name}
+                              {(item.description || item.statModifiers || item.weaponData || item.tags) && (
+                                isExpanded
+                                  ? <ChevronUp className="w-3 h-3 text-muted-foreground" />
+                                  : <ChevronDown className="w-3 h-3 text-muted-foreground" />
+                              )}
+                            </button>
+                            {item.equipSlot && (
+                              <span className="text-xs bg-accent/20 text-accent px-1.5 py-0.5 rounded">
+                                {item.equipSlot === 'weapon' ? 'Weapon' :
+                                 item.equipSlot === 'leftHand' ? 'Left Hand' :
+                                 item.equipSlot === 'rightHand' ? 'Right Hand' :
+                                 item.equipSlot === 'ringFinger' ? 'Ring' :
+                                 item.equipSlot.charAt(0).toUpperCase() + item.equipSlot.slice(1)}
+                              </span>
+                            )}
+                            {item.goldValue !== undefined && item.goldValue > 0 && (
+                              <span className="text-xs bg-accent/10 text-accent px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                                <Coins className="w-3 h-3" /> {item.goldValue}G
+                              </span>
+                            )}
+                          </div>
+                          {!isExpanded && item.description && (
+                            <span className="text-muted-foreground text-xs block">({item.description})</span>
+                          )}
+                          {!isExpanded && item.statModifiers && Object.keys(item.statModifiers).length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {Object.entries(item.statModifiers).filter(([,v]) => v !== 0).map(([stat, val]) => (
+                                <span key={stat} className={`text-xs px-1 rounded ${(val as number) > 0 ? 'text-green-400 bg-green-400/10' : 'text-red-400 bg-red-400/10'}`}>
+                                  {stat.toUpperCase()} {(val as number) > 0 ? '+' : ''}{val}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {isExpanded && renderExpandedItemDetails(item)}
+                        </div>
+                        {editMode && (
+                          <div className="flex flex-col gap-1 shrink-0">
+                            <button onClick={() => handleStartEditLibraryItem(item)} className="text-primary hover:text-primary/80" title="Edit item">
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => handleRemoveLibraryItem(item.id)} className="text-destructive hover:text-destructive/80" title="Delete item">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                  {editMode && (
-                    <div className="flex flex-col gap-1 shrink-0">
-                      <button onClick={() => handleStartEditLibraryItem(item)} className="text-primary hover:text-primary/80" title="Edit item">
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => handleRemoveLibraryItem(item.id)} className="text-destructive hover:text-destructive/80" title="Delete item">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
                     </div>
-                  )}
-                </div>
-              ))}
+                  );
+                })}
+              </div>
             </div>
           )}
           {editMode && (
@@ -815,79 +976,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                                   {!expandedItems.has(`${crawler.id}:${item.id}`) && item.description && (
                                     <span className="text-muted-foreground text-xs">({item.description})</span>
                                   )}
-                                  {expandedItems.has(`${crawler.id}:${item.id}`) && (
-                                    <div className="mt-2 space-y-1.5 text-xs border-l-2 border-primary/30 pl-3">
-                                      {item.description && (
-                                        <div>
-                                          <span className="text-muted-foreground">Description: </span>
-                                          <span className="text-foreground">{item.description}</span>
-                                        </div>
-                                      )}
-                                      {item.goldValue !== undefined && item.goldValue > 0 && (
-                                        <div>
-                                          <span className="text-muted-foreground">Value: </span>
-                                          <span className="text-accent">{item.goldValue}G</span>
-                                        </div>
-                                      )}
-                                      {item.equipSlot && (
-                                        <div>
-                                          <span className="text-muted-foreground">Slot: </span>
-                                          <span className="text-foreground">
-                                            {item.equipSlot === 'weapon' ? 'Weapon' :
-                                             item.equipSlot === 'leftHand' ? 'Left Hand' :
-                                             item.equipSlot === 'rightHand' ? 'Right Hand' :
-                                             item.equipSlot === 'ringFinger' ? 'Ring' :
-                                             item.equipSlot.charAt(0).toUpperCase() + item.equipSlot.slice(1)}
-                                          </span>
-                                        </div>
-                                      )}
-                                      {item.tags && item.tags.length > 0 && (
-                                        <div className="flex items-center gap-1 flex-wrap">
-                                          <span className="text-muted-foreground">Tags: </span>
-                                          {item.tags.map(tag => (
-                                            <span key={tag} className="bg-primary/10 text-primary px-1.5 py-0.5 rounded text-[10px]">{tag}</span>
-                                          ))}
-                                        </div>
-                                      )}
-                                      {item.statModifiers && Object.keys(item.statModifiers).length > 0 && (
-                                        <div>
-                                          <span className="text-muted-foreground">Stat Modifiers: </span>
-                                          <div className="flex flex-wrap gap-1 mt-0.5">
-                                            {Object.entries(item.statModifiers).filter(([,v]) => v !== 0).map(([stat, val]) => (
-                                              <span key={stat} className={`px-1.5 py-0.5 rounded ${(val as number) > 0 ? 'text-green-400 bg-green-400/10' : 'text-red-400 bg-red-400/10'}`}>
-                                                {stat.toUpperCase()} {(val as number) > 0 ? '+' : ''}{val}
-                                              </span>
-                                            ))}
-                                          </div>
-                                        </div>
-                                      )}
-                                      {item.weaponData && (
-                                        <div className="border border-destructive/20 bg-destructive/5 p-2 rounded space-y-1">
-                                          <span className="text-destructive font-display text-[10px]">WEAPON DATA</span>
-                                          <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
-                                            <div><span className="text-muted-foreground">Type: </span><span>{item.weaponData.weaponType}</span></div>
-                                            <div><span className="text-muted-foreground">Damage: </span><span className="text-destructive">{item.weaponData.damageType}</span></div>
-                                            <div><span className="text-muted-foreground">Dice: </span><span>{item.weaponData.damageDice.map(d => `${d.count}d${d.sides}`).join(' + ')}</span></div>
-                                            <div><span className="text-muted-foreground">Range: </span><span>{item.weaponData.isRanged ? `${item.weaponData.normalRange ?? '?'}/${item.weaponData.maxRange ?? '?'} ft` : 'Melee'}</span></div>
-                                            {item.weaponData.hitDie && (
-                                              <div><span className="text-muted-foreground">Hit Die: </span><span>{item.weaponData.hitDie.count}d{item.weaponData.hitDie.sides}</span></div>
-                                            )}
-                                            {item.weaponData.splashDamage && (
-                                              <div><span className="text-muted-foreground">Splash: </span><span className="text-accent">Yes</span></div>
-                                            )}
-                                          </div>
-                                          {item.weaponData.specialEffect && (
-                                            <div className="mt-1"><span className="text-muted-foreground">Special: </span><span className="text-accent italic">{item.weaponData.specialEffect}</span></div>
-                                          )}
-                                        </div>
-                                      )}
-                                      {item.isUpgraded && (
-                                        <div>
-                                          <span className="text-accent text-[10px] font-display">UPGRADED</span>
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
+                                  {expandedItems.has(`${crawler.id}:${item.id}`) && renderExpandedItemDetails(item)}
                                 </div>
                               )}
                               {editMode && editingItemId !== `${crawler.id}:${item.id}` && (
