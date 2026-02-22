@@ -30,13 +30,14 @@ export const CrawlerIcon: React.FC<CrawlerIconProps> = ({
   const currentHP = effectiveHP ?? crawler.hp ?? 0;
   const maxHP = effectiveMaxHP ?? crawler.maxHP ?? 1;
   const hasModifier = baseMaxHP !== undefined && baseMaxHP !== maxHP;
+  const isNegativeModifier = hasModifier && maxHP < baseMaxHP;
 
   const hpPercentage = maxHP > 0 ? Math.min(100, Math.max(0, (currentHP / maxHP) * 100)) : 0;
   // Base portion: the part of the bar that represents base max HP (without modifier)
-  const basePercentage = hasModifier
+  const basePercentage = hasModifier && !isNegativeModifier
     ? Math.min(100, Math.max(0, (Math.min(currentHP, baseMaxHP) / maxHP) * 100))
     : hpPercentage;
-  const modifierPercentage = hasModifier ? Math.max(0, hpPercentage - basePercentage) : 0;
+  const modifierPercentage = hasModifier && !isNegativeModifier ? Math.max(0, hpPercentage - basePercentage) : 0;
 
   return (
     <div
@@ -73,9 +74,9 @@ export const CrawlerIcon: React.FC<CrawlerIconProps> = ({
           style={{ width: Math.max(size, 48) }}
         >
           <div className="h-3.5 border border-muted-foreground/40 bg-destructive/60 overflow-hidden rounded-sm relative flex">
-            {/* Base HP portion (green) */}
+            {/* Base HP portion (green, or purple if negative modifier) */}
             <div
-              className="h-full transition-all duration-300 bg-green-500"
+              className={`h-full transition-all duration-300 ${isNegativeModifier ? 'bg-purple-500' : 'bg-green-500'}`}
               style={{ width: `${basePercentage}%` }}
             />
             {/* Equipment modifier portion (orange) */}
