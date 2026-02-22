@@ -1871,11 +1871,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 let total = 0;
                 for (const [stat, val] of Object.entries(mods)) {
                   if (val && ['str', 'dex', 'con', 'int', 'cha'].includes(stat)) {
-                    const baseStat = (selected as Record<string, unknown>)[stat] as number ?? 10;
-                    const equipMod = equippedMods[stat as keyof StatModifiers] ?? 0;
-                    const totalStat = baseStat + equipMod;
-                    const modifier = Math.floor((totalStat - 10) / 2);
-                    total += modifier * val;
+                    const baseStat = (selected as Record<string, unknown>)[stat] as number ?? 0;
+                    total += baseStat;
                   }
                 }
                 return total;
@@ -2407,10 +2404,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             let total = 0;
             for (const [stat, val] of Object.entries(mods)) {
               if (val && ['str', 'dex', 'con', 'int', 'cha'].includes(stat)) {
-                const baseStat = (selected as Record<string, unknown>)[stat] as number ?? 10;
-                const equipMod = equippedMods[stat as keyof StatModifiers] ?? 0;
-                const totalStat = baseStat + equipMod;
-                total += Math.floor((totalStat - 10) / 2) * val;
+                const baseStat = (selected as Record<string, unknown>)[stat] as number ?? 0;
+                total += baseStat;
               }
             }
             return total;
@@ -2598,14 +2593,15 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 {/* Hit Stat Modifiers */}
                 <div>
                   <label className="text-[10px] text-muted-foreground block mb-0.5">Hit Roll Stat Modifiers</label>
-                  <div className="grid grid-cols-5 gap-1">
+                  <p className="text-[9px] text-muted-foreground/60 mb-1">Adds the crawler&apos;s base stat value to the hit roll</p>
+                  <div className="flex gap-3">
                     {(['str', 'dex', 'con', 'int', 'cha'] as const).map((stat) => (
-                      <div key={stat} className="flex flex-col items-center">
-                        <label className="text-[9px] text-muted-foreground uppercase">{stat}</label>
-                        <input type="number" value={upgradeForm.hitModifiers?.[stat] ?? ""}
-                          onChange={(e) => updateUF({ hitModifiers: { ...upgradeForm.hitModifiers, [stat]: e.target.value ? parseInt(e.target.value) : undefined } })}
-                          placeholder="0" className="w-10 bg-muted border border-border px-1 py-0.5 text-[10px] text-center" />
-                      </div>
+                      <label key={stat} className="flex items-center gap-1 text-[10px] cursor-pointer">
+                        <input type="checkbox" checked={!!upgradeForm.hitModifiers?.[stat]}
+                          onChange={(e) => updateUF({ hitModifiers: { ...upgradeForm.hitModifiers, [stat]: e.target.checked ? 1 : undefined } })}
+                          className="w-3.5 h-3.5" />
+                        <span className="text-muted-foreground uppercase">{stat}</span>
+                      </label>
                     ))}
                   </div>
                 </div>
@@ -2613,14 +2609,15 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 {/* Damage Stat Modifiers */}
                 <div>
                   <label className="text-[10px] text-muted-foreground block mb-0.5">Damage Stat Modifiers</label>
-                  <div className="grid grid-cols-5 gap-1">
+                  <p className="text-[9px] text-muted-foreground/60 mb-1">Adds the crawler&apos;s base stat value to the damage roll</p>
+                  <div className="flex gap-3">
                     {(['str', 'dex', 'con', 'int', 'cha'] as const).map((stat) => (
-                      <div key={stat} className="flex flex-col items-center">
-                        <label className="text-[9px] text-muted-foreground uppercase">{stat}</label>
-                        <input type="number" value={upgradeForm.damageModifiers?.[stat] ?? ""}
-                          onChange={(e) => updateUF({ damageModifiers: { ...upgradeForm.damageModifiers, [stat]: e.target.value ? parseInt(e.target.value) : undefined } })}
-                          placeholder="0" className="w-10 bg-muted border border-border px-1 py-0.5 text-[10px] text-center" />
-                      </div>
+                      <label key={stat} className="flex items-center gap-1 text-[10px] cursor-pointer">
+                        <input type="checkbox" checked={!!upgradeForm.damageModifiers?.[stat]}
+                          onChange={(e) => updateUF({ damageModifiers: { ...upgradeForm.damageModifiers, [stat]: e.target.checked ? 1 : undefined } })}
+                          className="w-3.5 h-3.5" />
+                        <span className="text-muted-foreground uppercase">{stat}</span>
+                      </label>
                     ))}
                   </div>
                 </div>

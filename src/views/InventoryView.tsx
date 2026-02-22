@@ -716,16 +716,17 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                         {/* Hit Roll Stat Modifiers */}
                         <div>
                           <label className="text-[10px] text-muted-foreground block mb-0.5">Hit Roll Stat Modifiers</label>
-                          <div className="grid grid-cols-5 gap-1">
+                          <p className="text-[9px] text-muted-foreground/60 mb-1">Adds the crawler&apos;s base stat value to the hit roll</p>
+                          <div className="flex gap-3">
                             {(['str', 'dex', 'con', 'int', 'cha'] as const).map((stat) => (
-                              <div key={stat} className="flex flex-col items-center">
-                                <label className="text-[9px] text-muted-foreground uppercase">{stat}</label>
-                                <input type="number" value={wd.hitModifiers?.[stat] ?? ""}
+                              <label key={stat} className="flex items-center gap-1 text-[10px] cursor-pointer">
+                                <input type="checkbox" checked={!!wd.hitModifiers?.[stat]}
                                   onChange={(e) => updateWD({
-                                    hitModifiers: { ...wd.hitModifiers, [stat]: e.target.value ? parseInt(e.target.value) : undefined },
+                                    hitModifiers: { ...wd.hitModifiers, [stat]: e.target.checked ? 1 : undefined },
                                   })}
-                                  placeholder="0" className="w-10 bg-muted border border-border px-1 py-0.5 text-[10px] text-center" />
-                              </div>
+                                  className="w-3.5 h-3.5" />
+                                <span className="text-muted-foreground uppercase">{stat}</span>
+                              </label>
                             ))}
                           </div>
                         </div>
@@ -733,16 +734,17 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                         {/* Damage Stat Modifiers */}
                         <div>
                           <label className="text-[10px] text-muted-foreground block mb-0.5">Damage Stat Modifiers</label>
-                          <div className="grid grid-cols-5 gap-1">
+                          <p className="text-[9px] text-muted-foreground/60 mb-1">Adds the crawler&apos;s base stat value to the damage roll</p>
+                          <div className="flex gap-3">
                             {(['str', 'dex', 'con', 'int', 'cha'] as const).map((stat) => (
-                              <div key={stat} className="flex flex-col items-center">
-                                <label className="text-[9px] text-muted-foreground uppercase">{stat}</label>
-                                <input type="number" value={wd.damageModifiers?.[stat] ?? ""}
+                              <label key={stat} className="flex items-center gap-1 text-[10px] cursor-pointer">
+                                <input type="checkbox" checked={!!wd.damageModifiers?.[stat]}
                                   onChange={(e) => updateWD({
-                                    damageModifiers: { ...wd.damageModifiers, [stat]: e.target.value ? parseInt(e.target.value) : undefined },
+                                    damageModifiers: { ...wd.damageModifiers, [stat]: e.target.checked ? 1 : undefined },
                                   })}
-                                  placeholder="0" className="w-10 bg-muted border border-border px-1 py-0.5 text-[10px] text-center" />
-                              </div>
+                                  className="w-3.5 h-3.5" />
+                                <span className="text-muted-foreground uppercase">{stat}</span>
+                              </label>
                             ))}
                           </div>
                         </div>
