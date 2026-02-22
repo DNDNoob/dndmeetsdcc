@@ -160,7 +160,42 @@ const PingPanel: React.FC<PingPanelProps> = ({
     if (!combatState?.active) return { crawlers: [] as Crawler[], mobs: [] as typeof mobCombatEntries };
     const inCombatIds = new Set(combatState.combatants.map(c => c.id));
     const availCrawlers = playerCrawlers.filter(c => !inCombatIds.has(c.id));
-    const availMobs = mobCombatEntries.filter(e => !inCombatIds.has(e.combatId));
+
+    // Count how many of each base mobId are already in combat
+    const mobsInCombatBySource: Record<string, number> = {};
+    combatState.combatants.forEach(c => {
+      if (c.type === 'mob') {
+        const baseId = c.sourceId ?? c.id;
+        mobsInCombatBySource[baseId] = (mobsInCombatBySource[baseId] ?? 0) + 1;
+      }
+    });
+
+    // Count how many placements had an exact combatId match
+    const exactMatchedByMobId: Record<string, number> = {};
+    mobCombatEntries.forEach(e => {
+      if (inCombatIds.has(e.combatId)) {
+        exactMatchedByMobId[e.mobId] = (exactMatchedByMobId[e.mobId] ?? 0) + 1;
+      }
+    });
+
+    // Filter: skip exact matches, then use count-based matching for ID format mismatches
+    // (happens when a mob was added to combat as "mobId" then a duplicate token is placed,
+    //  changing the combatId format to "mobId:index")
+    const seenCount: Record<string, number> = {};
+    const availMobs = mobCombatEntries.filter(e => {
+      if (inCombatIds.has(e.combatId)) return false;
+
+      const inCombat = mobsInCombatBySource[e.mobId] ?? 0;
+      const exactlyMatched = exactMatchedByMobId[e.mobId] ?? 0;
+      const unmatchedInCombat = Math.max(0, inCombat - exactlyMatched);
+
+      const seen = seenCount[e.mobId] ?? 0;
+      seenCount[e.mobId] = seen + 1;
+      if (seen < unmatchedInCombat) return false;
+
+      return true;
+    });
+
     return { crawlers: availCrawlers, mobs: availMobs };
   }, [combatState, playerCrawlers, mobCombatEntries]);
 
