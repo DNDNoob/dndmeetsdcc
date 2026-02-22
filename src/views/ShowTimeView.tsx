@@ -711,6 +711,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   }, [currentMapId]);
 
   // Center the map in the viewport when image dimensions become known (only on initial load)
+  // Centering is handled solely via panOffset (not CSS flex centering) to avoid double-centering
   useEffect(() => {
     if (!needsCentering.current) return;
     if (!mapImageDimensions || !containerSize.width || !containerSize.height) return;
@@ -719,12 +720,11 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     const scaledH = mapImageDimensions.height * mapBaseScale / 100;
     const cw = containerSize.width;
     const ch = containerSize.height;
-    // If the scaled map is taller/wider than the container, offset to center
-    const offsetX = scaledW > cw ? -(scaledW - cw) / 2 : 0;
-    const offsetY = scaledH > ch ? -(scaledH - ch) / 2 : 0;
-    if (offsetX !== 0 || offsetY !== 0) {
-      setPanOffset({ x: offsetX, y: offsetY });
-    }
+    // Center map in container: positive offset centers smaller maps,
+    // negative offset centers larger maps (showing the middle)
+    const offsetX = (cw - scaledW) / 2;
+    const offsetY = (ch - scaledH) / 2;
+    setPanOffset({ x: offsetX, y: offsetY });
   }, [mapImageDimensions, containerSize, mapBaseScale]);
 
   // Listen for real-time drag updates from other players
@@ -2384,7 +2384,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       {/* Map display */}
       <div
         ref={mapContainerRef}
-        className="flex-1 flex items-center justify-center p-1 select-none overflow-hidden relative"
+        className="flex-1 p-1 select-none overflow-hidden relative"
         style={{ cursor: isPanning ? 'grabbing' : (isPingMode || isBoxMode || isRulerMode || isAddCrawlerMode || isAddMobMode) ? 'crosshair' : 'grab' }}
         onMouseDown={handlePanStart}
         onMouseMove={handleMouseMove}
