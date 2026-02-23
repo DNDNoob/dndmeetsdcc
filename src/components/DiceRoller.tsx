@@ -44,12 +44,14 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
   const addDiceRollRef = useRef(addDiceRoll);
   addDiceRollRef.current = addDiceRoll;
 
-  // Watch for new rolls (including remote)
+  // Watch for new rolls (including remote) — auto-expand the latest
   useEffect(() => {
     if (diceRolls.length === 0) return;
     const newest = diceRolls[0];
     if (newest.id !== lastSeenRollId.current) {
       lastSeenRollId.current = newest.id;
+      // Collapse all previous rolls, expand only the newest
+      setExpandedIds({ [newest.id]: true });
     }
   }, [diceRolls]);
 
@@ -107,6 +109,8 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
           };
 
           lastSeenRollId.current = entry.id;
+          // Collapse all previous rolls, expand the new one
+          setExpandedIds({ [entry.id]: true });
           addDiceRollRef.current(entry);
         }
 
@@ -195,7 +199,9 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
                             <span className="font-display" style={{ color: getLootBoxTierColor(entry.lootBoxNotification.tier as 'Dirt' | 'Copper' | 'Silver' | 'Gold') }}>
                               {entry.lootBoxNotification.boxName}
                             </span>
-                            <span className="text-muted-foreground"> sent to </span>
+                            {entry.crawlerId !== '__system__' && (
+                              <span className="text-muted-foreground"> sent to </span>
+                            )}
                             <span className="text-primary">{entry.lootBoxNotification.recipientNames.join(', ')}</span>
                           </div>
                           <span className="text-[10px] text-muted-foreground/60 ml-auto">{formatTimestamp(entry.timestamp)}</span>

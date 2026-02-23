@@ -23,16 +23,20 @@ const HealthBar: React.FC<HealthBarProps> = ({
 
   // Calculate the base portion (without modifier) as a percentage of max
   const hasModifier = baseMax !== undefined && baseMax !== max;
-  const basePercentage = hasModifier
+  const isNegativeModifier = hasModifier && max < baseMax;
+  const basePercentage = hasModifier && !isNegativeModifier
     ? Math.min(100, Math.max(0, (Math.min(current, baseMax) / max) * 100))
     : percentage;
-  const modifierPercentage = hasModifier ? percentage - basePercentage : 0;
+  const modifierPercentage = hasModifier && !isNegativeModifier ? percentage - basePercentage : 0;
 
   const variantClasses = {
     health: "bg-destructive",
     mana: "bg-primary",
     xp: "bg-accent",
   };
+
+  // Purple bar when equipment reduces max HP/mana
+  const baseBarClass = isNegativeModifier ? "bg-purple-500" : variantClasses[variant];
 
   return (
     <div className={cn("relative", className)}>
@@ -41,11 +45,11 @@ const HealthBar: React.FC<HealthBarProps> = ({
         <div
           className={cn(
             "h-full transition-all duration-500 ease-out",
-            variantClasses[variant]
+            baseBarClass
           )}
           style={{ width: `${basePercentage}%` }}
         />
-        {/* Modifier portion (orange) */}
+        {/* Modifier portion (orange) — only for positive modifiers */}
         {modifierPercentage > 0 && (
           <div
             className="h-full transition-all duration-500 ease-out bg-orange-500"

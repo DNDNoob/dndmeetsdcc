@@ -405,6 +405,11 @@ const Index = () => {
             onDungeonAILogout={handleDungeonAILogout}
             onDungeonAILogin={handleDungeonAILogin}
             playerName={currentPlayer.name}
+            playerType={currentPlayer.type}
+            crawlers={crawlers}
+            onSwitchPlayer={(id, name, type) => {
+              setCurrentPlayer({ id, name, type });
+            }}
           />
         )}
       </AnimatePresence>
@@ -424,6 +429,9 @@ const Index = () => {
             onSwitchPlayer={(id, name, type) => {
               setCurrentPlayer({ id, name, type });
             }}
+            isDungeonAILoggedIn={isDungeonAILoggedIn}
+            onDungeonAILogin={handleDungeonAILogin}
+            onDungeonAILogout={handleDungeonAILogout}
           />
 
           <main className="pb-16 sm:pb-12">

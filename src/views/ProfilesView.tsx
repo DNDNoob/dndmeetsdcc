@@ -283,6 +283,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   const [damageTargetType, setDamageTargetType] = useState<'crawler' | 'mob'>('mob');
   const [damageRollResult, setDamageRollResult] = useState<number | null>(null);
   const [splashTargetIds, setSplashTargetIds] = useState<{ id: string; type: 'crawler' | 'mob' }[]>([]);
+  const [splashDamageResults, setSplashDamageResults] = useState<Record<string, number>>({});
 
   // Weapon advantage/disadvantage menu
   const [weaponAdvMenu, setWeaponAdvMenu] = useState<{ weaponId: string; x: number; y: number } | null>(null);
@@ -1870,11 +1871,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 let total = 0;
                 for (const [stat, val] of Object.entries(mods)) {
                   if (val && ['str', 'dex', 'con', 'int', 'cha'].includes(stat)) {
-                    const baseStat = (selected as Record<string, unknown>)[stat] as number ?? 10;
-                    const equipMod = equippedMods[stat as keyof StatModifiers] ?? 0;
-                    const totalStat = baseStat + equipMod;
-                    const modifier = Math.floor((totalStat - 10) / 2);
-                    total += modifier * val;
+                    const baseStat = (selected as Record<string, unknown>)[stat] as number ?? 0;
+                    total += baseStat;
                   }
                 }
                 return total;
@@ -1958,13 +1956,14 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                   });
                 }
 
-                if (isCombatPhaseLocal && combatTargets.length > 0) {
-                  setPendingDamageRoll({ dice: formatDice(wd.damageDice), bonus: calcWeaponStatMod(wd.damageModifiers), actionName: weapon.name, isSplash: wd.splashDamage });
+                if (isCombatPhaseLocal && combatTargets.length > 0 && !wd.splashDamage) {
+                  setPendingDamageRoll({ dice: formatDice(wd.damageDice), bonus: calcWeaponStatMod(wd.damageModifiers), actionName: weapon.name, isSplash: false });
                   setShowDamageTargetModal(true);
                   setDamageRollResult(null);
                   setSplashTargetIds([]);
                 }
-                // Damage is NOT auto-rolled — player clicks the DAMAGE button manually
+                // Splash damage: player clicks DAMAGE button to select targets & roll per-mob
+                // Non-splash: damage target modal opened above
 
                 if (isCombatPhaseLocal && isMyTurn) {
                   onRecordCombatAction?.(selected.id, 'action');
@@ -1974,6 +1973,16 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
               const handleWeaponDamageRoll = (weapon: InventoryItem) => {
                 if (!weapon.weaponData) return;
                 const wd = weapon.weaponData;
+
+                // Splash weapons in combat: open target selection modal for per-mob rolls
+                if (wd.splashDamage && isCombatPhaseLocal && combatTargets.length > 0) {
+                  setPendingDamageRoll({ dice: formatDice(wd.damageDice), bonus: calcWeaponStatMod(wd.damageModifiers), actionName: weapon.name, isSplash: true });
+                  setShowDamageTargetModal(true);
+                  setDamageRollResult(null);
+                  setSplashTargetIds([]);
+                  setSplashDamageResults({});
+                  return;
+                }
 
                 let totalDamage = 0;
                 const results: { dice: string; result: number }[] = [];
@@ -2395,10 +2404,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             let total = 0;
             for (const [stat, val] of Object.entries(mods)) {
               if (val && ['str', 'dex', 'con', 'int', 'cha'].includes(stat)) {
-                const baseStat = (selected as Record<string, unknown>)[stat] as number ?? 10;
-                const equipMod = equippedMods[stat as keyof StatModifiers] ?? 0;
-                const totalStat = baseStat + equipMod;
-                total += Math.floor((totalStat - 10) / 2) * val;
+                const baseStat = (selected as Record<string, unknown>)[stat] as number ?? 0;
+                total += baseStat;
               }
             }
             return total;
@@ -2431,39 +2438,14 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
           }
 
           const combatTargets = combatState?.combatants.filter(c => c.id !== selected.id) ?? [];
-          if (isCombatPhaseLocal && combatTargets.length > 0) {
+          if (isCombatPhaseLocal && combatTargets.length > 0 && !wd.splashDamage) {
             const formatDice = (dice: WeaponDie[]): string => dice.map(d => `${d.count}d${d.sides}`).join(' + ');
-            setPendingDamageRoll({ dice: formatDice(wd.damageDice), bonus: calcMod(wd.damageModifiers), actionName: weapon.name, isSplash: wd.splashDamage });
+            setPendingDamageRoll({ dice: formatDice(wd.damageDice), bonus: calcMod(wd.damageModifiers), actionName: weapon.name, isSplash: false });
             setShowDamageTargetModal(true);
             setDamageRollResult(null);
             setSplashTargetIds([]);
-          } else if (!isCombatPhaseLocal) {
-            // Outside combat: auto-roll damage alongside attack for convenience
-            let totalDamage = 0;
-            const dmgResults: { dice: string; result: number }[] = [];
-            // Break out individual die results
-            for (const die of wd.damageDice) {
-              for (let i = 0; i < die.count; i++) {
-                const roll = Math.floor(Math.random() * die.sides) + 1;
-                dmgResults.push({ dice: `d${die.sides}`, result: roll });
-                totalDamage += roll;
-              }
-            }
-            const dmgStatMod = calcMod(wd.damageModifiers);
-            totalDamage += dmgStatMod;
-            const dmgDiceLabel = wd.damageDice.map(d => `${d.count}d${d.sides}`).join(' + ');
-            if (addDiceRoll) {
-              addDiceRoll({
-                id: crypto.randomUUID(),
-                crawlerName: selected.name,
-                crawlerId: selected.id,
-                timestamp: Date.now(),
-                results: dmgResults,
-                total: totalDamage,
-                statRoll: { stat: `${weapon.name} (${wd.damageType} Damage)`, modifier: dmgStatMod, rawRoll: totalDamage - dmgStatMod, diceLabel: dmgDiceLabel, rollType: 'Damage' },
-              });
-            }
           }
+          // Splash damage: player clicks DAMAGE button to select targets & roll per-mob
 
           if (isCombatPhaseLocal && isMyTurn) {
             onRecordCombatAction?.(selected.id, 'action');
@@ -2611,14 +2593,15 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 {/* Hit Stat Modifiers */}
                 <div>
                   <label className="text-[10px] text-muted-foreground block mb-0.5">Hit Roll Stat Modifiers</label>
-                  <div className="grid grid-cols-5 gap-1">
+                  <p className="text-[9px] text-muted-foreground/60 mb-1">Adds the crawler&apos;s base stat value to the hit roll</p>
+                  <div className="flex gap-3">
                     {(['str', 'dex', 'con', 'int', 'cha'] as const).map((stat) => (
-                      <div key={stat} className="flex flex-col items-center">
-                        <label className="text-[9px] text-muted-foreground uppercase">{stat}</label>
-                        <input type="number" value={upgradeForm.hitModifiers?.[stat] ?? ""}
-                          onChange={(e) => updateUF({ hitModifiers: { ...upgradeForm.hitModifiers, [stat]: e.target.value ? parseInt(e.target.value) : undefined } })}
-                          placeholder="0" className="w-10 bg-muted border border-border px-1 py-0.5 text-[10px] text-center" />
-                      </div>
+                      <label key={stat} className="flex items-center gap-1 text-[10px] cursor-pointer">
+                        <input type="checkbox" checked={!!upgradeForm.hitModifiers?.[stat]}
+                          onChange={(e) => updateUF({ hitModifiers: { ...upgradeForm.hitModifiers, [stat]: e.target.checked ? 1 : undefined } })}
+                          className="w-3.5 h-3.5" />
+                        <span className="text-muted-foreground uppercase">{stat}</span>
+                      </label>
                     ))}
                   </div>
                 </div>
@@ -2626,14 +2609,15 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 {/* Damage Stat Modifiers */}
                 <div>
                   <label className="text-[10px] text-muted-foreground block mb-0.5">Damage Stat Modifiers</label>
-                  <div className="grid grid-cols-5 gap-1">
+                  <p className="text-[9px] text-muted-foreground/60 mb-1">Adds the crawler&apos;s base stat value to the damage roll</p>
+                  <div className="flex gap-3">
                     {(['str', 'dex', 'con', 'int', 'cha'] as const).map((stat) => (
-                      <div key={stat} className="flex flex-col items-center">
-                        <label className="text-[9px] text-muted-foreground uppercase">{stat}</label>
-                        <input type="number" value={upgradeForm.damageModifiers?.[stat] ?? ""}
-                          onChange={(e) => updateUF({ damageModifiers: { ...upgradeForm.damageModifiers, [stat]: e.target.value ? parseInt(e.target.value) : undefined } })}
-                          placeholder="0" className="w-10 bg-muted border border-border px-1 py-0.5 text-[10px] text-center" />
-                      </div>
+                      <label key={stat} className="flex items-center gap-1 text-[10px] cursor-pointer">
+                        <input type="checkbox" checked={!!upgradeForm.damageModifiers?.[stat]}
+                          onChange={(e) => updateUF({ damageModifiers: { ...upgradeForm.damageModifiers, [stat]: e.target.checked ? 1 : undefined } })}
+                          className="w-3.5 h-3.5" />
+                        <span className="text-muted-foreground uppercase">{stat}</span>
+                      </label>
                     ))}
                   </div>
                 </div>
@@ -2695,20 +2679,49 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
       {showDamageTargetModal && pendingDamageRoll && combatState && (() => {
         const isSplash = pendingDamageRoll.isSplash ?? false;
         const hasTargets = isSplash ? splashTargetIds.length > 0 : !!damageTargetId;
+        const allSplashRolled = isSplash && splashTargetIds.length > 0 && splashTargetIds.every(t => splashDamageResults[t.id] !== undefined);
+
+        // Helper to parse and roll damage dice once
+        const rollDamageDice = (): { results: { dice: string; result: number }[]; totalRoll: number } => {
+          const diceStr = pendingDamageRoll.dice;
+          const diceParts = diceStr.split(/\s*\+\s*/);
+          let totalRoll = 0;
+          const results: { dice: string; result: number }[] = [];
+          for (const part of diceParts) {
+            const match = part.trim().match(/^(\d+)?d(\d+)$/i);
+            if (match) {
+              const count = parseInt(match[1] || '1');
+              const sides = parseInt(match[2]);
+              for (let i = 0; i < count; i++) {
+                const roll = Math.floor(Math.random() * sides) + 1;
+                results.push({ dice: `d${sides}`, result: roll });
+                totalRoll += roll;
+              }
+            } else {
+              const simpleMatch = part.trim().match(/^d(\d+)$/i);
+              const sides = simpleMatch ? parseInt(simpleMatch[1]) : 4;
+              const roll = Math.floor(Math.random() * sides) + 1;
+              results.push({ dice: `d${sides}`, result: roll });
+              totalRoll += roll;
+            }
+          }
+          return { results, totalRoll };
+        };
+
         return (
         <div className="fixed inset-0 bg-background/80 z-50 flex items-center justify-center p-4">
-          <div className="bg-background border-2 border-destructive rounded-lg p-6 max-w-md w-full shadow-xl">
+          <div className="bg-background border-2 border-destructive rounded-lg p-6 max-w-md w-full shadow-xl max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-display text-lg text-destructive">
                 {pendingDamageRoll.actionName} — {isSplash ? 'Select Targets' : 'Select Target'}
               </h3>
-              <button onClick={() => { setShowDamageTargetModal(false); setPendingDamageRoll(null); setDamageRollResult(null); setSplashTargetIds([]); }}>
+              <button onClick={() => { setShowDamageTargetModal(false); setPendingDamageRoll(null); setDamageRollResult(null); setSplashTargetIds([]); setSplashDamageResults({}); }}>
                 <X className="w-5 h-5 text-muted-foreground hover:text-foreground" />
               </button>
             </div>
 
             {isSplash && (
-              <p className="text-xs text-accent mb-2">Splash damage — select multiple targets</p>
+              <p className="text-xs text-accent mb-2">Splash damage — select targets, then roll damage for each</p>
             )}
 
             <div className="space-y-3">
@@ -2724,11 +2737,14 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                     const isSelected = isSplash
                       ? splashTargetIds.some(t => t.id === c.id)
                       : damageTargetId === c.id;
+                    const splashDmg = isSplash ? splashDamageResults[c.id] : undefined;
                     return (
                       <button
                         key={c.id}
                         onClick={() => {
                           if (isSplash) {
+                            // Don't allow changing targets after rolls have started
+                            if (Object.keys(splashDamageResults).length > 0) return;
                             setSplashTargetIds(prev => {
                               const exists = prev.some(t => t.id === c.id);
                               if (exists) return prev.filter(t => t.id !== c.id);
@@ -2742,7 +2758,9 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                         className={`w-full text-left px-3 py-2 border rounded text-sm transition-colors ${
                           isSelected
                             ? 'bg-destructive/20 border-destructive text-destructive'
-                            : 'bg-muted/30 border-border hover:border-destructive/50'
+                            : Object.keys(splashDamageResults).length > 0 && isSplash
+                              ? 'bg-muted/20 border-border text-muted-foreground/50 cursor-not-allowed'
+                              : 'bg-muted/30 border-border hover:border-destructive/50'
                         }`}
                       >
                         {isSplash && (
@@ -2757,52 +2775,27 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                         {crawler && (
                           <span className="text-muted-foreground ml-2">({crawler.hp}/{crawler.maxHP} HP)</span>
                         )}
+                        {splashDmg !== undefined && (
+                          <span className="text-accent font-display ml-2">→ {splashDmg} dmg</span>
+                        )}
                       </button>
                     );
                   })}
                 </div>
               </div>
 
-              {/* Damage roll */}
-              {hasTargets && (
+              {/* Damage roll - non-splash (single target) */}
+              {!isSplash && hasTargets && (
                 <div className="border border-border bg-muted/30 rounded p-3">
                   {damageRollResult === null ? (
                     <button
                       onClick={() => {
-                        // Parse and roll damage dice (supports "1d6 + 2d4" format)
-                        const diceStr = pendingDamageRoll.dice;
-                        const diceParts = diceStr.split(/\s*\+\s*/);
-                        let totalRoll = 0;
-                        const results: { dice: string; result: number }[] = [];
-
-                        for (const part of diceParts) {
-                          const match = part.trim().match(/^(\d+)?d(\d+)$/i);
-                          if (match) {
-                            const count = parseInt(match[1] || '1');
-                            const sides = parseInt(match[2]);
-                            // Break out individual die results
-                            for (let i = 0; i < count; i++) {
-                              const roll = Math.floor(Math.random() * sides) + 1;
-                              results.push({ dice: `d${sides}`, result: roll });
-                              totalRoll += roll;
-                            }
-                          } else {
-                            // Fallback for simple dice like "d6"
-                            const simpleMatch = part.trim().match(/^d(\d+)$/i);
-                            const sides = simpleMatch ? parseInt(simpleMatch[1]) : 4;
-                            const roll = Math.floor(Math.random() * sides) + 1;
-                            results.push({ dice: `d${sides}`, result: roll });
-                            totalRoll += roll;
-                          }
-                        }
-
+                        const { results, totalRoll } = rollDamageDice();
                         const totalDmg = totalRoll + pendingDamageRoll.bonus;
                         setDamageRollResult(totalDmg);
 
                         if (addDiceRoll) {
-                          const targetLabel = isSplash
-                            ? `${splashTargetIds.length} targets`
-                            : combatState.combatants.find(c => c.id === damageTargetId)?.name ?? 'target';
+                          const targetLabel = combatState.combatants.find(c => c.id === damageTargetId)?.name ?? 'target';
                           addDiceRoll({
                             id: crypto.randomUUID(),
                             crawlerName: selected.name,
@@ -2816,31 +2809,102 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                       }}
                       className="w-full py-3 bg-destructive text-destructive-foreground font-display rounded hover:bg-destructive/90 transition-colors"
                     >
-                      ROLL {pendingDamageRoll.dice.toUpperCase()} DAMAGE{isSplash ? ` (${splashTargetIds.length} targets)` : ''}
+                      ROLL {pendingDamageRoll.dice.toUpperCase()} DAMAGE
                     </button>
                   ) : (
                     <div className="text-center space-y-3">
                       <p className="font-display text-2xl text-destructive">{damageRollResult} DAMAGE</p>
-                      {isSplash && <p className="text-xs text-muted-foreground">Applied to {splashTargetIds.length} target{splashTargetIds.length !== 1 ? 's' : ''}</p>}
                       <button
                         onClick={async () => {
-                          if (isSplash) {
-                            // Apply damage to all splash targets
-                            for (const target of splashTargetIds) {
-                              await onApplyCombatDamage?.(target.id, target.type, damageRollResult);
+                          await onApplyCombatDamage?.(damageTargetId, damageTargetType, damageRollResult);
+                          setShowDamageTargetModal(false);
+                          setPendingDamageRoll(null);
+                          setDamageRollResult(null);
+                          setDamageTargetId('');
+                        }}
+                        className="w-full py-2 bg-destructive text-destructive-foreground font-display text-sm rounded hover:bg-destructive/90 transition-colors"
+                      >
+                        APPLY DAMAGE
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Damage roll - splash (per-target rolls) */}
+              {isSplash && hasTargets && (
+                <div className="border border-border bg-muted/30 rounded p-3 space-y-2">
+                  {!allSplashRolled ? (
+                    <>
+                      {/* Show roll buttons for each target that hasn't been rolled yet */}
+                      {splashTargetIds.map(target => {
+                        const targetName = combatState.combatants.find(c => c.id === target.id)?.name ?? 'target';
+                        const alreadyRolled = splashDamageResults[target.id] !== undefined;
+                        return (
+                          <button
+                            key={target.id}
+                            disabled={alreadyRolled}
+                            onClick={() => {
+                              const { results, totalRoll } = rollDamageDice();
+                              const totalDmg = totalRoll + pendingDamageRoll.bonus;
+                              setSplashDamageResults(prev => ({ ...prev, [target.id]: totalDmg }));
+
+                              if (addDiceRoll) {
+                                addDiceRoll({
+                                  id: crypto.randomUUID(),
+                                  crawlerName: selected.name,
+                                  crawlerId: selected.id,
+                                  timestamp: Date.now(),
+                                  results,
+                                  total: totalDmg,
+                                  statRoll: { stat: `${pendingDamageRoll.actionName} (Damage → ${targetName})`, modifier: pendingDamageRoll.bonus, rawRoll: totalRoll, diceLabel: pendingDamageRoll.dice, rollType: 'Damage' },
+                                });
+                              }
+                            }}
+                            className={`w-full py-2 font-display text-sm rounded transition-colors ${
+                              alreadyRolled
+                                ? 'bg-muted/50 text-muted-foreground cursor-not-allowed'
+                                : 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
+                            }`}
+                          >
+                            {alreadyRolled
+                              ? `${targetName}: ${splashDamageResults[target.id]} DAMAGE`
+                              : `ROLL ${pendingDamageRoll.dice.toUpperCase()} → ${targetName}`
                             }
-                          } else {
-                            await onApplyCombatDamage?.(damageTargetId, damageTargetType, damageRollResult);
+                          </button>
+                        );
+                      })}
+                    </>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="space-y-1">
+                        {splashTargetIds.map(target => {
+                          const targetName = combatState.combatants.find(c => c.id === target.id)?.name ?? 'target';
+                          return (
+                            <p key={target.id} className="text-sm font-display text-destructive">
+                              {targetName}: {splashDamageResults[target.id]} damage
+                            </p>
+                          );
+                        })}
+                      </div>
+                      <button
+                        onClick={async () => {
+                          for (const target of splashTargetIds) {
+                            const dmg = splashDamageResults[target.id];
+                            if (dmg !== undefined) {
+                              await onApplyCombatDamage?.(target.id, target.type, dmg);
+                            }
                           }
                           setShowDamageTargetModal(false);
                           setPendingDamageRoll(null);
                           setDamageRollResult(null);
                           setDamageTargetId('');
                           setSplashTargetIds([]);
+                          setSplashDamageResults({});
                         }}
                         className="w-full py-2 bg-destructive text-destructive-foreground font-display text-sm rounded hover:bg-destructive/90 transition-colors"
                       >
-                        APPLY DAMAGE
+                        APPLY ALL DAMAGE
                       </button>
                     </div>
                   )}
