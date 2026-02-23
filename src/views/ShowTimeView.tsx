@@ -1684,6 +1684,17 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     broadcastCrawlerPlacements(updated);
   }, [crawlerPlacements, broadcastCrawlerPlacements]);
 
+  // Count mob occurrences across ALL placements (episode + runtime) to match PingPanel's combatId logic
+  // Must be declared before handleRemoveRuntimeMob/handleRemoveEpisodeMob which reference it
+  const allPlacementsMobCounts = useMemo(() => {
+    const episodePlacements = selectedEpisode?.mobPlacements ?? [];
+    const runtimePlacements = runtimeMobPlacements ?? [];
+    const allPlacements = [...episodePlacements, ...runtimePlacements];
+    const counts: Record<string, number> = {};
+    allPlacements.forEach(p => { counts[p.mobId] = (counts[p.mobId] ?? 0) + 1; });
+    return counts;
+  }, [selectedEpisode?.mobPlacements, runtimeMobPlacements]);
+
   // Handle removing a runtime mob from the map
   const handleRemoveRuntimeMob = useCallback((index: number) => {
     // Remove from combat if active
@@ -2066,16 +2077,6 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       p.mapId === currentMapId || (!p.mapId && selectedEpisode.mapIds[0] === currentMapId)
     );
   }, [selectedEpisode, currentMapId]);
-
-  // Count mob occurrences across ALL placements (episode + runtime) to match PingPanel's combatId logic
-  const allPlacementsMobCounts = useMemo(() => {
-    const episodePlacements = selectedEpisode?.mobPlacements ?? [];
-    const runtimePlacements = runtimeMobPlacements ?? [];
-    const allPlacements = [...episodePlacements, ...runtimePlacements];
-    const counts: Record<string, number> = {};
-    allPlacements.forEach(p => { counts[p.mobId] = (counts[p.mobId] ?? 0) + 1; });
-    return counts;
-  }, [selectedEpisode?.mobPlacements, runtimeMobPlacements]);
 
   // Get the current map URL
   const currentMapUrl = useMemo(() => {
