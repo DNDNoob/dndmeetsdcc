@@ -526,6 +526,11 @@ export const useGameState = () => {
     return getStableCollection<Quest>('quests');
   }, [getCollection, isLoaded]);
 
+  // --- Assigned Quests (must be declared before deleteQuest to avoid TDZ) ---
+  const assignedQuests = useMemo(() => {
+    return getStableCollection<AssignedQuest>('assignedQuests');
+  }, [getCollection, isLoaded]);
+
   const addQuest = async (quest: Quest) => {
     return addItem('quests', {
       ...quest,
@@ -554,11 +559,6 @@ export const useGameState = () => {
     }
     return deleteItem('quests', id);
   };
-
-  // --- Assigned Quests ---
-  const assignedQuests = useMemo(() => {
-    return getStableCollection<AssignedQuest>('assignedQuests');
-  }, [getCollection, isLoaded]);
 
   const assignQuest = async (questId: string, crawlerIds: string[], episodeId?: string) => {
     const allCrawlerIds = crawlers.filter(c => c.id !== 'dungeonai').map(c => c.id);

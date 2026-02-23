@@ -13,7 +13,9 @@
       "📜 DM can check off action items per-crawler from ShowTime — completed items show strikethrough for players",
       "📜 Quest assignment, action reveal/completion, and reward reveal push notifications to the dice menu",
       "📜 Toast notifications appear for players when they receive a new quest",
-      "📜 DMs can link quests to episodes in the episode builder (similar to loot boxes)"
+      "📜 DMs can link quests to episodes in the episode builder (similar to loot boxes)",
+      "🐛 Fixed blank ShowTime page caused by TDZ variable ordering issue in quest code",
+      "📜 Added drag-to-reorder for quest action items and rewards on the DM console Quests tab"
     ]
   },
   {

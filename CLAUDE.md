@@ -307,6 +307,15 @@ const [name, setName] = useState('');
 - If something looks wrong, fix it and re-screenshot before committing
 - Pay special attention to: ShowTime map rendering, PingPanel combat UI, health bars, mob/crawler icons
 
+### Debugging Blank Pages / Broken Loading
+
+When a user reports a bug that causes something to not load or load incorrectly:
+
+1. **Reproduce first**: Always start by trying to reproduce the issue — run `npm run build` and serve the production build, or start the dev server and navigate to the affected page
+2. **Check the browser console**: Look for runtime errors (`ReferenceError`, `TypeError`, etc.) in the browser console — these are the #1 cause of blank pages
+3. **TDZ errors are the most common cause of blank pages**: A `ReferenceError: Cannot access 'X' before initialization` in the minified production build means a `const`/`let` variable is referenced before its declaration. The dev server (esbuild) may silently hide these, but Rollup in production builds enforces TDZ strictly. **Fix**: move the declaration above all references in the same scope.
+4. **Do not spend time guessing** — always check console output before investigating code paths
+
 ### What to Look For
 
 - **Blank pages**: Usually a runtime error (check browser console for `ReferenceError`, `TypeError`, etc.)
