@@ -241,9 +241,56 @@ export interface Episode {
   defaultFogOfWar?: boolean; // Default fog of war setting for new maps
   lootBoxes?: LootBoxTemplate[]; // Deprecated: embedded templates (for backwards compatibility)
   lootBoxIds?: string[]; // IDs of loot box templates assigned to this episode
+  questIds?: string[]; // IDs of quests assigned to this episode
   startingGameTime?: number; // epoch ms for the game clock starting time
   createdAt?: string;
   updatedAt?: string;
+}
+
+// Quest system types
+export type QuestRewardTier = 'Dirt' | 'Copper' | 'Silver' | 'Gold';
+
+export interface QuestReward {
+  id: string;
+  item: InventoryItem;
+  tier: QuestRewardTier;
+  visible: boolean; // DM can show/hide rewards
+}
+
+export interface QuestActionItem {
+  id: string;
+  description: string;
+  visible: boolean; // DM can show/hide action items
+  completedBy: string[]; // crawlerIds that have completed this action item
+}
+
+export interface QuestNote {
+  id: string;
+  crawlerId: string;
+  crawlerName: string;
+  text: string;
+  createdAt: string;
+}
+
+export interface Quest {
+  id: string;
+  name: string;
+  description: string;
+  rewards: QuestReward[];
+  actionItems: QuestActionItem[];
+  notes: QuestNote[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AssignedQuest {
+  id: string;
+  questId: string;
+  crawlerIds: string[]; // which crawlers have this quest
+  isPartyQuest: boolean; // true if all crawlers participate
+  episodeId?: string; // optional episode link
+  assignedAt: string;
+  completedAt?: string;
 }
 
 export interface WikiPage {

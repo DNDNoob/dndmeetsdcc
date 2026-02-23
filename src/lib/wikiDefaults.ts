@@ -270,6 +270,7 @@ From the DM Console, go to the Episodes tab:
 4. Configure fog of war settings per map
 5. Set map scale for each map
 6. Optionally attach loot box templates
+7. Optionally attach quests
 
 ## Running an Episode (Show Time)
 
@@ -481,6 +482,66 @@ Loot boxes are reward packages that the DM sends to crawlers during gameplay.
 Loot box sends appear in the dice roller history, so all players can see when loot is distributed.`,
   },
   {
+    id: 'quests',
+    slug: 'quests',
+    title: 'Quests',
+    category: 'Game Mechanics',
+    order: 14.5,
+    content: `# Quests
+
+Quests are objectives the DM creates and assigns to crawlers. They have action items to complete, tiered rewards, and shared notes.
+
+## Creating Quests (DM)
+
+1. Go to the **DM Console** and click the **Quests** tab
+2. Fill in the quest **name** and **description**
+3. Add **action items** — tasks for crawlers to complete (hidden from players by default)
+4. Add **item rewards** — search from the shared inventory library and assign a tier (Dirt/Copper/Silver/Gold)
+5. Rewards are also hidden from players by default — toggle visibility with the eye icon
+6. Click **Create Quest** to save
+
+## Linking Quests to Episodes
+
+When creating or editing an episode in the Episodes tab, you can select quests to include. This makes them available for assignment during Show Time.
+
+## Assigning Quests (DM)
+
+During Show Time, the Quest Panel appears in the map selector when the episode has quests linked:
+
+1. Select a quest to assign
+2. All crawlers are selected by default — deselect any who shouldn't receive it
+3. Click **Assign** to give the quest to the selected crawlers
+4. If all crawlers participate, it becomes a **Party Quest**
+5. A notification appears in the dice roller and as a toast for players
+
+## Managing Quests During Play (DM)
+
+After assigning a quest, the DM can:
+
+- **Toggle action item visibility**: Click the eye icon to reveal/hide action items for players
+- **Mark action items complete**: Click crawler initials next to each action item to check them off
+- **Toggle reward visibility**: Reveal rewards when appropriate
+
+Each visibility toggle and completion sends a notification to the dice roller.
+
+## Player Quest View
+
+Players see their assigned quests on the **Quests** tab of their profile page:
+
+- Expandable quest cards showing name, description, and Party Quest badge
+- Visible action items with completion status (strikethrough when completed by the DM)
+- Visible rewards with tier color
+- **Quest Notes**: A shared notepad where any crawler on the quest can add date-stamped text entries. Notes from other crawlers on the same quest are visible to everyone.
+
+## Notifications
+
+Quest events appear in the dice roller history:
+- Quest assigned (with recipient names)
+- Action item revealed
+- Action item completed
+- Reward revealed`,
+  },
+  {
     id: 'game-clock',
     slug: 'game-clock',
     title: 'Game Clock & Turns',
@@ -563,7 +624,9 @@ Everything in Show Time syncs in real time:
 - Mob and crawler positions (dragged by the DM)
 - Fog of war reveals
 - Combat state and turn order
-- Pings and shape annotations`,
+- Pings and shape annotations
+- Loot box distribution
+- Quest assignments and progress`,
   },
   {
     id: 'sound-effects',
@@ -618,6 +681,9 @@ Upload maps, set names, and manage map visibility.
 
 ### Loot Tab
 Create loot box templates and manage the loot distribution system. See the Loot Boxes page for details.
+
+### Quests Tab
+Create and manage quests with action items, tiered rewards, and descriptions. Quests can be linked to episodes and assigned to crawlers during Show Time. See the Quests page for details.
 
 ### Settings
 Configure the game clock, starting time, and other global settings.
