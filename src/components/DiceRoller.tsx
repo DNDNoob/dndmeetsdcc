@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DungeonButton } from "./ui/DungeonButton";
-import { Dices, ChevronUp, ChevronDown, Plus, X, Package } from "lucide-react";
+import { Dices, ChevronUp, ChevronDown, Plus, X, Package, ScrollText } from "lucide-react";
 import { getLootBoxTierColor } from "@/lib/gameData";
 import { DiceRollEntry } from "@/hooks/useGameState";
 
@@ -203,6 +203,46 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
                               <span className="text-muted-foreground"> sent to </span>
                             )}
                             <span className="text-primary">{entry.lootBoxNotification.recipientNames.join(', ')}</span>
+                          </div>
+                          <span className="text-[10px] text-muted-foreground/60 ml-auto">{formatTimestamp(entry.timestamp)}</span>
+                        </div>
+                      ) : entry.questNotification ? (
+                        // Quest notification display
+                        <div className="flex items-center gap-2">
+                          <ScrollText className="w-4 h-4 flex-shrink-0 text-emerald-400" />
+                          <div>
+                            <span className="font-display text-emerald-400">
+                              {entry.questNotification.questName}
+                            </span>
+                            {entry.questNotification.type === 'assigned' && (
+                              <>
+                                <span className="text-muted-foreground"> assigned to </span>
+                                <span className="text-primary">{entry.questNotification.recipientNames.join(', ')}</span>
+                                {entry.questNotification.detail === 'Party Quest' && (
+                                  <span className="text-emerald-400 ml-1">(Party Quest)</span>
+                                )}
+                              </>
+                            )}
+                            {entry.questNotification.type === 'action_revealed' && (
+                              <>
+                                <span className="text-muted-foreground"> — new objective: </span>
+                                <span className="text-foreground">{entry.questNotification.detail}</span>
+                              </>
+                            )}
+                            {entry.questNotification.type === 'action_completed' && (
+                              <>
+                                <span className="text-muted-foreground"> — </span>
+                                <span className="text-primary">{entry.questNotification.recipientNames.join(', ')}</span>
+                                <span className="text-muted-foreground"> completed: </span>
+                                <span className="text-foreground">{entry.questNotification.detail}</span>
+                              </>
+                            )}
+                            {entry.questNotification.type === 'reward_revealed' && (
+                              <>
+                                <span className="text-muted-foreground"> — reward revealed: </span>
+                                <span className="text-amber-400">{entry.questNotification.detail}</span>
+                              </>
+                            )}
                           </div>
                           <span className="text-[10px] text-muted-foreground/60 ml-auto">{formatTimestamp(entry.timestamp)}</span>
                         </div>

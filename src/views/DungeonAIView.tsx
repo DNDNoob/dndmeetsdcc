@@ -4,8 +4,8 @@ import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import MapMobPlacementEditor from "@/components/ui/MapMobPlacementEditor";
 import MapDesignerPopout from "@/components/ui/MapDesignerPopout";
-import { Mob, Episode, EpisodeMobPlacement, Crawler, CrawlerPlacement, InventoryItem, LootBoxTemplate, LootBoxTier, getLootBoxTierColor, type EquipmentSlot, type EquippedItems } from "@/lib/gameData";
-import { Brain, Upload, Plus, Trash2, Map, Skull, Image as ImageIcon, Save, Edit2, X, Layers, ChevronLeft, ChevronRight, User, Package, Search, Maximize2, Shield, ChevronDown as ChevronDownIcon } from "lucide-react";
+import { Mob, Episode, EpisodeMobPlacement, Crawler, CrawlerPlacement, InventoryItem, LootBoxTemplate, LootBoxTier, getLootBoxTierColor, type EquipmentSlot, type EquippedItems, Quest, QuestReward, QuestActionItem, QuestRewardTier } from "@/lib/gameData";
+import { Brain, Upload, Plus, Trash2, Map, Skull, Image as ImageIcon, Save, Edit2, X, Layers, ChevronLeft, ChevronRight, User, Package, Search, Maximize2, Shield, ChevronDown as ChevronDownIcon, ScrollText, Eye, EyeOff, CheckSquare } from "lucide-react";
 import { storage } from "@/lib/firebase";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 
@@ -28,6 +28,10 @@ interface DungeonAIViewProps {
   onUpdateLootBoxTemplate?: (id: string, updates: Partial<LootBoxTemplate>) => void;
   onDeleteLootBoxTemplate?: (id: string) => void;
   onSetGameClock?: (gameTime: number) => Promise<void>;
+  quests?: Quest[];
+  onAddQuest?: (quest: Quest) => void;
+  onUpdateQuest?: (id: string, updates: Partial<Quest>) => void;
+  onDeleteQuest?: (id: string) => void;
 }
 
 const DungeonAIView: React.FC<DungeonAIViewProps> = ({
@@ -49,8 +53,12 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   onUpdateLootBoxTemplate,
   onDeleteLootBoxTemplate,
   onSetGameClock,
+  quests = [],
+  onAddQuest,
+  onUpdateQuest,
+  onDeleteQuest,
 }) => {
-  const [activeTab, setActiveTab] = useState<"mobs" | "maps" | "episodes" | "lootboxes">("mobs");
+  const [activeTab, setActiveTab] = useState<"mobs" | "maps" | "episodes" | "lootboxes" | "quests">("mobs");
   const [newMob, setNewMob] = useState<Partial<Mob>>({
     name: "",
     level: 1,
@@ -95,6 +103,19 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   const [lootBoxItemQuantity, setLootBoxItemQuantity] = useState(1);
   const [newLootBoxGold, setNewLootBoxGold] = useState(0);
   const [editingLootBoxId, setEditingLootBoxId] = useState<string | null>(null);
+
+  // Quest state for episode (selected quest IDs)
+  const [selectedQuestIdsForEpisode, setSelectedQuestIdsForEpisode] = useState<string[]>([]);
+
+  // Quest editing state (for quests tab)
+  const [newQuestName, setNewQuestName] = useState("");
+  const [newQuestDescription, setNewQuestDescription] = useState("");
+  const [newQuestRewards, setNewQuestRewards] = useState<QuestReward[]>([]);
+  const [newQuestActionItems, setNewQuestActionItems] = useState<QuestActionItem[]>([]);
+  const [questRewardSearch, setQuestRewardSearch] = useState("");
+  const [questRewardTier, setQuestRewardTier] = useState<QuestRewardTier>("Copper");
+  const [newActionItemText, setNewActionItemText] = useState("");
+  const [editingQuestId, setEditingQuestId] = useState<string | null>(null);
 
   // Close mob item context menu on outside click
   useEffect(() => {
@@ -436,6 +457,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
         crawlerPlacements: selectedCrawlersForEpisode,
         mapSettings: mapSettings,
         lootBoxIds: selectedLootBoxIdsForEpisode.length > 0 ? selectedLootBoxIdsForEpisode : undefined,
+        questIds: selectedQuestIdsForEpisode.length > 0 ? selectedQuestIdsForEpisode : undefined,
         startingGameTime: parsedStartingTime,
       });
       setEditingEpisodeId(null);
@@ -450,6 +472,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
         crawlerPlacements: selectedCrawlersForEpisode,
         mapSettings: mapSettings,
         lootBoxIds: selectedLootBoxIdsForEpisode.length > 0 ? selectedLootBoxIdsForEpisode : undefined,
+        questIds: selectedQuestIdsForEpisode.length > 0 ? selectedQuestIdsForEpisode : undefined,
         startingGameTime: parsedStartingTime,
       };
       onAddEpisode(episode);
@@ -469,6 +492,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
     setCurrentMapIndexForEditor(0);
     setMapSettingsForEpisode({});
     setSelectedLootBoxIdsForEpisode([]);
+    setSelectedQuestIdsForEpisode([]);
     setNewEpisodeStartingTime("");
   };
 
@@ -563,6 +587,9 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
       setSelectedLootBoxIdsForEpisode([]);
     }
 
+    // Load quest IDs
+    setSelectedQuestIdsForEpisode(episode.questIds || []);
+
     // Load starting game time
     if (episode.startingGameTime) {
       const d = new Date(episode.startingGameTime);
@@ -628,6 +655,13 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
             className="flex-1"
           >
             <Package className="w-4 h-4 mr-2" /> Loot Boxes
+          </DungeonButton>
+          <DungeonButton
+            variant={activeTab === "quests" ? "admin" : "default"}
+            onClick={() => setActiveTab("quests")}
+            className="flex-1"
+          >
+            <ScrollText className="w-4 h-4 mr-2" /> Quests
           </DungeonButton>
         </div>
 
@@ -1647,6 +1681,46 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                   </div>
                 )}
 
+                {/* Quests - picker for episode */}
+                {quests.length > 0 && (
+                  <div className="bg-muted/30 border border-border rounded p-4 mt-4">
+                    <h5 className="font-display text-sm text-emerald-400 mb-3 flex items-center gap-2">
+                      <ScrollText className="w-4 h-4" />
+                      Quests
+                    </h5>
+                    <div className="grid sm:grid-cols-2 gap-2">
+                      {quests.map(quest => {
+                        const isSelected = selectedQuestIdsForEpisode.includes(quest.id);
+                        return (
+                          <button
+                            key={quest.id}
+                            onClick={() => setSelectedQuestIdsForEpisode(prev =>
+                              isSelected ? prev.filter(id => id !== quest.id) : [...prev, quest.id]
+                            )}
+                            className={`text-left p-2 border rounded transition-colors ${
+                              isSelected
+                                ? 'bg-emerald-500/20 border-emerald-500'
+                                : 'bg-background border-border hover:border-emerald-500/50'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <ScrollText className="w-4 h-4 flex-shrink-0 text-emerald-400" />
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-semibold truncate">{quest.name}</p>
+                                <p className="text-xs text-muted-foreground">{quest.actionItems.length} action items · {quest.rewards.length} rewards</p>
+                              </div>
+                              {isSelected && <span className="text-emerald-500">✓</span>}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Create quests in the Quests tab, then select them here to include in this episode.
+                    </p>
+                  </div>
+                )}
+
                 <div className="flex gap-2 pt-4">
                   {editingEpisodeId && (
                     <DungeonButton
@@ -1661,6 +1735,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                         setCurrentMapIndexForEditor(0);
                         setMapSettingsForEpisode({});
                         setSelectedLootBoxIdsForEpisode([]);
+                        setSelectedQuestIdsForEpisode([]);
                         setNewEpisodeStartingTime("");
                       }}
                       className="flex-1"
@@ -1702,6 +1777,11 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                         <span className="text-muted-foreground">
                           📦 {(episode.lootBoxIds?.length ?? episode.lootBoxes?.length ?? 0)} loot box{(episode.lootBoxIds?.length ?? episode.lootBoxes?.length ?? 0) !== 1 ? "es" : ""}
                         </span>
+                        {(episode.questIds?.length ?? 0) > 0 && (
+                          <span className="text-muted-foreground">
+                            📜 {episode.questIds!.length} quest{episode.questIds!.length !== 1 ? "s" : ""}
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -1994,6 +2074,307 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                         {Object.keys(template.items.reduce((acc, item) => { acc[item.name] = 1; return acc; }, {} as Record<string, number>)).length > 3 && (
                           <span>...</span>
                         )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === "quests" && (
+          <div className="space-y-6">
+            {/* Create/Edit Quest form */}
+            <div className="bg-muted/30 border border-border p-4">
+              <h3 className="font-display text-primary text-lg mb-4 flex items-center gap-2">
+                <ScrollText className="w-5 h-5" />
+                {editingQuestId ? "Edit Quest" : "Create Quest"}
+              </h3>
+
+              <div className="space-y-4">
+                {/* Quest name */}
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Quest Name *</label>
+                  <input
+                    type="text"
+                    placeholder="Quest name"
+                    value={newQuestName}
+                    onChange={e => setNewQuestName(e.target.value)}
+                    className="w-full bg-background border border-border rounded px-3 py-2 text-sm"
+                  />
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Description</label>
+                  <textarea
+                    placeholder="Quest description..."
+                    value={newQuestDescription}
+                    onChange={e => setNewQuestDescription(e.target.value)}
+                    className="w-full bg-background border border-border rounded px-3 py-2 text-sm min-h-[80px] resize-y"
+                  />
+                </div>
+
+                {/* Action Items */}
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Action Items</label>
+                  <div className="flex gap-2 mb-2">
+                    <input
+                      type="text"
+                      placeholder="Add action item..."
+                      value={newActionItemText}
+                      onChange={e => setNewActionItemText(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && newActionItemText.trim()) {
+                          setNewQuestActionItems(prev => [...prev, {
+                            id: crypto.randomUUID(),
+                            description: newActionItemText.trim(),
+                            visible: false,
+                            completedBy: [],
+                          }]);
+                          setNewActionItemText("");
+                        }
+                      }}
+                      className="flex-1 bg-background border border-border rounded px-3 py-2 text-sm"
+                    />
+                    <DungeonButton
+                      variant="admin"
+                      size="sm"
+                      disabled={!newActionItemText.trim()}
+                      onClick={() => {
+                        if (!newActionItemText.trim()) return;
+                        setNewQuestActionItems(prev => [...prev, {
+                          id: crypto.randomUUID(),
+                          description: newActionItemText.trim(),
+                          visible: false,
+                          completedBy: [],
+                        }]);
+                        setNewActionItemText("");
+                      }}
+                    >
+                      <Plus className="w-4 h-4" />
+                    </DungeonButton>
+                  </div>
+                  {newQuestActionItems.length > 0 && (
+                    <div className="space-y-1">
+                      {newQuestActionItems.map((item, idx) => (
+                        <div key={item.id} className="flex items-center gap-2 bg-background border border-border rounded px-3 py-2">
+                          <CheckSquare className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                          <span className="text-sm flex-1">{item.description}</span>
+                          <button
+                            onClick={() => setNewQuestActionItems(prev => {
+                              const next = [...prev];
+                              next[idx] = { ...next[idx], visible: !next[idx].visible };
+                              return next;
+                            })}
+                            className="p-1 hover:bg-muted rounded"
+                            title={item.visible ? "Visible to players" : "Hidden from players"}
+                          >
+                            {item.visible ? <Eye className="w-3 h-3 text-green-400" /> : <EyeOff className="w-3 h-3 text-muted-foreground" />}
+                          </button>
+                          <button
+                            onClick={() => setNewQuestActionItems(prev => prev.filter((_, i) => i !== idx))}
+                            className="p-1 hover:bg-destructive/10 rounded"
+                          >
+                            <X className="w-3 h-3 text-destructive" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-1">Action items are hidden from players by default. Toggle visibility with the eye icon.</p>
+                </div>
+
+                {/* Rewards */}
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Item Rewards</label>
+                  <div className="flex gap-2 mb-2">
+                    <select
+                      value={questRewardTier}
+                      onChange={e => setQuestRewardTier(e.target.value as QuestRewardTier)}
+                      className="bg-background border border-border rounded px-2 py-2 text-sm"
+                      style={{ color: getLootBoxTierColor(questRewardTier as LootBoxTier) }}
+                    >
+                      {(['Dirt', 'Copper', 'Silver', 'Gold'] as QuestRewardTier[]).map(tier => (
+                        <option key={tier} value={tier} style={{ color: getLootBoxTierColor(tier as LootBoxTier) }}>
+                          {tier}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="text"
+                      placeholder="Search items..."
+                      value={questRewardSearch}
+                      onChange={e => setQuestRewardSearch(e.target.value)}
+                      className="flex-1 bg-background border border-border rounded px-3 py-2 text-sm"
+                    />
+                  </div>
+                  {questRewardSearch && getSharedInventory && (
+                    <div className="max-h-32 overflow-y-auto space-y-1 mb-2">
+                      {getSharedInventory()
+                        .filter(item => item.name.toLowerCase().includes(questRewardSearch.toLowerCase()))
+                        .slice(0, 10)
+                        .map(item => (
+                          <button
+                            key={item.id}
+                            onClick={() => {
+                              setNewQuestRewards(prev => [...prev, {
+                                id: crypto.randomUUID(),
+                                item: { ...item, id: crypto.randomUUID() },
+                                tier: questRewardTier,
+                                visible: false,
+                              }]);
+                              setQuestRewardSearch("");
+                            }}
+                            className="w-full text-left p-2 bg-background border border-border rounded hover:border-primary transition-colors text-sm flex justify-between items-center"
+                          >
+                            <span>{item.name}</span>
+                            <span className="text-xs text-primary">+ Add</span>
+                          </button>
+                        ))}
+                      {getSharedInventory().filter(item => item.name.toLowerCase().includes(questRewardSearch.toLowerCase())).length === 0 && (
+                        <p className="text-xs text-muted-foreground p-2">No items found</p>
+                      )}
+                    </div>
+                  )}
+                  {newQuestRewards.length > 0 && (
+                    <div className="space-y-1">
+                      {newQuestRewards.map((reward, idx) => (
+                        <div key={reward.id} className="flex items-center gap-2 bg-background border border-border rounded px-3 py-2">
+                          <Package className="w-4 h-4 flex-shrink-0" style={{ color: getLootBoxTierColor(reward.tier as LootBoxTier) }} />
+                          <span className="text-sm flex-1">{reward.item.name}</span>
+                          <span className="text-xs" style={{ color: getLootBoxTierColor(reward.tier as LootBoxTier) }}>{reward.tier}</span>
+                          <button
+                            onClick={() => setNewQuestRewards(prev => {
+                              const next = [...prev];
+                              next[idx] = { ...next[idx], visible: !next[idx].visible };
+                              return next;
+                            })}
+                            className="p-1 hover:bg-muted rounded"
+                            title={reward.visible ? "Visible to players" : "Hidden from players"}
+                          >
+                            {reward.visible ? <Eye className="w-3 h-3 text-green-400" /> : <EyeOff className="w-3 h-3 text-muted-foreground" />}
+                          </button>
+                          <button
+                            onClick={() => setNewQuestRewards(prev => prev.filter((_, i) => i !== idx))}
+                            className="p-1 hover:bg-destructive/10 rounded"
+                          >
+                            <X className="w-3 h-3 text-destructive" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-1">Rewards are hidden from players by default. Toggle visibility with the eye icon.</p>
+                  {!getSharedInventory && (
+                    <p className="text-xs text-muted-foreground mt-1">Add items to the Shared Inventory Library (Inventory tab) to populate rewards.</p>
+                  )}
+                </div>
+
+                {/* Action buttons */}
+                <div className="flex gap-2 pt-2">
+                  {editingQuestId && (
+                    <DungeonButton
+                      variant="default"
+                      onClick={() => {
+                        setEditingQuestId(null);
+                        setNewQuestName("");
+                        setNewQuestDescription("");
+                        setNewQuestRewards([]);
+                        setNewQuestActionItems([]);
+                      }}
+                      className="flex-1"
+                    >
+                      <X className="w-4 h-4 mr-2" /> Cancel
+                    </DungeonButton>
+                  )}
+                  <DungeonButton
+                    variant="admin"
+                    className="flex-1"
+                    disabled={!newQuestName.trim() || !onAddQuest}
+                    onClick={() => {
+                      if (!newQuestName.trim()) return;
+                      if (editingQuestId && onUpdateQuest) {
+                        onUpdateQuest(editingQuestId, {
+                          name: newQuestName,
+                          description: newQuestDescription,
+                          rewards: newQuestRewards,
+                          actionItems: newQuestActionItems,
+                        });
+                        setEditingQuestId(null);
+                      } else if (onAddQuest) {
+                        onAddQuest({
+                          id: crypto.randomUUID(),
+                          name: newQuestName,
+                          description: newQuestDescription,
+                          rewards: newQuestRewards,
+                          actionItems: newQuestActionItems,
+                          notes: [],
+                          createdAt: new Date().toISOString(),
+                          updatedAt: new Date().toISOString(),
+                        });
+                      }
+                      setNewQuestName("");
+                      setNewQuestDescription("");
+                      setNewQuestRewards([]);
+                      setNewQuestActionItems([]);
+                    }}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    {editingQuestId ? "Update Quest" : "Create Quest"}
+                  </DungeonButton>
+                </div>
+              </div>
+            </div>
+
+            {/* Existing Quests Library */}
+            <div className="space-y-3">
+              <h3 className="font-display text-primary text-lg">Quest Library</h3>
+              {quests.length === 0 ? (
+                <p className="text-muted-foreground text-sm py-8">No quests created yet.</p>
+              ) : (
+                <div className="grid sm:grid-cols-2 gap-3">
+                  {quests.map(quest => (
+                    <div key={quest.id} className="border border-emerald-500/50 bg-muted/20 p-4 rounded">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <ScrollText className="w-5 h-5 flex-shrink-0 text-emerald-400" />
+                          <h4 className="font-display text-foreground">{quest.name}</h4>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => {
+                              setEditingQuestId(quest.id);
+                              setNewQuestName(quest.name);
+                              setNewQuestDescription(quest.description);
+                              setNewQuestRewards([...quest.rewards]);
+                              setNewQuestActionItems([...quest.actionItems]);
+                            }}
+                            className="p-1 hover:bg-muted rounded"
+                          >
+                            <Edit2 className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+                          </button>
+                          {onDeleteQuest && (
+                            <button
+                              onClick={() => {
+                                if (confirm(`Delete quest "${quest.name}"?`)) {
+                                  onDeleteQuest(quest.id);
+                                }
+                              }}
+                              className="p-1 hover:bg-destructive/10 rounded"
+                            >
+                              <Trash2 className="w-4 h-4 text-destructive" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      {quest.description && (
+                        <p className="text-xs text-muted-foreground mb-2">{quest.description}</p>
+                      )}
+                      <div className="flex gap-3 text-xs text-muted-foreground">
+                        <span>{quest.actionItems.length} action item{quest.actionItems.length !== 1 ? 's' : ''}</span>
+                        <span>{quest.rewards.length} reward{quest.rewards.length !== 1 ? 's' : ''}</span>
                       </div>
                     </div>
                   ))}

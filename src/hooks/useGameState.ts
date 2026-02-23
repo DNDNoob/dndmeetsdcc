@@ -11,6 +11,8 @@ import {
   CombatState,
   CombatantEntry,
   WikiPage,
+  Quest,
+  AssignedQuest,
   getEquippedModifiers,
   defaultCrawlers,
   defaultInventory,
@@ -34,6 +36,13 @@ export interface DiceRollEntry {
     boxName: string;
     tier: string;
     recipientNames: string[];
+  };
+  // For quest notifications
+  questNotification?: {
+    questName: string;
+    type: 'assigned' | 'action_revealed' | 'action_completed' | 'reward_revealed';
+    recipientNames: string[];
+    detail?: string; // action item text or reward name
   };
 }
 
@@ -510,6 +519,71 @@ export const useGameState = () => {
 
   const deleteLootBoxTemplate = async (id: string) => {
     return deleteItem('lootBoxTemplates', id);
+  };
+
+  // --- Quests ---
+  const quests = useMemo(() => {
+    return getStableCollection<Quest>('quests');
+  }, [getCollection, isLoaded]);
+
+  const addQuest = async (quest: Quest) => {
+    return addItem('quests', {
+      ...quest,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    } as Record<string, unknown>);
+  };
+
+  const updateQuest = async (id: string, updates: Partial<Quest>) => {
+    return updateItem('quests', id, {
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    } as Record<string, unknown>);
+  };
+
+  const deleteQuest = async (id: string) => {
+    // Also delete all assigned quests referencing this quest
+    const assigned = assignedQuests.filter(a => a.questId === id);
+    if (assigned.length > 0) {
+      const ops: BatchOperation[] = assigned.map(a => ({
+        type: 'delete' as const,
+        collection: 'assignedQuests' as const,
+        id: a.id,
+      }));
+      await batchWrite(ops);
+    }
+    return deleteItem('quests', id);
+  };
+
+  // --- Assigned Quests ---
+  const assignedQuests = useMemo(() => {
+    return getStableCollection<AssignedQuest>('assignedQuests');
+  }, [getCollection, isLoaded]);
+
+  const assignQuest = async (questId: string, crawlerIds: string[], episodeId?: string) => {
+    const allCrawlerIds = crawlers.filter(c => c.id !== 'dungeonai').map(c => c.id);
+    const isPartyQuest = crawlerIds.length >= allCrawlerIds.length && allCrawlerIds.every(id => crawlerIds.includes(id));
+    const assignment: AssignedQuest = {
+      id: crypto.randomUUID(),
+      questId,
+      crawlerIds,
+      isPartyQuest,
+      episodeId,
+      assignedAt: new Date().toISOString(),
+    };
+    return addItem('assignedQuests', { ...assignment } as Record<string, unknown>);
+  };
+
+  const updateAssignedQuest = async (id: string, updates: Partial<AssignedQuest>) => {
+    return updateItem('assignedQuests', id, updates as Record<string, unknown>);
+  };
+
+  const deleteAssignedQuest = async (id: string) => {
+    return deleteItem('assignedQuests', id);
+  };
+
+  const getCrawlerAssignedQuests = (crawlerId: string) => {
+    return assignedQuests.filter(a => a.crawlerIds.includes(crawlerId));
   };
 
   // --- Dice Rolls ---
@@ -1057,6 +1131,15 @@ export const useGameState = () => {
     addLootBoxTemplate,
     updateLootBoxTemplate,
     deleteLootBoxTemplate,
+    quests,
+    addQuest,
+    updateQuest,
+    deleteQuest,
+    assignedQuests,
+    assignQuest,
+    updateAssignedQuest,
+    deleteAssignedQuest,
+    getCrawlerAssignedQuests,
     diceRolls,
     addDiceRoll,
     clearDiceRolls,

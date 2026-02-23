@@ -21,6 +21,7 @@ export type CollectionName =
   | 'wiki'
   // Add new collections below:
   | 'quests'
+  | 'assignedQuests'
   | 'npcs'
   | 'spells'
   | 'items'

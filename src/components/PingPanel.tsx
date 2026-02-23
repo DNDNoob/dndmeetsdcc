@@ -135,7 +135,9 @@ const PingPanel: React.FC<PingPanelProps> = ({
       const count = mobCounts[p.mobId];
       const currentIndex = mobIndices[p.mobId] ?? 0;
       mobIndices[p.mobId] = currentIndex + 1;
-      const suffix = count > 1 ? ` ${String.fromCharCode(65 + currentIndex)}` : '';
+      // Use stable letterIndex if available, fall back to sequential for legacy data
+      const letterIdx = p.letterIndex ?? currentIndex;
+      const suffix = count > 1 ? ` ${String.fromCharCode(65 + letterIdx)}` : '';
       return {
         combatId: count > 1 ? `${p.mobId}:${placementIdx}` : p.mobId,
         mobId: p.mobId,

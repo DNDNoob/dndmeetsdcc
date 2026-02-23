@@ -6,7 +6,7 @@ import { HealthBar } from "@/components/ui/HealthBar";
 import { EquipmentSlot } from "@/components/ui/EquipmentSlot";
 import { Crawler, Mob, InventoryItem, createEmptyCrawler, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie } from "@/lib/gameData";
 import type { DiceRollEntry } from "@/hooks/useGameState";
-import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Backpack, HardHat, Package, Lock, Unlock, ChevronDown, ChevronUp, Check, Search, Send, BookOpen, Filter, X, Gem, Footprints, Shirt, Hand, Target, Swords, RefreshCw, Timer } from "lucide-react";
+import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Backpack, HardHat, Package, Lock, Unlock, ChevronDown, ChevronUp, Check, Search, Send, BookOpen, Filter, X, Gem, Footprints, Shirt, Hand, Target, Swords, RefreshCw, Timer, ScrollText, Eye, EyeOff, CheckSquare } from "lucide-react";
 
 type SortOption = 'name-asc' | 'name-desc' | 'gold-desc' | 'gold-asc';
 
@@ -41,7 +41,7 @@ const getEquipmentIcon = (slot?: string, className: string = "w-4 h-4 shrink-0")
   }
 };
 
-type ProfileTab = 'profile' | 'inventory' | 'actions' | 'spells' | 'reactions' | 'attacks' | 'bonus';
+type ProfileTab = 'profile' | 'inventory' | 'actions' | 'spells' | 'reactions' | 'attacks' | 'bonus' | 'quests';
 
 // Noncombat actions mapped to their associated ability score
 const NONCOMBAT_ACTIONS: { label: string; stat: 'str' | 'dex' | 'con' | 'int' | 'cha' }[] = [
@@ -91,6 +91,9 @@ interface ProfilesViewProps {
   onApplyCombatDamage?: (targetId: string, targetType: 'crawler' | 'mob', damage: number) => Promise<void>;
   addDiceRoll?: (entry: DiceRollEntry) => Promise<void>;
   mobs?: Mob[];
+  getCrawlerAssignedQuests?: (crawlerId: string) => import("@/lib/gameData").AssignedQuest[];
+  quests?: import("@/lib/gameData").Quest[];
+  onUpdateQuest?: (id: string, updates: Partial<import("@/lib/gameData").Quest>) => void;
 }
 
 // Loot Box display section for crawler profiles
@@ -258,6 +261,9 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   onApplyCombatDamage,
   addDiceRoll,
   mobs: mobsProp,
+  getCrawlerAssignedQuests,
+  quests: questsProp = [],
+  onUpdateQuest,
 }) => {
   const [selectedId, setSelectedId] = useState(crawlers[0]?.id || "");
   const [editMode, setEditMode] = useState(false);
@@ -267,6 +273,10 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   // Expanded items tracking
   const [expandedItemIds, setExpandedItemIds] = useState<Set<string>>(new Set());
   const [allItemsExpanded, setAllItemsExpanded] = useState(false);
+
+  // Quest tab state
+  const [questExpandedId, setQuestExpandedId] = useState<string | null>(null);
+  const [questNoteText, setQuestNoteText] = useState('');
 
   // Tab and filtering state
   const [activeTab, setActiveTab] = useState<ProfileTab>('profile');
@@ -804,6 +814,23 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             >
               <Timer className="w-5 h-5" />
               <span className="hidden xl:inline text-sm font-medium">Bonus</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('quests')}
+              className={`p-3 rounded-l-lg transition-colors flex items-center gap-2 ${
+                activeTab === 'quests'
+                  ? 'bg-primary/20 text-primary border-r-2 border-primary'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              }`}
+              title="Quests"
+            >
+              <ScrollText className="w-5 h-5" />
+              <span className="hidden xl:inline text-sm font-medium">Quests</span>
+              {getCrawlerAssignedQuests && getCrawlerAssignedQuests(selected?.id || '').length > 0 && (
+                <span className="bg-emerald-500/20 text-emerald-400 text-xs px-1.5 py-0.5 rounded-full">
+                  {getCrawlerAssignedQuests(selected?.id || '').length}
+                </span>
+              )}
             </button>
           </div>
 
@@ -2231,6 +2258,168 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                       <span className="text-[10px] text-muted-foreground">DEX stealth check</span>
                     </button>
                   </div>
+                </div>
+              );
+            })()}
+
+            {activeTab === 'quests' && (() => {
+              const crawlerQuests = getCrawlerAssignedQuests ? getCrawlerAssignedQuests(selected.id) : [];
+
+              return (
+                <div className="space-y-6">
+                  <h2 className="font-display text-xl text-primary flex items-center gap-2">
+                    <ScrollText className="w-6 h-6" /> QUESTS
+                  </h2>
+
+                  {crawlerQuests.length === 0 ? (
+                    <p className="text-muted-foreground text-sm">No quests assigned yet.</p>
+                  ) : (
+                    <div className="space-y-4">
+                      {crawlerQuests.map(assigned => {
+                        const quest = questsProp.find(q => q.id === assigned.questId);
+                        if (!quest) return null;
+                        const isExpanded = questExpandedId === assigned.id;
+
+                        return (
+                          <div key={assigned.id} className="border border-emerald-500/50 bg-muted/20 rounded-lg overflow-hidden">
+                            <button
+                              onClick={() => setQuestExpandedId(isExpanded ? null : assigned.id)}
+                              className="w-full text-left p-4 flex items-center justify-between hover:bg-muted/30 transition-colors"
+                            >
+                              <div className="flex items-center gap-3">
+                                <ScrollText className="w-5 h-5 text-emerald-400" />
+                                <div>
+                                  <h3 className="font-display text-foreground">{quest.name}</h3>
+                                  {assigned.isPartyQuest && (
+                                    <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded">Party Quest</span>
+                                  )}
+                                </div>
+                              </div>
+                              {isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+                            </button>
+
+                            {isExpanded && (
+                              <div className="p-4 pt-0 space-y-4">
+                                {/* Description */}
+                                {quest.description && (
+                                  <p className="text-sm text-muted-foreground">{quest.description}</p>
+                                )}
+
+                                {/* Action Items - only show visible ones for non-DM */}
+                                {quest.actionItems.filter(ai => ai.visible).length > 0 && (
+                                  <div>
+                                    <h4 className="text-sm font-display text-emerald-400 mb-2 flex items-center gap-2">
+                                      <CheckSquare className="w-4 h-4" /> Action Items
+                                    </h4>
+                                    <div className="space-y-1">
+                                      {quest.actionItems.filter(ai => ai.visible).map(ai => {
+                                        const isCompleted = ai.completedBy.includes(selected.id);
+                                        return (
+                                          <div key={ai.id} className="flex items-center gap-2 text-sm">
+                                            {isCompleted ? (
+                                              <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                                            ) : (
+                                              <div className="w-4 h-4 border border-muted-foreground/50 rounded flex-shrink-0" />
+                                            )}
+                                            <span className={isCompleted ? 'line-through text-muted-foreground' : 'text-foreground'}>
+                                              {ai.description}
+                                            </span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Rewards - only show visible ones */}
+                                {quest.rewards.filter(r => r.visible).length > 0 && (
+                                  <div>
+                                    <h4 className="text-sm font-display text-amber-400 mb-2 flex items-center gap-2">
+                                      <Package className="w-4 h-4" /> Rewards
+                                    </h4>
+                                    <div className="space-y-1">
+                                      {quest.rewards.filter(r => r.visible).map(reward => (
+                                        <div key={reward.id} className="flex items-center gap-2 text-sm">
+                                          <Package className="w-3 h-3 flex-shrink-0" style={{ color: getLootBoxTierColor(reward.tier as import("@/lib/gameData").LootBoxTier) }} />
+                                          <span>{reward.item.name}</span>
+                                          <span className="text-xs" style={{ color: getLootBoxTierColor(reward.tier as import("@/lib/gameData").LootBoxTier) }}>
+                                            {reward.tier}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Notes section */}
+                                <div>
+                                  <h4 className="text-sm font-display text-primary mb-2">Quest Notes</h4>
+                                  {quest.notes && quest.notes.length > 0 && (
+                                    <div className="space-y-2 mb-3 max-h-48 overflow-y-auto">
+                                      {quest.notes.map(note => (
+                                        <div key={note.id} className="bg-muted/30 border border-border rounded p-2">
+                                          <div className="flex items-center justify-between mb-1">
+                                            <span className="text-xs font-semibold text-primary">{note.crawlerName}</span>
+                                            <span className="text-[10px] text-muted-foreground">
+                                              {new Date(note.createdAt).toLocaleDateString()}
+                                            </span>
+                                          </div>
+                                          <p className="text-xs text-foreground">{note.text}</p>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                  <div className="flex gap-2">
+                                    <input
+                                      type="text"
+                                      placeholder="Add a note..."
+                                      value={questNoteText}
+                                      onChange={e => setQuestNoteText(e.target.value)}
+                                      onKeyDown={e => {
+                                        if (e.key === 'Enter' && questNoteText.trim() && onUpdateQuest) {
+                                          onUpdateQuest(quest.id, {
+                                            notes: [...(quest.notes || []), {
+                                              id: crypto.randomUUID(),
+                                              crawlerId: selected.id,
+                                              crawlerName: selected.name,
+                                              text: questNoteText.trim(),
+                                              createdAt: new Date().toISOString(),
+                                            }],
+                                          });
+                                          setQuestNoteText('');
+                                        }
+                                      }}
+                                      className="flex-1 bg-background border border-border rounded px-3 py-2 text-sm"
+                                    />
+                                    <DungeonButton
+                                      variant="admin"
+                                      size="sm"
+                                      disabled={!questNoteText.trim() || !onUpdateQuest}
+                                      onClick={() => {
+                                        if (!questNoteText.trim() || !onUpdateQuest) return;
+                                        onUpdateQuest(quest.id, {
+                                          notes: [...(quest.notes || []), {
+                                            id: crypto.randomUUID(),
+                                            crawlerId: selected.id,
+                                            crawlerName: selected.name,
+                                            text: questNoteText.trim(),
+                                            createdAt: new Date().toISOString(),
+                                          }],
+                                        });
+                                        setQuestNoteText('');
+                                      }}
+                                    >
+                                      <Send className="w-4 h-4" />
+                                    </DungeonButton>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               );
             })()}

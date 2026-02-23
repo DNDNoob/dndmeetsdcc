@@ -162,6 +162,15 @@ const Index = () => {
     wikiPages,
     addWikiPage,
     updateWikiPage,
+    quests,
+    addQuest,
+    updateQuest,
+    deleteQuest,
+    assignedQuests,
+    assignQuest,
+    updateAssignedQuest,
+    deleteAssignedQuest,
+    getCrawlerAssignedQuests,
     roomId,
     isLoaded
   } = useGameState();
@@ -314,6 +323,30 @@ const Index = () => {
     prevLootBoxes.current = lootBoxes;
   }, [lootBoxes, currentPlayer]);
 
+  // Quest assignment notifications
+  const seenAssignedQuestIds = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!currentPlayer || currentPlayer.type === 'ai') return;
+
+    // Initialize seen IDs on first load
+    if (seenAssignedQuestIds.current.size === 0 && assignedQuests.length > 0) {
+      assignedQuests.forEach(a => seenAssignedQuestIds.current.add(a.id));
+      return;
+    }
+
+    const myQuests = assignedQuests.filter(a => a.crawlerIds.includes(currentPlayer.id));
+    for (const assigned of myQuests) {
+      if (!seenAssignedQuestIds.current.has(assigned.id)) {
+        seenAssignedQuestIds.current.add(assigned.id);
+        const quest = quests.find(q => q.id === assigned.questId);
+        if (quest) {
+          const label = assigned.isPartyQuest ? `Party Quest: ${quest.name}` : `New Quest: ${quest.name}`;
+          toast(label, { icon: '📜', duration: Infinity });
+        }
+      }
+    }
+  }, [assignedQuests, currentPlayer, quests]);
+
   // Game start/stop notifications for players (detect system dice roll messages)
   const seenSystemRollIds = useRef<Set<string>>(new Set());
   useEffect(() => {
@@ -458,6 +491,9 @@ const Index = () => {
                 onApplyCombatDamage={applyCombatDamage}
                 addDiceRoll={addDiceRoll}
                 mobs={mobs}
+                getCrawlerAssignedQuests={getCrawlerAssignedQuests}
+                quests={quests}
+                onUpdateQuest={updateQuest}
               />
             )}
             {currentView === "maps" && (
@@ -502,6 +538,10 @@ const Index = () => {
                 onUpdateLootBoxTemplate={updateLootBoxTemplate}
                 onDeleteLootBoxTemplate={deleteLootBoxTemplate}
                 onSetGameClock={setGameClock}
+                quests={quests}
+                onAddQuest={addQuest}
+                onUpdateQuest={updateQuest}
+                onDeleteQuest={deleteQuest}
               />
             )}
             {currentView === "showtime" && (
@@ -533,7 +573,14 @@ const Index = () => {
                 noncombatTurnState={noncombatTurnState}
                 resetNoncombatTurns={resetNoncombatTurns}
                 combatState={activeCombatState}
+                onRemoveCombatant={removeCombatant}
                 roomId={roomId}
+                quests={quests}
+                assignedQuests={assignedQuests}
+                onAssignQuest={assignQuest}
+                onUpdateQuest={updateQuest}
+                onUpdateAssignedQuest={updateAssignedQuest}
+                onDeleteAssignedQuest={deleteAssignedQuest}
               />
             )}
             {currentView === "sounds" && <SoundEffectsView />}

@@ -7,8 +7,8 @@ import { GridOverlay } from "@/components/ui/GridOverlay";
 import RulerOverlay from "@/components/ui/RulerOverlay";
 import { MobIcon } from "@/components/ui/MobIcon";
 import { FogOfWar } from "@/components/ui/FogOfWar";
-import { Episode, Mob, MapSettings, Crawler, CrawlerPlacement, EpisodeMobPlacement, SentLootBox, LootBoxTemplate, getLootBoxTierColor, InventoryItem, CombatState, getEquippedModifiers } from "@/lib/gameData";
-import { Map as MapIcon, X, Eye, Layers, ChevronLeft, ChevronRight, PlayCircle, Grid3x3, CloudFog, Eraser, Trash2, Target, ZoomIn, ZoomOut, Package, Lock, Unlock, Search, Plus, Heart } from "lucide-react";
+import { Episode, Mob, MapSettings, Crawler, CrawlerPlacement, EpisodeMobPlacement, SentLootBox, LootBoxTemplate, getLootBoxTierColor, InventoryItem, CombatState, getEquippedModifiers, Quest, AssignedQuest, QuestActionItem, LootBoxTier } from "@/lib/gameData";
+import { Map as MapIcon, X, Eye, EyeOff, Layers, ChevronLeft, ChevronRight, PlayCircle, Grid3x3, CloudFog, Eraser, Trash2, Target, ZoomIn, ZoomOut, Package, Lock, Unlock, Search, Plus, Heart, ScrollText, CheckSquare, Check } from "lucide-react";
 import { PingEffect, Ping } from "@/components/ui/PingEffect";
 import { MapBox, MapBoxData, ShapeType } from "@/components/ui/MapBox";
 import { MapToolsMenu } from "@/components/ui/MapToolsMenu";
@@ -42,10 +42,17 @@ interface ShowTimeViewProps {
   noncombatTurnState?: import("@/lib/gameData").NoncombatTurnState | null;
   resetNoncombatTurns?: (episodeId: string) => Promise<void>;
   combatState?: CombatState | null;
+  onRemoveCombatant?: (combatantId: string) => Promise<void>;
   onRuntimePlacementsChange?: (crawlerPlacements: CrawlerPlacement[], runtimeMobPlacements: EpisodeMobPlacement[]) => void;
   onGameActiveChange?: (active: boolean) => void;
   onRegisterGameToggle?: (toggleFn: (active: boolean) => Promise<void>) => void;
   roomId?: string | null;
+  quests?: Quest[];
+  assignedQuests?: AssignedQuest[];
+  onAssignQuest?: (questId: string, crawlerIds: string[], episodeId?: string) => Promise<void>;
+  onUpdateQuest?: (id: string, updates: Partial<Quest>) => void;
+  onUpdateAssignedQuest?: (id: string, updates: Partial<AssignedQuest>) => void;
+  onDeleteAssignedQuest?: (id: string) => void;
 }
 
 const SHOWTIME_STORAGE_KEY = 'dcc_showtime_state';
@@ -227,6 +234,365 @@ const LootBoxPanel: React.FC<{
   );
 };
 
+// Quest Panel for DM to assign quests and manage action items
+const QuestPanel: React.FC<{
+  episode: Episode;
+  crawlers: Crawler[];
+  quests: Quest[];
+  assignedQuests: AssignedQuest[];
+  onAssignQuest: (questId: string, crawlerIds: string[], episodeId?: string) => Promise<void>;
+  onUpdateQuest?: (id: string, updates: Partial<Quest>) => void;
+  onUpdateAssignedQuest?: (id: string, updates: Partial<AssignedQuest>) => void;
+  onDeleteAssignedQuest?: (id: string) => void;
+  addDiceRoll?: (entry: import("@/hooks/useGameState").DiceRollEntry) => Promise<void>;
+}> = ({ episode, crawlers, quests, assignedQuests, onAssignQuest, onUpdateQuest, onUpdateAssignedQuest, onDeleteAssignedQuest, addDiceRoll }) => {
+  const [selectedQuestId, setSelectedQuestId] = useState<string | null>(null);
+  const [selectedCrawlerIds, setSelectedCrawlerIds] = useState<string[]>([]);
+
+  // Get quests assigned to this episode
+  const episodeQuestIds = episode.questIds || [];
+  const episodeQuests = quests.filter(q => episodeQuestIds.includes(q.id));
+  const episodeCrawlerIds = [...new Set((episode.crawlerPlacements || []).map(p => p.crawlerId))];
+  const episodeCrawlers = crawlers.filter(c => episodeCrawlerIds.includes(c.id));
+
+  // Get assigned quests for this episode
+  const episodeAssignedQuests = assignedQuests.filter(a => a.episodeId === episode.id);
+
+  const handleAssign = async () => {
+    const quest = episodeQuests.find(q => q.id === selectedQuestId);
+    if (!quest || selectedCrawlerIds.length === 0) return;
+    await onAssignQuest(quest.id, selectedCrawlerIds, episode.id);
+
+    // Send dice notification
+    if (addDiceRoll) {
+      const recipientNames = selectedCrawlerIds
+        .map(id => crawlers.find(c => c.id === id)?.name)
+        .filter(Boolean) as string[];
+      const allPlayerCrawlers = crawlers.filter(c => c.id !== 'dungeonai');
+      const isPartyQuest = selectedCrawlerIds.length >= allPlayerCrawlers.length && allPlayerCrawlers.every(c => selectedCrawlerIds.includes(c.id));
+      await addDiceRoll({
+        id: crypto.randomUUID(),
+        crawlerName: 'DM',
+        crawlerId: '__dm__',
+        timestamp: Date.now(),
+        results: [],
+        total: 0,
+        questNotification: {
+          questName: quest.name,
+          type: 'assigned',
+          recipientNames,
+          detail: isPartyQuest ? 'Party Quest' : undefined,
+        },
+      });
+    }
+
+    setSelectedCrawlerIds([]);
+    setSelectedQuestId(null);
+  };
+
+  const toggleAll = () => {
+    if (selectedCrawlerIds.length === episodeCrawlers.length) {
+      setSelectedCrawlerIds([]);
+    } else {
+      setSelectedCrawlerIds(episodeCrawlers.map(c => c.id));
+    }
+  };
+
+  // Default select all when choosing a quest
+  const handleSelectQuest = (questId: string) => {
+    if (selectedQuestId === questId) {
+      setSelectedQuestId(null);
+      setSelectedCrawlerIds([]);
+    } else {
+      setSelectedQuestId(questId);
+      setSelectedCrawlerIds(episodeCrawlers.map(c => c.id));
+    }
+  };
+
+  const handleToggleActionVisibility = (questId: string, actionItemId: string, currentVisible: boolean) => {
+    if (!onUpdateQuest) return;
+    const quest = quests.find(q => q.id === questId);
+    if (!quest) return;
+    const updatedItems = quest.actionItems.map(ai =>
+      ai.id === actionItemId ? { ...ai, visible: !currentVisible } : ai
+    );
+    onUpdateQuest(questId, { actionItems: updatedItems });
+
+    // Send dice notification when revealing an action item
+    if (!currentVisible && addDiceRoll) {
+      const actionItem = quest.actionItems.find(ai => ai.id === actionItemId);
+      if (actionItem) {
+        addDiceRoll({
+          id: crypto.randomUUID(),
+          crawlerName: 'DM',
+          crawlerId: '__dm__',
+          timestamp: Date.now(),
+          results: [],
+          total: 0,
+          questNotification: {
+            questName: quest.name,
+            type: 'action_revealed',
+            recipientNames: [],
+            detail: actionItem.description,
+          },
+        });
+      }
+    }
+  };
+
+  const handleToggleRewardVisibility = (questId: string, rewardId: string, currentVisible: boolean) => {
+    if (!onUpdateQuest) return;
+    const quest = quests.find(q => q.id === questId);
+    if (!quest) return;
+    const updatedRewards = quest.rewards.map(r =>
+      r.id === rewardId ? { ...r, visible: !currentVisible } : r
+    );
+    onUpdateQuest(questId, { rewards: updatedRewards });
+
+    // Send dice notification when revealing a reward
+    if (!currentVisible && addDiceRoll) {
+      const reward = quest.rewards.find(r => r.id === rewardId);
+      if (reward) {
+        addDiceRoll({
+          id: crypto.randomUUID(),
+          crawlerName: 'DM',
+          crawlerId: '__dm__',
+          timestamp: Date.now(),
+          results: [],
+          total: 0,
+          questNotification: {
+            questName: quest.name,
+            type: 'reward_revealed',
+            recipientNames: [],
+            detail: reward.item.name,
+          },
+        });
+      }
+    }
+  };
+
+  const handleToggleActionComplete = (questId: string, actionItemId: string, crawlerId: string) => {
+    if (!onUpdateQuest) return;
+    const quest = quests.find(q => q.id === questId);
+    if (!quest) return;
+    const actionItem = quest.actionItems.find(ai => ai.id === actionItemId);
+    if (!actionItem) return;
+
+    const alreadyCompleted = actionItem.completedBy.includes(crawlerId);
+    const updatedItems = quest.actionItems.map(ai =>
+      ai.id === actionItemId
+        ? {
+            ...ai,
+            completedBy: alreadyCompleted
+              ? ai.completedBy.filter(id => id !== crawlerId)
+              : [...ai.completedBy, crawlerId],
+          }
+        : ai
+    );
+    onUpdateQuest(questId, { actionItems: updatedItems });
+
+    // Send dice notification when completing an action item
+    if (!alreadyCompleted && addDiceRoll) {
+      const crawler = crawlers.find(c => c.id === crawlerId);
+      addDiceRoll({
+        id: crypto.randomUUID(),
+        crawlerName: 'DM',
+        crawlerId: '__dm__',
+        timestamp: Date.now(),
+        results: [],
+        total: 0,
+        questNotification: {
+          questName: quest.name,
+          type: 'action_completed',
+          recipientNames: crawler ? [crawler.name] : [],
+          detail: actionItem.description,
+        },
+      });
+    }
+  };
+
+  if (episodeQuests.length === 0) return null;
+
+  return (
+    <div>
+      <h3 className="font-display text-emerald-400 text-lg mb-4 flex items-center gap-2">
+        <ScrollText className="w-5 h-5" />
+        Quests
+      </h3>
+
+      {/* Quest selection for assigning */}
+      <div className="grid sm:grid-cols-2 gap-2 mb-4">
+        {episodeQuests.map(quest => {
+          const isAssigned = episodeAssignedQuests.some(a => a.questId === quest.id);
+          return (
+            <button
+              key={quest.id}
+              onClick={() => handleSelectQuest(quest.id)}
+              className={`text-left p-2 border rounded transition-colors ${
+                selectedQuestId === quest.id
+                  ? 'bg-emerald-500/20 border-emerald-500'
+                  : isAssigned
+                    ? 'bg-muted/50 border-emerald-500/30'
+                    : 'bg-muted/30 border-border hover:border-emerald-500/50'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <ScrollText className="w-4 h-4 flex-shrink-0 text-emerald-400" />
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold truncate">{quest.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {quest.actionItems.length} tasks · {quest.rewards.length} rewards
+                    {isAssigned && ' · Assigned'}
+                  </p>
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Crawler selection - only show when a quest is selected and not yet assigned */}
+      {selectedQuestId && !episodeAssignedQuests.some(a => a.questId === selectedQuestId) && (
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm text-muted-foreground">Assign to:</p>
+            <button onClick={toggleAll} className="text-xs text-primary hover:underline">
+              {selectedCrawlerIds.length === episodeCrawlers.length ? 'Deselect All' : 'Select All'}
+            </button>
+          </div>
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-2">
+            {episodeCrawlers.map(crawler => (
+              <button
+                key={crawler.id}
+                onClick={() => setSelectedCrawlerIds(prev =>
+                  prev.includes(crawler.id) ? prev.filter(id => id !== crawler.id) : [...prev, crawler.id]
+                )}
+                className={`text-left p-2 border rounded text-sm transition-colors ${
+                  selectedCrawlerIds.includes(crawler.id)
+                    ? 'bg-blue-500/20 border-blue-500'
+                    : 'bg-muted/30 border-border hover:border-blue-500/50'
+                }`}
+              >
+                {crawler.name}
+                {selectedCrawlerIds.includes(crawler.id) && <span className="ml-1">✓</span>}
+              </button>
+            ))}
+          </div>
+          <DungeonButton
+            variant="admin"
+            size="sm"
+            className="mt-3"
+            disabled={selectedCrawlerIds.length === 0}
+            onClick={handleAssign}
+          >
+            <ScrollText className="w-4 h-4 mr-2" />
+            Assign to {selectedCrawlerIds.length} crawler{selectedCrawlerIds.length !== 1 ? 's' : ''}
+          </DungeonButton>
+        </div>
+      )}
+
+      {/* Assigned quests management */}
+      {episodeAssignedQuests.length > 0 && (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">Active Quests:</p>
+          {episodeAssignedQuests.map(assigned => {
+            const quest = quests.find(q => q.id === assigned.questId);
+            if (!quest) return null;
+            const assignedCrawlers = crawlers.filter(c => assigned.crawlerIds.includes(c.id));
+            return (
+              <div key={assigned.id} className="bg-muted/30 border border-emerald-500/30 rounded p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <ScrollText className="w-4 h-4 text-emerald-400" />
+                    <span className="text-sm font-semibold">{quest.name}</span>
+                    {assigned.isPartyQuest && (
+                      <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded">Party Quest</span>
+                    )}
+                  </div>
+                  {onDeleteAssignedQuest && (
+                    <button
+                      onClick={() => onDeleteAssignedQuest(assigned.id)}
+                      className="p-1 hover:bg-destructive/10 rounded"
+                    >
+                      <Trash2 className="w-3 h-3 text-destructive" />
+                    </button>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Assigned to: {assignedCrawlers.map(c => c.name).join(', ')}
+                </p>
+
+                {/* Action items with toggle visibility + completion */}
+                {quest.actionItems.length > 0 && (
+                  <div className="space-y-1 mb-2">
+                    <p className="text-xs text-muted-foreground font-semibold">Action Items:</p>
+                    {quest.actionItems.map(ai => (
+                      <div key={ai.id} className="flex items-center gap-2 text-xs">
+                        <button
+                          onClick={() => handleToggleActionVisibility(quest.id, ai.id, ai.visible)}
+                          className="p-0.5 hover:bg-muted rounded"
+                          title={ai.visible ? "Visible to players" : "Hidden from players"}
+                        >
+                          {ai.visible ? <Eye className="w-3 h-3 text-green-400" /> : <EyeOff className="w-3 h-3 text-muted-foreground" />}
+                        </button>
+                        <span className={ai.completedBy.length > 0 ? 'text-muted-foreground' : 'text-foreground'}>
+                          {ai.description}
+                        </span>
+                        <div className="ml-auto flex gap-1">
+                          {assignedCrawlers.map(crawler => {
+                            const isComplete = ai.completedBy.includes(crawler.id);
+                            return (
+                              <button
+                                key={crawler.id}
+                                onClick={() => handleToggleActionComplete(quest.id, ai.id, crawler.id)}
+                                className={`px-1.5 py-0.5 rounded text-[10px] border transition-colors ${
+                                  isComplete
+                                    ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
+                                    : 'bg-muted/30 border-border text-muted-foreground hover:border-emerald-500/50'
+                                }`}
+                                title={`${crawler.name}: ${isComplete ? 'Completed' : 'Not completed'}`}
+                              >
+                                {crawler.name.slice(0, 3)}{isComplete && ' ✓'}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Rewards with toggle visibility */}
+                {quest.rewards.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground font-semibold">Rewards:</p>
+                    {quest.rewards.map(reward => (
+                      <div key={reward.id} className="flex items-center gap-2 text-xs">
+                        <button
+                          onClick={() => handleToggleRewardVisibility(quest.id, reward.id, reward.visible)}
+                          className="p-0.5 hover:bg-muted rounded"
+                          title={reward.visible ? "Visible to players" : "Hidden from players"}
+                        >
+                          {reward.visible ? <Eye className="w-3 h-3 text-green-400" /> : <EyeOff className="w-3 h-3 text-muted-foreground" />}
+                        </button>
+                        <Package className="w-3 h-3 flex-shrink-0" style={{ color: getLootBoxTierColor(reward.tier as LootBoxTier) }} />
+                        <span>{reward.item.name}</span>
+                        <span className="text-muted-foreground" style={{ color: getLootBoxTierColor(reward.tier as LootBoxTier) }}>
+                          {reward.tier}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Inventory Panel for DM to search and add items to player inventories
 const InventoryPanel: React.FC<{
   crawlers: Crawler[];
@@ -359,7 +725,7 @@ const InventoryPanel: React.FC<{
   );
 };
 
-const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock, noncombatTurnState, resetNoncombatTurns, combatState, onRuntimePlacementsChange, onGameActiveChange, onRegisterGameToggle, roomId }) => {
+const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock, noncombatTurnState, resetNoncombatTurns, combatState, onRemoveCombatant, onRuntimePlacementsChange, onGameActiveChange, onRegisterGameToggle, roomId, quests = [], assignedQuests = [], onAssignQuest, onUpdateQuest, onUpdateAssignedQuest, onDeleteAssignedQuest }) => {
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
   const selectedEpisodeIdRef = useRef<string | null>(null);
   const [currentMapIndex, setCurrentMapIndex] = useState(0);
@@ -1294,16 +1660,22 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   const handleAddMobToMapRuntime = useCallback((x: number, y: number) => {
     if (!selectedMobId || !currentMapId) return;
 
+    // Compute next letterIndex: find max letterIndex for this mobId across all placements
+    const episodePlacements = selectedEpisode?.mobPlacements ?? [];
+    const allSameId = [...episodePlacements, ...runtimeMobPlacements].filter(p => p.mobId === selectedMobId);
+    const maxLetterIndex = allSameId.reduce((max, p) => Math.max(max, p.letterIndex ?? -1), -1);
+
     const newPlacement: EpisodeMobPlacement = {
       mobId: selectedMobId,
       mapId: currentMapId,
       x,
       y,
+      letterIndex: maxLetterIndex + 1,
     };
     const updated = [...runtimeMobPlacements, newPlacement];
     setRuntimeMobPlacements(updated);
     broadcastRuntimeMobPlacements(updated);
-  }, [selectedMobId, currentMapId, runtimeMobPlacements, broadcastRuntimeMobPlacements]);
+  }, [selectedMobId, currentMapId, runtimeMobPlacements, selectedEpisode?.mobPlacements, broadcastRuntimeMobPlacements]);
 
   // Handle removing a crawler from the map
   const handleRemoveCrawlerFromMap = useCallback((index: number) => {
@@ -1314,19 +1686,51 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
   // Handle removing a runtime mob from the map
   const handleRemoveRuntimeMob = useCallback((index: number) => {
+    // Remove from combat if active
+    if (combatState?.active && onRemoveCombatant) {
+      const episodePlacementCount = selectedEpisode?.mobPlacements?.length ?? 0;
+      const placementIdx = episodePlacementCount + index;
+      const placement = runtimeMobPlacements[index];
+      if (placement) {
+        const totalSameId = allPlacementsMobCounts[placement.mobId] ?? 1;
+        const combatId = totalSameId > 1 ? `${placement.mobId}:${placementIdx}` : placement.mobId;
+        if (combatState.combatants.some(c => c.id === combatId)) {
+          onRemoveCombatant(combatId);
+        } else {
+          // Also check bare mobId for pre-suffix entries
+          const bareMatch = combatState.combatants.find(c => c.id === placement.mobId || c.sourceId === placement.mobId);
+          if (bareMatch) onRemoveCombatant(bareMatch.id);
+        }
+      }
+    }
     const updated = runtimeMobPlacements.filter((_, i) => i !== index);
     setRuntimeMobPlacements(updated);
     broadcastRuntimeMobPlacements(updated);
-  }, [runtimeMobPlacements, broadcastRuntimeMobPlacements]);
+  }, [runtimeMobPlacements, broadcastRuntimeMobPlacements, combatState, onRemoveCombatant, selectedEpisode?.mobPlacements?.length, allPlacementsMobCounts]);
 
   // Handle removing an episode mob from the map (persists to episode)
   const handleRemoveEpisodeMob = useCallback((globalIndex: number) => {
     if (!selectedEpisode || !onUpdateEpisode) return;
+    // Remove from combat if active
+    if (combatState?.active && onRemoveCombatant) {
+      const placement = selectedEpisode.mobPlacements[globalIndex];
+      if (placement) {
+        const totalSameId = allPlacementsMobCounts[placement.mobId] ?? 1;
+        const combatId = totalSameId > 1 ? `${placement.mobId}:${globalIndex}` : placement.mobId;
+        if (combatState.combatants.some(c => c.id === combatId)) {
+          onRemoveCombatant(combatId);
+        } else {
+          // Also check bare mobId for pre-suffix entries
+          const bareMatch = combatState.combatants.find(c => c.id === placement.mobId || c.sourceId === placement.mobId);
+          if (bareMatch) onRemoveCombatant(bareMatch.id);
+        }
+      }
+    }
     const updated = selectedEpisode.mobPlacements.filter((_, i) => i !== globalIndex);
     const updatedEpisode = { ...selectedEpisode, mobPlacements: updated };
     setSelectedEpisode(updatedEpisode);
     onUpdateEpisode(selectedEpisode.id, { mobPlacements: updated });
-  }, [selectedEpisode, onUpdateEpisode]);
+  }, [selectedEpisode, onUpdateEpisode, combatState, onRemoveCombatant, allPlacementsMobCounts]);
 
   // Handle delete for selected map entity (Delete key or context menu)
   const handleDeleteSelectedEntity = useCallback(() => {
@@ -2229,6 +2633,21 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
               />
             )}
 
+            {/* Quest Panel - DM only */}
+            {isAdmin && selectedEpisode.questIds && selectedEpisode.questIds.length > 0 && onAssignQuest && (
+              <QuestPanel
+                episode={selectedEpisode}
+                crawlers={crawlers}
+                quests={quests}
+                assignedQuests={assignedQuests}
+                onAssignQuest={onAssignQuest}
+                onUpdateQuest={onUpdateQuest}
+                onUpdateAssignedQuest={onUpdateAssignedQuest}
+                onDeleteAssignedQuest={onDeleteAssignedQuest}
+                addDiceRoll={addDiceRoll}
+              />
+            )}
+
             {/* Inventory Management - DM only (filtered to episode crawlers) */}
             {isAdmin && getCrawlerInventory && onUpdateCrawlerInventory && (() => {
               const epCrawlerIds = [...new Set((selectedEpisode.crawlerPlacements || []).map(p => p.crawlerId))];
@@ -2581,11 +3000,13 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
               (p, i) => p === placement || (p.mobId === placement.mobId && p.x === placement.x && p.y === placement.y && p.mapId === placement.mapId)
             ) ?? localIndex;
 
-            // Count how many times this mob appears before this index on this map
+            // Use stable letterIndex if available, fall back to sequential counting for legacy data
+            const totalSameId = allPlacementsMobCounts[placement.mobId] ?? 1;
             const sameIdBefore = currentMapMobPlacements
               .slice(0, localIndex)
               .filter(p => p.mobId === placement.mobId).length;
-            const letter = sameIdBefore > 0 ? String.fromCharCode(65 + sameIdBefore) : '';
+            const letterIdx = placement.letterIndex ?? sameIdBefore;
+            const letter = totalSameId > 1 ? String.fromCharCode(65 + letterIdx) : '';
 
             const isDragging = draggingMobId === `${placement.mobId}-${globalIndex}`;
 
@@ -2831,16 +3252,15 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             const mob = mobs.find(m => m.id === placement.mobId);
             if (!mob) return null;
 
-            // Count how many times this mob appears in episode mobs on this map
+            // Use stable letterIndex if available, fall back to sequential counting for legacy data
+            const totalSameId = allPlacementsMobCounts[placement.mobId] ?? 1;
             const episodeMobCount = currentMapMobPlacements.filter(p => p.mobId === placement.mobId).length;
-            // Count how many times this mob appears before this index in runtime mobs
             const runtimeMobsBefore = filteredArr
               .slice(0, index)
               .filter(p => p.mobId === placement.mobId).length;
-            // Total count before this one (episode + runtime before)
             const totalBefore = episodeMobCount + runtimeMobsBefore;
-            // Only show letter if this mob has any duplicates (totalBefore > 0)
-            const letter = totalBefore > 0 ? String.fromCharCode(65 + totalBefore) : '';
+            const letterIdx = placement.letterIndex ?? totalBefore;
+            const letter = totalSameId > 1 ? String.fromCharCode(65 + letterIdx) : '';
             const isDragging = draggingRuntimeId === `mob-${index}`;
             const canInteract = isPointVisible(placement.x, placement.y);
 
