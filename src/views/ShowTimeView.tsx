@@ -42,6 +42,7 @@ interface ShowTimeViewProps {
   noncombatTurnState?: import("@/lib/gameData").NoncombatTurnState | null;
   resetNoncombatTurns?: (episodeId: string) => Promise<void>;
   combatState?: CombatState | null;
+  onRemoveCombatant?: (combatantId: string) => Promise<void>;
   onRuntimePlacementsChange?: (crawlerPlacements: CrawlerPlacement[], runtimeMobPlacements: EpisodeMobPlacement[]) => void;
   onGameActiveChange?: (active: boolean) => void;
   onRegisterGameToggle?: (toggleFn: (active: boolean) => Promise<void>) => void;
@@ -359,7 +360,7 @@ const InventoryPanel: React.FC<{
   );
 };
 
-const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock, noncombatTurnState, resetNoncombatTurns, combatState, onRuntimePlacementsChange, onGameActiveChange, onRegisterGameToggle, roomId }) => {
+const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock, noncombatTurnState, resetNoncombatTurns, combatState, onRemoveCombatant, onRuntimePlacementsChange, onGameActiveChange, onRegisterGameToggle, roomId }) => {
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
   const selectedEpisodeIdRef = useRef<string | null>(null);
   const [currentMapIndex, setCurrentMapIndex] = useState(0);
@@ -1294,16 +1295,22 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   const handleAddMobToMapRuntime = useCallback((x: number, y: number) => {
     if (!selectedMobId || !currentMapId) return;
 
+    // Compute next letterIndex: find max letterIndex for this mobId across all placements
+    const episodePlacements = selectedEpisode?.mobPlacements ?? [];
+    const allSameId = [...episodePlacements, ...runtimeMobPlacements].filter(p => p.mobId === selectedMobId);
+    const maxLetterIndex = allSameId.reduce((max, p) => Math.max(max, p.letterIndex ?? -1), -1);
+
     const newPlacement: EpisodeMobPlacement = {
       mobId: selectedMobId,
       mapId: currentMapId,
       x,
       y,
+      letterIndex: maxLetterIndex + 1,
     };
     const updated = [...runtimeMobPlacements, newPlacement];
     setRuntimeMobPlacements(updated);
     broadcastRuntimeMobPlacements(updated);
-  }, [selectedMobId, currentMapId, runtimeMobPlacements, broadcastRuntimeMobPlacements]);
+  }, [selectedMobId, currentMapId, runtimeMobPlacements, selectedEpisode?.mobPlacements, broadcastRuntimeMobPlacements]);
 
   // Handle removing a crawler from the map
   const handleRemoveCrawlerFromMap = useCallback((index: number) => {
@@ -1314,19 +1321,51 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
   // Handle removing a runtime mob from the map
   const handleRemoveRuntimeMob = useCallback((index: number) => {
+    // Remove from combat if active
+    if (combatState?.active && onRemoveCombatant) {
+      const episodePlacementCount = selectedEpisode?.mobPlacements?.length ?? 0;
+      const placementIdx = episodePlacementCount + index;
+      const placement = runtimeMobPlacements[index];
+      if (placement) {
+        const totalSameId = allPlacementsMobCounts[placement.mobId] ?? 1;
+        const combatId = totalSameId > 1 ? `${placement.mobId}:${placementIdx}` : placement.mobId;
+        if (combatState.combatants.some(c => c.id === combatId)) {
+          onRemoveCombatant(combatId);
+        } else {
+          // Also check bare mobId for pre-suffix entries
+          const bareMatch = combatState.combatants.find(c => c.id === placement.mobId || c.sourceId === placement.mobId);
+          if (bareMatch) onRemoveCombatant(bareMatch.id);
+        }
+      }
+    }
     const updated = runtimeMobPlacements.filter((_, i) => i !== index);
     setRuntimeMobPlacements(updated);
     broadcastRuntimeMobPlacements(updated);
-  }, [runtimeMobPlacements, broadcastRuntimeMobPlacements]);
+  }, [runtimeMobPlacements, broadcastRuntimeMobPlacements, combatState, onRemoveCombatant, selectedEpisode?.mobPlacements?.length, allPlacementsMobCounts]);
 
   // Handle removing an episode mob from the map (persists to episode)
   const handleRemoveEpisodeMob = useCallback((globalIndex: number) => {
     if (!selectedEpisode || !onUpdateEpisode) return;
+    // Remove from combat if active
+    if (combatState?.active && onRemoveCombatant) {
+      const placement = selectedEpisode.mobPlacements[globalIndex];
+      if (placement) {
+        const totalSameId = allPlacementsMobCounts[placement.mobId] ?? 1;
+        const combatId = totalSameId > 1 ? `${placement.mobId}:${globalIndex}` : placement.mobId;
+        if (combatState.combatants.some(c => c.id === combatId)) {
+          onRemoveCombatant(combatId);
+        } else {
+          // Also check bare mobId for pre-suffix entries
+          const bareMatch = combatState.combatants.find(c => c.id === placement.mobId || c.sourceId === placement.mobId);
+          if (bareMatch) onRemoveCombatant(bareMatch.id);
+        }
+      }
+    }
     const updated = selectedEpisode.mobPlacements.filter((_, i) => i !== globalIndex);
     const updatedEpisode = { ...selectedEpisode, mobPlacements: updated };
     setSelectedEpisode(updatedEpisode);
     onUpdateEpisode(selectedEpisode.id, { mobPlacements: updated });
-  }, [selectedEpisode, onUpdateEpisode]);
+  }, [selectedEpisode, onUpdateEpisode, combatState, onRemoveCombatant, allPlacementsMobCounts]);
 
   // Handle delete for selected map entity (Delete key or context menu)
   const handleDeleteSelectedEntity = useCallback(() => {
@@ -2581,11 +2620,13 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
               (p, i) => p === placement || (p.mobId === placement.mobId && p.x === placement.x && p.y === placement.y && p.mapId === placement.mapId)
             ) ?? localIndex;
 
-            // Count how many times this mob appears before this index on this map
+            // Use stable letterIndex if available, fall back to sequential counting for legacy data
+            const totalSameId = allPlacementsMobCounts[placement.mobId] ?? 1;
             const sameIdBefore = currentMapMobPlacements
               .slice(0, localIndex)
               .filter(p => p.mobId === placement.mobId).length;
-            const letter = sameIdBefore > 0 ? String.fromCharCode(65 + sameIdBefore) : '';
+            const letterIdx = placement.letterIndex ?? sameIdBefore;
+            const letter = totalSameId > 1 ? String.fromCharCode(65 + letterIdx) : '';
 
             const isDragging = draggingMobId === `${placement.mobId}-${globalIndex}`;
 
@@ -2831,16 +2872,15 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             const mob = mobs.find(m => m.id === placement.mobId);
             if (!mob) return null;
 
-            // Count how many times this mob appears in episode mobs on this map
+            // Use stable letterIndex if available, fall back to sequential counting for legacy data
+            const totalSameId = allPlacementsMobCounts[placement.mobId] ?? 1;
             const episodeMobCount = currentMapMobPlacements.filter(p => p.mobId === placement.mobId).length;
-            // Count how many times this mob appears before this index in runtime mobs
             const runtimeMobsBefore = filteredArr
               .slice(0, index)
               .filter(p => p.mobId === placement.mobId).length;
-            // Total count before this one (episode + runtime before)
             const totalBefore = episodeMobCount + runtimeMobsBefore;
-            // Only show letter if this mob has any duplicates (totalBefore > 0)
-            const letter = totalBefore > 0 ? String.fromCharCode(65 + totalBefore) : '';
+            const letterIdx = placement.letterIndex ?? totalBefore;
+            const letter = totalSameId > 1 ? String.fromCharCode(65 + letterIdx) : '';
             const isDragging = draggingRuntimeId === `mob-${index}`;
             const canInteract = isPointVisible(placement.x, placement.y);
 

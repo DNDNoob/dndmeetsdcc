@@ -1,5 +1,12 @@
 [
   {
+    "date": "2026-02-22",
+    "changes": [
+      "⚔️ Mob token letters are now stable — deleting a token no longer reorders other tokens of the same type (e.g., deleting Flurg B leaves Flurg C and Flurg D unchanged)",
+      "⚔️ Deleting a mob from the map during active combat now automatically removes it from the combat turn order"
+    ]
+  },
+  {
     "date": "2026-02-21",
     "changes": [
       "👤 Player identity switcher dropdown now available on the Main Menu screen",

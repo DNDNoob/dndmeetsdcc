@@ -533,6 +533,7 @@ const Index = () => {
                 noncombatTurnState={noncombatTurnState}
                 resetNoncombatTurns={resetNoncombatTurns}
                 combatState={activeCombatState}
+                onRemoveCombatant={removeCombatant}
                 roomId={roomId}
               />
             )}

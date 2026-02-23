@@ -350,12 +350,16 @@ const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
                   size="sm"
                   className="justify-start h-auto flex-col"
                   onClick={() => {
+                    // Compute next letterIndex for this mobId
+                    const allSameId = placements.filter(p => p.mobId === mob.id);
+                    const maxLetterIndex = allSameId.reduce((max, p) => Math.max(max, p.letterIndex ?? -1), -1);
                     const newPlacement: EpisodeMobPlacement = {
                       mobId: mob.id,
                       mapId: mapId,
                       x: 50,
                       y: 50,
                       scale: 1,
+                      letterIndex: maxLetterIndex + 1,
                     };
                     onPlacementsChange([...placements, newPlacement]);
                     if (onAddMob) {

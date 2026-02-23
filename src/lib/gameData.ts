@@ -116,6 +116,7 @@ export interface EpisodeMobPlacement {
   currentHP?: number; // Per-placement HP override (persisted after combat, episode-specific)
   inventoryOverride?: InventoryItem[]; // Per-placement inventory override (episode-specific)
   goldOverride?: number; // Per-placement gold override (episode-specific)
+  letterIndex?: number; // Stable letter assignment (0=A, 1=B, etc.) — survives deletion of other placements
 }
 
 export interface CrawlerPlacement {
