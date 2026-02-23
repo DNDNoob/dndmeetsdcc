@@ -5,7 +5,7 @@ import { DungeonButton } from "@/components/ui/DungeonButton";
 import MapMobPlacementEditor from "@/components/ui/MapMobPlacementEditor";
 import MapDesignerPopout from "@/components/ui/MapDesignerPopout";
 import { Mob, Episode, EpisodeMobPlacement, Crawler, CrawlerPlacement, InventoryItem, LootBoxTemplate, LootBoxTier, getLootBoxTierColor, type EquipmentSlot, type EquippedItems, Quest, QuestReward, QuestActionItem, QuestRewardTier } from "@/lib/gameData";
-import { Brain, Upload, Plus, Trash2, Map, Skull, Image as ImageIcon, Save, Edit2, X, Layers, ChevronLeft, ChevronRight, User, Package, Search, Maximize2, Shield, ChevronDown as ChevronDownIcon, ScrollText, Eye, EyeOff, CheckSquare } from "lucide-react";
+import { Brain, Upload, Plus, Trash2, Map, Skull, Image as ImageIcon, Save, Edit2, X, Layers, ChevronLeft, ChevronRight, User, Package, Search, Maximize2, Shield, ChevronDown as ChevronDownIcon, ScrollText, Eye, EyeOff, CheckSquare, GripVertical } from "lucide-react";
 import { storage } from "@/lib/firebase";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 
@@ -116,6 +116,8 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   const [questRewardTier, setQuestRewardTier] = useState<QuestRewardTier>("Copper");
   const [newActionItemText, setNewActionItemText] = useState("");
   const [editingQuestId, setEditingQuestId] = useState<string | null>(null);
+  const [dragActionIdx, setDragActionIdx] = useState<number | null>(null);
+  const [dragRewardIdx, setDragRewardIdx] = useState<number | null>(null);
 
   // Close mob item context menu on outside click
   useEffect(() => {
@@ -2159,7 +2161,25 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                   {newQuestActionItems.length > 0 && (
                     <div className="space-y-1">
                       {newQuestActionItems.map((item, idx) => (
-                        <div key={item.id} className="flex items-center gap-2 bg-background border border-border rounded px-3 py-2">
+                        <div
+                          key={item.id}
+                          draggable
+                          onDragStart={() => setDragActionIdx(idx)}
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            if (dragActionIdx === null || dragActionIdx === idx) return;
+                            setNewQuestActionItems(prev => {
+                              const next = [...prev];
+                              const [moved] = next.splice(dragActionIdx, 1);
+                              next.splice(idx, 0, moved);
+                              return next;
+                            });
+                            setDragActionIdx(idx);
+                          }}
+                          onDragEnd={() => setDragActionIdx(null)}
+                          className={`flex items-center gap-2 bg-background border rounded px-3 py-2 cursor-grab active:cursor-grabbing transition-colors ${dragActionIdx === idx ? 'border-primary bg-primary/10' : 'border-border'}`}
+                        >
+                          <GripVertical className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                           <CheckSquare className="w-4 h-4 text-emerald-400 flex-shrink-0" />
                           <span className="text-sm flex-1">{item.description}</span>
                           <button
@@ -2241,7 +2261,25 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                   {newQuestRewards.length > 0 && (
                     <div className="space-y-1">
                       {newQuestRewards.map((reward, idx) => (
-                        <div key={reward.id} className="flex items-center gap-2 bg-background border border-border rounded px-3 py-2">
+                        <div
+                          key={reward.id}
+                          draggable
+                          onDragStart={() => setDragRewardIdx(idx)}
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            if (dragRewardIdx === null || dragRewardIdx === idx) return;
+                            setNewQuestRewards(prev => {
+                              const next = [...prev];
+                              const [moved] = next.splice(dragRewardIdx, 1);
+                              next.splice(idx, 0, moved);
+                              return next;
+                            });
+                            setDragRewardIdx(idx);
+                          }}
+                          onDragEnd={() => setDragRewardIdx(null)}
+                          className={`flex items-center gap-2 bg-background border rounded px-3 py-2 cursor-grab active:cursor-grabbing transition-colors ${dragRewardIdx === idx ? 'border-primary bg-primary/10' : 'border-border'}`}
+                        >
+                          <GripVertical className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                           <Package className="w-4 h-4 flex-shrink-0" style={{ color: getLootBoxTierColor(reward.tier as LootBoxTier) }} />
                           <span className="text-sm flex-1">{reward.item.name}</span>
                           <span className="text-xs" style={{ color: getLootBoxTierColor(reward.tier as LootBoxTier) }}>{reward.tier}</span>
