@@ -58,16 +58,19 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
   // Load and subscribe to real-time updates
   useEffect(() => {
     const unsubscribers: (() => void)[] = [];
+    let cancelled = false;
 
     const setupRealtimeSync = async () => {
       setLoading(true);
-      console.log('[FirebaseStore] � Initializing authentication...');
+      console.log('[FirebaseStore] 🔐 Initializing authentication...');
 
       try {
         // Initialize authentication first
         await initAuth();
+        // If effect was cleaned up during async auth, don't set up listeners
+        if (cancelled) return;
         console.log('[FirebaseStore] ✅ Authentication ready');
-        
+
         console.log('[FirebaseStore] 📂 Setting up real-time sync...', { roomId });
 
         // Set up real-time listeners for each collection
@@ -103,6 +106,11 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
             }
           );
 
+          // If cleanup was called while setting up, immediately unsubscribe
+          if (cancelled) {
+            unsubscribe();
+            return;
+          }
           unsubscribers.push(unsubscribe);
         }
 
@@ -122,6 +130,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
 
     // Cleanup listeners on unmount or roomId change
     return () => {
+      cancelled = true;
       console.log('[FirebaseStore] 🧹 Cleaning up listeners');
       unsubscribers.forEach(unsub => unsub());
     };

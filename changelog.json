@@ -1,5 +1,15 @@
 [
   {
+    "date": "2026-02-24",
+    "changes": [
+      "🐛 Fixed race condition in loot box claiming — inventory, gold, and loot box updates are now properly awaited to prevent data loss",
+      "🐛 Fixed Firebase listener leak when switching rooms — listeners created during async auth initialization are now properly cleaned up",
+      "🐛 Fixed item consolidation mismatch between Profiles and Inventory views — identical items now group consistently across both views",
+      "🐛 Fixed weapon upgrade modal persisting stale data when switching between crawlers",
+      "🐛 Fixed inventory document IDs not using crawlerId convention — new inventory documents now correctly use the crawler ID as the Firestore document ID"
+    ]
+  },
+  {
     "date": "2026-02-23",
     "changes": [
       "📜 MAJOR: Added Quest system — DMs can create quests with action items, tiered rewards, and descriptions",

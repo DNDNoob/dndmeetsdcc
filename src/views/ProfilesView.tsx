@@ -538,11 +538,12 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
     return inventory.find(item => item.id === itemId);
   };
 
-  // Helper to create item signature for consolidation
+  // Helper to create item signature for consolidation (must match InventoryView's getItemSignature)
   const getItemSignature = (item: InventoryItem) => {
-    const mods = item.statModifiers || {};
-    const sortedMods = JSON.stringify(Object.keys(mods).sort().reduce((acc, key) => ({ ...acc, [key]: mods[key as keyof typeof mods] }), {}));
-    return `${item.name}|${item.description || ''}|${item.equipSlot || ''}|${item.goldValue ?? 0}|${sortedMods}`;
+    const modifiersStr = item.statModifiers
+      ? JSON.stringify(Object.entries(item.statModifiers).filter(([, v]) => v !== 0).sort())
+      : '';
+    return `${item.name}|${item.description || ''}|${item.equipSlot || ''}|${item.goldValue ?? 0}|${modifiersStr}`;
   };
 
   // Consolidated inventory for display (groups identical items)
@@ -681,6 +682,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             onChange={(e) => {
               setSelectedId(e.target.value);
               setEditMode(false);
+              setUpgradingWeapon(null);
+              setUpgradeForm(null);
             }}
             className="bg-background border border-primary text-primary px-4 py-2 font-mono"
           >
