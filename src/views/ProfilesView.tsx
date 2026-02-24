@@ -2332,24 +2332,59 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                                 )}
 
                                 {/* Rewards - only show visible ones */}
-                                {quest.rewards.filter(r => r.visible).length > 0 && (
-                                  <div>
-                                    <h4 className="text-sm font-display text-amber-400 mb-2 flex items-center gap-2">
-                                      <Package className="w-4 h-4" /> Rewards
-                                    </h4>
-                                    <div className="space-y-1">
-                                      {quest.rewards.filter(r => r.visible).map(reward => (
-                                        <div key={reward.id} className="flex items-center gap-2 text-sm">
-                                          <Package className="w-3 h-3 flex-shrink-0" style={{ color: getLootBoxTierColor(reward.tier as import("@/lib/gameData").LootBoxTier) }} />
-                                          <span>{reward.item.name}</span>
-                                          <span className="text-xs" style={{ color: getLootBoxTierColor(reward.tier as import("@/lib/gameData").LootBoxTier) }}>
-                                            {reward.tier}
-                                          </span>
-                                        </div>
-                                      ))}
+                                {quest.rewards.filter(r => r.visible).length > 0 && (() => {
+                                  const visibleActions = quest.actionItems.filter(ai => ai.visible);
+                                  const allActionsComplete = visibleActions.length > 0 && visibleActions.every(ai => ai.completedBy.includes(selected.id));
+
+                                  return (
+                                    <div>
+                                      <h4 className="text-sm font-display text-amber-400 mb-2 flex items-center gap-2">
+                                        <Package className="w-4 h-4" /> Rewards
+                                      </h4>
+                                      <div className="space-y-2">
+                                        {quest.rewards.filter(r => r.visible).map(reward => {
+                                          const alreadyClaimed = reward.claimedBy?.includes(selected.id) ?? false;
+                                          const canClaim = allActionsComplete && !alreadyClaimed && onUpdateQuest;
+
+                                          return (
+                                            <div key={reward.id} className="flex items-center gap-2 text-sm">
+                                              <Package className="w-3 h-3 flex-shrink-0" style={{ color: getLootBoxTierColor(reward.tier as import("@/lib/gameData").LootBoxTier) }} />
+                                              <span className={alreadyClaimed ? 'text-muted-foreground' : ''}>{reward.item.name}</span>
+                                              <span className="text-xs" style={{ color: getLootBoxTierColor(reward.tier as import("@/lib/gameData").LootBoxTier) }}>
+                                                {reward.tier}
+                                              </span>
+                                              {alreadyClaimed ? (
+                                                <span className="ml-auto text-xs text-emerald-400 flex items-center gap-1">
+                                                  <Check className="w-3 h-3" /> Claimed
+                                                </span>
+                                              ) : canClaim ? (
+                                                <button
+                                                  className="ml-auto text-xs px-2 py-0.5 bg-amber-500/20 border border-amber-500 text-amber-400 rounded hover:bg-amber-500/30 transition-colors flex items-center gap-1"
+                                                  onClick={() => {
+                                                    // Add item to crawler's inventory
+                                                    const currentItems = getCrawlerInventory(selected.id);
+                                                    const newItem: InventoryItem = { ...reward.item, id: crypto.randomUUID() };
+                                                    onUpdateCrawlerInventory(selected.id, [...currentItems, newItem]);
+
+                                                    // Mark reward as claimed
+                                                    const updatedRewards = quest.rewards.map(r =>
+                                                      r.id === reward.id
+                                                        ? { ...r, claimedBy: [...(r.claimedBy || []), selected.id] }
+                                                        : r
+                                                    );
+                                                    onUpdateQuest!(quest.id, { rewards: updatedRewards });
+                                                  }}
+                                                >
+                                                  <Plus className="w-3 h-3" /> Claim
+                                                </button>
+                                              ) : null}
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
                                     </div>
-                                  </div>
-                                )}
+                                  );
+                                })()}
 
                                 {/* Notes section */}
                                 <div>

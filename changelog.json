@@ -16,7 +16,8 @@
       "📜 DMs can link quests to episodes in the episode builder (similar to loot boxes)",
       "🐛 Fixed blank ShowTime page caused by TDZ variable ordering issue in quest code",
       "🐛 Fixed additional ShowTime TDZ crash — allPlacementsMobCounts was referenced before declaration in combat mob removal callbacks",
-      "📜 Added drag-to-reorder for quest action items and rewards on the DM console Quests tab"
+      "📜 Added drag-to-reorder for quest action items and rewards on the DM console Quests tab",
+      "📜 Quest rewards can now be claimed — when a DM completes all action items and reveals the reward, players see a 'Claim' button to add it to their inventory"
     ]
   },
   {

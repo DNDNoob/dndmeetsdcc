@@ -530,7 +530,7 @@ Players see their assigned quests on the **Quests** tab of their profile page:
 
 - Expandable quest cards showing name, description, and Party Quest badge
 - Visible action items with completion status (strikethrough when completed by the DM)
-- Visible rewards with tier color
+- Visible rewards with tier color — when all visible action items are completed and a reward is revealed, a **Claim** button appears to add the reward item to the crawler's inventory
 - **Quest Notes**: A shared notepad where any crawler on the quest can add date-stamped text entries. Notes from other crawlers on the same quest are visible to everyone.
 
 ## Notifications

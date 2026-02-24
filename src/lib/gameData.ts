@@ -255,6 +255,7 @@ export interface QuestReward {
   item: InventoryItem;
   tier: QuestRewardTier;
   visible: boolean; // DM can show/hide rewards
+  claimedBy?: string[]; // crawlerIds that have claimed this reward
 }
 
 export interface QuestActionItem {
