@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { DungeonButton } from "./ui/DungeonButton";
 import { Home, User, Map, Backpack, Skull, Presentation, Volume2, FileText, Brain, Pin, PinOff, ChevronDown, BookOpen, Lock, Unlock } from "lucide-react";
 import { Crawler } from "@/lib/gameData";
+import GoogleAuthButton from "./GoogleAuthButton";
 
 const DM_PASSWORD = "DND_IS_LIFE!";
 
@@ -130,6 +131,7 @@ const Navigation: React.FC<NavigationProps> = ({
               <FileText className="w-3 h-3" />
               <span className="hidden sm:inline text-xs">Changelog</span>
             </DungeonButton>
+            <GoogleAuthButton compact />
           </div>
           <div className="relative" ref={playerDropdownRef}>
             <button

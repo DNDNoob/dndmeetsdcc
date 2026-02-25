@@ -1,5 +1,23 @@
 [
   {
+    "date": "2026-02-25",
+    "changes": [
+      "🔐 Added Google Sign-In — users can now sign in with their Google account to enable write access (anonymous users can still browse read-only)",
+      "🔐 Sign In / Sign Out button available on Splash Screen, Main Menu, and Navigation bar",
+      "🔐 Firestore security rules updated to allow anonymous reads but require Google auth for writes"
+    ]
+  },
+  {
+    "date": "2026-02-24",
+    "changes": [
+      "🐛 Fixed race condition in loot box claiming — inventory, gold, and loot box updates are now properly awaited to prevent data loss",
+      "🐛 Fixed Firebase listener leak when switching rooms — listeners created during async auth initialization are now properly cleaned up",
+      "🐛 Fixed item consolidation mismatch between Profiles and Inventory views — identical items now group consistently across both views",
+      "🐛 Fixed weapon upgrade modal persisting stale data when switching between crawlers",
+      "🐛 Fixed inventory document IDs not using crawlerId convention — new inventory documents now correctly use the crawler ID as the Firestore document ID"
+    ]
+  },
+  {
     "date": "2026-02-23",
     "changes": [
       "📜 MAJOR: Added Quest system — DMs can create quests with action items, tiered rewards, and descriptions",
@@ -16,7 +34,8 @@
       "📜 DMs can link quests to episodes in the episode builder (similar to loot boxes)",
       "🐛 Fixed blank ShowTime page caused by TDZ variable ordering issue in quest code",
       "🐛 Fixed additional ShowTime TDZ crash — allPlacementsMobCounts was referenced before declaration in combat mob removal callbacks",
-      "📜 Added drag-to-reorder for quest action items and rewards on the DM console Quests tab"
+      "📜 Added drag-to-reorder for quest action items and rewards on the DM console Quests tab",
+      "📜 Quest rewards can now be claimed — when a DM completes all action items and reveals the reward, players see a 'Claim' button to add it to their inventory"
     ]
   },
   {

@@ -375,7 +375,7 @@ export const useGameState = () => {
   const addCrawler = async (crawler: Crawler) => {
     console.log('[GameState] ➕ Adding crawler:', crawler);
     await addItem('crawlers', { ...crawler } as Record<string, unknown>);
-    await addItem('inventory', { crawlerId: crawler.id, items: [] });
+    await addItem('inventory', { id: crawler.id, crawlerId: crawler.id, items: [] });
   };
 
   const deleteCrawler = async (id: string) => {
@@ -405,8 +405,8 @@ export const useGameState = () => {
       // Update existing inventory in Firebase using the document ID
       return updateItem('inventory', existing.id, { crawlerId, items });
     } else {
-      // Add new inventory entry to Firebase
-      return addItem('inventory', { crawlerId, items });
+      // Add new inventory entry to Firebase (use crawlerId as document ID per convention)
+      return addItem('inventory', { id: crawlerId, crawlerId, items });
     }
   };
 
@@ -470,14 +470,14 @@ export const useGameState = () => {
     // Add items to crawler inventory
     if (itemsToClaim.length > 0) {
       const currentItems = getCrawlerInventory(crawlerId);
-      updateCrawlerInventory(crawlerId, [...currentItems, ...itemsToClaim]);
+      await updateCrawlerInventory(crawlerId, [...currentItems, ...itemsToClaim]);
     }
 
     // Add gold to crawler if claiming gold
     if (claimGold && box.gold && box.gold > 0) {
       const crawler = crawlers.find(c => c.id === crawlerId);
       if (crawler) {
-        updateCrawler(crawlerId, { gold: (crawler.gold || 0) + box.gold });
+        await updateCrawler(crawlerId, { gold: (crawler.gold || 0) + box.gold });
       }
     }
 
@@ -487,9 +487,9 @@ export const useGameState = () => {
 
     // Delete box if empty, otherwise update
     if (remainingItems.length === 0 && remainingGold === 0) {
-      deleteItem('lootBoxes', lootBoxId);
+      await deleteItem('lootBoxes', lootBoxId);
     } else {
-      updateItem('lootBoxes', lootBoxId, {
+      await updateItem('lootBoxes', lootBoxId, {
         items: remainingItems,
         gold: remainingGold
       });

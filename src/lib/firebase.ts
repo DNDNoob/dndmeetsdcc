@@ -1,7 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, doc, setDoc, getDoc, getDocs, deleteDoc, updateDoc, onSnapshot, query, where, writeBatch } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
-import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut as firebaseSignOut, type User } from 'firebase/auth';
 
 // Firebase configuration - get these from Firebase Console
 const firebaseConfig = {
@@ -41,6 +41,64 @@ try {
 
 // Export instances (may be null in offline mode)
 export { db, storage, auth };
+
+// Google Auth provider
+const googleProvider = auth ? new GoogleAuthProvider() : null;
+
+/**
+ * Sign in with Google. Returns the signed-in user.
+ * If a user is currently signed in anonymously, the Google sign-in replaces the anonymous session.
+ */
+export const signInWithGoogle = async (): Promise<User | null> => {
+  if (!auth || !googleProvider) {
+    console.warn('[Firebase] Cannot sign in with Google — offline mode');
+    return null;
+  }
+  try {
+    const result = await signInWithPopup(auth, googleProvider);
+    console.log('[Firebase] ✅ Google sign-in successful:', result.user.displayName);
+    return result.user;
+  } catch (error) {
+    console.error('[Firebase] ❌ Google sign-in error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Sign out from Google and fall back to anonymous auth.
+ */
+export const signOutGoogle = async (): Promise<void> => {
+  if (!auth) return;
+  try {
+    await firebaseSignOut(auth);
+    // Fall back to anonymous auth so reads still work
+    await signInAnonymously(auth);
+    console.log('[Firebase] ✅ Signed out from Google, now anonymous');
+  } catch (error) {
+    console.error('[Firebase] ❌ Sign-out error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Subscribe to auth state changes. Callback receives the current user (or null).
+ * Returns an unsubscribe function.
+ */
+export const onAuthChange = (callback: (user: User | null) => void): (() => void) => {
+  if (!auth) {
+    callback(null);
+    return () => {};
+  }
+  return onAuthStateChanged(auth, callback);
+};
+
+/**
+ * Check if the current user is signed in with Google (not anonymous).
+ */
+export const isGoogleUser = (user: User | null): boolean => {
+  if (!user) return false;
+  return user.providerData.some(p => p.providerId === 'google.com');
+};
 
 // Sign in anonymously when the app loads
 let authInitialized = false;

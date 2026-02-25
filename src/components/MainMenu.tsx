@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { DungeonButton } from "./ui/DungeonButton";
 import { User, Map, Backpack, Skull, Brain, Lock, Unlock, Presentation, Volume2, ChevronDown } from "lucide-react";
 import { Crawler } from "@/lib/gameData";
+import GoogleAuthButton from "./GoogleAuthButton";
 
 interface MainMenuProps {
   onNavigate: (view: string) => void;
@@ -87,6 +88,9 @@ const MainMenu: React.FC<MainMenuProps> = ({ onNavigate, onDungeonAI, isDungeonA
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-40 flex flex-col items-center justify-center bg-background"
     >
+      <div className="absolute top-4 left-4">
+        <GoogleAuthButton />
+      </div>
       <div className="absolute top-4 right-4 relative" ref={playerDropdownRef}>
         <button
           onClick={() => onSwitchPlayer && setShowPlayerDropdown(!showPlayerDropdown)}
