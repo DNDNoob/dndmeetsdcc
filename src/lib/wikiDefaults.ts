@@ -765,27 +765,36 @@ The wiki supports standard Markdown:
 - Include examples where they help clarify a concept`,
   },
   {
-    id: 'google-sign-in',
-    slug: 'google-sign-in',
-    title: 'Google Sign-In',
+    id: 'accounts',
+    slug: 'accounts',
+    title: 'Accounts & Sign-In',
     category: 'Basics',
     order: 4,
-    content: `# Google Sign-In
+    content: `# Accounts & Sign-In
 
-The app supports Google Sign-In to control who can make changes to the game data.
+The app supports user accounts to control who can make changes to the game data.
 
 ## How It Works
 
 - **Anonymous users** (not signed in) can browse the app and view all data — maps, profiles, mobs, episodes, etc. — but they **cannot** make any changes.
-- **Google-authenticated users** can read and write: edit profiles, manage inventory, roll dice, run combat, and use all DM features.
+- **Signed-in users** (via Google or email/password) can read and write: edit profiles, manage inventory, roll dice, run combat, and use all DM features.
 
-This means anyone can visit the site and spectate, but only trusted users who sign in with Google can modify game data.
+This means anyone can visit the site and spectate, but only users with an account can modify game data.
+
+## Creating an Account
+
+1. Click the **Sign In** button — it appears in the top-right on the Splash Screen and Main Menu, or in the navigation bar during gameplay.
+2. In the auth modal, click the **CREATE ACCOUNT** tab.
+3. Fill in your display name (optional), email address, and a password (at least 6 characters).
+4. Click **Create Account**. You're now signed in!
+
+Alternatively, click **Continue with Google** to create an account using your Google account — no password needed.
 
 ## Signing In
 
-1. Click the **Sign In** button — it appears in the top-right on the Splash Screen and Main Menu, or in the navigation bar during gameplay.
-2. A Google sign-in popup will appear. Select your Google account.
-3. Once signed in, your Google name appears next to the button, which changes to **Sign Out**.
+1. Click the **Sign In** button.
+2. Enter your email and password, or click **Continue with Google**.
+3. Once signed in, your name appears next to the button, which changes to **Sign Out**.
 
 ## Signing Out
 
@@ -793,6 +802,6 @@ Click **Sign Out** to revert to anonymous (read-only) mode. You can sign back in
 
 ## For the DM
 
-Google Sign-In is separate from the DM password. To access the DM Console, you still need to enter the DM password as before. However, you must also be signed in with Google to make any writes (creating episodes, placing mobs, sending loot, etc.).`,
+Account sign-in is separate from the DM password. To access the DM Console, you still need to enter the DM password as before. However, you must also be signed in with an account to make any writes (creating episodes, placing mobs, sending loot, etc.).`,
   },
 ];

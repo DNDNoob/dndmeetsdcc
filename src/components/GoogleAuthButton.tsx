@@ -8,11 +8,12 @@ interface GoogleAuthButtonProps {
 }
 
 const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({ compact = false }) => {
-  const { user, isGoogle, loading, signIn, signOut } = useAuth();
+  const { user, isAuthenticated, loading, signOut, openAuthModal } = useAuth();
 
   if (loading) return null;
 
-  if (isGoogle && user) {
+  if (isAuthenticated && user) {
+    const displayLabel = user.displayName || user.email || 'User';
     return (
       <div className="flex items-center gap-2">
         {!compact && (
@@ -26,7 +27,7 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({ compact = false }) 
               />
             )}
             <span className="text-xs text-green-400 font-display truncate max-w-[120px]">
-              {user.displayName || user.email || 'Google User'}
+              {displayLabel}
             </span>
           </div>
         )}
@@ -35,7 +36,7 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({ compact = false }) 
           size="sm"
           onClick={signOut}
           className="flex items-center gap-1"
-          title="Sign out from Google"
+          title={`Signed in as ${displayLabel} — click to sign out`}
         >
           <LogOut className="w-3 h-3" />
           <span className="hidden sm:inline text-xs">Sign Out</span>
@@ -48,9 +49,9 @@ const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({ compact = false }) 
     <DungeonButton
       variant="ghost"
       size="sm"
-      onClick={signIn}
+      onClick={openAuthModal}
       className="flex items-center gap-1"
-      title="Sign in with Google to enable editing"
+      title="Sign in to enable editing"
     >
       <LogIn className="w-3 h-3" />
       <span className="hidden sm:inline text-xs">Sign In</span>
