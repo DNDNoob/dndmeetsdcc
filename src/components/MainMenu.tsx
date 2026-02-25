@@ -88,10 +88,9 @@ const MainMenu: React.FC<MainMenuProps> = ({ onNavigate, onDungeonAI, isDungeonA
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-40 flex flex-col items-center justify-center bg-background"
     >
-      <div className="absolute top-4 left-4">
-        <GoogleAuthButton />
-      </div>
-      <div className="absolute top-4 right-4 relative" ref={playerDropdownRef}>
+      <div className="absolute top-4 right-4 flex items-center gap-3" ref={playerDropdownRef}>
+        <GoogleAuthButton compact />
+        <div className="relative">
         <button
           onClick={() => onSwitchPlayer && setShowPlayerDropdown(!showPlayerDropdown)}
           className={`flex items-center gap-1.5 hover:opacity-80 transition-opacity ${onSwitchPlayer ? 'cursor-pointer' : 'cursor-default'}`}
@@ -178,6 +177,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ onNavigate, onDungeonAI, isDungeonA
             </motion.div>
           )}
         </AnimatePresence>
+        </div>
       </div>
 
       <motion.h1

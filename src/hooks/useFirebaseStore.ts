@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { db, getCollectionRef, setDoc, doc, deleteDoc, updateDoc, onSnapshot, initAuth, writeBatch } from '../lib/firebase';
+import { db, auth, getCollectionRef, setDoc, doc, deleteDoc, updateDoc, onSnapshot, initAuth, writeBatch } from '../lib/firebase';
+import { isGoogleUser } from '../lib/firebase';
+import { toast } from 'sonner';
 import type { CollectionName } from '../types/collections';
 
 interface DataStore {
@@ -158,7 +160,18 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
   const MAX_IMAGE_LENGTH = 1_040_000; // Firestore field limit is ~1,048,487 bytes; leave margin
   const MAX_AVATAR_LENGTH = 500_000; // 500KB for avatars
 
+  // Guard: block writes for anonymous (non-Google) users
+  const requireGoogleAuth = useCallback(() => {
+    const currentUser = auth?.currentUser ?? null;
+    if (!isGoogleUser(currentUser)) {
+      toast.error('Sign in with Google to make changes', { id: 'auth-required' });
+      return false;
+    }
+    return true;
+  }, []);
+
   const addItem = useCallback(async (collection: CollectionName, item: Record<string, unknown>) => {
+    if (!requireGoogleAuth()) return;
     try {
       const itemId = (item.id as string) || crypto.randomUUID();
       const itemWithId = { ...item, id: itemId };
@@ -235,6 +248,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
   }, [roomId]); // cleanObject is stable, doesn't need to be in dependencies
 
   const updateItem = useCallback(async (collection: CollectionName, id: string, updates: Record<string, unknown>) => {
+    if (!requireGoogleAuth()) return;
     try {
       // Optimistic update: immediately update local state before Firebase write
       setData(prevData => ({
@@ -293,6 +307,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
   }, [roomId]); // cleanObject is stable, doesn't need to be in dependencies
 
   const deleteItem = useCallback(async (collection: CollectionName, id: string) => {
+    if (!requireGoogleAuth()) return;
     // Capture previous state via functional update to avoid stale closure
     let previousData: Record<string, unknown>[] = [];
     setData(prevData => {
@@ -327,6 +342,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
   // Always use 'update' when modifying existing documents to avoid data loss!
   const batchWrite = useCallback(async (operations: BatchOperation[]) => {
     if (!db || operations.length === 0) return;
+    if (!requireGoogleAuth()) return;
 
     // Capture previous state via functional update to avoid stale closure
     let previousData: DataStore = {};

@@ -58,8 +58,19 @@ export const signInWithGoogle = async (): Promise<User | null> => {
     const result = await signInWithPopup(auth, googleProvider);
     console.log('[Firebase] ✅ Google sign-in successful:', result.user.displayName);
     return result.user;
-  } catch (error) {
-    console.error('[Firebase] ❌ Google sign-in error:', error);
+  } catch (error: unknown) {
+    const firebaseError = error as { code?: string; message?: string };
+    const code = firebaseError.code ?? '';
+    // Don't rethrow for user-initiated cancellations
+    if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+      console.log('[Firebase] Google sign-in popup closed by user');
+      return null;
+    }
+    // Unauthorized domain — the current hostname isn't listed in Firebase Console
+    if (code === 'auth/unauthorized-domain') {
+      console.error('[Firebase] ❌ Domain not authorized for Google sign-in. Add this domain to Firebase Console → Authentication → Settings → Authorized domains.');
+    }
+    console.error('[Firebase] ❌ Google sign-in error:', code, firebaseError.message);
     throw error;
   }
 };

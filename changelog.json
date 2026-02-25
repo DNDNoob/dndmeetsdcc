@@ -4,7 +4,10 @@
     "changes": [
       "🔐 Added Google Sign-In — users can now sign in with their Google account to enable write access (anonymous users can still browse read-only)",
       "🔐 Sign In / Sign Out button available on Splash Screen, Main Menu, and Navigation bar",
-      "🔐 Firestore security rules updated to allow anonymous reads but require Google auth for writes"
+      "🔐 Firestore security rules updated to allow anonymous reads but require Google auth for writes",
+      "🐛 Fixed: anonymous users could still edit data client-side — writes now blocked with a toast message when not signed in with Google",
+      "🐛 Fixed Google sign-in popup closing immediately — now handles auth errors (unauthorized domain, popup closed) gracefully with user-friendly messages",
+      "🐛 Fixed Main Menu layout — moved Google sign-in button next to the player selector instead of displacing it"
     ]
   },
   {
