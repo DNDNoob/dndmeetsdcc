@@ -1,7 +1,18 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, doc, setDoc, getDoc, getDocs, deleteDoc, updateDoc, onSnapshot, query, where, writeBatch } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
-import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut as firebaseSignOut, type User } from 'firebase/auth';
+import {
+  getAuth,
+  signInAnonymously,
+  onAuthStateChanged,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signOut as firebaseSignOut,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile,
+  type User,
+} from 'firebase/auth';
 
 // Firebase configuration - get these from Firebase Console
 const firebaseConfig = {
@@ -76,20 +87,52 @@ export const signInWithGoogle = async (): Promise<User | null> => {
 };
 
 /**
- * Sign out from Google and fall back to anonymous auth.
+ * Create an account with email + password. Returns the new user.
  */
-export const signOutGoogle = async (): Promise<void> => {
+export const signUpWithEmail = async (email: string, password: string, displayName?: string): Promise<User | null> => {
+  if (!auth) {
+    console.warn('[Firebase] Cannot create account — offline mode');
+    return null;
+  }
+  const result = await createUserWithEmailAndPassword(auth, email, password);
+  if (displayName) {
+    await updateProfile(result.user, { displayName });
+  }
+  console.log('[Firebase] ✅ Email account created:', result.user.email);
+  return result.user;
+};
+
+/**
+ * Sign in with email + password. Returns the user.
+ */
+export const signInWithEmail = async (email: string, password: string): Promise<User | null> => {
+  if (!auth) {
+    console.warn('[Firebase] Cannot sign in — offline mode');
+    return null;
+  }
+  const result = await signInWithEmailAndPassword(auth, email, password);
+  console.log('[Firebase] ✅ Email sign-in successful:', result.user.email);
+  return result.user;
+};
+
+/**
+ * Sign out and fall back to anonymous auth.
+ */
+export const signOutUser = async (): Promise<void> => {
   if (!auth) return;
   try {
     await firebaseSignOut(auth);
     // Fall back to anonymous auth so reads still work
     await signInAnonymously(auth);
-    console.log('[Firebase] ✅ Signed out from Google, now anonymous');
+    console.log('[Firebase] ✅ Signed out, now anonymous');
   } catch (error) {
     console.error('[Firebase] ❌ Sign-out error:', error);
     throw error;
   }
 };
+
+/** @deprecated Use signOutUser instead */
+export const signOutGoogle = signOutUser;
 
 /**
  * Subscribe to auth state changes. Callback receives the current user (or null).
@@ -109,6 +152,16 @@ export const onAuthChange = (callback: (user: User | null) => void): (() => void
 export const isGoogleUser = (user: User | null): boolean => {
   if (!user) return false;
   return user.providerData.some(p => p.providerId === 'google.com');
+};
+
+/**
+ * Check if the current user is authenticated (not anonymous).
+ * This includes Google sign-in AND email/password accounts.
+ */
+export const isAuthenticatedUser = (user: User | null): boolean => {
+  if (!user) return false;
+  // Anonymous users have no providerData entries
+  return user.providerData.length > 0;
 };
 
 // Sign in anonymously when the app loads
