@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import { onAuthChange, signInWithGoogle, signOutGoogle, isGoogleUser } from '@/lib/firebase';
+import { toast } from 'sonner';
 import type { User } from 'firebase/auth';
 
 interface AuthContextType {
@@ -30,7 +31,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = useCallback(async () => {
-    await signInWithGoogle();
+    try {
+      await signInWithGoogle();
+    } catch (error: unknown) {
+      const firebaseError = error as { code?: string };
+      const code = firebaseError.code ?? '';
+      if (code === 'auth/unauthorized-domain') {
+        toast.error('This domain is not authorized for Google sign-in. Ask the admin to add it in Firebase Console.');
+      } else {
+        toast.error('Google sign-in failed. Please try again.');
+      }
+    }
   }, []);
 
   const signOut = useCallback(async () => {
