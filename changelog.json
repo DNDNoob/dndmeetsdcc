@@ -1,5 +1,13 @@
 [
   {
+    "date": "2026-02-25",
+    "changes": [
+      "🔐 Added Google Sign-In — users can now sign in with their Google account to enable write access (anonymous users can still browse read-only)",
+      "🔐 Sign In / Sign Out button available on Splash Screen, Main Menu, and Navigation bar",
+      "🔐 Firestore security rules updated to allow anonymous reads but require Google auth for writes"
+    ]
+  },
+  {
     "date": "2026-02-24",
     "changes": [
       "🐛 Fixed race condition in loot box claiming — inventory, gold, and loot box updates are now properly awaited to prevent data loss",

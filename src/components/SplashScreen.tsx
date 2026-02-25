@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { DungeonButton } from "./ui/DungeonButton";
 import PlayerSelector from "./PlayerSelector";
 import { Crawler } from "@/lib/gameData";
+import GoogleAuthButton from "./GoogleAuthButton";
 
 interface SplashScreenProps {
   crawlers: Crawler[];
@@ -19,6 +20,9 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ crawlers, onEnter }) => {
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background"
     >
+      <div className="absolute top-4 right-4 z-10">
+        <GoogleAuthButton />
+      </div>
       <AnimatePresence mode="wait">
         {!showSelector ? (
           <motion.div
