@@ -187,15 +187,15 @@ Each campaign maps to a **room** in the existing room-scoped Firestore structure
 
 ---
 
-## Open Questions
+## Resolved Design Decisions
 
-1. **Can a campaign have multiple DMs?** — Current plan assumes single owner = single DM. Should we support co-DMs (e.g. an `adminIds` array)?
+1. **Single ownership only** — One DM per campaign (the creator). No co-DMs or `adminIds` array needed.
 
-2. **Campaign deletion** — Should deleting a campaign delete all its game data (crawlers, mobs, maps, etc.)? Or just the campaign metadata, leaving the room data orphaned?
+2. **Campaign deletion deletes episode-dependent data** — Deleting a campaign removes all room-scoped data (episodes, mob placements, crawler placements, maps within episodes, etc.). Mob *types* and crawler *templates* that exist independently are preserved for future campaigns. Additionally, **campaigns can be copied** — a "Copy Campaign" feature lets a DM duplicate a campaign's structure.
 
-3. **Player limits** — Should campaigns have a maximum number of members?
+3. **Player limit: max 10** — Campaigns have a maximum of 10 members. The DM can also add their own crawler to the game (DM counts as a player too, but their crawler is optional).
 
-4. **DM transfer** — Can a DM transfer ownership of a campaign to another member?
+4. **No ownership transfer** — Campaign ownership cannot be transferred. The creator is always the DM.
 
 ---
 

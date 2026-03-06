@@ -1,20 +1,20 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DungeonButton } from "./ui/DungeonButton";
-import { User, Map, Backpack, Skull, Brain, Lock, Unlock, Presentation, Volume2, ChevronDown } from "lucide-react";
+import { User, Map, Backpack, Skull, Brain, Presentation, Volume2, ChevronDown, ArrowLeft } from "lucide-react";
 import { Crawler } from "@/lib/gameData";
 import GoogleAuthButton from "./GoogleAuthButton";
 
 interface MainMenuProps {
   onNavigate: (view: string) => void;
   onDungeonAI: () => void;
-  isDungeonAILoggedIn?: boolean;
-  onDungeonAILogout?: () => void;
+  isAdmin: boolean;
   playerName?: string;
   playerType?: "crawler" | "ai" | "npc";
-  onDungeonAILogin?: () => void;
   crawlers?: Crawler[];
   onSwitchPlayer?: (playerId: string, playerName: string, playerType: "crawler" | "ai" | "npc") => void;
+  campaignName?: string;
+  onBackToCampaigns?: () => void;
 }
 
 const menuItems = [
@@ -26,12 +26,17 @@ const menuItems = [
   { id: "sounds", label: "Sound Effects", icon: Volume2 },
 ];
 
-const DM_PASSWORD = "DND_IS_LIFE!";
-
-const MainMenu: React.FC<MainMenuProps> = ({ onNavigate, onDungeonAI, isDungeonAILoggedIn = false, onDungeonAILogout, playerName = "Crawler", playerType = "crawler", onDungeonAILogin, crawlers, onSwitchPlayer }) => {
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState(false);
+const MainMenu: React.FC<MainMenuProps> = ({
+  onNavigate,
+  onDungeonAI,
+  isAdmin,
+  playerName = "Crawler",
+  playerType = "crawler",
+  crawlers,
+  onSwitchPlayer,
+  campaignName,
+  onBackToCampaigns,
+}) => {
   const [showPlayerDropdown, setShowPlayerDropdown] = useState(false);
   const playerDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -53,34 +58,6 @@ const MainMenu: React.FC<MainMenuProps> = ({ onNavigate, onDungeonAI, isDungeonA
     return "text-primary text-glow-cyan";
   };
 
-  const handleDungeonAIClick = () => {
-    if (isDungeonAILoggedIn) {
-      onDungeonAI();
-    } else {
-      setShowPasswordModal(true);
-      setPassword("");
-      setError(false);
-    }
-  };
-
-  const handlePasswordSubmit = (navigateToDM = true) => {
-    if (password === DM_PASSWORD) {
-      localStorage.setItem("dcc_dungeon_ai_login", "true");
-      setShowPasswordModal(false);
-      if (onDungeonAILogin) onDungeonAILogin();
-      if (navigateToDM) onDungeonAI();
-    } else {
-      setError(true);
-    }
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem("dcc_dungeon_ai_login");
-    if (onDungeonAILogout) {
-      onDungeonAILogout();
-    }
-  };
-
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -88,6 +65,14 @@ const MainMenu: React.FC<MainMenuProps> = ({ onNavigate, onDungeonAI, isDungeonA
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-40 flex flex-col items-center justify-center bg-background"
     >
+      <div className="absolute top-4 left-4 flex items-center gap-2">
+        {onBackToCampaigns && (
+          <DungeonButton variant="ghost" size="sm" onClick={onBackToCampaigns} className="flex items-center gap-1">
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span className="text-xs">Campaigns</span>
+          </DungeonButton>
+        )}
+      </div>
       <div className="absolute top-4 right-4 flex items-center gap-3" ref={playerDropdownRef}>
         <GoogleAuthButton compact />
         <div className="relative">
@@ -132,33 +117,24 @@ const MainMenu: React.FC<MainMenuProps> = ({ onNavigate, onDungeonAI, isDungeonA
                     <span className="text-muted-foreground ml-auto text-[10px]">Lvl {c.level}</span>
                   </button>
                 ))}
-                <div className="border-t border-border my-1" />
-                <div className="px-3 py-1 text-[10px] text-muted-foreground font-display">DUNGEON MASTER</div>
-                <button
-                  onClick={() => {
-                    if (isDungeonAILoggedIn) {
-                      onSwitchPlayer('dungeonai', 'DUNGEON AI', 'ai');
-                      onDungeonAILogin?.();
-                    } else {
-                      setShowPlayerDropdown(false);
-                      setShowPasswordModal(true);
-                      setPassword("");
-                      setError(false);
-                    }
-                    setShowPlayerDropdown(false);
-                  }}
-                  className={`w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 hover:bg-primary/10 transition-colors ${
-                    playerType === 'ai' ? 'text-accent bg-primary/5' : 'text-foreground'
-                  }`}
-                >
-                  <Brain className="w-4 h-4 text-accent" />
-                  <span>Dungeon AI</span>
-                  {isDungeonAILoggedIn ? (
-                    <Unlock className="w-3 h-3 text-accent ml-auto" />
-                  ) : (
-                    <Lock className="w-3 h-3 text-muted-foreground ml-auto" />
-                  )}
-                </button>
+                {isAdmin && (
+                  <>
+                    <div className="border-t border-border my-1" />
+                    <div className="px-3 py-1 text-[10px] text-muted-foreground font-display">DUNGEON MASTER</div>
+                    <button
+                      onClick={() => {
+                        onSwitchPlayer('dungeonai', 'DUNGEON AI', 'ai');
+                        setShowPlayerDropdown(false);
+                      }}
+                      className={`w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 hover:bg-primary/10 transition-colors ${
+                        playerType === 'ai' ? 'text-accent bg-primary/5' : 'text-foreground'
+                      }`}
+                    >
+                      <Brain className="w-4 h-4 text-accent" />
+                      <span>Dungeon AI</span>
+                    </button>
+                  </>
+                )}
                 <div className="border-t border-border my-1" />
                 <div className="px-3 py-1 text-[10px] text-muted-foreground font-display">SPECTATORS</div>
                 <button
@@ -179,6 +155,16 @@ const MainMenu: React.FC<MainMenuProps> = ({ onNavigate, onDungeonAI, isDungeonA
         </AnimatePresence>
         </div>
       </div>
+
+      {campaignName && (
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="text-xs text-muted-foreground font-display tracking-wider mb-2"
+        >
+          {campaignName}
+        </motion.p>
+      )}
 
       <motion.h1
         initial={{ y: -20, opacity: 0 }}
@@ -209,82 +195,22 @@ const MainMenu: React.FC<MainMenuProps> = ({ onNavigate, onDungeonAI, isDungeonA
         ))}
       </div>
 
-      {/* Dungeon AI Button */}
-      <motion.div
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.6 }}
-        className="mt-8 flex gap-2"
-      >
-        <DungeonButton
-          variant="admin"
-          className="flex items-center gap-3 px-8 py-4"
-          onClick={handleDungeonAIClick}
-        >
-          <Brain className="w-6 h-6" />
-          <span className="font-display tracking-wider">DUNGEON AI</span>
-          {isDungeonAILoggedIn ? <Lock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-        </DungeonButton>
-        {isDungeonAILoggedIn && (
-          <DungeonButton
-            variant="menu"
-            className="flex items-center gap-2 px-4 py-4"
-            onClick={handleLogout}
-          >
-            <span className="font-display text-xs">LOGOUT</span>
-          </DungeonButton>
-        )}
-      </motion.div>
-
-      {/* Password Modal */}
-      {showPasswordModal && (
+      {/* Dungeon AI Button — only shown if the user is the DM */}
+      {isAdmin && (
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-background/90"
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.6 }}
+          className="mt-8"
         >
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="bg-background border-2 border-accent p-6 max-w-sm w-full mx-4"
+          <DungeonButton
+            variant="admin"
+            className="flex items-center gap-3 px-8 py-4"
+            onClick={onDungeonAI}
           >
-            <div className="flex items-center gap-3 mb-4">
-              <Brain className="w-6 h-6 text-accent" />
-              <h2 className="font-display text-xl text-accent text-glow-gold">DUNGEON AI ACCESS</h2>
-            </div>
-            <p className="text-muted-foreground text-sm mb-4">
-              Enter the Dungeon Master password to access DM features.
-            </p>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                setError(false);
-              }}
-              onKeyDown={(e) => e.key === "Enter" && handlePasswordSubmit()}
-              placeholder="Enter password..."
-              className={`w-full bg-muted border px-4 py-3 mb-4 font-mono ${
-                error ? "border-destructive" : "border-border"
-              }`}
-              autoFocus
-            />
-            {error && (
-              <p className="text-destructive text-sm mb-4">ACCESS DENIED - Invalid password</p>
-            )}
-            <div className="flex gap-3">
-              <DungeonButton
-                variant="menu"
-                className="flex-1"
-                onClick={() => setShowPasswordModal(false)}
-              >
-                Cancel
-              </DungeonButton>
-              <DungeonButton variant="admin" className="flex-1" onClick={handlePasswordSubmit}>
-                Access
-              </DungeonButton>
-            </div>
-          </motion.div>
+            <Brain className="w-6 h-6" />
+            <span className="font-display tracking-wider">DUNGEON AI</span>
+          </DungeonButton>
         </motion.div>
       )}
     </motion.div>

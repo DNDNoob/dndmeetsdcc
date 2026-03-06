@@ -305,6 +305,33 @@ export interface WikiPage {
   updatedBy?: string;
 }
 
+// User profile — one per authenticated Firebase user (root-level collection)
+export interface UserProfile {
+  id: string;             // Firebase Auth uid
+  username: string;       // Unique tag e.g. "DragonSlayer42"
+  displayName: string;    // Freeform display name
+  avatarUrl?: string;     // Optional avatar (from Google or uploaded)
+  email?: string;         // Stored for reference (populated from auth)
+  createdAt: number;      // Epoch ms
+  updatedAt: number;
+}
+
+// Campaign — groups players into a room with a single DM (root-level collection)
+export interface Campaign {
+  id: string;             // Auto-generated
+  name: string;           // Campaign name
+  description?: string;   // Optional description
+  ownerId: string;        // Firebase uid of campaign creator (the DM)
+  ownerName: string;      // Denormalized display name for UI
+  memberIds: string[];    // Firebase uids of players who have joined (max 10)
+  maxMembers: number;     // Max player count (default 10)
+  inviteCode: string;     // Short unique code for invite links
+  createdAt: number;
+  updatedAt: number;
+}
+
+export const MAX_CAMPAIGN_MEMBERS = 10;
+
 export const defaultCrawlers: Crawler[] = [
   {
     id: "1",

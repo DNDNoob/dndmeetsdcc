@@ -4,13 +4,17 @@ import { DungeonButton } from "./ui/DungeonButton";
 import PlayerSelector from "./PlayerSelector";
 import { Crawler } from "@/lib/gameData";
 import GoogleAuthButton from "./GoogleAuthButton";
+import { ArrowLeft } from "lucide-react";
 
 interface SplashScreenProps {
   crawlers: Crawler[];
   onEnter: (playerId: string, playerName: string, playerType: "crawler" | "ai" | "npc") => void;
+  isAdmin?: boolean;
+  campaignName?: string;
+  onBackToCampaigns?: () => void;
 }
 
-const SplashScreen: React.FC<SplashScreenProps> = ({ crawlers, onEnter }) => {
+const SplashScreen: React.FC<SplashScreenProps> = ({ crawlers, onEnter, isAdmin, campaignName, onBackToCampaigns }) => {
   const [showSelector, setShowSelector] = useState(false);
 
   return (
@@ -20,6 +24,14 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ crawlers, onEnter }) => {
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background"
     >
+      {onBackToCampaigns && (
+        <div className="absolute top-4 left-4 z-10">
+          <DungeonButton variant="ghost" size="sm" onClick={onBackToCampaigns} className="flex items-center gap-1">
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span className="text-xs">Campaigns</span>
+          </DungeonButton>
+        </div>
+      )}
       <div className="absolute top-4 right-4 z-10">
         <GoogleAuthButton />
       </div>
@@ -55,10 +67,22 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ crawlers, onEnter }) => {
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.5, duration: 0.5 }}
-              className="text-muted-foreground text-lg mb-12 tracking-wide"
+              className="text-muted-foreground text-lg mb-2 tracking-wide"
             >
               CRAWLER HUB v1.0
             </motion.p>
+
+            {campaignName && (
+              <motion.p
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.6, duration: 0.5 }}
+                className="text-accent text-sm mb-10 font-display tracking-wider"
+              >
+                {campaignName}
+              </motion.p>
+            )}
+            {!campaignName && <div className="mb-10" />}
 
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}

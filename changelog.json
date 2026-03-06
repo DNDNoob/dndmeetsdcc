@@ -1,5 +1,21 @@
 [
   {
+    "date": "2026-03-06",
+    "changes": [
+      "🏰 MAJOR: Added Campaign System — create, join, copy, and manage campaigns with isolated game data",
+      "🏰 Campaign-based DM access — the campaign creator is automatically the DM with full DM Console access (replaces old password system)",
+      "🏰 Invite links — DMs can share invite codes/links to let players join their campaign (max 10 players per campaign)",
+      "🏰 Campaign selection screen — authenticated users see their owned and joined campaigns before entering the game",
+      "🏰 Copy Campaign — DMs can duplicate a campaign's structure (mobs, maps, episodes, quests, wiki) for reuse",
+      "🏰 Campaign deletion — removes all room-scoped game data (episodes, placements, etc.) while preserving global templates",
+      "👤 User Profiles — authenticated users now set up a unique username and display name on first sign-in",
+      "👤 Username validation — usernames must be 3-24 characters, alphanumeric + underscores, and globally unique",
+      "🔗 Join via invite link — /join/:inviteCode route lets users join campaigns directly from a shared URL",
+      "🧭 Back to Campaigns — navigate back to the campaign list from any screen (Splash, Menu, or Navigation bar)",
+      "🗑️ Removed old DM password login system — DM access is now determined by campaign ownership"
+    ]
+  },
+  {
     "date": "2026-02-25",
     "changes": [
       "🔐 Added Google Sign-In — users can now sign in with their Google account to enable write access (anonymous users can still browse read-only)",

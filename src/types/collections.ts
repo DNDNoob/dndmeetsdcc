@@ -26,6 +26,8 @@ export type CollectionName =
   | 'spells'
   | 'items'
   | 'encounters'
+  | 'userProfiles'
+  | 'campaigns'
   | string; // Allow any string for flexibility
 
 /**

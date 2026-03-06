@@ -7,19 +7,34 @@ import {
   signOutUser,
   isAuthenticatedUser,
   isGoogleUser,
+  db,
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  setDoc,
+  updateDoc,
+  onSnapshot,
+  query,
+  where,
 } from '@/lib/firebase';
 import { toast } from 'sonner';
 import type { User } from 'firebase/auth';
+import type { UserProfile } from '@/lib/gameData';
 
 interface AuthContextType {
   /** The current Firebase user (anonymous, Google, or email/password). Null while loading. */
   user: User | null;
+  /** The user's profile from Firestore. Null if not yet created or not authenticated. */
+  userProfile: UserProfile | null;
   /** True if the user is authenticated (Google OR email/password — NOT anonymous). */
   isAuthenticated: boolean;
   /** True if the current user signed in with Google specifically. */
   isGoogle: boolean;
   /** True while the initial auth state is being resolved. */
   loading: boolean;
+  /** True if the user needs to set up their username (authenticated but no profile). */
+  needsUsername: boolean;
   /** Sign in with Google popup. */
   signInGoogle: () => Promise<void>;
   /** Create an account with email + password. */
@@ -34,15 +49,22 @@ interface AuthContextType {
   closeAuthModal: () => void;
   /** Whether the auth modal is open. */
   authModalOpen: boolean;
+  /** Create or update the user's profile. */
+  saveUserProfile: (username: string, displayName: string) => Promise<boolean>;
+  /** Update the user's profile fields. */
+  updateUserProfile: (updates: Partial<UserProfile>) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [needsUsername, setNeedsUsername] = useState(false);
 
+  // Listen to auth state changes
   useEffect(() => {
     const unsubscribe = onAuthChange((u) => {
       setUser(u);
@@ -50,6 +72,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     return unsubscribe;
   }, []);
+
+  // When user changes, subscribe to their profile document
+  useEffect(() => {
+    if (!user || !isAuthenticatedUser(user) || !db) {
+      setUserProfile(null);
+      setNeedsUsername(false);
+      return;
+    }
+
+    const profileRef = doc(db, 'userProfiles', user.uid);
+    const unsubscribe = onSnapshot(profileRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const profile = { id: snapshot.id, ...snapshot.data() } as UserProfile;
+        setUserProfile(profile);
+        setNeedsUsername(false);
+      } else {
+        setUserProfile(null);
+        setNeedsUsername(true);
+      }
+    }, (error) => {
+      console.error('[Auth] Error subscribing to user profile:', error);
+      setUserProfile(null);
+    });
+
+    return unsubscribe;
+  }, [user]);
 
   const signInGoogle = useCallback(async () => {
     try {
@@ -119,8 +167,75 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     await signOutUser();
+    setUserProfile(null);
+    setNeedsUsername(false);
     toast('Signed out');
   }, []);
+
+  const saveUserProfile = useCallback(async (username: string, displayName: string): Promise<boolean> => {
+    if (!user || !db) return false;
+
+    // Check username uniqueness
+    try {
+      const q = query(collection(db, 'userProfiles'), where('username', '==', username));
+      const existing = await getDocs(q);
+      if (!existing.empty) {
+        // Check if it's the current user's own profile
+        const isOwnProfile = existing.docs.some(d => d.id === user.uid);
+        if (!isOwnProfile) {
+          toast.error('That username is already taken');
+          return false;
+        }
+      }
+    } catch (error) {
+      console.error('[Auth] Error checking username:', error);
+      toast.error('Failed to validate username');
+      return false;
+    }
+
+    const now = Date.now();
+    const profileRef = doc(db, 'userProfiles', user.uid);
+
+    try {
+      const existingDoc = await getDoc(profileRef);
+      if (existingDoc.exists()) {
+        await updateDoc(profileRef, {
+          username,
+          displayName,
+          updatedAt: now,
+        });
+      } else {
+        const profile: UserProfile = {
+          id: user.uid,
+          username,
+          displayName,
+          avatarUrl: user.photoURL || undefined,
+          email: user.email || undefined,
+          createdAt: now,
+          updatedAt: now,
+        };
+        await setDoc(profileRef, profile);
+      }
+      return true;
+    } catch (error) {
+      console.error('[Auth] Error saving user profile:', error);
+      toast.error('Failed to save profile');
+      return false;
+    }
+  }, [user]);
+
+  const updateUserProfile = useCallback(async (updates: Partial<UserProfile>): Promise<void> => {
+    if (!user || !db) return;
+    try {
+      await updateDoc(doc(db, 'userProfiles', user.uid), {
+        ...updates,
+        updatedAt: Date.now(),
+      });
+    } catch (error) {
+      console.error('[Auth] Error updating user profile:', error);
+      toast.error('Failed to update profile');
+    }
+  }, [user]);
 
   const openAuthModal = useCallback(() => setAuthModalOpen(true), []);
   const closeAuthModal = useCallback(() => setAuthModalOpen(false), []);
@@ -131,9 +246,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider value={{
       user,
+      userProfile,
       isAuthenticated,
       isGoogle,
       loading,
+      needsUsername,
       signInGoogle,
       signUp,
       signInEmail,
@@ -141,6 +258,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       openAuthModal,
       closeAuthModal,
       authModalOpen,
+      saveUserProfile,
+      updateUserProfile,
     }}>
       {children}
     </AuthContext.Provider>

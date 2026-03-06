@@ -1,11 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DungeonButton } from "./ui/DungeonButton";
-import { Home, User, Map, Backpack, Skull, Presentation, Volume2, FileText, Brain, Pin, PinOff, ChevronDown, BookOpen, Lock, Unlock } from "lucide-react";
+import { Home, User, Map, Backpack, Skull, Presentation, Volume2, FileText, Brain, Pin, PinOff, ChevronDown, BookOpen, ArrowLeft } from "lucide-react";
 import { Crawler } from "@/lib/gameData";
 import GoogleAuthButton from "./GoogleAuthButton";
-
-const DM_PASSWORD = "DND_IS_LIFE!";
 
 interface NavigationProps {
   onNavigate: (view: string) => void;
@@ -18,9 +16,9 @@ interface NavigationProps {
   onVisibilityChange?: (visible: boolean) => void;
   crawlers?: Crawler[];
   onSwitchPlayer?: (playerId: string, playerName: string, playerType: "crawler" | "ai" | "npc") => void;
-  isDungeonAILoggedIn?: boolean;
-  onDungeonAILogin?: () => void;
-  onDungeonAILogout?: () => void;
+  isAdmin: boolean;
+  campaignName?: string;
+  onBackToCampaigns?: () => void;
 }
 
 const navItems = [
@@ -41,16 +39,13 @@ const Navigation: React.FC<NavigationProps> = ({
   onVisibilityChange,
   crawlers,
   onSwitchPlayer,
-  isDungeonAILoggedIn = false,
-  onDungeonAILogin,
-  onDungeonAILogout,
+  isAdmin,
+  campaignName,
+  onBackToCampaigns,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
   const [showPlayerDropdown, setShowPlayerDropdown] = useState(false);
-  const [showDMPasswordInput, setShowDMPasswordInput] = useState(false);
-  const [dmPassword, setDmPassword] = useState("");
-  const [dmPasswordError, setDmPasswordError] = useState(false);
   const playerDropdownRef = useRef<HTMLDivElement>(null);
 
   const getPlayerColor = () => {
@@ -60,15 +55,6 @@ const Navigation: React.FC<NavigationProps> = ({
   };
 
   const shouldCollapse = autoCollapse && !isPinned && !isHovered;
-
-  // Reset DM password input when dropdown closes
-  useEffect(() => {
-    if (!showPlayerDropdown) {
-      setShowDMPasswordInput(false);
-      setDmPassword("");
-      setDmPasswordError(false);
-    }
-  }, [showPlayerDropdown]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -89,7 +75,7 @@ const Navigation: React.FC<NavigationProps> = ({
 
   return (
     <>
-      {/* Hover trigger zone when collapsed - only covers left portion to avoid blocking the ping panel on the right */}
+      {/* Hover trigger zone when collapsed */}
       {autoCollapse && !isPinned && !isHovered && (
         <div
           className="fixed top-0 left-0 h-8 z-[60]"
@@ -122,6 +108,18 @@ const Navigation: React.FC<NavigationProps> = ({
                 {isPinned ? <Pin className="w-3 h-3" /> : <PinOff className="w-3 h-3" />}
               </DungeonButton>
             )}
+            {onBackToCampaigns && (
+              <DungeonButton
+                variant="ghost"
+                size="sm"
+                onClick={onBackToCampaigns}
+                className="flex items-center gap-1"
+                title="Back to campaigns"
+              >
+                <ArrowLeft className="w-3 h-3" />
+                <span className="hidden sm:inline text-xs">Campaigns</span>
+              </DungeonButton>
+            )}
             <DungeonButton
               variant="ghost"
               size="sm"
@@ -132,6 +130,11 @@ const Navigation: React.FC<NavigationProps> = ({
               <span className="hidden sm:inline text-xs">Changelog</span>
             </DungeonButton>
             <GoogleAuthButton compact />
+            {campaignName && (
+              <span className="text-[10px] text-muted-foreground font-display tracking-wider hidden md:inline">
+                {campaignName}
+              </span>
+            )}
           </div>
           <div className="relative" ref={playerDropdownRef}>
             <button
@@ -175,63 +178,23 @@ const Navigation: React.FC<NavigationProps> = ({
                         <span className="text-muted-foreground ml-auto text-[10px]">Lvl {c.level}</span>
                       </button>
                     ))}
-                    <div className="border-t border-border my-1" />
-                    <div className="px-3 py-1 text-[10px] text-muted-foreground font-display">DUNGEON MASTER</div>
-                    {showDMPasswordInput ? (
-                      <div className="px-3 py-1.5">
-                        <input
-                          type="password"
-                          value={dmPassword}
-                          onChange={(e) => { setDmPassword(e.target.value); setDmPasswordError(false); }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              if (dmPassword === DM_PASSWORD) {
-                                localStorage.setItem("dcc_dungeon_ai_login", "true");
-                                onDungeonAILogin?.();
-                                setShowDMPasswordInput(false);
-                                setDmPassword("");
-                                setShowPlayerDropdown(false);
-                              } else {
-                                setDmPasswordError(true);
-                              }
-                            }
-                            if (e.key === 'Escape') {
-                              setShowDMPasswordInput(false);
-                              setDmPassword("");
-                              setDmPasswordError(false);
-                            }
-                          }}
-                          placeholder="Enter DM password..."
-                          className={`w-full bg-muted border px-2 py-1 text-xs font-mono ${dmPasswordError ? 'border-destructive' : 'border-border'}`}
-                          autoFocus
-                        />
-                        {dmPasswordError && <p className="text-destructive text-[10px] mt-1">Wrong password</p>}
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => {
-                          if (isDungeonAILoggedIn) {
+                    {isAdmin && (
+                      <>
+                        <div className="border-t border-border my-1" />
+                        <div className="px-3 py-1 text-[10px] text-muted-foreground font-display">DUNGEON MASTER</div>
+                        <button
+                          onClick={() => {
                             onSwitchPlayer('dungeonai', 'DUNGEON AI', 'ai');
-                            onDungeonAILogin?.();
                             setShowPlayerDropdown(false);
-                          } else {
-                            setShowDMPasswordInput(true);
-                            setDmPassword("");
-                            setDmPasswordError(false);
-                          }
-                        }}
-                        className={`w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 hover:bg-primary/10 transition-colors ${
-                          playerType === 'ai' ? 'text-accent bg-primary/5' : 'text-foreground'
-                        }`}
-                      >
-                        <Brain className="w-4 h-4 text-accent" />
-                        <span>Dungeon AI</span>
-                        {isDungeonAILoggedIn ? (
-                          <Unlock className="w-3 h-3 text-accent ml-auto" />
-                        ) : (
-                          <Lock className="w-3 h-3 text-muted-foreground ml-auto" />
-                        )}
-                      </button>
+                          }}
+                          className={`w-full text-left px-3 py-1.5 text-xs flex items-center gap-2 hover:bg-primary/10 transition-colors ${
+                            playerType === 'ai' ? 'text-accent bg-primary/5' : 'text-foreground'
+                          }`}
+                        >
+                          <Brain className="w-4 h-4 text-accent" />
+                          <span>Dungeon AI</span>
+                        </button>
+                      </>
                     )}
                     <div className="border-t border-border my-1" />
                     <div className="px-3 py-1 text-[10px] text-muted-foreground font-display">SPECTATORS</div>
@@ -308,7 +271,7 @@ const Navigation: React.FC<NavigationProps> = ({
             <span className="hidden sm:inline">Wiki</span>
           </DungeonButton>
 
-          {playerType === "ai" && (
+          {isAdmin && (
             <DungeonButton
               variant={currentView === "dungeonai" ? "default" : "nav"}
               size="sm"

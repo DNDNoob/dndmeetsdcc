@@ -61,6 +61,7 @@ export const useGameState = () => {
     batchWrite,
     isLoaded,
     roomId,
+    setRoomId,
   } = useGame();
 
   // Cache for memoization - store previous collection values and their serialized forms
@@ -1169,6 +1170,7 @@ export const useGameState = () => {
     addWikiPage,
     updateWikiPage,
     roomId,
+    setRoomId,
     isLoaded,
   };
 };

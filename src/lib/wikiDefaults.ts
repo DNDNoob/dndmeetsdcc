@@ -11,30 +11,49 @@ export const defaultWikiPages: Omit<WikiPage, 'updatedAt' | 'updatedBy'>[] = [
 
 Welcome to the Dungeon Crawler Carl companion app! This tool helps a Dungeon Master (DM) run tabletop RPG sessions with real-time maps, combat tracking, dice rolling, and more. Everything syncs across all connected players in real time via Firebase.
 
+## Sign In & Set Up Your Profile
+
+1. **Sign in** using Google or email/password.
+2. **Choose a username** and display name when prompted (first time only).
+3. You'll be taken to the **Campaign Selection** screen.
+
+## Campaigns
+
+All game data is organized into **campaigns**. A campaign is an isolated game world with its own crawlers, mobs, maps, episodes, and more.
+
+- **Create a Campaign** to become the DM (Dungeon Master).
+- **Join a Campaign** using an invite code or link shared by the DM.
+- Each campaign supports up to 10 players.
+
+See the [Campaigns](/wiki/campaigns) page for full details.
+
 ## Choosing Your Identity
 
-When you first load the app, you will see a splash screen where you pick who you are. You can select any of the available crawlers (player characters), or choose "Just a Boring NPC" if you want to spectate without being tied to a character.
+After selecting a campaign, you'll see a splash screen where you pick who you are. Select any available crawler (player character), or choose "Just a Boring NPC" to spectate. The DM is automatically logged in as "Dungeon AI" when entering their own campaign.
 
-You can switch your identity at any time by clicking the player name in the top-right corner of the navigation bar. This opens a dropdown with all available crawlers and the NPC option.
+You can switch your identity at any time by clicking the player name in the top-right corner.
 
 ## The DM (Dungeon AI)
 
-The DM logs in by selecting the Dungeon AI option from the splash screen or by using the DM Console login on the main menu. Once logged in as the DM, you gain access to the DM Console and a suite of admin-only controls throughout the app.
+The user who creates a campaign is automatically the DM. The DM has full access to the DM Console and all admin-only controls. No password is needed — campaign ownership determines DM access.
+
+The DM can also play as a crawler by switching their identity in the player dropdown.
 
 ## Navigation
 
-The navigation bar at the top of the screen gives you quick access to all the main sections:
+The navigation bar at the top of the screen gives you quick access to all sections:
 
 - **Main Menu** - The hub page with navigation cards
 - **Profiles** - View and manage crawler character sheets
 - **Maps** - Browse uploaded maps
 - **Inventory** - Manage items, equipment, and gold
 - **Mobs** - View enemies and NPCs
-- **Show Time** - The live game presentation view (where the action happens)
-- **Sounds** - Play sound effects for everyone
+- **Show Time** - The live game presentation view
+- **Sounds** - Play sound effects
+- **Wiki** - Game documentation
 - **DM Console** - Admin panel (DM only)
 
-During Show Time, the navigation bar auto-collapses to maximize screen space. Hover near the top-left to reveal it, or click the pin button to keep it visible.`,
+Use the **Campaigns** button to return to the campaign list at any time.`,
   },
   {
     id: 'crawlers',
@@ -772,36 +791,98 @@ The wiki supports standard Markdown:
     order: 4,
     content: `# Accounts & Sign-In
 
-The app supports user accounts to control who can make changes to the game data.
+The app requires user accounts for all game interactions. Your account is how the system knows who you are and what campaigns you belong to.
 
 ## How It Works
 
-- **Anonymous users** (not signed in) can browse the app and view all data — maps, profiles, mobs, episodes, etc. — but they **cannot** make any changes.
-- **Signed-in users** (via Google or email/password) can read and write: edit profiles, manage inventory, roll dice, run combat, and use all DM features.
-
-This means anyone can visit the site and spectate, but only users with an account can modify game data.
+- **Anonymous users** (not signed in) cannot access any campaigns or game data.
+- **Signed-in users** (via Google or email/password) can create campaigns, join campaigns, and interact with all game features.
 
 ## Creating an Account
 
-1. Click the **Sign In** button — it appears in the top-right on the Splash Screen and Main Menu, or in the navigation bar during gameplay.
-2. In the auth modal, click the **CREATE ACCOUNT** tab.
-3. Fill in your display name (optional), email address, and a password (at least 6 characters).
-4. Click **Create Account**. You're now signed in!
-
-Alternatively, click **Continue with Google** to create an account using your Google account — no password needed.
+1. Click the **Sign In** button on any screen.
+2. Click **CREATE ACCOUNT** and fill in your email and password (at least 6 characters).
+3. Alternatively, click **Continue with Google** for one-click account creation.
+4. On first sign-in, you'll be prompted to choose a **username** (unique, 3-24 characters, letters/numbers/underscores) and **display name**.
 
 ## Signing In
 
-1. Click the **Sign In** button.
-2. Enter your email and password, or click **Continue with Google**.
-3. Once signed in, your name appears next to the button, which changes to **Sign Out**.
+1. Click **Sign In** and enter your email/password, or use Google.
+2. After sign-in, you'll see the Campaign Selection screen.
 
 ## Signing Out
 
-Click **Sign Out** to revert to anonymous (read-only) mode. You can sign back in at any time.
+Click **Sign Out** to sign out. You can sign back in at any time.
 
-## For the DM
+## User Profile
 
-Account sign-in is separate from the DM password. To access the DM Console, you still need to enter the DM password as before. However, you must also be signed in with an account to make any writes (creating episodes, placing mobs, sending loot, etc.).`,
+Your profile includes:
+- **Username** — unique identifier, used for lookups
+- **Display Name** — shown in campaigns and as the DM name
+- **Avatar** — pulled from your Google account if applicable`,
+  },
+  {
+    id: 'campaigns',
+    slug: 'campaigns',
+    title: 'Campaigns',
+    category: 'Basics',
+    order: 5,
+    content: `# Campaigns
+
+Campaigns are the foundation of the game. Each campaign is an isolated game world with its own crawlers, mobs, maps, episodes, quests, and more. All game data is scoped to a campaign — nothing leaks between campaigns.
+
+## Creating a Campaign
+
+1. From the Campaign Selection screen, click **New Campaign**.
+2. Enter a name and optional description.
+3. Click **Create Campaign**. You are now the DM (Dungeon Master) of this campaign.
+
+As the DM, you have full access to the DM Console, mob creation, episode management, combat controls, and all admin features.
+
+## Joining a Campaign
+
+Players join campaigns via **invite codes** or **invite links**.
+
+1. The DM shares the invite link (e.g., \`https://yoursite.com/join/abc123\`) or the invite code.
+2. Click the link, or go to the Campaign Selection screen and click **Join Campaign**, then paste the invite code.
+3. You'll be added to the campaign's member list.
+
+## Player Limit
+
+Each campaign supports up to **10 players** (including the DM if they play as a crawler).
+
+## DM Access
+
+- The user who **creates** a campaign is the DM.
+- The DM has access to the DM Console, mob management, episode control, combat admin, loot distribution, and all admin-only features.
+- Players see player-only views (Profiles, Maps, Inventory, Mobs, Show Time, Sounds, Wiki).
+- The DM can also play as a crawler by switching their identity in the player dropdown.
+
+## Copying a Campaign
+
+DMs can **copy** a campaign to create a duplicate with the same mobs, maps, episodes, quests, and wiki content. This is useful for:
+- Running the same adventure with a different group
+- Creating a backup before making major changes
+- Reusing content across campaigns
+
+The copy includes mobs, maps, episodes, loot box templates, quests, and wiki pages. Transient data like combat state, dice rolls, and assigned quests are not copied.
+
+## Deleting a Campaign
+
+DMs can delete a campaign, which permanently removes all room-scoped game data (episodes, mob placements, crawler placements, maps, etc.). This action cannot be undone.
+
+## Leaving a Campaign
+
+Players can leave a campaign at any time from the Campaign Selection screen. The DM cannot leave their own campaign — they must delete it instead.
+
+## Invite Code Management
+
+- DMs can copy the invite link to share with players.
+- DMs can **regenerate** the invite code if needed (e.g., if an old code was leaked).
+- Regenerating the code invalidates the old one.
+
+## Switching Campaigns
+
+Click the **Campaigns** button (or back arrow) in the navigation bar, Main Menu, or Splash Screen to return to the Campaign Selection screen and switch campaigns.`,
   },
 ];
