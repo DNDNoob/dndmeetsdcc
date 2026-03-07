@@ -2,6 +2,18 @@
   {
     "date": "2026-03-07",
     "changes": [
+      "🐛 Fixed changelog modal — now closes on Escape key, outside click, and route changes",
+      "🐛 Fixed page refresh losing campaign context — session now persists across reloads",
+      "🐛 Fixed identity selection not remembering DM/player choice per campaign",
+      "🐛 Fixed display name showing Google auth name instead of user-configured name",
+      "🐛 Removed debug 'roomId' text from Sound Effects page",
+      "🐛 Fixed broken markdown links in Wiki — internal links now navigate correctly",
+      "📱 Added responsive hamburger menu for mobile devices",
+      "♿ Added skip navigation link for keyboard users",
+      "♿ Added focus-visible outlines on all interactive elements",
+      "♿ Added aria-labels to icon-only buttons and form inputs",
+      "♿ Added ARIA landmarks to Campaign selection page",
+      "⚡ Gated debug console logging behind development mode flag",
       "👥 Added Friend Request System — send, accept, decline, and cancel friend requests by username",
       "👥 Friends list — view accepted friends with option to remove them",
       "👥 Pending requests badge — incoming friend requests show a notification count on the Friends section",

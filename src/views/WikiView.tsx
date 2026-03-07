@@ -49,6 +49,9 @@ const renderMarkdown = (text: string): string => {
   html = html.replace(/\*\*(.+?)\*\*/g, '<strong class="text-foreground font-semibold">$1</strong>');
   html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
 
+  // Markdown links [text](url)
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-primary underline hover:text-primary/80 transition-colors">$1</a>');
+
   // Inline code
   html = html.replace(/`([^`]+)`/g, '<code class="bg-muted px-1.5 py-0.5 rounded text-primary text-xs font-mono">$1</code>');
 
@@ -319,6 +322,19 @@ const WikiView: React.FC<WikiViewProps> = ({
                       <div
                         className="wiki-content"
                         dangerouslySetInnerHTML={{ __html: renderMarkdown(selectedPage.content) }}
+                        onClick={(e) => {
+                          const target = e.target as HTMLElement;
+                          if (target.tagName === 'A') {
+                            const href = target.getAttribute('href') || '';
+                            // Handle internal wiki links like /wiki/campaigns
+                            if (href.startsWith('/wiki/')) {
+                              e.preventDefault();
+                              const pageSlug = href.replace('/wiki/', '');
+                              const matchingPage = pages.find(p => p.id === pageSlug || p.title.toLowerCase().replace(/\s+/g, '-') === pageSlug);
+                              if (matchingPage) setSelectedPageId(matchingPage.id);
+                            }
+                          }
+                        }}
                       />
                       {selectedPage.updatedAt && (
                         <div className="mt-8 pt-4 border-t border-border text-[10px] text-muted-foreground">

@@ -4,6 +4,7 @@ import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import { Volume2, Search, Play, Star, Upload, Square } from "lucide-react";
 import { useFirebaseStore } from "@/hooks/useFirebaseStore";
+import { logger } from "@/lib/logger";
 import { storage, db } from "@/lib/firebase";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { collection, query, where, onSnapshot, serverTimestamp, addDoc, Timestamp } from "firebase/firestore";
@@ -65,10 +66,6 @@ function cleanSoundName(name: string): string {
 
 const SoundEffectsView: React.FC = () => {
   const { getCollection, addItem, deleteItem, roomId } = useFirebaseStore();
-  // Debug: Log current roomId
-  useEffect(() => {
-    console.log('[SoundEffectsView] Current roomId:', roomId);
-  }, [roomId]);
   const [searchQuery, setSearchQuery] = useState("");
   const [results, setResults] = useState<SoundEffect[]>(LOCAL_SOUNDS);
   const [playingId, setPlayingId] = useState<string | null>(null);
@@ -85,9 +82,9 @@ const SoundEffectsView: React.FC = () => {
 
   // Debug logging
   useEffect(() => {
-    console.log('Sound effects from Firebase:', allSoundEffects.length);
-    console.log('Uploaded sounds:', uploaded);
-    console.log('Favorites:', favorites.length);
+    logger.log('Sound effects from Firebase:', allSoundEffects.length);
+    logger.log('Uploaded sounds:', uploaded);
+    logger.log('Favorites:', favorites.length);
   }, [allSoundEffects.length, uploaded.length, favorites.length]);
 
   // Ensure uploaded sounds are included when they change
@@ -108,7 +105,7 @@ const SoundEffectsView: React.FC = () => {
       snapshot.docChanges().forEach((change) => {
         if (change.type === "added") {
           const sound = change.doc.data() as SoundEffect;
-          console.log('[SoundEffectsView] Received sound broadcast:', sound, 'roomId:', roomId);
+          logger.log('[SoundEffectsView] Received sound broadcast:', sound, 'roomId:', roomId);
           playSoundLocal(sound, false);
         }
       });
@@ -156,7 +153,7 @@ const SoundEffectsView: React.FC = () => {
             tags: r.tags || [],
             source: r.source || json.source || 'proxy'
           }));
-          console.log('[SoundEffects] Got', mapped.length, 'results from proxy');
+          logger.log('[SoundEffects] Got', mapped.length, 'results from proxy');
           setResults([...uploaded, ...mapped]);
           return;
         } catch (e) {
@@ -171,7 +168,7 @@ const SoundEffectsView: React.FC = () => {
         // Check cache first
         const cached = freesoundCache.get(q);
         if (cached && Date.now() - cached.timestamp < FREESOUND_CACHE_DURATION) {
-          console.log('[SoundEffects] Cache hit for:', q);
+          logger.log('[SoundEffects] Cache hit for:', q);
           if (active) setResults([...uploaded, ...cached.results]);
           return;
         }
@@ -189,7 +186,7 @@ const SoundEffectsView: React.FC = () => {
             tags: r.tags || [],
             source: 'freesound'
           })).filter((s: SoundEffect) => s.url);
-          console.log('[SoundEffects] Got', mapped.length, 'results from Freesound API');
+          logger.log('[SoundEffects] Got', mapped.length, 'results from Freesound API');
           // Cache results
           freesoundCache.set(q, { results: mapped, timestamp: Date.now() });
           setResults([...uploaded, ...mapped]);
@@ -273,12 +270,12 @@ const SoundEffectsView: React.FC = () => {
     if (!db) return; // Guard against null db
     const broadcastCollectionName = roomId ? `rooms/${roomId}/sound-broadcast` : 'sound-broadcast';
     try {
-      console.log('[SoundEffectsView] Broadcasting sound:', sound, 'to collection:', broadcastCollectionName, 'roomId:', roomId);
+      logger.log('[SoundEffectsView] Broadcasting sound:', sound, 'to collection:', broadcastCollectionName, 'roomId:', roomId);
       await addDoc(collection(db, broadcastCollectionName), {
         ...sound,
         createdAt: serverTimestamp()
       });
-      console.log('[SoundEffectsView] Broadcast successful');
+      logger.log('[SoundEffectsView] Broadcast successful');
     } catch (error) {
       console.error('[SoundEffectsView] Failed to broadcast sound:', error);
     }
@@ -338,8 +335,6 @@ const SoundEffectsView: React.FC = () => {
 
   return (
     <div className="p-4">
-      {/* Debug: Show current roomId */}
-      <div className="mb-2 text-xs text-muted-foreground">Current roomId: {roomId ? roomId : '(none)'}</div>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold">Sound Effects Library</h1>
       </div>

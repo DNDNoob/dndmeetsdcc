@@ -8,12 +8,12 @@ interface GoogleAuthButtonProps {
 }
 
 const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({ compact = false }) => {
-  const { user, isAuthenticated, loading, signOut, openAuthModal } = useAuth();
+  const { user, isAuthenticated, loading, signOut, openAuthModal, userProfile } = useAuth();
 
   if (loading) return null;
 
   if (isAuthenticated && user) {
-    const displayLabel = user.displayName || user.email || 'User';
+    const displayLabel = userProfile?.displayName || user.displayName || user.email || 'User';
     return (
       <div className="flex items-center gap-2">
         {!compact && (

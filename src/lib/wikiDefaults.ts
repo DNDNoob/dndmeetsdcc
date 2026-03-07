@@ -53,6 +53,8 @@ The navigation bar at the top of the screen gives you quick access to all sectio
 - **Wiki** - Game documentation
 - **DM Console** - Admin panel (DM only)
 
+On mobile devices, the navigation collapses into a **hamburger menu** (☰) — tap it to access all sections from a dropdown.
+
 Use the **Campaigns** button to return to the campaign list at any time.`,
   },
   {
