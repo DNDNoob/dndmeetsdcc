@@ -1,5 +1,14 @@
 [
   {
+    "date": "2026-03-07",
+    "changes": [
+      "👥 Added Friend Request System — send, accept, decline, and cancel friend requests by username",
+      "👥 Friends list — view accepted friends with option to remove them",
+      "👥 Pending requests badge — incoming friend requests show a notification count on the Friends section",
+      "👥 Friends section on Campaign screen — collapsible panel with add friend form, incoming/sent requests, and friend list"
+    ]
+  },
+  {
     "date": "2026-03-06",
     "changes": [
       "🏰 MAJOR: Added Campaign System — create, join, copy, and manage campaigns with isolated game data",

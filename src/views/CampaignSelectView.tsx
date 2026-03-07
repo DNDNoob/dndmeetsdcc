@@ -5,10 +5,11 @@ import { DungeonCard } from '@/components/ui/DungeonCard';
 import GoogleAuthButton from '@/components/GoogleAuthButton';
 import {
   Plus, Crown, Users, Copy, Trash2, Link, RefreshCw,
-  LogOut, UserMinus, X, Shield,
+  LogOut, UserMinus, X, Shield, UserPlus, Check, Clock,
+  Heart,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import type { Campaign, UserProfile } from '@/lib/gameData';
+import type { Campaign, UserProfile, FriendRequest } from '@/lib/gameData';
 
 interface CampaignSelectViewProps {
   myCampaigns: Campaign[];
@@ -23,6 +24,15 @@ interface CampaignSelectViewProps {
   onRegenerateInviteCode: (id: string) => Promise<string | null>;
   onSelectCampaign: (campaign: Campaign) => void;
   onSignOut: () => void;
+  // Friends
+  friends: FriendRequest[];
+  pendingReceived: FriendRequest[];
+  pendingSent: FriendRequest[];
+  onSendFriendRequest: (username: string) => Promise<boolean>;
+  onAcceptFriendRequest: (requestId: string) => Promise<void>;
+  onDeclineFriendRequest: (requestId: string) => Promise<void>;
+  onRemoveFriend: (requestId: string) => Promise<void>;
+  onCancelFriendRequest: (requestId: string) => Promise<void>;
 }
 
 const CampaignSelectView: React.FC<CampaignSelectViewProps> = ({
@@ -38,6 +48,14 @@ const CampaignSelectView: React.FC<CampaignSelectViewProps> = ({
   onRegenerateInviteCode,
   onSelectCampaign,
   onSignOut,
+  friends,
+  pendingReceived,
+  pendingSent,
+  onSendFriendRequest,
+  onAcceptFriendRequest,
+  onDeclineFriendRequest,
+  onRemoveFriend,
+  onCancelFriendRequest,
 }) => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showJoinForm, setShowJoinForm] = useState(false);
@@ -49,6 +67,9 @@ const CampaignSelectView: React.FC<CampaignSelectViewProps> = ({
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [copyName, setCopyName] = useState('');
   const [showCopyForm, setShowCopyForm] = useState<string | null>(null);
+  const [showFriends, setShowFriends] = useState(false);
+  const [friendUsername, setFriendUsername] = useState('');
+  const [confirmRemoveFriend, setConfirmRemoveFriend] = useState<string | null>(null);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,6 +101,27 @@ const CampaignSelectView: React.FC<CampaignSelectViewProps> = ({
     setCopyName('');
     setShowCopyForm(null);
     setSubmitting(false);
+  };
+
+  const handleSendFriendRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!friendUsername.trim()) return;
+    setSubmitting(true);
+    const success = await onSendFriendRequest(friendUsername.trim());
+    if (success) {
+      setFriendUsername('');
+    }
+    setSubmitting(false);
+  };
+
+  // Get the "other person" info from a friend request relative to current user
+  const getFriendInfo = (req: FriendRequest) => {
+    const isFromMe = req.fromUserId === userProfile?.id;
+    return {
+      displayName: isFromMe ? req.toDisplayName : req.fromDisplayName,
+      username: isFromMe ? req.toUsername : req.fromUsername,
+      avatarUrl: isFromMe ? req.toAvatarUrl : req.fromAvatarUrl,
+    };
   };
 
   const handleCopyInviteLink = (campaign: Campaign) => {
@@ -490,6 +532,225 @@ const CampaignSelectView: React.FC<CampaignSelectViewProps> = ({
             </p>
           </div>
         )}
+
+        {/* Friends Section */}
+        <div className="border-t border-border pt-6">
+          <button
+            onClick={() => setShowFriends(!showFriends)}
+            className="flex items-center gap-2 w-full text-left mb-4"
+          >
+            <Heart className="w-4 h-4 text-primary" />
+            <h2 className="font-display text-sm text-primary tracking-[0.2em]">
+              FRIENDS
+            </h2>
+            {pendingReceived.length > 0 && (
+              <span className="bg-destructive text-destructive-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                {pendingReceived.length}
+              </span>
+            )}
+            <span className="text-[10px] text-muted-foreground ml-auto">
+              {showFriends ? 'Hide' : 'Show'}
+            </span>
+          </button>
+
+          <AnimatePresence>
+            {showFriends && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="overflow-hidden space-y-4"
+              >
+                {/* Add friend form */}
+                <DungeonCard className="p-4">
+                  <h3 className="font-display text-xs text-primary tracking-wider mb-3 flex items-center gap-2">
+                    <UserPlus className="w-3.5 h-3.5" />
+                    ADD FRIEND
+                  </h3>
+                  <form onSubmit={handleSendFriendRequest} className="flex gap-2">
+                    <input
+                      type="text"
+                      value={friendUsername}
+                      onChange={(e) => setFriendUsername(e.target.value)}
+                      placeholder="Enter username..."
+                      className="flex-1 bg-muted border border-border px-3 py-2 text-sm font-mono focus:border-primary focus:outline-none"
+                      disabled={submitting}
+                    />
+                    <DungeonButton
+                      variant="default"
+                      type="submit"
+                      disabled={submitting || !friendUsername.trim()}
+                    >
+                      <UserPlus className="w-4 h-4" />
+                    </DungeonButton>
+                  </form>
+                </DungeonCard>
+
+                {/* Pending received requests */}
+                {pendingReceived.length > 0 && (
+                  <div>
+                    <h3 className="font-display text-xs text-accent tracking-[0.2em] mb-2 flex items-center gap-2">
+                      <Clock className="w-3.5 h-3.5" />
+                      INCOMING REQUESTS ({pendingReceived.length})
+                    </h3>
+                    <div className="space-y-2">
+                      {pendingReceived.map(req => {
+                        const info = getFriendInfo(req);
+                        return (
+                          <motion.div key={req.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                            <DungeonCard className="p-3">
+                              <div className="flex items-center gap-3">
+                                {info.avatarUrl ? (
+                                  <img src={info.avatarUrl} alt="" className="w-8 h-8 rounded-full object-cover border border-border" />
+                                ) : (
+                                  <div className="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center">
+                                    <Users className="w-4 h-4 text-muted-foreground" />
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-display text-foreground truncate">{info.displayName}</p>
+                                  <p className="text-[10px] text-muted-foreground">@{info.username}</p>
+                                </div>
+                                <div className="flex gap-1">
+                                  <button
+                                    onClick={() => onAcceptFriendRequest(req.id)}
+                                    className="p-1.5 text-primary hover:bg-primary/10 rounded transition-colors"
+                                    title="Accept"
+                                  >
+                                    <Check className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => onDeclineFriendRequest(req.id)}
+                                    className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors"
+                                    title="Decline"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            </DungeonCard>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Pending sent requests */}
+                {pendingSent.length > 0 && (
+                  <div>
+                    <h3 className="font-display text-xs text-muted-foreground tracking-[0.2em] mb-2 flex items-center gap-2">
+                      <Clock className="w-3.5 h-3.5" />
+                      SENT REQUESTS ({pendingSent.length})
+                    </h3>
+                    <div className="space-y-2">
+                      {pendingSent.map(req => {
+                        const info = getFriendInfo(req);
+                        return (
+                          <motion.div key={req.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                            <DungeonCard className="p-3">
+                              <div className="flex items-center gap-3">
+                                {info.avatarUrl ? (
+                                  <img src={info.avatarUrl} alt="" className="w-8 h-8 rounded-full object-cover border border-border" />
+                                ) : (
+                                  <div className="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center">
+                                    <Users className="w-4 h-4 text-muted-foreground" />
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-display text-foreground truncate">{info.displayName}</p>
+                                  <p className="text-[10px] text-muted-foreground">@{info.username}</p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] text-muted-foreground">Pending</span>
+                                  <button
+                                    onClick={() => onCancelFriendRequest(req.id)}
+                                    className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors"
+                                    title="Cancel request"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            </DungeonCard>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Friend list */}
+                {friends.length > 0 && (
+                  <div>
+                    <h3 className="font-display text-xs text-primary tracking-[0.2em] mb-2 flex items-center gap-2">
+                      <Heart className="w-3.5 h-3.5" />
+                      MY FRIENDS ({friends.length})
+                    </h3>
+                    <div className="space-y-2">
+                      {friends.map(req => {
+                        const info = getFriendInfo(req);
+                        return (
+                          <motion.div key={req.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                            <DungeonCard className="p-3">
+                              <div className="flex items-center gap-3">
+                                {info.avatarUrl ? (
+                                  <img src={info.avatarUrl} alt="" className="w-8 h-8 rounded-full object-cover border border-border" />
+                                ) : (
+                                  <div className="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center">
+                                    <Users className="w-4 h-4 text-muted-foreground" />
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-display text-foreground truncate">{info.displayName}</p>
+                                  <p className="text-[10px] text-muted-foreground">@{info.username}</p>
+                                </div>
+                                {confirmRemoveFriend === req.id ? (
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-[10px] text-destructive">Remove?</span>
+                                    <button
+                                      onClick={() => { onRemoveFriend(req.id); setConfirmRemoveFriend(null); }}
+                                      className="p-1 text-destructive hover:bg-destructive/10 rounded transition-colors"
+                                    >
+                                      <Check className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => setConfirmRemoveFriend(null)}
+                                      className="p-1 text-muted-foreground hover:text-foreground rounded transition-colors"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => setConfirmRemoveFriend(req.id)}
+                                    className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors"
+                                    title="Remove friend"
+                                  >
+                                    <UserMinus className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </div>
+                            </DungeonCard>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Empty friends state */}
+                {friends.length === 0 && pendingReceived.length === 0 && pendingSent.length === 0 && (
+                  <div className="text-center py-6">
+                    <p className="text-muted-foreground text-xs">
+                      No friends yet. Add a friend by entering their username above.
+                    </p>
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
     </motion.div>
   );

@@ -332,6 +332,24 @@ export interface Campaign {
 
 export const MAX_CAMPAIGN_MEMBERS = 10;
 
+// Friend request — sent between users (root-level collection)
+export type FriendRequestStatus = 'pending' | 'accepted' | 'declined';
+
+export interface FriendRequest {
+  id: string;               // Auto-generated
+  fromUserId: string;        // Firebase uid of sender
+  fromUsername: string;       // Denormalized for display
+  fromDisplayName: string;   // Denormalized for display
+  fromAvatarUrl?: string;    // Denormalized for display
+  toUserId: string;          // Firebase uid of recipient
+  toUsername: string;         // Denormalized for display
+  toDisplayName: string;     // Denormalized for display
+  toAvatarUrl?: string;      // Denormalized for display
+  status: FriendRequestStatus;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export const defaultCrawlers: Crawler[] = [
   {
     id: "1",

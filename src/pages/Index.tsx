@@ -20,6 +20,7 @@ import WikiView from "@/views/WikiView";
 import { useGameState, DiceRollEntry } from "@/hooks/useGameState";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCampaigns } from "@/hooks/useCampaigns";
+import { useFriends } from "@/hooks/useFriends";
 import { toast } from "sonner";
 import type { Episode, Campaign, CrawlerPlacement, EpisodeMobPlacement } from "@/lib/gameData";
 
@@ -65,6 +66,18 @@ const Index = () => {
     leaveCampaign,
     regenerateInviteCode,
   } = useCampaigns(user?.uid ?? null);
+
+  // Friend requests
+  const {
+    friends,
+    pendingReceived,
+    pendingSent,
+    sendFriendRequest,
+    acceptFriendRequest,
+    declineFriendRequest,
+    removeFriend,
+    cancelFriendRequest,
+  } = useFriends(user?.uid ?? null);
 
   const [activeCampaign, setActiveCampaign] = useState<Campaign | null>(loadSavedCampaign);
 
@@ -458,6 +471,14 @@ const Index = () => {
         onRegenerateInviteCode={regenerateInviteCode}
         onSelectCampaign={handleSelectCampaign}
         onSignOut={signOut}
+        friends={friends}
+        pendingReceived={pendingReceived}
+        pendingSent={pendingSent}
+        onSendFriendRequest={(username) => sendFriendRequest(username, userProfile!)}
+        onAcceptFriendRequest={acceptFriendRequest}
+        onDeclineFriendRequest={declineFriendRequest}
+        onRemoveFriend={removeFriend}
+        onCancelFriendRequest={cancelFriendRequest}
       />
     );
   }

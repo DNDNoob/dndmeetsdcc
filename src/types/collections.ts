@@ -28,6 +28,7 @@ export type CollectionName =
   | 'encounters'
   | 'userProfiles'
   | 'campaigns'
+  | 'friendRequests'
   | string; // Allow any string for flexibility
 
 /**
