@@ -7,6 +7,7 @@ import Navigation from "@/components/Navigation";
 import DiceRoller from "@/components/DiceRoller";
 import PingPanel from "@/components/PingPanel";
 import ChangelogViewer from "@/components/ChangelogViewer";
+import CampaignSelectView from "@/views/CampaignSelectView";
 import ProfilesView from "@/views/ProfilesView";
 import MapsView from "@/views/MapsView";
 import InventoryView from "@/views/InventoryView";
@@ -17,8 +18,11 @@ import SoundEffectsView from "@/views/SoundEffectsView";
 import WikiView from "@/views/WikiView";
 
 import { useGameState, DiceRollEntry } from "@/hooks/useGameState";
+import { useAuth } from "@/contexts/AuthContext";
+import { useCampaigns } from "@/hooks/useCampaigns";
+import { useFriends } from "@/hooks/useFriends";
 import { toast } from "sonner";
-import type { Episode, Mob, CrawlerPlacement, EpisodeMobPlacement } from "@/lib/gameData";
+import type { Episode, Campaign, CrawlerPlacement, EpisodeMobPlacement } from "@/lib/gameData";
 
 type AppScreen = "splash" | "menu" | "game";
 type GameView = "profiles" | "maps" | "inventory" | "mobs" | "dungeonai" | "showtime" | "sounds" | "wiki";
@@ -27,7 +31,7 @@ const GAME_VIEWS: readonly string[] = ["profiles", "maps", "inventory", "mobs", 
 
 const STORAGE_KEY_PLAYER = "dcc_current_player";
 const STORAGE_KEY_MAP_VISIBILITY = "dcc_map_visibility";
-const STORAGE_KEY_DUNGEON_AI_LOGIN = "dcc_dungeon_ai_login";
+const STORAGE_KEY_ACTIVE_CAMPAIGN = "dcc_active_campaign";
 
 function loadSavedPlayer(): { id: string; name: string; type: "crawler" | "ai" | "npc" } | null {
   const saved = localStorage.getItem(STORAGE_KEY_PLAYER);
@@ -37,9 +41,45 @@ function loadSavedPlayer(): { id: string; name: string; type: "crawler" | "ai" |
   return null;
 }
 
+function loadSavedCampaign(): Campaign | null {
+  const saved = localStorage.getItem(STORAGE_KEY_ACTIVE_CAMPAIGN);
+  if (saved) {
+    try { return JSON.parse(saved); } catch { return null; }
+  }
+  return null;
+}
+
 const Index = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user, isAuthenticated, userProfile, needsUsername, signOut } = useAuth();
+
+  // Campaign management
+  const {
+    myCampaigns,
+    joinedCampaigns,
+    loading: campaignsLoading,
+    createCampaign,
+    deleteCampaign,
+    copyCampaign,
+    joinCampaignByCode,
+    leaveCampaign,
+    regenerateInviteCode,
+  } = useCampaigns(user?.uid ?? null);
+
+  // Friend requests
+  const {
+    friends,
+    pendingReceived,
+    pendingSent,
+    sendFriendRequest,
+    acceptFriendRequest,
+    declineFriendRequest,
+    removeFriend,
+    cancelFriendRequest,
+  } = useFriends(user?.uid ?? null);
+
+  const [activeCampaign, setActiveCampaign] = useState<Campaign | null>(loadSavedCampaign);
 
   // Derive screen and currentView from the URL path
   const pathSegment = location.pathname.replace(/^\//, '').split('/')[0] || '';
@@ -60,17 +100,12 @@ const Index = () => {
 
   const [showChangelog, setShowChangelog] = useState(false);
 
-  // Initialize player synchronously from localStorage to avoid redirect flash on refresh
+  // Initialize player synchronously from localStorage
   const [currentPlayer, setCurrentPlayer] = useState<{
     id: string;
     name: string;
     type: "crawler" | "ai" | "npc";
-  } | null>(() => {
-    if (localStorage.getItem(STORAGE_KEY_DUNGEON_AI_LOGIN) === "true") {
-      return { id: "dungeonai", name: "DUNGEON AI", type: "ai" };
-    }
-    return loadSavedPlayer();
-  });
+  } | null>(() => loadSavedPlayer());
 
   const [mapVisibility, setMapVisibility] = useState<boolean[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEY_MAP_VISIBILITY);
@@ -83,27 +118,12 @@ const Index = () => {
   const [isNavVisible, setIsNavVisible] = useState(true);
   const [isDiceExpanded, setIsDiceExpanded] = useState(false);
 
-  const [isDungeonAILoggedIn, setIsDungeonAILoggedIn] = useState(
-    () => localStorage.getItem(STORAGE_KEY_DUNGEON_AI_LOGIN) === "true"
-  );
-
   const [isShowtimeActive, setIsShowtimeActive] = useState(false);
   const [activeEpisode, setActiveEpisode] = useState<Episode | null>(null);
   const [runtimeCrawlerPlacements, setRuntimeCrawlerPlacements] = useState<CrawlerPlacement[]>([]);
   const [runtimeMobPlacements, setRuntimeMobPlacements] = useState<EpisodeMobPlacement[]>([]);
   const [isGameActive, setIsGameActive] = useState(false);
   const setGameActiveRef = useRef<((active: boolean) => Promise<void>) | null>(null);
-
-  const [previousPlayer, setPreviousPlayer] = useState<{
-    id: string;
-    name: string;
-    type: "crawler" | "ai" | "npc";
-  } | null>(() => {
-    if (localStorage.getItem(STORAGE_KEY_DUNGEON_AI_LOGIN) === "true") {
-      return loadSavedPlayer();
-    }
-    return null;
-  });
 
   const {
     crawlers,
@@ -172,11 +192,46 @@ const Index = () => {
     deleteAssignedQuest,
     getCrawlerAssignedQuests,
     roomId,
+    setRoomId,
     isLoaded
   } = useGameState();
 
   // Map names come from Firestore via useGameState
   const mapNames = firestoreMapNames;
+
+  // Determine if current user is the DM of the active campaign
+  const isAdmin = useMemo(() => {
+    if (!activeCampaign || !user) return false;
+    return activeCampaign.ownerId === user.uid;
+  }, [activeCampaign, user]);
+
+  // Sync roomId with active campaign
+  useEffect(() => {
+    if (activeCampaign) {
+      setRoomId(activeCampaign.id);
+    } else {
+      setRoomId(null);
+    }
+  }, [activeCampaign, setRoomId]);
+
+  // Persist active campaign to localStorage
+  useEffect(() => {
+    if (activeCampaign) {
+      localStorage.setItem(STORAGE_KEY_ACTIVE_CAMPAIGN, JSON.stringify(activeCampaign));
+    } else {
+      localStorage.removeItem(STORAGE_KEY_ACTIVE_CAMPAIGN);
+    }
+  }, [activeCampaign]);
+
+  // When user signs out or becomes unauthenticated, clear campaign
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setActiveCampaign(null);
+    }
+  }, [isAuthenticated]);
+
+  // Determine if we should show campaign selection
+  const showCampaignSelect = isAuthenticated && !needsUsername && !activeCampaign;
 
   // Route guards — redirect invalid navigation states
   useEffect(() => {
@@ -191,11 +246,11 @@ const Index = () => {
       return;
     }
     // Non-admin trying to access dungeonai → menu
-    if (pathSegment === 'dungeonai' && currentPlayer?.type !== 'ai') {
+    if (pathSegment === 'dungeonai' && !isAdmin) {
       navigate('/menu', { replace: true });
       return;
     }
-  }, [pathSegment, currentPlayer, navigate]);
+  }, [pathSegment, currentPlayer, navigate, isAdmin]);
 
   // Persist player to localStorage
   useEffect(() => {
@@ -209,7 +264,7 @@ const Index = () => {
     localStorage.setItem(STORAGE_KEY_MAP_VISIBILITY, JSON.stringify(mapVisibility));
   }, [mapVisibility]);
 
-  // --- Navigation handlers (now use navigate()) ---
+  // --- Navigation handlers ---
 
   const handlePlayerSelect = (playerId: string, playerName: string, playerType: "crawler" | "ai" | "npc") => {
     setCurrentPlayer({ id: playerId, name: playerName, type: playerType });
@@ -224,31 +279,26 @@ const Index = () => {
     navigate('/dungeonai');
   };
 
-  const handleDungeonAILogin = () => {
-    // store previous player and switch to Dungeon AI profile for UI
-    setPreviousPlayer(currentPlayer);
-    setCurrentPlayer({ id: "dungeonai", name: "DUNGEON AI", type: "ai" });
-    setIsDungeonAILoggedIn(true);
-    localStorage.setItem(STORAGE_KEY_DUNGEON_AI_LOGIN, "true");
-  };
-
-  const handleDungeonAILogout = () => {
-    setIsDungeonAILoggedIn(false);
-    // restore previous player if one existed
-    if (previousPlayer) {
-      setCurrentPlayer(previousPlayer);
-      setPreviousPlayer(null);
-      navigate('/menu');
-    } else {
-      setCurrentPlayer(null);
-      navigate('/');
-    }
-
-    localStorage.removeItem(STORAGE_KEY_DUNGEON_AI_LOGIN);
-  };
-
   const handleReturnToMenu = () => {
     navigate('/menu');
+  };
+
+  const handleBackToCampaigns = () => {
+    setActiveCampaign(null);
+    setCurrentPlayer(null);
+    navigate('/', { replace: true });
+  };
+
+  const handleSelectCampaign = (campaign: Campaign) => {
+    setActiveCampaign(campaign);
+    // If user is the DM, set them as the DM player
+    if (user && campaign.ownerId === user.uid) {
+      setCurrentPlayer({ id: "dungeonai", name: "DUNGEON AI", type: "ai" });
+    } else {
+      // Reset player so they select one from splash
+      setCurrentPlayer(null);
+    }
+    navigate('/');
   };
 
   const handleStatRoll = (crawlerName: string, crawlerId: string, stat: string, totalStat: number) => {
@@ -367,17 +417,15 @@ const Index = () => {
   }, [diceRolls, currentPlayer]);
 
   // Filter combat state to only show for the matching episode
-  // Must be before the early return to maintain consistent hook order
   const activeCombatState = useMemo(() => {
     if (!combatState?.active) return combatState;
-    // If combat has an episodeId, only show it when the matching episode is active
     if (combatState.episodeId && activeEpisode?.id && combatState.episodeId !== activeEpisode.id) {
       return null;
     }
     return combatState;
   }, [combatState, activeEpisode]);
 
-  // Stable callbacks for ShowTimeView to avoid re-triggering effects on every render
+  // Stable callbacks for ShowTimeView
   const handleShowtimeActiveChange = useCallback((active: boolean, episode?: Episode | null) => {
     setIsShowtimeActive(active);
     setActiveEpisode(episode ?? null);
@@ -407,7 +455,35 @@ const Index = () => {
     setGameActiveRef.current = fn;
   }, []);
 
-  if (!isLoaded) {
+  // If authenticated and no campaign selected, show campaign selection
+  if (showCampaignSelect) {
+    return (
+      <CampaignSelectView
+        myCampaigns={myCampaigns}
+        joinedCampaigns={joinedCampaigns}
+        loading={campaignsLoading}
+        userProfile={userProfile}
+        onCreateCampaign={(name, desc) => createCampaign(name, desc, userProfile ?? undefined)}
+        onDeleteCampaign={deleteCampaign}
+        onCopyCampaign={(sourceId, newName) => copyCampaign(sourceId, newName, userProfile ?? undefined)}
+        onJoinCampaign={joinCampaignByCode}
+        onLeaveCampaign={leaveCampaign}
+        onRegenerateInviteCode={regenerateInviteCode}
+        onSelectCampaign={handleSelectCampaign}
+        onSignOut={signOut}
+        friends={friends}
+        pendingReceived={pendingReceived}
+        pendingSent={pendingSent}
+        onSendFriendRequest={(username) => sendFriendRequest(username, userProfile!)}
+        onAcceptFriendRequest={acceptFriendRequest}
+        onDeclineFriendRequest={declineFriendRequest}
+        onRemoveFriend={removeFriend}
+        onCancelFriendRequest={cancelFriendRequest}
+      />
+    );
+  }
+
+  if (!isLoaded && activeCampaign) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-primary animate-pulse font-display tracking-widest">
@@ -417,8 +493,6 @@ const Index = () => {
     );
   }
 
-  const isAdmin = currentPlayer?.type === "ai";
-
   return (
     <div className="min-h-screen">
       <AnimatePresence mode="wait">
@@ -427,6 +501,9 @@ const Index = () => {
             key="splash"
             crawlers={crawlers}
             onEnter={handlePlayerSelect}
+            isAdmin={isAdmin}
+            campaignName={activeCampaign?.name}
+            onBackToCampaigns={activeCampaign ? handleBackToCampaigns : undefined}
           />
         )}
         {screen === "menu" && currentPlayer && (
@@ -434,15 +511,15 @@ const Index = () => {
             key="menu"
             onNavigate={handleNavigate}
             onDungeonAI={handleDungeonAI}
-            isDungeonAILoggedIn={isDungeonAILoggedIn}
-            onDungeonAILogout={handleDungeonAILogout}
-            onDungeonAILogin={handleDungeonAILogin}
+            isAdmin={isAdmin}
             playerName={currentPlayer.name}
             playerType={currentPlayer.type}
             crawlers={crawlers}
             onSwitchPlayer={(id, name, type) => {
               setCurrentPlayer({ id, name, type });
             }}
+            campaignName={activeCampaign?.name}
+            onBackToCampaigns={handleBackToCampaigns}
           />
         )}
       </AnimatePresence>
@@ -462,9 +539,9 @@ const Index = () => {
             onSwitchPlayer={(id, name, type) => {
               setCurrentPlayer({ id, name, type });
             }}
-            isDungeonAILoggedIn={isDungeonAILoggedIn}
-            onDungeonAILogin={handleDungeonAILogin}
-            onDungeonAILogout={handleDungeonAILogout}
+            isAdmin={isAdmin}
+            campaignName={activeCampaign?.name}
+            onBackToCampaigns={handleBackToCampaigns}
           />
 
           <main className="pb-16 sm:pb-12">
@@ -518,7 +595,7 @@ const Index = () => {
               />
             )}
             {currentView === "mobs" && <MobsView mobs={mobs} />}
-            {currentView === "dungeonai" && (
+            {currentView === "dungeonai" && isAdmin && (
               <DungeonAIView
                 mobs={mobs}
                 onUpdateMobs={setMobs}
