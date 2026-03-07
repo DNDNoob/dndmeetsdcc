@@ -53,6 +53,8 @@ try {
 // Export instances (may be null in offline mode)
 export { db, storage, auth };
 
+import { logger } from './logger';
+
 // Google Auth provider
 const googleProvider = auth ? new GoogleAuthProvider() : null;
 
@@ -67,14 +69,14 @@ export const signInWithGoogle = async (): Promise<User | null> => {
   }
   try {
     const result = await signInWithPopup(auth, googleProvider);
-    console.log('[Firebase] ✅ Google sign-in successful:', result.user.displayName);
+    logger.log('[Firebase] ✅ Google sign-in successful:', result.user.displayName);
     return result.user;
   } catch (error: unknown) {
     const firebaseError = error as { code?: string; message?: string };
     const code = firebaseError.code ?? '';
     // Don't rethrow for user-initiated cancellations
     if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
-      console.log('[Firebase] Google sign-in popup closed by user');
+      logger.log('[Firebase] Google sign-in popup closed by user');
       return null;
     }
     // Unauthorized domain — the current hostname isn't listed in Firebase Console
@@ -98,7 +100,7 @@ export const signUpWithEmail = async (email: string, password: string, displayNa
   if (displayName) {
     await updateProfile(result.user, { displayName });
   }
-  console.log('[Firebase] ✅ Email account created:', result.user.email);
+  logger.log('[Firebase] ✅ Email account created:', result.user.email);
   return result.user;
 };
 
@@ -111,7 +113,7 @@ export const signInWithEmail = async (email: string, password: string): Promise<
     return null;
   }
   const result = await signInWithEmailAndPassword(auth, email, password);
-  console.log('[Firebase] ✅ Email sign-in successful:', result.user.email);
+  logger.log('[Firebase] ✅ Email sign-in successful:', result.user.email);
   return result.user;
 };
 
@@ -124,7 +126,7 @@ export const signOutUser = async (): Promise<void> => {
     await firebaseSignOut(auth);
     // Fall back to anonymous auth so reads still work
     await signInAnonymously(auth);
-    console.log('[Firebase] ✅ Signed out, now anonymous');
+    logger.log('[Firebase] ✅ Signed out, now anonymous');
   } catch (error) {
     console.error('[Firebase] ❌ Sign-out error:', error);
     throw error;

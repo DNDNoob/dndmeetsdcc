@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { CollectionName, PersistedItem } from '../types/collections';
+import { logger } from '../lib/logger';
 
 interface DataStore {
   [collectionName: string]: any[];
@@ -57,13 +58,13 @@ export function useDataStore(): UseDataStoreReturn {
 
   const loadData = async () => {
     try {
-      console.log(`[DataStore] Loading data from server: ${API_BASE}/api/game/load`);
+      logger.log(`[DataStore] Loading data from server: ${API_BASE}/api/game/load`);
       const response = await fetch(`${API_BASE}/api/game/load`);
-      console.log(`[DataStore] Server response status: ${response.status}`);
+      logger.log(`[DataStore] Server response status: ${response.status}`);
       
       if (response.ok) {
         const serverData = await response.json();
-        console.log('[DataStore] ✅ Loaded from server:', Object.keys(serverData || {}));
+        logger.log('[DataStore] ✅ Loaded from server:', Object.keys(serverData || {}));
         if (serverData) {
           setData(serverData);
           localStorage.setItem(STORAGE_KEY, JSON.stringify(serverData));
@@ -74,13 +75,13 @@ export function useDataStore(): UseDataStoreReturn {
       }
       
       // Fallback to localStorage
-      console.log('[DataStore] Trying localStorage fallback...');
+      logger.log('[DataStore] Trying localStorage fallback...');
       const localData = localStorage.getItem(STORAGE_KEY);
       if (localData) {
-        console.log('[DataStore] ✅ Loaded from localStorage');
+        logger.log('[DataStore] ✅ Loaded from localStorage');
         setData(JSON.parse(localData));
       } else {
-        console.log('[DataStore] No existing data, starting fresh');
+        logger.log('[DataStore] No existing data, starting fresh');
         setData({});
       }
     } catch (err) {
@@ -90,7 +91,7 @@ export function useDataStore(): UseDataStoreReturn {
       // Try localStorage as fallback
       const localData = localStorage.getItem(STORAGE_KEY);
       if (localData) {
-        console.log('[DataStore] Recovered from localStorage after error');
+        logger.log('[DataStore] Recovered from localStorage after error');
         setData(JSON.parse(localData));
       }
     } finally {
@@ -103,7 +104,7 @@ export function useDataStore(): UseDataStoreReturn {
     if (!isLoaded) return; // Don't save during initial load
     
     try {
-      console.log('[DataStore] 💾 Saving data...', {
+      logger.log('[DataStore] 💾 Saving data...', {
         collections: Object.keys(newData),
         counts: Object.fromEntries(
           Object.entries(newData).map(([key, val]) => [key, Array.isArray(val) ? val.length : 'not-array'])
@@ -116,7 +117,7 @@ export function useDataStore(): UseDataStoreReturn {
       
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(dataForLocalStorage));
-        console.log('[DataStore] ✅ Saved to localStorage (excluding maps)');
+        logger.log('[DataStore] ✅ Saved to localStorage (excluding maps)');
       } catch (storageErr) {
         console.warn('[DataStore] ⚠️ localStorage save failed (quota exceeded), relying on server:', storageErr);
         // Continue anyway - server is more important
@@ -135,7 +136,7 @@ export function useDataStore(): UseDataStoreReturn {
         console.error('[DataStore] Error details:', errorText);
         setError(`Server save failed: ${response.status}`);
       } else {
-        console.log('[DataStore] ✅ Saved to server successfully');
+        logger.log('[DataStore] ✅ Saved to server successfully');
       }
     } catch (err) {
       console.error('[DataStore] ❌ Save error:', err);

@@ -32,6 +32,7 @@ const GAME_VIEWS: readonly string[] = ["profiles", "maps", "inventory", "mobs", 
 const STORAGE_KEY_PLAYER = "dcc_current_player";
 const STORAGE_KEY_MAP_VISIBILITY = "dcc_map_visibility";
 const STORAGE_KEY_ACTIVE_CAMPAIGN = "dcc_active_campaign";
+const STORAGE_KEY_CAMPAIGN_PLAYER_PREFIX = "dcc_campaign_player_";
 
 function loadSavedPlayer(): { id: string; name: string; type: "crawler" | "ai" | "npc" } | null {
   const saved = localStorage.getItem(STORAGE_KEY_PLAYER);
@@ -52,7 +53,7 @@ function loadSavedCampaign(): Campaign | null {
 const Index = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, isAuthenticated, userProfile, needsUsername, signOut } = useAuth();
+  const { user, isAuthenticated, userProfile, needsUsername, signOut, loading: authLoading } = useAuth();
 
   // Campaign management
   const {
@@ -224,14 +225,15 @@ const Index = () => {
   }, [activeCampaign]);
 
   // When user signs out or becomes unauthenticated, clear campaign
+  // Guard with authLoading so we don't clear the campaign before auth resolves
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!authLoading && !isAuthenticated) {
       setActiveCampaign(null);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, authLoading]);
 
   // Determine if we should show campaign selection
-  const showCampaignSelect = isAuthenticated && !needsUsername && !activeCampaign;
+  const showCampaignSelect = !authLoading && isAuthenticated && !needsUsername && !activeCampaign;
 
   // Route guards — redirect invalid navigation states
   useEffect(() => {
@@ -252,12 +254,15 @@ const Index = () => {
     }
   }, [pathSegment, currentPlayer, navigate, isAdmin]);
 
-  // Persist player to localStorage
+  // Persist player to localStorage (global + per-campaign)
   useEffect(() => {
     if (currentPlayer) {
       localStorage.setItem(STORAGE_KEY_PLAYER, JSON.stringify(currentPlayer));
+      if (activeCampaign) {
+        localStorage.setItem(STORAGE_KEY_CAMPAIGN_PLAYER_PREFIX + activeCampaign.id, JSON.stringify(currentPlayer));
+      }
     }
-  }, [currentPlayer]);
+  }, [currentPlayer, activeCampaign]);
 
   // Persist map visibility to localStorage
   useEffect(() => {
@@ -295,8 +300,17 @@ const Index = () => {
     if (user && campaign.ownerId === user.uid) {
       setCurrentPlayer({ id: "dungeonai", name: "DUNGEON AI", type: "ai" });
     } else {
-      // Reset player so they select one from splash
-      setCurrentPlayer(null);
+      // Try to restore previously selected player for this campaign
+      const savedPlayer = localStorage.getItem(STORAGE_KEY_CAMPAIGN_PLAYER_PREFIX + campaign.id);
+      if (savedPlayer) {
+        try {
+          setCurrentPlayer(JSON.parse(savedPlayer));
+        } catch {
+          setCurrentPlayer(null);
+        }
+      } else {
+        setCurrentPlayer(null);
+      }
     }
     navigate('/');
   };
@@ -495,6 +509,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen">
+      <a href="#main-content" className="skip-nav">Skip to main content</a>
       <AnimatePresence mode="wait">
         {screen === "splash" && (
           <SplashScreen
@@ -544,7 +559,7 @@ const Index = () => {
             onBackToCampaigns={handleBackToCampaigns}
           />
 
-          <main className="pb-16 sm:pb-12">
+          <main id="main-content" className="pb-16 sm:pb-12">
             {currentView === "profiles" && (
               <ProfilesView
                 crawlers={crawlers}

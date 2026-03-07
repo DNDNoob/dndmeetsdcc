@@ -82,6 +82,29 @@
     @apply border-border;
   }
 
+  /* Accessible focus indicators for keyboard navigation */
+  *:focus-visible {
+    outline: 2px solid hsl(183 100% 50%);
+    outline-offset: 2px;
+  }
+
+  /* Skip navigation link for keyboard users */
+  .skip-nav {
+    position: absolute;
+    top: -100%;
+    left: 0;
+    z-index: 100;
+    padding: 0.5rem 1rem;
+    background: hsl(225 30% 4%);
+    color: hsl(183 100% 50%);
+    border: 2px solid hsl(183 100% 50%);
+    font-size: 0.875rem;
+  }
+
+  .skip-nav:focus {
+    top: 0;
+  }
+
   body {
     @apply bg-background text-foreground font-mono;
     background-image: radial-gradient(circle, hsl(220 30% 12%) 1px, transparent 1px);

@@ -686,6 +686,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
               setUpgradeForm(null);
             }}
             className="bg-background border border-primary text-primary px-4 py-2 font-mono"
+            aria-label="Select crawler profile"
           >
             {crawlers.map((c) => (
               <option key={c.id} value={c.id}>
@@ -949,6 +950,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                   accept="image/*"
                   onChange={handleAvatarUpload}
                   className="hidden"
+                  aria-label="Upload profile avatar"
                 />
                 <button
                   onClick={() => avatarInputRef.current?.click()}

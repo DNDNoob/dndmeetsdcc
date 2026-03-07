@@ -22,6 +22,7 @@ import { useGame } from "@/contexts/GameContext";
 import type { BatchOperation } from "@/hooks/useFirebaseStore";
 import { storage } from "@/lib/firebase";
 import { ref as storageRef, deleteObject } from "firebase/storage";
+import { logger } from "@/lib/logger";
 
 export interface DiceRollEntry {
   id: string;
@@ -181,7 +182,7 @@ export const useGameState = () => {
     const toUpdate = newMobs.filter(m => existingIds.includes(m.id));
     const toDelete = existingMobs.filter(m => !newIds.includes(m.id));
 
-    console.log('[GameState] 🔄 Persisting mobs', {
+    logger.log('[GameState] 🔄 Persisting mobs', {
       add: toAdd.map(m => m.id),
       update: toUpdate.map(m => m.id),
       delete: toDelete.map(m => m.id),
@@ -217,7 +218,7 @@ export const useGameState = () => {
   const setMaps = async (newMaps: string[]) => {
     const existingDocs = getCollection('maps') as Record<string, unknown>[];
     
-    console.log('[GameState] 🗺️ setMaps called', {
+    logger.log('[GameState] 🗺️ setMaps called', {
       newMapsCount: newMaps.length,
       existingDocsCount: existingDocs?.length || 0,
       existingIds: existingDocs?.map((d) => d?.id)?.slice(0, 3) || []
@@ -245,7 +246,7 @@ export const useGameState = () => {
       }
     });
 
-    console.log('[GameState] 🗺️ Existing maps:', {
+    logger.log('[GameState] 🗺️ Existing maps:', {
       count: existingMapIds.size,
       ids: Array.from(existingMapIds).slice(0, 3),
       fingerprintSample: Array.from(existingMapsByFingerprint.keys()).slice(0, 2)
@@ -267,7 +268,7 @@ export const useGameState = () => {
       return !newFingerprintSet.has(fp);
     });
 
-    console.log('[GameState] 🗺️ Maps diff', {
+    logger.log('[GameState] 🗺️ Maps diff', {
       toAdd: mapsToAddIndices.length,
       toDelete: mapsToDeleteIds.length,
       toDeleteIds: mapsToDeleteIds.slice(0, 3),
@@ -320,7 +321,7 @@ export const useGameState = () => {
       if (sp && storage) {
         try {
           await deleteObject(storageRef(storage, sp));
-          console.log('[GameState] 🗑️ Deleted map from Firebase Storage:', sp);
+          logger.log('[GameState] 🗑️ Deleted map from Firebase Storage:', sp);
         } catch (err) {
           console.warn('[GameState] ⚠️ Failed to delete map from Storage (may already be deleted):', sp, err);
         }
@@ -333,11 +334,11 @@ export const useGameState = () => {
     }
 
     if (operations.length > 0) {
-      console.log('[GameState] 🗺️ Executing batch write for', operations.length, 'map operations');
+      logger.log('[GameState] 🗺️ Executing batch write for', operations.length, 'map operations');
       await batchWrite(operations);
     }
 
-    console.log('[GameState] ✅ setMaps completed');
+    logger.log('[GameState] ✅ setMaps completed');
   };
 
   // Clean up empty maps that were saved without image data (migration from old size limits)
@@ -351,11 +352,11 @@ export const useGameState = () => {
       .map(d => d?.id as string);
 
     if (emptyMapIds.length === 0) {
-      console.log('[GameState] ✅ No empty maps to clean up');
+      logger.log('[GameState] ✅ No empty maps to clean up');
       return;
     }
 
-    console.log('[GameState] 🧹 Cleaning up', emptyMapIds.length, 'empty maps...');
+    logger.log('[GameState] 🧹 Cleaning up', emptyMapIds.length, 'empty maps...');
 
     // Use batch delete for faster cleanup
     const operations: BatchOperation[] = emptyMapIds.map(id => ({
@@ -365,16 +366,16 @@ export const useGameState = () => {
     }));
 
     await batchWrite(operations);
-    console.log('[GameState] ✅ Cleanup complete');
+    logger.log('[GameState] ✅ Cleanup complete');
   };
 
   const updateCrawler = async (id: string, updates: Partial<Crawler>) => {
-    console.log('[GameState] 📝 Updating crawler:', { id, updates });
+    logger.log('[GameState] 📝 Updating crawler:', { id, updates });
     return updateItem('crawlers', id, updates as Record<string, unknown>);
   };
 
   const addCrawler = async (crawler: Crawler) => {
-    console.log('[GameState] ➕ Adding crawler:', crawler);
+    logger.log('[GameState] ➕ Adding crawler:', crawler);
     await addItem('crawlers', { ...crawler } as Record<string, unknown>);
     await addItem('inventory', { id: crawler.id, crawlerId: crawler.id, items: [] });
   };
@@ -719,7 +720,7 @@ export const useGameState = () => {
       const newHP = Math.min(effectiveMaxHP, currentHP + Math.ceil(missingHP / 2));
       const newMana = Math.min(effectiveMaxMana, currentMana + Math.ceil(missingMana / 2));
 
-      console.log('[GameState] 🛌 Short rest for', crawler.name, {
+      logger.log('[GameState] 🛌 Short rest for', crawler.name, {
         currentHP, currentMana, effectiveMaxHP, effectiveMaxMana, newHP, newMana
       });
 
@@ -748,7 +749,7 @@ export const useGameState = () => {
       const effectiveMaxHP = (crawler.maxHP || 0) + (mods.maxHP ?? 0);
       const effectiveMaxMana = (crawler.maxMana || 0) + (mods.maxMana ?? 0);
 
-      console.log('[GameState] 🛏️ Long rest for', crawler.name, {
+      logger.log('[GameState] 🛏️ Long rest for', crawler.name, {
         effectiveMaxHP, effectiveMaxMana
       });
 
@@ -855,7 +856,7 @@ export const useGameState = () => {
       });
     }
 
-    console.log('[GameState] ⚔️ Combat started with', combatants.length, 'combatants (mobs auto-rolled). Combat #', prevCount + 1);
+    logger.log('[GameState] ⚔️ Combat started with', combatants.length, 'combatants (mobs auto-rolled). Combat #', prevCount + 1);
   };
 
   const rollMobInitiatives = async () => {
@@ -868,7 +869,7 @@ export const useGameState = () => {
       return c;
     });
     await updateItem('combatState', 'current', { combatants: updatedCombatants } as Record<string, unknown>);
-    console.log('[GameState] 🎲 Mob initiatives rolled');
+    logger.log('[GameState] 🎲 Mob initiatives rolled');
   };
 
   const recordCombatInitiative = async (combatantId: string, roll: number) => {
@@ -892,7 +893,7 @@ export const useGameState = () => {
       currentTurnIndex: 0,
       combatRound: 1,
     } as Record<string, unknown>);
-    console.log('[GameState] ⚔️ Combat order confirmed, starting combat phase');
+    logger.log('[GameState] ⚔️ Combat order confirmed, starting combat phase');
   };
 
   const advanceCombatTurn = async () => {
@@ -933,7 +934,7 @@ export const useGameState = () => {
       if (crawler) {
         const newHP = Math.max(0, (crawler.hp || 0) - damage);
         await updateItem('crawlers', targetId, { hp: newHP } as Record<string, unknown>);
-        console.log('[GameState] ⚔️ Damage applied to crawler', crawler.name, ':', damage, '→ HP:', newHP);
+        logger.log('[GameState] ⚔️ Damage applied to crawler', crawler.name, ':', damage, '→ HP:', newHP);
       }
     } else {
       const combatant = combatState?.combatants.find(c => c.id === targetId);
@@ -951,7 +952,7 @@ export const useGameState = () => {
         }
         // Do NOT update the shared mob document — each combatant instance tracks HP independently
         // The mob document's hitPoints represents the base/max HP for the mob type
-        console.log('[GameState] ⚔️ Damage applied to mob', combatant?.name ?? mob.name, ':', damage, '→ HP:', newHP);
+        logger.log('[GameState] ⚔️ Damage applied to mob', combatant?.name ?? mob.name, ':', damage, '→ HP:', newHP);
       }
     }
   };
@@ -968,7 +969,7 @@ export const useGameState = () => {
       // Fallback when not in combat: direct mob document update
       await updateItem('mobs', combatantId, { hitPoints: newHP } as Record<string, unknown>);
     }
-    console.log('[GameState] ⚔️ DM override: combatant HP set to', newHP);
+    logger.log('[GameState] ⚔️ DM override: combatant HP set to', newHP);
   };
 
   const endCombat = async () => {
@@ -1004,7 +1005,7 @@ export const useGameState = () => {
 
         if (changed) {
           await updateEpisode(episode.id, { mobPlacements: updatedPlacements });
-          console.log('[GameState] ⚔️ Persisted mob HP to episode', episode.id);
+          logger.log('[GameState] ⚔️ Persisted mob HP to episode', episode.id);
         }
       }
     }
@@ -1015,7 +1016,7 @@ export const useGameState = () => {
       combatants: [],
       currentTurnIndex: 0,
     } as Record<string, unknown>);
-    console.log('[GameState] ⚔️ Combat ended');
+    logger.log('[GameState] ⚔️ Combat ended');
   };
 
   const cancelCombat = async () => {
@@ -1029,7 +1030,7 @@ export const useGameState = () => {
       currentTurnIndex: 0,
       combatCount: revertedCount,
     } as Record<string, unknown>);
-    console.log('[GameState] ⚔️ Combat cancelled (count reverted to', revertedCount, ')');
+    logger.log('[GameState] ⚔️ Combat cancelled (count reverted to', revertedCount, ')');
   };
 
   const removeCombatant = async (combatantId: string) => {
@@ -1084,7 +1085,7 @@ export const useGameState = () => {
       });
     }
 
-    console.log('[GameState] ➕ Added', toAdd.length, 'combatant(s) to active combat');
+    logger.log('[GameState] ➕ Added', toAdd.length, 'combatant(s) to active combat');
   };
 
   // ======== Wiki ========

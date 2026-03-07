@@ -3,6 +3,7 @@ import { db, auth, getCollectionRef, setDoc, doc, deleteDoc, updateDoc, onSnapsh
 import { isAuthenticatedUser } from '../lib/firebase';
 import { toast } from 'sonner';
 import type { CollectionName } from '../types/collections';
+import { logger } from '../lib/logger';
 
 interface DataStore {
   [collectionName: string]: Record<string, unknown>[];
@@ -64,16 +65,16 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
 
     const setupRealtimeSync = async () => {
       setLoading(true);
-      console.log('[FirebaseStore] 🔐 Initializing authentication...');
+      logger.log('[FirebaseStore] 🔐 Initializing authentication...');
 
       try {
         // Initialize authentication first
         await initAuth();
         // If effect was cleaned up during async auth, don't set up listeners
         if (cancelled) return;
-        console.log('[FirebaseStore] ✅ Authentication ready');
+        logger.log('[FirebaseStore] ✅ Authentication ready');
 
-        console.log('[FirebaseStore] 📂 Setting up real-time sync...', { roomId });
+        logger.log('[FirebaseStore] 📂 Setting up real-time sync...', { roomId });
 
         // Set up real-time listeners for each collection
         for (const collectionName of collections) {
@@ -88,7 +89,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
                 ...doc.data()
               }));
 
-              console.log(`[FirebaseStore] 🔄 Real-time update: ${collectionPath}`, {
+              logger.log(`[FirebaseStore] 🔄 Real-time update: ${collectionPath}`, {
                 count: items.length,
                 ids: items.map(i => (i.id as string).substring(0, 8)).join(', '),
                 items: collectionName === 'maps' ? items.map(i => ({
@@ -116,7 +117,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
           unsubscribers.push(unsubscribe);
         }
 
-        console.log('[FirebaseStore] ✅ Real-time sync active');
+        logger.log('[FirebaseStore] ✅ Real-time sync active');
         setIsLoaded(true);
       } catch (err) {
         console.error('[FirebaseStore] ❌ Setup error:', err);
@@ -133,7 +134,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
     // Cleanup listeners on unmount or roomId change
     return () => {
       cancelled = true;
-      console.log('[FirebaseStore] 🧹 Cleaning up listeners');
+      logger.log('[FirebaseStore] 🧹 Cleaning up listeners');
       unsubscribers.forEach(unsub => unsub());
     };
   }, [roomId]);
@@ -190,7 +191,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
       if (itemWithId.image === undefined || itemWithId.image === null) {
         delete itemWithId.image;
       } else if (typeof itemWithId.image === 'string' && itemWithId.image.length > MAX_IMAGE_LENGTH) {
-        console.warn('[FirebaseStore] ⚠️ Image too large; stripping before save', {
+        logger.warn('[FirebaseStore] ⚠️ Image too large; stripping before save', {
           collection,
           itemId,
           imageSize: (itemWithId.image as string).length,
@@ -199,7 +200,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
         });
         delete itemWithId.image;
       } else if (typeof itemWithId.image === 'string' && collection === 'maps') {
-        console.log('[FirebaseStore] ✅ Storing map image', {
+        logger.log('[FirebaseStore] ✅ Storing map image', {
           itemId,
           imageSize: (itemWithId.image as string).length,
           sizeInMB: ((itemWithId.image as string).length / 1_000_000).toFixed(2)
@@ -210,7 +211,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
       if (itemWithId.avatar === undefined || itemWithId.avatar === null) {
         delete itemWithId.avatar;
       } else if (typeof itemWithId.avatar === 'string' && itemWithId.avatar.length > MAX_AVATAR_LENGTH) {
-        console.warn('[FirebaseStore] ⚠️ Avatar too large; stripping before save', {
+        logger.warn('[FirebaseStore] ⚠️ Avatar too large; stripping before save', {
           collection,
           itemId,
           avatarSize: (itemWithId.avatar as string).length,
@@ -219,7 +220,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
         });
         delete itemWithId.avatar;
       } else if (typeof itemWithId.avatar === 'string') {
-        console.log('[FirebaseStore] ✅ Storing avatar', {
+        logger.log('[FirebaseStore] ✅ Storing avatar', {
           itemId,
           avatarSize: (itemWithId.avatar as string).length,
           sizeInKB: ((itemWithId.avatar as string).length / 1_000).toFixed(2)
@@ -231,7 +232,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
 
       const cleaned = cleanObject(itemWithId);
       if (collection === 'episodes') {
-        console.log('[FirebaseStore] 📝 Episode data being written:', {
+        logger.log('[FirebaseStore] 📝 Episode data being written:', {
           id: itemId,
           hasMapSettings: !!(cleaned as Record<string, unknown>).mapSettings,
           mapSettings: JSON.stringify((cleaned as Record<string, unknown>).mapSettings),
@@ -239,7 +240,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
         });
       }
       await setDoc(docRef, cleaned);
-      console.log('[FirebaseStore] ✅ Added item:', collection, itemId);
+      logger.log('[FirebaseStore] ✅ Added item:', collection, itemId);
     } catch (err) {
       console.error('[FirebaseStore] ❌ Add error:', err);
       setError(err instanceof Error ? err.message : 'Failed to add item');
@@ -266,7 +267,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
       if (updatesCopy.image === undefined || updatesCopy.image === null) {
         delete updatesCopy.image;
       } else if (typeof updatesCopy.image === 'string' && updatesCopy.image.length > MAX_IMAGE_LENGTH) {
-        console.warn('[FirebaseStore] ⚠️ Image too large; stripping before update', {
+        logger.warn('[FirebaseStore] ⚠️ Image too large; stripping before update', {
           collection,
           id,
           imageSize: (updatesCopy.image as string).length,
@@ -280,7 +281,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
       if (updatesCopy.avatar === undefined || updatesCopy.avatar === null) {
         delete updatesCopy.avatar;
       } else if (typeof updatesCopy.avatar === 'string' && updatesCopy.avatar.length > MAX_AVATAR_LENGTH) {
-        console.warn('[FirebaseStore] ⚠️ Avatar too large; stripping before update', {
+        logger.warn('[FirebaseStore] ⚠️ Avatar too large; stripping before update', {
           collection,
           id,
           avatarSize: (updatesCopy.avatar as string).length,
@@ -289,7 +290,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
         });
         delete updatesCopy.avatar;
       } else if (typeof updatesCopy.avatar === 'string') {
-        console.log('[FirebaseStore] ✅ Updating avatar', {
+        logger.log('[FirebaseStore] ✅ Updating avatar', {
           id,
           avatarSize: (updatesCopy.avatar as string).length,
           sizeInKB: ((updatesCopy.avatar as string).length / 1_000).toFixed(2)
@@ -298,7 +299,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
 
       const cleanedFinal = cleanObject(updatesCopy);
       await updateDoc(docRef, cleanedFinal as Record<string, unknown>);
-      console.log('[FirebaseStore] ✅ Updated item:', collection, id);
+      logger.log('[FirebaseStore] ✅ Updated item:', collection, id);
     } catch (err) {
       console.error('[FirebaseStore] ❌ Update error:', err);
       setError(err instanceof Error ? err.message : 'Failed to update item');
@@ -323,7 +324,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
       const docRef = doc(collectionRef, id);
 
       await deleteDoc(docRef);
-      console.log('[FirebaseStore] ✅ Deleted item:', collection, id);
+      logger.log('[FirebaseStore] ✅ Deleted item:', collection, id);
     } catch (err) {
       console.error('[FirebaseStore] ❌ Delete error:', err);
       // Rollback optimistic update on error
@@ -395,13 +396,13 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
             if (itemData.image === undefined || itemData.image === null) {
               delete itemData.image;
             } else if (typeof itemData.image === 'string' && itemData.image.length > MAX_IMAGE_LENGTH) {
-              console.warn('[FirebaseStore] ⚠️ Image too large in batch; stripping', { id: op.id });
+              logger.warn('[FirebaseStore] ⚠️ Image too large in batch; stripping', { id: op.id });
               delete itemData.image;
             }
             if (itemData.avatar === undefined || itemData.avatar === null) {
               delete itemData.avatar;
             } else if (typeof itemData.avatar === 'string' && itemData.avatar.length > MAX_AVATAR_LENGTH) {
-              console.warn('[FirebaseStore] ⚠️ Avatar too large in batch; stripping', { id: op.id });
+              logger.warn('[FirebaseStore] ⚠️ Avatar too large in batch; stripping', { id: op.id });
               delete itemData.avatar;
             }
 
@@ -418,7 +419,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
             // This helps catch accidental overwrites early
             if (op.collection === 'crawlers') {
               const fieldCount = Object.keys(cleanedUpdate as Record<string, unknown>).length;
-              console.log('[FirebaseStore] 🔄 Crawler update:', {
+              logger.log('[FirebaseStore] 🔄 Crawler update:', {
                 id: op.id,
                 fields: Object.keys(cleanedUpdate as Record<string, unknown>),
                 fieldCount
@@ -435,7 +436,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
       }
 
       await batch.commit();
-      console.log('[FirebaseStore] ✅ Batch write completed:', operations.length, 'operations');
+      logger.log('[FirebaseStore] ✅ Batch write completed:', operations.length, 'operations');
     } catch (err) {
       console.error('[FirebaseStore] ❌ Batch write error:', err);
       // Rollback optimistic update on error

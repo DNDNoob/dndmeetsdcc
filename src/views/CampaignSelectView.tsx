@@ -215,6 +215,7 @@ const CampaignSelectView: React.FC<CampaignSelectViewProps> = ({
                   onClick={(e) => { e.stopPropagation(); setConfirmDelete(campaign.id); }}
                   className="text-[10px] text-muted-foreground hover:text-destructive px-2 py-1 transition-colors flex items-center gap-1 ml-auto"
                   title="Delete campaign"
+                  aria-label="Delete campaign"
                 >
                   <Trash2 className="w-3 h-3" />
                 </button>
@@ -366,9 +367,11 @@ const CampaignSelectView: React.FC<CampaignSelectViewProps> = ({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       className="fixed inset-0 z-40 flex flex-col bg-background overflow-auto"
+      role="main"
+      aria-label="Campaign selection"
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+      <header className="flex items-center justify-between px-4 py-3 border-b border-border">
         <div className="flex items-center gap-3">
           <h1 className="font-display text-xl text-primary text-glow-cyan tracking-[0.2em]">
             CAMPAIGNS
@@ -381,11 +384,11 @@ const CampaignSelectView: React.FC<CampaignSelectViewProps> = ({
               {userProfile.displayName}
             </span>
           )}
-          <DungeonButton variant="ghost" size="sm" onClick={onSignOut}>
+          <DungeonButton variant="ghost" size="sm" onClick={onSignOut} aria-label="Sign out">
             <LogOut className="w-3.5 h-3.5" />
           </DungeonButton>
         </div>
-      </div>
+      </header>
 
       <div className="flex-1 max-w-2xl mx-auto w-full px-4 py-6 space-y-6">
         {/* Action buttons */}

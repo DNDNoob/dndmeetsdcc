@@ -1,5 +1,7 @@
+import { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, FileText, Calendar } from "lucide-react";
+import { useLocation } from "react-router-dom";
 import changelogData from "../../changelog.json";
 
 interface ChangelogViewerProps {
@@ -8,6 +10,24 @@ interface ChangelogViewerProps {
 }
 
 const ChangelogViewer: React.FC<ChangelogViewerProps> = ({ isOpen, onClose }) => {
+  const location = useLocation();
+
+  // Close on Escape key
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  // Close on route change
+  useEffect(() => {
+    if (isOpen) onClose();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -32,7 +52,8 @@ const ChangelogViewer: React.FC<ChangelogViewerProps> = ({ isOpen, onClose }) =>
               </h2>
               <button
                 onClick={onClose}
-                className="text-primary hover:text-primary/80 transition-colors"
+                className="text-primary hover:text-primary/80 transition-colors p-1"
+                aria-label="Close changelog"
               >
                 <X className="w-6 h-6" />
               </button>

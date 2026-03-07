@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DungeonButton } from "./ui/DungeonButton";
-import { Home, User, Map, Backpack, Skull, Presentation, Volume2, FileText, Brain, Pin, PinOff, ChevronDown, BookOpen, ArrowLeft } from "lucide-react";
+import { Home, User, Map, Backpack, Skull, Presentation, Volume2, FileText, Brain, Pin, PinOff, ChevronDown, BookOpen, ArrowLeft, Menu, X } from "lucide-react";
 import { Crawler } from "@/lib/gameData";
 import GoogleAuthButton from "./GoogleAuthButton";
 
@@ -46,7 +46,9 @@ const Navigation: React.FC<NavigationProps> = ({
   const [isHovered, setIsHovered] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
   const [showPlayerDropdown, setShowPlayerDropdown] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const playerDropdownRef = useRef<HTMLDivElement>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
 
   const getPlayerColor = () => {
     if (playerType === "ai") return "text-accent text-glow-gold";
@@ -68,10 +70,32 @@ const Navigation: React.FC<NavigationProps> = ({
     return () => document.removeEventListener('mousedown', handleClick);
   }, [showPlayerDropdown]);
 
+  // Close mobile menu on outside click
+  useEffect(() => {
+    if (!showMobileMenu) return;
+    const handleClick = (e: MouseEvent) => {
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target as Node)) {
+        setShowMobileMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showMobileMenu]);
+
   // Notify parent of visibility changes
   useEffect(() => {
     onVisibilityChange?.(!shouldCollapse);
   }, [shouldCollapse, onVisibilityChange]);
+
+  // All nav items including extra ones
+  const allNavItems = [
+    { id: "menu", label: "Main Menu", icon: Home, onClick: onReturnToMenu },
+    ...navItems.map(item => ({ ...item, onClick: () => onNavigate(item.id) })),
+    { id: "showtime", label: "Show Time", icon: Presentation, onClick: () => onNavigate("showtime") },
+    { id: "sounds", label: "Sounds", icon: Volume2, onClick: () => onNavigate("sounds") },
+    { id: "wiki", label: "Wiki", icon: BookOpen, onClick: () => onNavigate("wiki") },
+    ...(isAdmin ? [{ id: "dungeonai", label: "DM Console", icon: Brain, onClick: () => onNavigate("dungeonai") }] : []),
+  ];
 
   return (
     <>
@@ -93,17 +117,87 @@ const Navigation: React.FC<NavigationProps> = ({
         className="sticky top-0 z-[55] bg-background/95 backdrop-blur border-b-2 border-primary px-4 py-3"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
+        aria-label="Main navigation"
       >
       <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between mb-0 md:mb-2">
           <div className="flex items-center gap-2">
+            {/* Mobile hamburger menu button */}
+            <div className="md:hidden" ref={mobileMenuRef}>
+              <DungeonButton
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowMobileMenu(!showMobileMenu)}
+                aria-label={showMobileMenu ? "Close menu" : "Open menu"}
+                aria-expanded={showMobileMenu}
+              >
+                {showMobileMenu ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+              </DungeonButton>
+
+              {/* Mobile dropdown menu */}
+              <AnimatePresence>
+                {showMobileMenu && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    className="absolute left-2 right-2 top-full mt-1 bg-background border-2 border-primary shadow-lg shadow-primary/20 z-[70] max-h-[70vh] overflow-y-auto"
+                    style={{ scrollbarWidth: 'none' }}
+                  >
+                    <div className="py-2">
+                      {allNavItems.map((item) => (
+                        <button
+                          key={item.id}
+                          onClick={() => {
+                            item.onClick();
+                            setShowMobileMenu(false);
+                          }}
+                          className={`w-full text-left px-4 py-2.5 text-sm flex items-center gap-3 hover:bg-primary/10 transition-colors ${
+                            currentView === item.id ? 'text-primary bg-primary/5 font-display' : 'text-foreground'
+                          }`}
+                        >
+                          <item.icon className="w-4 h-4" />
+                          <span>{item.label}</span>
+                        </button>
+                      ))}
+                      <div className="border-t border-border my-2" />
+                      {onBackToCampaigns && (
+                        <button
+                          onClick={() => {
+                            onBackToCampaigns();
+                            setShowMobileMenu(false);
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-sm flex items-center gap-3 hover:bg-primary/10 transition-colors text-foreground"
+                        >
+                          <ArrowLeft className="w-4 h-4" />
+                          <span>Back to Campaigns</span>
+                        </button>
+                      )}
+                      <button
+                        onClick={() => {
+                          onShowChangelog();
+                          setShowMobileMenu(false);
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-sm flex items-center gap-3 hover:bg-primary/10 transition-colors text-foreground"
+                      >
+                        <FileText className="w-4 h-4" />
+                        <span>Changelog</span>
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Desktop-only buttons */}
             {autoCollapse && (
               <DungeonButton
                 variant={isPinned ? "admin" : "ghost"}
                 size="sm"
                 onClick={() => setIsPinned(!isPinned)}
-                className="flex items-center gap-1"
+                className="hidden md:flex items-center gap-1"
                 title={isPinned ? "Unpin navigation" : "Pin navigation"}
+                aria-label={isPinned ? "Unpin navigation" : "Pin navigation"}
               >
                 {isPinned ? <Pin className="w-3 h-3" /> : <PinOff className="w-3 h-3" />}
               </DungeonButton>
@@ -113,8 +207,9 @@ const Navigation: React.FC<NavigationProps> = ({
                 variant="ghost"
                 size="sm"
                 onClick={onBackToCampaigns}
-                className="flex items-center gap-1"
+                className="hidden md:flex items-center gap-1"
                 title="Back to campaigns"
+                aria-label="Back to campaigns"
               >
                 <ArrowLeft className="w-3 h-3" />
                 <span className="hidden sm:inline text-xs">Campaigns</span>
@@ -124,7 +219,8 @@ const Navigation: React.FC<NavigationProps> = ({
               variant="ghost"
               size="sm"
               onClick={onShowChangelog}
-              className="flex items-center gap-1"
+              className="hidden md:flex items-center gap-1"
+              aria-label="View changelog"
             >
               <FileText className="w-3 h-3" />
               <span className="hidden sm:inline text-xs">Changelog</span>
@@ -140,6 +236,8 @@ const Navigation: React.FC<NavigationProps> = ({
             <button
               onClick={() => onSwitchPlayer && setShowPlayerDropdown(!showPlayerDropdown)}
               className={`flex items-center gap-1.5 hover:opacity-80 transition-opacity ${onSwitchPlayer ? 'cursor-pointer' : 'cursor-default'}`}
+              aria-label={`Current player: ${playerType === "ai" ? "DUNGEON AI" : playerName}. Click to switch.`}
+              aria-expanded={showPlayerDropdown}
             >
               <User className="w-4 h-4 text-muted-foreground" />
               <span className={`text-xs md:text-sm font-display ${getPlayerColor()}`}>
@@ -217,7 +315,8 @@ const Navigation: React.FC<NavigationProps> = ({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-2 md:gap-3">
+        {/* Desktop nav buttons - hidden on mobile */}
+        <div className="hidden md:flex flex-wrap items-center justify-center gap-1 sm:gap-2 md:gap-3">
           <DungeonButton
             variant="nav"
             size="sm"
