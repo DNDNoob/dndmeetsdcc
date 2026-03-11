@@ -2499,6 +2499,22 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                             {episode.mobPlacements.length !== 1 ? "s" : ""}
                           </span>
                         </div>
+                        {(episode.lootBoxIds?.length ?? 0) > 0 && (
+                          <div className="flex items-center gap-2">
+                            <Package className="w-4 h-4 text-yellow-400" />
+                            <span>
+                              {episode.lootBoxIds!.length} loot box{episode.lootBoxIds!.length !== 1 ? "es" : ""}
+                            </span>
+                          </div>
+                        )}
+                        {(episode.questIds?.length ?? 0) > 0 && (
+                          <div className="flex items-center gap-2">
+                            <ScrollText className="w-4 h-4 text-green-400" />
+                            <span>
+                              {episode.questIds!.length} quest{episode.questIds!.length !== 1 ? "s" : ""}
+                            </span>
+                          </div>
+                        )}
                       </div>
 
                       <DungeonButton
