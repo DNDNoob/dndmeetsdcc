@@ -406,6 +406,8 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   };
 
   const handleDeleteMap = (index: number) => {
+    const mapName = (mapNames && mapNames[index]) || `Map ${index + 1}`;
+    if (!confirm(`Are you sure you want to delete "${mapName}"? This cannot be undone.`)) return;
     const result = onUpdateMaps(maps.filter((_, i) => i !== index));
     // If onUpdateMaps returns a Promise, we could await it here if needed
     // For now, just call it and let it handle async internally
@@ -528,13 +530,30 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
     });
   };
 
+  const getSpreadPosition = (existingCount: number): { x: number; y: number } => {
+    // Spread new placements in a grid pattern around center to avoid stacking
+    if (existingCount === 0) return { x: 50, y: 50 };
+    const spacing = 8;
+    const cols = Math.ceil(Math.sqrt(existingCount + 1));
+    const row = Math.floor(existingCount / cols);
+    const col = existingCount % cols;
+    const offsetX = (col - (cols - 1) / 2) * spacing;
+    const offsetY = (row - (Math.ceil((existingCount + 1) / cols) - 1) / 2) * spacing;
+    return {
+      x: Math.max(5, Math.min(95, 50 + offsetX)),
+      y: Math.max(5, Math.min(95, 50 + offsetY)),
+    };
+  };
+
   const handleAddMobToEpisode = (mobId: string) => {
     // Get current map ID
     const currentMapId = selectedMapsForEpisode[currentMapIndexForEditor];
     if (!currentMapId) return;
 
     // Allow duplicate mobs - each placement is independent
-    setSelectedMobsForEpisode([...selectedMobsForEpisode, { mobId, mapId: currentMapId, x: 50, y: 50 }]);
+    const existingOnMap = selectedMobsForEpisode.filter(p => p.mapId === currentMapId).length;
+    const pos = getSpreadPosition(existingOnMap);
+    setSelectedMobsForEpisode([...selectedMobsForEpisode, { mobId, mapId: currentMapId, x: pos.x, y: pos.y }]);
   };
 
   const handleRemoveMobFromEpisode = (_mobId: string) => {
@@ -1326,6 +1345,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                           size="sm"
                           onClick={() => startEditingMapName(index)}
                           className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          aria-label={`Edit name for ${mapNames?.[index] || `Map ${index + 1}`}`}
                         >
                           <Edit2 className="w-3 h-3" />
                         </DungeonButton>
@@ -1339,6 +1359,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                     size="sm"
                     className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity"
                     onClick={() => handleDeleteMap(index)}
+                    aria-label={`Delete ${mapNames?.[index] || `Map ${index + 1}`}`}
                   >
                     <Trash2 className="w-4 h-4" />
                   </DungeonButton>
@@ -1609,11 +1630,13 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                                 size="sm"
                                 className="justify-start"
                                 onClick={() => {
+                                  const existingOnMap = selectedCrawlersForEpisode.filter(p => p.mapId === currentMapId).length;
+                                  const pos = getSpreadPosition(existingOnMap);
                                   const newPlacement: CrawlerPlacement = {
                                     crawlerId: crawler.id,
                                     mapId: currentMapId,
-                                    x: 50,
-                                    y: 50,
+                                    x: pos.x,
+                                    y: pos.y,
                                   };
                                   setSelectedCrawlersForEpisode(prev => [...prev, newPlacement]);
                                 }}
@@ -2154,6 +2177,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                         }]);
                         setNewActionItemText("");
                       }}
+                      aria-label="Add action item"
                     >
                       <Plus className="w-4 h-4" />
                     </DungeonButton>

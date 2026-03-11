@@ -353,11 +353,20 @@ const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
                     // Compute next letterIndex for this mobId
                     const allSameId = placements.filter(p => p.mobId === mob.id);
                     const maxLetterIndex = allSameId.reduce((max, p) => Math.max(max, p.letterIndex ?? -1), -1);
+                    // Spread new placements to avoid stacking at center
+                    const existingOnMap = currentMapPlacements.length;
+                    const spacing = 8;
+                    const cols = Math.max(1, Math.ceil(Math.sqrt(existingOnMap + 1)));
+                    const row = Math.floor(existingOnMap / cols);
+                    const col = existingOnMap % cols;
+                    const totalRows = Math.ceil((existingOnMap + 1) / cols);
+                    const posX = Math.max(5, Math.min(95, 50 + (col - (cols - 1) / 2) * spacing));
+                    const posY = Math.max(5, Math.min(95, 50 + (row - (totalRows - 1) / 2) * spacing));
                     const newPlacement: EpisodeMobPlacement = {
                       mobId: mob.id,
                       mapId: mapId,
-                      x: 50,
-                      y: 50,
+                      x: posX,
+                      y: posY,
                       scale: 1,
                       letterIndex: maxLetterIndex + 1,
                     };
