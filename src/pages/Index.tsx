@@ -206,6 +206,31 @@ const Index = () => {
     return activeCampaign.ownerId === user.uid;
   }, [activeCampaign, user]);
 
+  // Restore campaign from URL query param on cold load (deep linking)
+  const campaignRestoredRef = useRef(false);
+  useEffect(() => {
+    if (campaignRestoredRef.current || activeCampaign || campaignsLoading || !isAuthenticated || authLoading) return;
+    const params = new URLSearchParams(location.search);
+    const campaignId = params.get('campaign');
+    if (!campaignId) return;
+
+    const allCampaigns = [...myCampaigns, ...joinedCampaigns];
+    const found = allCampaigns.find(c => c.id === campaignId);
+    if (found) {
+      campaignRestoredRef.current = true;
+      setActiveCampaign(found);
+      // Restore player identity
+      if (user && found.ownerId === user.uid) {
+        setCurrentPlayer({ id: "dungeonai", name: "DUNGEON AI", type: "ai" });
+      } else {
+        const savedPlayer = localStorage.getItem(STORAGE_KEY_CAMPAIGN_PLAYER_PREFIX + found.id);
+        if (savedPlayer) {
+          try { setCurrentPlayer(JSON.parse(savedPlayer)); } catch { /* ignore */ }
+        }
+      }
+    }
+  }, [myCampaigns, joinedCampaigns, campaignsLoading, activeCampaign, isAuthenticated, authLoading, location.search, user]);
+
   // Sync roomId with active campaign
   useEffect(() => {
     if (activeCampaign) {
@@ -215,12 +240,25 @@ const Index = () => {
     }
   }, [activeCampaign, setRoomId]);
 
-  // Persist active campaign to localStorage
+  // Persist active campaign to localStorage and sync URL query param
   useEffect(() => {
     if (activeCampaign) {
       localStorage.setItem(STORAGE_KEY_ACTIVE_CAMPAIGN, JSON.stringify(activeCampaign));
+      // Add campaign ID to URL for deep linking (preserves current path)
+      const params = new URLSearchParams(location.search);
+      if (params.get('campaign') !== activeCampaign.id) {
+        params.set('campaign', activeCampaign.id);
+        navigate(`${location.pathname}?${params.toString()}`, { replace: true });
+      }
     } else {
       localStorage.removeItem(STORAGE_KEY_ACTIVE_CAMPAIGN);
+      // Remove campaign param from URL
+      const params = new URLSearchParams(location.search);
+      if (params.has('campaign')) {
+        params.delete('campaign');
+        const qs = params.toString();
+        navigate(`${location.pathname}${qs ? '?' + qs : ''}`, { replace: true });
+      }
     }
   }, [activeCampaign]);
 
@@ -296,23 +334,26 @@ const Index = () => {
 
   const handleSelectCampaign = (campaign: Campaign) => {
     setActiveCampaign(campaign);
+    let restoredPlayer: { id: string; name: string; type: "crawler" | "ai" | "npc" } | null = null;
+
     // If user is the DM, set them as the DM player
     if (user && campaign.ownerId === user.uid) {
-      setCurrentPlayer({ id: "dungeonai", name: "DUNGEON AI", type: "ai" });
+      restoredPlayer = { id: "dungeonai", name: "DUNGEON AI", type: "ai" };
     } else {
       // Try to restore previously selected player for this campaign
       const savedPlayer = localStorage.getItem(STORAGE_KEY_CAMPAIGN_PLAYER_PREFIX + campaign.id);
       if (savedPlayer) {
         try {
-          setCurrentPlayer(JSON.parse(savedPlayer));
+          restoredPlayer = JSON.parse(savedPlayer);
         } catch {
-          setCurrentPlayer(null);
+          // ignore parse errors
         }
-      } else {
-        setCurrentPlayer(null);
       }
     }
-    navigate('/');
+
+    setCurrentPlayer(restoredPlayer);
+    // If we have a player (DM or restored), skip splash and go to menu
+    navigate(restoredPlayer ? '/menu' : '/');
   };
 
   const handleStatRoll = (crawlerName: string, crawlerId: string, stat: string, totalStat: number) => {

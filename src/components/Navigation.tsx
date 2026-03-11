@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DungeonButton } from "./ui/DungeonButton";
-import { Home, User, Map, Backpack, Skull, Presentation, Volume2, FileText, Brain, Pin, PinOff, ChevronDown, BookOpen, ArrowLeft, Menu, X } from "lucide-react";
+import { Home, User, Map, Backpack, Skull, Presentation, Volume2, FileText, Brain, Pin, ChevronDown, BookOpen, ArrowLeft, Menu, X } from "lucide-react";
 import { Crawler } from "@/lib/gameData";
 import GoogleAuthButton from "./GoogleAuthButton";
 
@@ -199,7 +199,7 @@ const Navigation: React.FC<NavigationProps> = ({
                 title={isPinned ? "Unpin navigation" : "Pin navigation"}
                 aria-label={isPinned ? "Unpin navigation" : "Pin navigation"}
               >
-                {isPinned ? <Pin className="w-3 h-3" /> : <PinOff className="w-3 h-3" />}
+                <Pin className={`w-3 h-3 ${isPinned ? '' : 'opacity-50'}`} />
               </DungeonButton>
             )}
             {onBackToCampaigns && (

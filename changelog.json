@@ -4,10 +4,12 @@
     "changes": [
       "🐛 Fixed changelog modal — now closes on Escape key, outside click, and route changes",
       "🐛 Fixed page refresh losing campaign context — session now persists across reloads",
-      "🐛 Fixed identity selection not remembering DM/player choice per campaign",
+      "🔗 Added deep linking support — campaign ID is preserved in URL for bookmarking and sharing",
+      "🐛 Fixed identity selection — DMs and players now skip splash screen when re-entering a campaign",
       "🐛 Fixed display name showing Google auth name instead of user-configured name",
       "🐛 Removed debug 'roomId' text from Sound Effects page",
       "🐛 Fixed broken markdown links in Wiki — internal links now navigate correctly",
+      "🐛 Fixed stray scissors icon on Show Time page — replaced PinOff icon with dimmed Pin icon",
       "📱 Added responsive hamburger menu for mobile devices",
       "♿ Added skip navigation link for keyboard users",
       "♿ Added focus-visible outlines on all interactive elements",
