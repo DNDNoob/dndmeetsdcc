@@ -30,6 +30,7 @@ export interface Crawler {
   gold: number;
   avatar?: string;
   equippedItems?: EquippedItems;
+  knownSpells?: KnownSpell[];
 }
 
 export type StatModifiers = Partial<Record<'str' | 'dex' | 'con' | 'int' | 'cha' | 'hp' | 'maxHP' | 'mana' | 'maxMana', number>>;
@@ -60,6 +61,83 @@ export interface WeaponData {
   splashDamage?: boolean; // if true, damage can target multiple enemies
 }
 
+// Spell system types
+export const SPELL_SCHOOLS = ['Evocation', 'Necromancy', 'Illusion', 'Conjuration', 'Abjuration', 'Divination', 'Transmutation', 'Enchantment'] as const;
+export type SpellSchool = typeof SPELL_SCHOOLS[number];
+
+export const SPELL_ACTION_TYPES = ['Action', 'Bonus Action'] as const;
+export type SpellActionType = typeof SPELL_ACTION_TYPES[number];
+
+export const SPELL_DAMAGE_TYPES = [...DAMAGE_TYPES, 'Healing'] as const;
+export type SpellDamageType = typeof SPELL_DAMAGE_TYPES[number];
+
+export interface SpellDuration {
+  combatTurns?: number;
+  noncombatTurns?: number;
+  description?: string; // free-form label, e.g. "Until dispelled"
+}
+
+export interface SpellData {
+  manaCost: number;
+  spellLevel: number; // 1–9 (D&D spell level)
+  school: SpellSchool;
+  actionType: SpellActionType;
+  range: number | 'Self' | 'Touch'; // feet or keyword
+  canTargetSelf: boolean; // whether caster can target themselves
+  target: 'Single' | 'Area' | 'Self' | 'Multiple';
+  areaOfEffect?: { shape: 'sphere' | 'cone' | 'line' | 'cube'; size: number };
+  damageDice?: WeaponDie[]; // reuses existing WeaponDie type
+  damageType?: SpellDamageType;
+  hitDie?: WeaponDie; // bonus die on spell attack roll
+  hitModifiers?: StatModifiers;
+  damageModifiers?: StatModifiers;
+  duration?: SpellDuration;
+  savingThrow?: string; // e.g. 'DEX', 'CON'
+  specialEffect?: string;
+  splashDamage?: boolean;
+}
+
+export interface Spell {
+  id: string;
+  name: string;
+  description: string;
+  tags?: string[];
+  spellData: SpellData;
+}
+
+export const SPELL_LEARNED_FROM = ['tome', 'quest', 'level', 'race', 'class', 'granted'] as const;
+export type SpellLearnedFrom = typeof SPELL_LEARNED_FROM[number];
+
+export interface KnownSpell {
+  spellId: string;
+  spellName: string; // denormalized for display
+  learnedFrom: SpellLearnedFrom;
+  learnedAt: string; // ISO timestamp
+  castCount: number; // total casts, drives mastery level
+}
+
+// Mastery threshold: level N requires 5*N*(N+1) total casts (10, 30, 60, 100, ...)
+export function getSpellMasteryLevel(castCount: number): number {
+  let level = 0;
+  while (5 * (level + 1) * (level + 2) <= castCount) {
+    level++;
+  }
+  return level;
+}
+
+// Effective mana cost: each mastery level reduces base cost by ceil(base * 5%), floored at 0
+export function getEffectiveManaCost(baseCost: number, masteryLevel: number): number {
+  const reductionPerLevel = Math.ceil(baseCost * 0.05);
+  return Math.max(0, baseCost - reductionPerLevel * masteryLevel);
+}
+
+// Casts remaining until the next mastery level
+export function getCastsUntilNextMastery(castCount: number): number {
+  const currentLevel = getSpellMasteryLevel(castCount);
+  const nextThreshold = 5 * (currentLevel + 1) * (currentLevel + 2);
+  return nextThreshold - castCount;
+}
+
 export interface InventoryItem {
   id: string;
   name: string;
@@ -71,6 +149,11 @@ export interface InventoryItem {
   tags?: string[]; // Custom tags for filtering (e.g., "magic", "cursed", "quest")
   weaponData?: WeaponData; // Weapon-specific data (only for items with "weapon" tag or weapon equipSlot)
   isUpgraded?: boolean; // Whether this item has been upgraded by a crawler
+  isSpellTome?: boolean; // Consumable that teaches a spell when used
+  spellTomeData?: {
+    spellId?: string; // References a spell in the library
+    customSpell?: Spell; // Embedded one-off spell (not in library)
+  };
 }
 
 // Compute total stat modifiers from all equipped items on a crawler

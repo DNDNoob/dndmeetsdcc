@@ -887,4 +887,92 @@ Players can leave a campaign at any time from the Campaign Selection screen. The
 
 Click the **Campaigns** button (or back arrow) in the navigation bar, Main Menu, or Splash Screen to return to the Campaign Selection screen and switch campaigns.`,
   },
+  {
+    id: 'spells',
+    slug: 'spells',
+    title: 'Spell System',
+    category: 'Game Mechanics',
+    order: 50,
+    content: `# Spell System
+
+Crawlers can learn and cast spells. Each spell consumes **mana** when cast and belongs to a **spell school** (Evocation, Necromancy, Illusion, etc.).
+
+## Learning Spells
+
+Spells can be learned in several ways:
+
+| Source | How |
+|--------|-----|
+| **Spell Tome** | Consume a Spell Tome item from your inventory — the tome is destroyed and you learn the spell |
+| **Granted** | A DM grants the spell directly from the Spells page |
+| **Quest** | Awarded as a quest reward |
+| **Level Up** | Granted by the DM when leveling up |
+| **Race / Class** | Innate spells from your race or class (set during character creation) |
+
+A crawler cannot learn the same spell twice.
+
+## Casting Spells
+
+Each spell costs **mana** to cast. Spells are cast using either an **Action** or **Bonus Action** depending on how the spell was designed.
+
+Spells can optionally:
+- Target a single enemy, multiple targets, an area, or the caster themselves
+- Deal damage of a specific type (Fire, Poison, Healing, etc.)
+- Apply effects lasting for a set number of **combat turns** or **noncombat turns**
+- Require a saving throw from the target
+- Have a splash damage effect (hits multiple enemies)
+
+## Spell Mastery
+
+Every time a crawler casts a spell, their **cast count** increases. Reaching cast count thresholds levels up the spell, reducing its mana cost:
+
+| Mastery Level | Cast Count Required | Mana Discount |
+|---------------|---------------------|---------------|
+| 1 | 10 | −5% of base |
+| 2 | 30 | −10% of base |
+| 3 | 60 | −15% of base |
+| 4 | 100 | −20% of base |
+
+The reduction per level is **ceil(base cost × 5%)**, stacked per mastery level. Mana cost never goes below 0.
+
+## Spell Tomes
+
+Spell Tomes are consumable inventory items. When a crawler **Uses** a tome:
+1. The tome is removed from their inventory
+2. They learn the spell contained in the tome
+
+Tomes can contain either a **library spell** (selected from the shared spell library) or a **custom spell** (designed specifically for that tome). DMs can promote a custom spell to the shared library from the Spells page.
+
+## Spell Library
+
+The **Spells page** (accessible from the navigation bar) shows:
+- **Left panel**: The shared spell library — DMs can create, edit, and delete reusable spells
+- **Right panel**: Per-crawler known spells, cast counts, mastery levels, and an effective mana cost display
+
+DMs can also grant any library spell directly to a specific crawler from the library panel.
+
+## Spell Data Fields
+
+Each spell has the following configurable properties:
+
+| Field | Description |
+|-------|-------------|
+| Mana Cost | Mana consumed per cast (0 = free) |
+| Spell Level | D&D-style level 1–9 |
+| School | Evocation, Necromancy, Illusion, etc. |
+| Action Type | Action or Bonus Action |
+| Range | Feet, Self, or Touch |
+| Target | Single, Area, Self, or Multiple |
+| Area of Effect | Shape (sphere/cone/line/cube) and size in feet |
+| Damage Dice | One or more dice (e.g., 2d6 + 1d4) |
+| Damage Type | Fire, Poison, Healing, Spiritual, etc. |
+| Hit Die | Bonus die added to the spell attack roll |
+| Hit Modifiers | Stat bonuses applied to hit roll (STR/DEX/CON/INT/CHA) |
+| Damage Modifiers | Stat bonuses applied to damage roll |
+| Duration | Combat turns, noncombat turns, or a custom label |
+| Saving Throw | Which stat the target rolls to resist |
+| Splash Damage | Whether the spell can hit multiple targets |
+| Special Effect | Free-text description of any on-hit effects |
+| Can Target Self | Whether the caster can target themselves |`,
+  },
 ];

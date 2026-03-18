@@ -16,6 +16,7 @@ import DungeonAIView from "@/views/DungeonAIView";
 import ShowTimeView from "@/views/ShowTimeView";
 import SoundEffectsView from "@/views/SoundEffectsView";
 import WikiView from "@/views/WikiView";
+import SpellsView from "@/views/SpellsView";
 
 import { useGameState, DiceRollEntry } from "@/hooks/useGameState";
 import { useAuth } from "@/contexts/AuthContext";
@@ -25,9 +26,9 @@ import { toast } from "sonner";
 import type { Episode, Campaign, CrawlerPlacement, EpisodeMobPlacement } from "@/lib/gameData";
 
 type AppScreen = "splash" | "menu" | "game";
-type GameView = "profiles" | "maps" | "inventory" | "mobs" | "dungeonai" | "showtime" | "sounds" | "wiki";
+type GameView = "profiles" | "maps" | "inventory" | "mobs" | "dungeonai" | "showtime" | "sounds" | "wiki" | "spells";
 
-const GAME_VIEWS: readonly string[] = ["profiles", "maps", "inventory", "mobs", "dungeonai", "showtime", "sounds", "wiki"];
+const GAME_VIEWS: readonly string[] = ["profiles", "maps", "inventory", "mobs", "dungeonai", "showtime", "sounds", "wiki", "spells"];
 
 const STORAGE_KEY_PLAYER = "dcc_current_player";
 const STORAGE_KEY_MAP_VISIBILITY = "dcc_map_visibility";
@@ -183,6 +184,15 @@ const Index = () => {
     wikiPages,
     addWikiPage,
     updateWikiPage,
+    spells,
+    addSpell,
+    updateSpell,
+    deleteSpell,
+    learnSpell,
+    forgetSpell,
+    castSpell,
+    consumeSpellTome,
+    promoteSpellToLibrary,
     quests,
     addQuest,
     updateQuest,
@@ -648,6 +658,24 @@ const Index = () => {
                 onUpdateCrawler={updateCrawler}
                 getSharedInventory={getSharedInventory}
                 onUpdateSharedInventory={updateSharedInventory}
+                spells={spells}
+                onConsumeSpellTome={consumeSpellTome}
+                onPromoteSpellToLibrary={promoteSpellToLibrary}
+                isAdmin={isAdmin}
+              />
+            )}
+            {currentView === "spells" && (
+              <SpellsView
+                crawlers={crawlers}
+                spells={spells}
+                onAddSpell={addSpell}
+                onUpdateSpell={updateSpell}
+                onDeleteSpell={deleteSpell}
+                onLearnSpell={learnSpell}
+                onForgetSpell={forgetSpell}
+                onCastSpell={castSpell}
+                onPromoteSpellToLibrary={promoteSpellToLibrary}
+                isAdmin={isAdmin}
               />
             )}
             {currentView === "mobs" && <MobsView mobs={mobs} />}
