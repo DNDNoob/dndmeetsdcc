@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Plus, Trash2, ChevronDown, ChevronUp, BookOpen, Zap, Star, Wand2, X, Check } from "lucide-react";
+import { Plus, Trash2, ChevronDown, ChevronUp, BookOpen, Zap, Star, Wand2, X, Check, Globe, Lock, Users } from "lucide-react";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import {
@@ -34,6 +34,11 @@ interface SpellsViewProps {
   onCastSpell: (crawlerId: string, spellId: string) => Promise<void>;
   onPromoteSpellToLibrary: (spell: Spell) => Promise<void>;
   isAdmin: boolean;
+  currentUserId?: string;
+  currentUsername?: string;
+  publicSpells?: Spell[];
+  onToggleSpellPublic?: (spell: Spell, isPublic: boolean) => void;
+  showPublicContent?: boolean;
 }
 
 const createDefaultSpellData = (): SpellData => ({
@@ -385,6 +390,20 @@ function SpellDataEditor({ spellData, onChange }: SpellDataEditorProps) {
         </div>
       </div>
 
+      {/* Reaction Trigger (only for Reaction spells) */}
+      {sd.actionType === 'Reaction' && (
+        <div>
+          <label className="text-[10px] text-muted-foreground block mb-0.5">Reaction Trigger <span className="text-destructive">*</span></label>
+          <input
+            type="text"
+            value={sd.reactionTrigger ?? ''}
+            onChange={(e) => onChange({ reactionTrigger: e.target.value || undefined })}
+            placeholder="e.g. When you are hit by an attack"
+            className="bg-muted border border-border px-2 py-1 text-xs w-full"
+          />
+        </div>
+      )}
+
       {/* Special Effect */}
       <div>
         <label className="text-[10px] text-muted-foreground block mb-0.5">Special Effect</label>
@@ -409,6 +428,8 @@ function SpellCard({
   onDelete,
   onGrant,
   crawlers,
+  currentUserId,
+  onTogglePublic,
 }: {
   spell: Spell;
   isAdmin: boolean;
@@ -416,6 +437,8 @@ function SpellCard({
   onDelete: () => void;
   onGrant: (crawlerId: string) => void;
   crawlers: Crawler[];
+  currentUserId?: string;
+  onTogglePublic?: (isPublic: boolean) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [showGrantMenu, setShowGrantMenu] = useState(false);
@@ -465,6 +488,7 @@ function SpellCard({
             {durationParts.length > 0 && <div className="col-span-2"><span className="text-muted-foreground">Duration: </span>{durationParts.join(', ')}</div>}
             {sd.canTargetSelf && <div className="col-span-2 text-muted-foreground italic">Can target self</div>}
             {sd.splashDamage && <div className="col-span-2 text-muted-foreground italic">Splash damage</div>}
+            {sd.reactionTrigger && <div className="col-span-2"><span className="text-muted-foreground">Trigger: </span><span className="text-accent italic">{sd.reactionTrigger}</span></div>}
           </div>
           {sd.specialEffect && (
             <div className="text-accent italic text-[11px]">
@@ -478,6 +502,31 @@ function SpellCard({
               ))}
             </div>
           )}
+
+          {/* Creator + public toggle */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {spell.createdByUsername && (
+              <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                <Globe className="w-2.5 h-2.5" /> by {spell.createdByUsername}
+              </span>
+            )}
+            {currentUserId && spell.createdBy === currentUserId && onTogglePublic && (
+              <button
+                type="button"
+                onClick={() => onTogglePublic(!spell.isPublic)}
+                className={`flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 border transition-colors ${
+                  spell.isPublic
+                    ? 'border-primary/50 text-primary hover:bg-primary/10'
+                    : 'border-border text-muted-foreground hover:border-primary/30 hover:text-primary'
+                }`}
+              >
+                {spell.isPublic
+                  ? <><Globe className="w-2.5 h-2.5" /> Public</>
+                  : <><Lock className="w-2.5 h-2.5" /> Private</>
+                }
+              </button>
+            )}
+          </div>
 
           {isAdmin && (
             <div className="flex gap-2 pt-1 relative">
@@ -620,6 +669,12 @@ function KnownSpellCard({
                     <span className="text-destructive">
                       {spell.spellData.damageDice!.map(d => `${d.count}d${d.sides}`).join(' + ')}
                     </span>
+                  </div>
+                )}
+                {spell.spellData.reactionTrigger && (
+                  <div className="col-span-2">
+                    <span className="text-muted-foreground">Trigger: </span>
+                    <span className="text-accent italic">{spell.spellData.reactionTrigger}</span>
                   </div>
                 )}
               </div>
@@ -789,6 +844,11 @@ const SpellsView: React.FC<SpellsViewProps> = ({
   onCastSpell,
   onPromoteSpellToLibrary,
   isAdmin,
+  currentUserId,
+  currentUsername,
+  publicSpells = [],
+  onToggleSpellPublic,
+  showPublicContent = false,
 }) => {
   const [selectedCrawlerId, setSelectedCrawlerId] = useState<string>(crawlers[0]?.id ?? '');
   const [editingSpell, setEditingSpell] = useState<Spell | null>(null);
@@ -808,7 +868,12 @@ const SpellsView: React.FC<SpellsViewProps> = ({
     if (exists) {
       await onUpdateSpell(spell.id, spell);
     } else {
-      await onAddSpell(spell);
+      const newSpell: Spell = {
+        ...spell,
+        ...(currentUserId ? { createdBy: currentUserId, createdByUsername: currentUsername } : {}),
+        isPublic: false,
+      };
+      await onAddSpell(newSpell);
     }
     setEditingSpell(null);
   };
@@ -881,8 +946,44 @@ const SpellsView: React.FC<SpellsViewProps> = ({
                   onEdit={() => setEditingSpell({ ...spell })}
                   onDelete={() => onDeleteSpell(spell.id)}
                   onGrant={(crawlerId) => onLearnSpell(crawlerId, spell, 'granted')}
+                  currentUserId={currentUserId}
+                  onTogglePublic={onToggleSpellPublic ? (isPublic) => onToggleSpellPublic(spell, isPublic) : undefined}
                 />
               ))}
+            </div>
+          )}
+          {/* Community Spells */}
+          {showPublicContent && publicSpells.filter(ps => !spells.some(s => s.id === ps.id)).length > 0 && (
+            <div className="border border-primary/20 bg-primary/5 p-3 rounded space-y-2 mt-3">
+              <h3 className="font-display text-xs text-primary flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5" />
+                COMMUNITY SPELLS
+              </h3>
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin' }}>
+                {publicSpells.filter(ps => !spells.some(s => s.id === ps.id)).map(spell => (
+                  <div key={spell.id} className="flex items-center justify-between gap-2 py-1.5 px-2 border border-primary/20 bg-background/50 text-xs">
+                    <div className="min-w-0">
+                      <span className="font-display text-primary truncate block">{spell.name}</span>
+                      <span className="text-muted-foreground">Lvl {spell.spellData.spellLevel} {spell.spellData.school}</span>
+                      {spell.createdByUsername && (
+                        <span className="text-[10px] text-primary/60 flex items-center gap-0.5 mt-0.5">
+                          <Globe className="w-2.5 h-2.5" /> by {spell.createdByUsername}
+                        </span>
+                      )}
+                    </div>
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => onAddSpell({ ...spell, id: crypto.randomUUID(), isPublic: false })}
+                        className="text-primary hover:text-primary/80 shrink-0"
+                        title="Add to library"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>

@@ -65,7 +65,7 @@ export interface WeaponData {
 export const SPELL_SCHOOLS = ['Evocation', 'Necromancy', 'Illusion', 'Conjuration', 'Abjuration', 'Divination', 'Transmutation', 'Enchantment'] as const;
 export type SpellSchool = typeof SPELL_SCHOOLS[number];
 
-export const SPELL_ACTION_TYPES = ['Action', 'Bonus Action'] as const;
+export const SPELL_ACTION_TYPES = ['Action', 'Bonus Action', 'Reaction'] as const;
 export type SpellActionType = typeof SPELL_ACTION_TYPES[number];
 
 export const SPELL_DAMAGE_TYPES = [...DAMAGE_TYPES, 'Healing'] as const;
@@ -95,6 +95,7 @@ export interface SpellData {
   savingThrow?: string; // e.g. 'DEX', 'CON'
   specialEffect?: string;
   splashDamage?: boolean;
+  reactionTrigger?: string; // For Reaction spells: describes what triggers the reaction (e.g. "when you are hit by an attack")
 }
 
 export interface Spell {
@@ -103,6 +104,9 @@ export interface Spell {
   description: string;
   tags?: string[];
   spellData: SpellData;
+  createdBy?: string;        // Firebase uid of creator
+  createdByUsername?: string; // Denormalized for display
+  isPublic?: boolean;        // Whether visible to players outside the campaign
 }
 
 export const SPELL_LEARNED_FROM = ['tome', 'quest', 'level', 'race', 'class', 'granted'] as const;
@@ -156,6 +160,9 @@ export interface InventoryItem {
       customSpell?: Spell; // Embedded one-off spell (not in library)
     }>;
   };
+  createdBy?: string;        // Firebase uid of creator
+  createdByUsername?: string; // Denormalized for display
+  isPublic?: boolean;        // Whether visible to players outside the campaign
 }
 
 // Compute total stat modifiers from all equipped items on a crawler
@@ -399,6 +406,7 @@ export interface UserProfile {
   email?: string;         // Stored for reference (populated from auth)
   createdAt: number;      // Epoch ms
   updatedAt: number;
+  showPublicContent?: boolean; // Whether to show public content from other players
 }
 
 // Campaign — groups players into a room with a single DM (root-level collection)
@@ -433,6 +441,19 @@ export interface FriendRequest {
   status: FriendRequestStatus;
   createdAt: number;
   updatedAt: number;
+}
+
+// Audit record for significant user decisions/setting changes (root-level collection)
+export interface UserDecision {
+  id: string;
+  userId: string;
+  username?: string;          // Denormalized for display in reports
+  action: string;             // e.g. 'enable_public_content', 'disable_public_content'
+  label: string;              // Human-readable description
+  oldValue?: unknown;         // Previous value (for toggles/settings)
+  newValue?: unknown;         // New value
+  context?: string;           // Optional extra context (e.g. campaign id)
+  timestamp: number;          // Epoch ms
 }
 
 export const defaultCrawlers: Crawler[] = [

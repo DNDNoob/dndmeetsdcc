@@ -22,6 +22,7 @@ import { useGameState, DiceRollEntry } from "@/hooks/useGameState";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCampaigns } from "@/hooks/useCampaigns";
 import { useFriends } from "@/hooks/useFriends";
+import { usePublicContent } from "@/hooks/usePublicContent";
 import { toast } from "sonner";
 import type { Episode, Campaign, CrawlerPlacement, EpisodeMobPlacement } from "@/lib/gameData";
 
@@ -54,7 +55,7 @@ function loadSavedCampaign(): Campaign | null {
 const Index = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, isAuthenticated, userProfile, needsUsername, signOut, loading: authLoading } = useAuth();
+  const { user, isAuthenticated, userProfile, needsUsername, signOut, loading: authLoading, updateUserProfile, logDecision } = useAuth();
 
   // Campaign management
   const {
@@ -215,6 +216,29 @@ const Index = () => {
     if (!activeCampaign || !user) return false;
     return activeCampaign.ownerId === user.uid;
   }, [activeCampaign, user]);
+
+  // Public content (cross-campaign sharing)
+  const showPublicContent = userProfile?.showPublicContent ?? false;
+  const { publicItems, publicSpells, publishItem, unpublishItem, publishSpell, unpublishSpell } = usePublicContent(showPublicContent);
+
+  const handleToggleItemPublic = useCallback(async (item: import('@/lib/gameData').InventoryItem, isPublic: boolean) => {
+    const sharedItems = getSharedInventory();
+    updateSharedInventory(sharedItems.map(i => i.id === item.id ? { ...i, isPublic } : i));
+    if (isPublic) {
+      await publishItem({ ...item, isPublic: true });
+    } else {
+      await unpublishItem(item.id);
+    }
+  }, [getSharedInventory, updateSharedInventory, publishItem, unpublishItem]);
+
+  const handleToggleSpellPublic = useCallback(async (spell: import('@/lib/gameData').Spell, isPublic: boolean) => {
+    await updateSpell(spell.id, { isPublic });
+    if (isPublic) {
+      await publishSpell({ ...spell, isPublic: true });
+    } else {
+      await unpublishSpell(spell.id);
+    }
+  }, [updateSpell, publishSpell, unpublishSpell]);
 
   // Restore campaign from URL query param on cold load (deep linking)
   const campaignRestoredRef = useRef(false);
@@ -544,6 +568,8 @@ const Index = () => {
         onDeclineFriendRequest={declineFriendRequest}
         onRemoveFriend={removeFriend}
         onCancelFriendRequest={cancelFriendRequest}
+        onUpdateUserProfile={updateUserProfile}
+        onLogDecision={logDecision}
       />
     );
   }
@@ -662,6 +688,11 @@ const Index = () => {
                 onConsumeSpellTome={consumeSpellTome}
                 onPromoteSpellToLibrary={promoteSpellToLibrary}
                 isAdmin={isAdmin}
+                currentUserId={user?.uid}
+                currentUsername={userProfile?.username}
+                publicItems={publicItems}
+                onToggleItemPublic={handleToggleItemPublic}
+                showPublicContent={showPublicContent}
               />
             )}
             {currentView === "spells" && (
@@ -676,6 +707,11 @@ const Index = () => {
                 onCastSpell={castSpell}
                 onPromoteSpellToLibrary={promoteSpellToLibrary}
                 isAdmin={isAdmin}
+                currentUserId={user?.uid}
+                currentUsername={userProfile?.username}
+                publicSpells={publicSpells}
+                onToggleSpellPublic={handleToggleSpellPublic}
+                showPublicContent={showPublicContent}
               />
             )}
             {currentView === "mobs" && <MobsView mobs={mobs} />}

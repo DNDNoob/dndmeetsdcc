@@ -20,7 +20,7 @@ import {
 } from '@/lib/firebase';
 import { toast } from 'sonner';
 import type { User } from 'firebase/auth';
-import type { UserProfile } from '@/lib/gameData';
+import type { UserProfile, UserDecision } from '@/lib/gameData';
 
 interface AuthContextType {
   /** The current Firebase user (anonymous, Google, or email/password). Null while loading. */
@@ -53,6 +53,8 @@ interface AuthContextType {
   saveUserProfile: (username: string, displayName: string) => Promise<boolean>;
   /** Update the user's profile fields. */
   updateUserProfile: (updates: Partial<UserProfile>) => Promise<void>;
+  /** Record a significant user decision to the audit log. */
+  logDecision: (action: string, label: string, opts?: { oldValue?: unknown; newValue?: unknown; context?: string }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -237,6 +239,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [user]);
 
+  const logDecision = useCallback(async (
+    action: string,
+    label: string,
+    opts: { oldValue?: unknown; newValue?: unknown; context?: string } = {}
+  ): Promise<void> => {
+    if (!user || !db) return;
+    const record: UserDecision = {
+      id: crypto.randomUUID(),
+      userId: user.uid,
+      username: userProfile?.username,
+      action,
+      label,
+      oldValue: opts.oldValue,
+      newValue: opts.newValue,
+      context: opts.context,
+      timestamp: Date.now(),
+    };
+    try {
+      await setDoc(doc(db, 'userDecisions', record.id), record);
+    } catch (err) {
+      console.error('[Auth] Failed to log decision:', err);
+    }
+  }, [user, userProfile]);
+
   const openAuthModal = useCallback(() => setAuthModalOpen(true), []);
   const closeAuthModal = useCallback(() => setAuthModalOpen(false), []);
 
@@ -260,6 +286,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       authModalOpen,
       saveUserProfile,
       updateUserProfile,
+      logDecision,
     }}>
       {children}
     </AuthContext.Provider>

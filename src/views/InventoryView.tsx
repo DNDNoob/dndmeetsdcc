@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import { Crawler, InventoryItem, EquipmentSlot as SlotType, StatModifiers, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, Spell, SpellData } from "@/lib/gameData";
-import { Coins, Package, Sword, Shield, Plus, Trash2, Edit2, Save, HardHat, Search, BookOpen, Gem, Footprints, Shirt, Hand, Crosshair, ChevronDown, ChevronUp, Wand2 } from "lucide-react";
+import { Coins, Package, Sword, Shield, Plus, Trash2, Edit2, Save, HardHat, Search, BookOpen, Gem, Footprints, Shirt, Hand, Crosshair, ChevronDown, ChevronUp, Wand2, Globe, Lock, Users } from "lucide-react";
 import { SpellDataEditor } from "@/views/SpellsView";
 
 // Inline SVG for legs/pants slot
@@ -50,6 +50,11 @@ interface InventoryViewProps {
   onConsumeSpellTome?: (crawlerId: string, itemId: string) => Promise<void>;
   onPromoteSpellToLibrary?: (spell: Spell) => Promise<void>;
   isAdmin?: boolean;
+  currentUserId?: string;
+  currentUsername?: string;
+  publicItems?: InventoryItem[];
+  onToggleItemPublic?: (item: InventoryItem, isPublic: boolean) => void;
+  showPublicContent?: boolean;
 }
 
 // Helper to create item signature for grouping
@@ -94,6 +99,11 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   onConsumeSpellTome,
   onPromoteSpellToLibrary,
   isAdmin = false,
+  currentUserId,
+  currentUsername,
+  publicItems = [],
+  onToggleItemPublic,
+  showPublicContent = false,
 }) => {
   const [editMode, setEditMode] = useState(false);
   // Expanded item details state
@@ -292,6 +302,8 @@ const InventoryView: React.FC<InventoryViewProps> = ({
         ...(mods && Object.keys(mods).length > 0 ? { statModifiers: mods } : {}),
         ...weaponFields,
         ...spellTomeFields,
+        ...(currentUserId ? { createdBy: currentUserId, createdByUsername: currentUsername } : {}),
+        isPublic: false,
       };
       onUpdateSharedInventory([...items, item]);
     }
@@ -582,16 +594,47 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                           )}
                           {isExpanded && renderExpandedItemDetails(item)}
                         </div>
-                        {editMode && (
-                          <div className="flex flex-col gap-1 shrink-0">
-                            <button onClick={() => handleStartEditLibraryItem(item)} className="text-primary hover:text-primary/80" title="Edit item">
-                              <Edit2 className="w-4 h-4" />
+                        <div className="flex flex-col gap-1 shrink-0 items-end">
+                          {/* Creator attribution */}
+                          {item.createdByUsername && (
+                            <span className="text-[9px] text-muted-foreground whitespace-nowrap">
+                              by {item.createdByUsername}
+                            </span>
+                          )}
+                          {/* Public/private toggle (own items only) */}
+                          {currentUserId && item.createdBy === currentUserId && onToggleItemPublic && (
+                            <button
+                              onClick={() => onToggleItemPublic(item, !item.isPublic)}
+                              title={item.isPublic ? 'Make private' : 'Make public'}
+                              className={`flex items-center gap-0.5 text-[9px] px-1 py-0.5 border transition-colors ${
+                                item.isPublic
+                                  ? 'border-primary/50 text-primary hover:bg-primary/10'
+                                  : 'border-border text-muted-foreground hover:border-primary/30 hover:text-primary'
+                              }`}
+                            >
+                              {item.isPublic
+                                ? <><Globe className="w-2.5 h-2.5" /> Public</>
+                                : <><Lock className="w-2.5 h-2.5" /> Private</>
+                              }
                             </button>
-                            <button onClick={() => handleRemoveLibraryItem(item.id)} className="text-destructive hover:text-destructive/80" title="Delete item">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        )}
+                          )}
+                          {/* Show public badge on items from others */}
+                          {item.isPublic && item.createdBy !== currentUserId && (
+                            <span className="flex items-center gap-0.5 text-[9px] text-primary">
+                              <Globe className="w-2.5 h-2.5" />
+                            </span>
+                          )}
+                          {editMode && (
+                            <>
+                              <button onClick={() => handleStartEditLibraryItem(item)} className="text-primary hover:text-primary/80" title="Edit item">
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button onClick={() => handleRemoveLibraryItem(item.id)} className="text-destructive hover:text-destructive/80" title="Delete item">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );
@@ -1035,6 +1078,65 @@ const InventoryView: React.FC<InventoryViewProps> = ({
             })()}
           </div>
         </div>
+
+        {/* Community Items */}
+        {showPublicContent && publicItems.length > 0 && (
+          <div className="border border-primary/20 bg-primary/5 p-4 mb-6">
+            <h3 className="font-display text-lg text-primary flex items-center gap-2 mb-4">
+              <Users className="w-5 h-5" />
+              COMMUNITY ITEMS
+              <span className="text-xs text-muted-foreground font-normal ml-1">from other players</span>
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-64 overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin' }}>
+              {publicItems.filter(pi => !libraryItems.some(li => li.id === pi.id)).map((item) => (
+                <div key={item.id} className="flex flex-col text-sm py-2 px-3 border border-primary/20 bg-background/50">
+                  <div className="flex items-start gap-2">
+                    {getEquipmentIcon(item.equipSlot, "w-4 h-4 shrink-0 mt-0.5")}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1 flex-wrap">
+                        <span className="text-foreground">{item.name}</span>
+                        {item.equipSlot && (
+                          <span className="text-xs bg-accent/20 text-accent px-1.5 py-0.5 rounded">
+                            {item.equipSlot === 'weapon' ? 'Weapon' :
+                             item.equipSlot === 'leftHand' ? 'Left Hand' :
+                             item.equipSlot === 'rightHand' ? 'Right Hand' :
+                             item.equipSlot === 'ringFinger' ? 'Ring' :
+                             item.equipSlot.charAt(0).toUpperCase() + item.equipSlot.slice(1)}
+                          </span>
+                        )}
+                        {item.goldValue !== undefined && item.goldValue > 0 && (
+                          <span className="text-xs bg-accent/10 text-accent px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                            <Coins className="w-3 h-3" /> {item.goldValue}G
+                          </span>
+                        )}
+                      </div>
+                      {item.description && (
+                        <span className="text-muted-foreground text-xs block">({item.description})</span>
+                      )}
+                      {item.createdByUsername && (
+                        <span className="text-[10px] text-primary/60 flex items-center gap-0.5 mt-0.5">
+                          <Globe className="w-2.5 h-2.5" /> by {item.createdByUsername}
+                        </span>
+                      )}
+                    </div>
+                    {editMode && (
+                      <button
+                        onClick={() => {
+                          const items = getSharedInventory();
+                          onUpdateSharedInventory([...items, { ...item, id: crypto.randomUUID(), isPublic: false }]);
+                        }}
+                        className="text-primary hover:text-primary/80 shrink-0"
+                        title="Add to campaign library"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Crawler inventories */}
         <div className="space-y-6">
