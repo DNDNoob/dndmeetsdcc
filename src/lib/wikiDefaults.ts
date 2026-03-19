@@ -219,7 +219,28 @@ From the Profiles page, you can send gold and items to other crawlers. Select a 
 
 ## Expandable Item Details
 
-Click any item name in the inventory to expand its full details, including description, gold value, equipment slot, stat modifiers, weapon data, and tags.`,
+Click any item name in the inventory to expand its full details, including description, gold value, equipment slot, stat modifiers, weapon data, and tags.
+
+## Creator Attribution
+
+Every item in the shared library shows who created it. The creator's username appears as a small badge on the item card. This helps the DM and players know the origin of each item.
+
+## Public & Private Items
+
+Library items are **private by default** — they are only visible within your campaign. You can toggle an item public to share it with the broader community:
+
+- Click the **globe icon** on any item you created to make it public
+- Click the **lock icon** to revert it to private
+- Only the item's creator can toggle its visibility
+
+Public items appear in the **Community Items** section for any player who has enabled public content in their account settings.
+
+## Community Items
+
+If you have **Show Public Content** enabled in your account settings, a "Community Items" section appears above the crawler inventories. It lists public items shared by other players across all campaigns.
+
+- DMs can click **+** on a community item to copy it into their local item library
+- Copied items start as private and belong to the DM who imported them`,
   },
   {
     id: 'combat',
@@ -464,7 +485,11 @@ All dice rolls sync across all connected players in real time. When someone roll
 
 ## System Messages
 
-The dice roller also shows system notifications like game start/stop events and loot box deliveries.`,
+The dice roller also shows system notifications like game start/stop events and loot box deliveries.
+
+## Closing the Dice Roller (Mobile)
+
+On mobile, tap the **✕** button in the top-right corner of the dice roller panel to collapse it. This keeps the interface clean when you no longer need the roller visible.`,
   },
   {
     id: 'loot-boxes',
@@ -821,7 +846,30 @@ Click **Sign Out** to sign out. You can sign back in at any time.
 Your profile includes:
 - **Username** — unique identifier, used for lookups
 - **Display Name** — shown in campaigns and as the DM name
-- **Avatar** — pulled from your Google account if applicable`,
+- **Avatar** — pulled from your Google account if applicable
+
+## Account Settings
+
+Click the **⚙ Account Settings** section on the Campaign Select screen to manage your preferences.
+
+### Show Public Content
+
+Toggle **Show Public Content** to opt in to seeing items and spells shared publicly by other players:
+
+- **Off (default)** — you only see your own campaign's content
+- **On** — a "Community Items" section appears in Inventory and a "Community Spells" section appears in Spells, showing publicly shared content from all players
+
+When you enable this setting, an **age warning** is displayed reminding you that public content is user-generated and may not be suitable for all ages. You must acknowledge this warning to continue.
+
+You can disable public content at any time from Account Settings. Your toggle decisions are recorded in your Decision History.
+
+## Decision History
+
+Inside Account Settings, the **Decision History** panel shows a log of significant account-level decisions you have made (e.g., enabling or disabling public content). Each entry shows:
+
+- The action taken
+- A human-readable label
+- The date and time`,
   },
   {
     id: 'campaigns',
@@ -960,7 +1008,7 @@ Each spell has the following configurable properties:
 | Mana Cost | Mana consumed per cast (0 = free) |
 | Spell Level | D&D-style level 1–9 |
 | School | Evocation, Necromancy, Illusion, etc. |
-| Action Type | Action or Bonus Action |
+| Action Type | Action, Bonus Action, or **Reaction** |
 | Range | Feet, Self, or Touch |
 | Target | Single, Area, Self, or Multiple |
 | Area of Effect | Shape (sphere/cone/line/cube) and size in feet |
@@ -973,6 +1021,93 @@ Each spell has the following configurable properties:
 | Saving Throw | Which stat the target rolls to resist |
 | Splash Damage | Whether the spell can hit multiple targets |
 | Special Effect | Free-text description of any on-hit effects |
-| Can Target Self | Whether the caster can target themselves |`,
+| Can Target Self | Whether the caster can target themselves |
+| Reaction Trigger | *(Reaction spells only)* What event triggers the reaction, e.g. "When you are hit by an attack" |
+
+## Reaction Spells
+
+Spells with **Action Type: Reaction** are cast in response to a specific trigger event outside your turn. When creating a reaction spell, fill in the **Reaction Trigger** field to describe exactly when it can be used. The trigger is displayed on the spell card so players know when to declare it.
+
+Examples of reaction triggers:
+- "When you are hit by an attack"
+- "When an ally within 30 ft takes damage"
+- "When you fail a saving throw"
+
+## Sharing Spells
+
+Authenticated players can **share spells publicly** so other players across all campaigns can discover and use them.
+
+- **Creator attribution**: every spell shows who created it ("by username")
+- **Privacy toggle**: if you created a spell, a **globe/lock** button appears when the spell is expanded — click it to make it public or private. Spells are **private by default**.
+- **Community Spells**: if you have [Public Content](/wiki/public-content) enabled in Account Settings, a **Community Spells** panel appears at the bottom of the Spell Library showing public spells from other players. DMs can add any community spell to their campaign library with the **+** button.`,
+  },
+  {
+    id: 'public-content',
+    slug: 'public-content',
+    title: 'Public Content & Sharing',
+    category: 'Accounts',
+    order: 6,
+    content: `# Public Content & Sharing
+
+Players can share inventory items and spells publicly so other players across all campaigns can discover and use them. This system is opt-in — public content is disabled by default.
+
+## Privacy Model
+
+All content (shared library items and spells) is **private by default**. This means:
+
+- Items and spells you create are only visible within your own campaigns.
+- Other players cannot see your content unless you explicitly make it public.
+
+## Making Content Public
+
+Every item in the Item Library and every spell in the Spell Library that you created has a **globe/lock toggle badge**:
+
+- 🔒 **Private** (default) — only visible within your campaign
+- 🌐 **Public** — visible to all players who have opted in to public content
+
+Click the badge to toggle. The change takes effect immediately.
+
+> Items created by others show a read-only attribution badge ("by username") so you know who made them.
+
+## Enabling Public Content
+
+To see content shared by other players:
+
+1. Go to the **Campaign Selection** screen.
+2. Open **Account Settings** (bottom of the page).
+3. Toggle **Show Public Content** on.
+4. Confirm the **age warning** — community content is user-generated and has not been moderated.
+
+Once enabled:
+- A **Community Items** section appears in the Inventory page's Item Library.
+- A **Community Spells** panel appears in the Spell Library.
+
+These sections show public content from all other players. DMs can copy community items/spells into their campaign library with the **+** button.
+
+## Disabling Public Content
+
+Toggle **Show Public Content** off in Account Settings at any time. The Community Items and Community Spells sections will immediately disappear.
+
+## Decision History
+
+Every time you change a privacy-related setting (like enabling or disabling public content), the action is recorded in your **Decision History**. To view it:
+
+1. Open **Account Settings** in Campaign Select.
+2. Click **Decision History** to expand the log.
+
+Each entry shows:
+- What changed (e.g. "Enabled public content")
+- The old and new value
+- A timestamp
+
+This gives you a complete personal record of when you opted in or out of public content.
+
+## Age Warning
+
+When enabling public content, you will see a one-time warning:
+
+> *Public content is created by other players and may not be suitable for all ages. Items and spells shared publicly have not been reviewed or moderated.*
+
+You must confirm before the toggle activates. This confirmation is recorded in your Decision History.`,
   },
 ];
