@@ -19,13 +19,13 @@ const HealthBar: React.FC<HealthBarProps> = ({
   className,
   baseMax,
 }) => {
-  const percentage = Math.min(100, Math.max(0, (current / max) * 100));
+  const percentage = max > 0 ? Math.min(100, Math.max(0, (current / max) * 100)) : 0;
 
   // Calculate the base portion (without modifier) as a percentage of max
   const hasModifier = baseMax !== undefined && baseMax !== max;
   const isNegativeModifier = hasModifier && max < baseMax;
   const basePercentage = hasModifier && !isNegativeModifier
-    ? Math.min(100, Math.max(0, (Math.min(current, baseMax) / max) * 100))
+    ? Math.min(100, Math.max(0, max > 0 ? (Math.min(current, baseMax) / max) * 100 : 0))
     : percentage;
   const modifierPercentage = hasModifier && !isNegativeModifier ? percentage - basePercentage : 0;
 

@@ -79,6 +79,22 @@ const PingPanel: React.FC<PingPanelProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isExpanded]);
 
+  // Filter to only crawlers loaded in the active episode (merge episode + runtime placements)
+  const episodeCrawlerIds = useMemo(() => {
+    const ids = new Set<string>();
+    // From episode's pre-placed crawlers (all maps)
+    activeEpisode?.crawlerPlacements?.forEach(p => ids.add(p.crawlerId));
+    // From runtime placements (crawlers added during ShowTime)
+    runtimeCrawlerPlacements?.forEach(p => ids.add(p.crawlerId));
+    return ids.size > 0 ? ids : null;
+  }, [activeEpisode?.crawlerPlacements, runtimeCrawlerPlacements]);
+
+  const playerCrawlers = useMemo(() => (crawlers ?? []).filter(c => {
+    if (c.id === 'dungeonai') return false;
+    if (episodeCrawlerIds) return episodeCrawlerIds.has(c.id);
+    return true;
+  }), [crawlers, episodeCrawlerIds]);
+
   const openRestDropdown = (type: 'short' | 'long') => {
     const selected: Record<string, boolean> = {};
     playerCrawlers.forEach(c => { selected[c.id] = true; });
@@ -99,22 +115,6 @@ const PingPanel: React.FC<PingPanelProps> = ({
     }
     setShowRestDropdown(null);
   };
-
-  // Filter to only crawlers loaded in the active episode (merge episode + runtime placements)
-  const episodeCrawlerIds = useMemo(() => {
-    const ids = new Set<string>();
-    // From episode's pre-placed crawlers (all maps)
-    activeEpisode?.crawlerPlacements?.forEach(p => ids.add(p.crawlerId));
-    // From runtime placements (crawlers added during ShowTime)
-    runtimeCrawlerPlacements?.forEach(p => ids.add(p.crawlerId));
-    return ids.size > 0 ? ids : null;
-  }, [activeEpisode?.crawlerPlacements, runtimeCrawlerPlacements]);
-
-  const playerCrawlers = useMemo(() => (crawlers ?? []).filter(c => {
-    if (c.id === 'dungeonai') return false;
-    if (episodeCrawlerIds) return episodeCrawlerIds.has(c.id);
-    return true;
-  }), [crawlers, episodeCrawlerIds]);
 
   // Build placement-based mob entries (merge episode + runtime placements)
   const mobCombatEntries = useMemo(() => {

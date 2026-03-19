@@ -666,7 +666,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
 
   const currentAvatar = editMode ? (editData.avatar ?? selected.avatar) : selected.avatar;
   const currentGold = editMode ? (editData.gold ?? selected.gold ?? 0) : (selected.gold ?? 0);
-  const equippedMods = getEquippedModifiers(selected, inventory);
+  const equippedMods = getEquippedModifiers(editMode ? { ...selected, ...editData } : selected, inventory);
 
   return (
     <motion.div

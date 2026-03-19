@@ -94,7 +94,7 @@ const MobsView: React.FC<MobsViewProps> = ({ mobs }) => {
 
                   {mob.encountered ? (
                     <>
-                      <p className="text-muted-foreground text-sm mb-3">{mob.description}</p>
+                      {mob.description && <p className="text-muted-foreground text-sm mb-3">{mob.description}</p>}
                       
                       {/* Stats Grid */}
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">

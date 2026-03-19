@@ -2,6 +2,10 @@
   {
     "date": "2026-03-19",
     "changes": [
+      "🐛 Fixed crash when clicking Short Rest / Long Rest — PingPanel TDZ error resolved (playerCrawlers was referenced before its useMemo declaration)",
+      "🐛 Fixed health bars showing NaN when max HP/mana is 0 — HealthBar now guards against division by zero",
+      "🐛 Fixed effective HP/Mana stats not updating in real-time while editing a crawler's equipped items in ProfilesView",
+      "🐛 Fixed empty paragraph rendering in Mobs list when a mob has no description",
       "🔒 Content privacy system — inventory items and spells in the shared library are now linked to the account that created them, private by default",
       "🌐 Public content toggle — item and spell creators can mark their content as public to share with the community; a globe/lock badge shows the current status",
       "👥 Community Items — when public content is enabled, a Community Items section appears in Inventory showing public items from other players that can be copied to your campaign library",
