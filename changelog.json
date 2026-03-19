@@ -1,5 +1,17 @@
 [
   {
+    "date": "2026-03-19",
+    "changes": [
+      "🔒 Content privacy system — inventory items and spells in the shared library are now linked to the account that created them, private by default",
+      "🌐 Public content toggle — item and spell creators can mark their content as public to share with the community; a globe/lock badge shows the current status",
+      "👥 Community Items — when public content is enabled, a Community Items section appears in Inventory showing public items from other players that can be copied to your campaign library",
+      "✨ Community Spells — when public content is enabled, a Community Spells section appears in the Spell Library showing public spells from other players that DMs can add to their library",
+      "⚙️ Account Settings — a new Account Settings section in Campaign Select lets players toggle 'Show Public Content' on/off",
+      "⚠️ Age warning — enabling public content shows a confirmation dialog warning that community content may not be suitable for all ages",
+      "🏷️ Creator attribution — items and spells display the username of whoever created them"
+    ]
+  },
+  {
     "date": "2026-03-18",
     "changes": [
       "✨ Added Spell System — crawlers can now learn and cast spells with mana costs, damage dice, schools, durations, and special effects",

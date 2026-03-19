@@ -6,7 +6,7 @@ import GoogleAuthButton from '@/components/GoogleAuthButton';
 import {
   Plus, Crown, Users, Copy, Trash2, Link, RefreshCw,
   LogOut, UserMinus, X, Shield, UserPlus, Check, Clock,
-  Heart,
+  Heart, Settings, Globe, Lock, AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Campaign, UserProfile, FriendRequest } from '@/lib/gameData';
@@ -33,6 +33,7 @@ interface CampaignSelectViewProps {
   onDeclineFriendRequest: (requestId: string) => Promise<void>;
   onRemoveFriend: (requestId: string) => Promise<void>;
   onCancelFriendRequest: (requestId: string) => Promise<void>;
+  onUpdateUserProfile: (updates: Partial<UserProfile>) => Promise<void>;
 }
 
 const CampaignSelectView: React.FC<CampaignSelectViewProps> = ({
@@ -56,6 +57,7 @@ const CampaignSelectView: React.FC<CampaignSelectViewProps> = ({
   onDeclineFriendRequest,
   onRemoveFriend,
   onCancelFriendRequest,
+  onUpdateUserProfile,
 }) => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showJoinForm, setShowJoinForm] = useState(false);
@@ -70,6 +72,8 @@ const CampaignSelectView: React.FC<CampaignSelectViewProps> = ({
   const [showFriends, setShowFriends] = useState(false);
   const [friendUsername, setFriendUsername] = useState('');
   const [confirmRemoveFriend, setConfirmRemoveFriend] = useState<string | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showAgeWarning, setShowAgeWarning] = useState(false);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -754,7 +758,132 @@ const CampaignSelectView: React.FC<CampaignSelectViewProps> = ({
             )}
           </AnimatePresence>
         </div>
+
+        {/* Account Settings Section */}
+        {userProfile && (
+          <div className="border-t border-border pt-6">
+            <button
+              onClick={() => setShowSettings(!showSettings)}
+              className="flex items-center gap-2 w-full text-left mb-4"
+            >
+              <Settings className="w-4 h-4 text-primary" />
+              <h2 className="font-display text-sm text-primary tracking-[0.2em]">
+                ACCOUNT SETTINGS
+              </h2>
+              <span className="text-[10px] text-muted-foreground ml-auto">
+                {showSettings ? 'Hide' : 'Show'}
+              </span>
+            </button>
+
+            <AnimatePresence>
+              {showSettings && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden"
+                >
+                  <DungeonCard className="p-4 space-y-3">
+                    <h3 className="font-display text-xs text-primary tracking-wider flex items-center gap-2">
+                      <Globe className="w-3.5 h-3.5" />
+                      CONTENT PREFERENCES
+                    </h3>
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          {userProfile.showPublicContent
+                            ? <Globe className="w-3.5 h-3.5 text-primary shrink-0" />
+                            : <Lock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                          }
+                          <span className="text-sm font-display">
+                            {userProfile.showPublicContent ? 'Public Content: On' : 'Public Content: Off'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground mt-1 ml-5">
+                          {userProfile.showPublicContent
+                            ? 'You can see items and spells shared publicly by other players.'
+                            : 'Only see content from your own campaigns and friends.'}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          if (!userProfile.showPublicContent) {
+                            setShowAgeWarning(true);
+                          } else {
+                            onUpdateUserProfile({ showPublicContent: false });
+                            toast('Public content disabled');
+                          }
+                        }}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none shrink-0 ${
+                          userProfile.showPublicContent ? 'bg-primary' : 'bg-muted-foreground/30'
+                        }`}
+                        role="switch"
+                        aria-checked={userProfile.showPublicContent ?? false}
+                        aria-label="Toggle public content"
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                            userProfile.showPublicContent ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </DungeonCard>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
       </div>
+
+      {/* Age Warning Modal */}
+      <AnimatePresence>
+        {showAgeWarning && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-background/90"
+            onClick={() => setShowAgeWarning(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-background border-2 border-accent p-5 max-w-sm w-full mx-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-2 mb-3">
+                <AlertTriangle className="w-5 h-5 text-accent shrink-0" />
+                <h3 className="font-display text-sm text-accent tracking-wider">CONTENT WARNING</h3>
+              </div>
+              <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
+                Public content is created by other players and <strong className="text-foreground">may not be suitable for all ages</strong>.
+                Items and spells shared publicly have not been reviewed or moderated.
+              </p>
+              <p className="text-xs text-muted-foreground mb-5">
+                By enabling public content you confirm you are of appropriate age and agree to view user-generated content at your own discretion.
+              </p>
+              <div className="flex gap-2">
+                <DungeonButton variant="menu" className="flex-1" onClick={() => setShowAgeWarning(false)}>
+                  Cancel
+                </DungeonButton>
+                <DungeonButton
+                  variant="default"
+                  className="flex-1"
+                  onClick={async () => {
+                    await onUpdateUserProfile({ showPublicContent: true });
+                    setShowAgeWarning(false);
+                    toast('Public content enabled');
+                  }}
+                >
+                  I Understand, Enable
+                </DungeonButton>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };

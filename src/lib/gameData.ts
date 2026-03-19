@@ -103,6 +103,9 @@ export interface Spell {
   description: string;
   tags?: string[];
   spellData: SpellData;
+  createdBy?: string;        // Firebase uid of creator
+  createdByUsername?: string; // Denormalized for display
+  isPublic?: boolean;        // Whether visible to players outside the campaign
 }
 
 export const SPELL_LEARNED_FROM = ['tome', 'quest', 'level', 'race', 'class', 'granted'] as const;
@@ -156,6 +159,9 @@ export interface InventoryItem {
       customSpell?: Spell; // Embedded one-off spell (not in library)
     }>;
   };
+  createdBy?: string;        // Firebase uid of creator
+  createdByUsername?: string; // Denormalized for display
+  isPublic?: boolean;        // Whether visible to players outside the campaign
 }
 
 // Compute total stat modifiers from all equipped items on a crawler
@@ -399,6 +405,7 @@ export interface UserProfile {
   email?: string;         // Stored for reference (populated from auth)
   createdAt: number;      // Epoch ms
   updatedAt: number;
+  showPublicContent?: boolean; // Whether to show public content from other players
 }
 
 // Campaign — groups players into a room with a single DM (root-level collection)
