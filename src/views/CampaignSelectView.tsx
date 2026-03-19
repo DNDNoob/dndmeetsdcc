@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DungeonButton } from '@/components/ui/DungeonButton';
 import { DungeonCard } from '@/components/ui/DungeonCard';
@@ -9,7 +9,8 @@ import {
   Heart, Settings, Globe, Lock, AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import type { Campaign, UserProfile, FriendRequest } from '@/lib/gameData';
+import type { Campaign, UserProfile, FriendRequest, UserDecision } from '@/lib/gameData';
+import { db, collection, query, where, getDocs } from '@/lib/firebase';
 
 interface CampaignSelectViewProps {
   myCampaigns: Campaign[];
@@ -34,6 +35,7 @@ interface CampaignSelectViewProps {
   onRemoveFriend: (requestId: string) => Promise<void>;
   onCancelFriendRequest: (requestId: string) => Promise<void>;
   onUpdateUserProfile: (updates: Partial<UserProfile>) => Promise<void>;
+  onLogDecision: (action: string, label: string, opts?: { oldValue?: unknown; newValue?: unknown; context?: string }) => Promise<void>;
 }
 
 const CampaignSelectView: React.FC<CampaignSelectViewProps> = ({
@@ -58,6 +60,7 @@ const CampaignSelectView: React.FC<CampaignSelectViewProps> = ({
   onRemoveFriend,
   onCancelFriendRequest,
   onUpdateUserProfile,
+  onLogDecision,
 }) => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showJoinForm, setShowJoinForm] = useState(false);
@@ -74,6 +77,25 @@ const CampaignSelectView: React.FC<CampaignSelectViewProps> = ({
   const [confirmRemoveFriend, setConfirmRemoveFriend] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showAgeWarning, setShowAgeWarning] = useState(false);
+  const [decisionHistory, setDecisionHistory] = useState<UserDecision[]>([]);
+  const [showDecisionHistory, setShowDecisionHistory] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  // Load decision history when the user opens Account Settings
+  useEffect(() => {
+    if (!showSettings || !userProfile?.id || !db) return;
+    setLoadingHistory(true);
+    const q = query(collection(db, 'userDecisions'), where('userId', '==', userProfile.id));
+    getDocs(q)
+      .then((snap) => {
+        const docs = snap.docs
+          .map(d => d.data() as UserDecision)
+          .sort((a, b) => b.timestamp - a.timestamp);
+        setDecisionHistory(docs);
+      })
+      .catch((err) => console.error('[CampaignSelect] Failed to load decision history:', err))
+      .finally(() => setLoadingHistory(false));
+  }, [showSettings, userProfile?.id]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -811,6 +833,7 @@ const CampaignSelectView: React.FC<CampaignSelectViewProps> = ({
                             setShowAgeWarning(true);
                           } else {
                             onUpdateUserProfile({ showPublicContent: false });
+                            onLogDecision('disable_public_content', 'Disabled public content', { oldValue: true, newValue: false });
                             toast('Public content disabled');
                           }
                         }}
@@ -829,6 +852,53 @@ const CampaignSelectView: React.FC<CampaignSelectViewProps> = ({
                       </button>
                     </div>
                   </DungeonCard>
+
+                  {/* Decision history */}
+                  <div className="mt-3">
+                    <button
+                      onClick={() => setShowDecisionHistory(!showDecisionHistory)}
+                      className="flex items-center gap-2 w-full text-left text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <Clock className="w-3.5 h-3.5" />
+                      <span className="font-display tracking-wider">DECISION HISTORY</span>
+                      <span className="ml-auto">{showDecisionHistory ? '▲' : '▼'}</span>
+                    </button>
+
+                    <AnimatePresence>
+                      {showDecisionHistory && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="overflow-hidden mt-2"
+                        >
+                          {loadingHistory ? (
+                            <p className="text-[11px] text-muted-foreground italic">Loading...</p>
+                          ) : decisionHistory.length === 0 ? (
+                            <p className="text-[11px] text-muted-foreground italic">No decisions recorded yet.</p>
+                          ) : (
+                            <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin' }}>
+                              {decisionHistory.map(d => (
+                                <div key={d.id} className="flex items-start gap-2 text-[11px] border border-border/50 px-2 py-1.5 bg-muted/30">
+                                  <div className="flex-1 min-w-0">
+                                    <span className="text-foreground">{d.label}</span>
+                                    {d.oldValue !== undefined && d.newValue !== undefined && (
+                                      <span className="text-muted-foreground ml-1">
+                                        ({String(d.oldValue)} → {String(d.newValue)})
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="text-muted-foreground/60 shrink-0 whitespace-nowrap">
+                                    {new Date(d.timestamp).toLocaleDateString()} {new Date(d.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -873,6 +943,7 @@ const CampaignSelectView: React.FC<CampaignSelectViewProps> = ({
                   className="flex-1"
                   onClick={async () => {
                     await onUpdateUserProfile({ showPublicContent: true });
+                    await onLogDecision('enable_public_content', 'Enabled public content (age warning acknowledged)', { oldValue: false, newValue: true });
                     setShowAgeWarning(false);
                     toast('Public content enabled');
                   }}

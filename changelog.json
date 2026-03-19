@@ -8,7 +8,10 @@
       "✨ Community Spells — when public content is enabled, a Community Spells section appears in the Spell Library showing public spells from other players that DMs can add to their library",
       "⚙️ Account Settings — a new Account Settings section in Campaign Select lets players toggle 'Show Public Content' on/off",
       "⚠️ Age warning — enabling public content shows a confirmation dialog warning that community content may not be suitable for all ages",
-      "🏷️ Creator attribution — items and spells display the username of whoever created them"
+      "🏷️ Creator attribution — items and spells display the username of whoever created them",
+      "📋 Decision audit log — significant account setting changes (e.g. enabling/disabling public content) are recorded to a personal decision history in Firestore",
+      "🕐 Decision history panel — Account Settings now includes a collapsible Decision History section showing a timestamped log of past decisions",
+      "✖️ Added X close button to the Dice Roller panel header for easy dismissal on mobile"
     ]
   },
   {

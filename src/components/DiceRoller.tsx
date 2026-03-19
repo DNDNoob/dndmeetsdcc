@@ -171,9 +171,18 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
               }
             }}
           >
-            <h3 className="font-display text-primary text-glow-cyan text-lg mb-3 flex items-center gap-2 shrink-0">
-              <Dices className="w-5 h-5" /> DICE ROLLER
-            </h3>
+            <div className="flex items-center justify-between mb-3 shrink-0">
+              <h3 className="font-display text-primary text-glow-cyan text-lg flex items-center gap-2">
+                <Dices className="w-5 h-5" /> DICE ROLLER
+              </h3>
+              <button
+                onClick={() => setIsExpanded(false)}
+                className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Close dice roller"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
 
 
 

@@ -442,6 +442,19 @@ export interface FriendRequest {
   updatedAt: number;
 }
 
+// Audit record for significant user decisions/setting changes (root-level collection)
+export interface UserDecision {
+  id: string;
+  userId: string;
+  username?: string;          // Denormalized for display in reports
+  action: string;             // e.g. 'enable_public_content', 'disable_public_content'
+  label: string;              // Human-readable description
+  oldValue?: unknown;         // Previous value (for toggles/settings)
+  newValue?: unknown;         // New value
+  context?: string;           // Optional extra context (e.g. campaign id)
+  timestamp: number;          // Epoch ms
+}
+
 export const defaultCrawlers: Crawler[] = [
   {
     id: "1",

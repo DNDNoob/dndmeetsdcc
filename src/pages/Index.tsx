@@ -55,7 +55,7 @@ function loadSavedCampaign(): Campaign | null {
 const Index = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, isAuthenticated, userProfile, needsUsername, signOut, loading: authLoading } = useAuth();
+  const { user, isAuthenticated, userProfile, needsUsername, signOut, loading: authLoading, updateUserProfile, logDecision } = useAuth();
 
   // Campaign management
   const {
@@ -569,6 +569,7 @@ const Index = () => {
         onRemoveFriend={removeFriend}
         onCancelFriendRequest={cancelFriendRequest}
         onUpdateUserProfile={updateUserProfile}
+        onLogDecision={logDecision}
       />
     );
   }
