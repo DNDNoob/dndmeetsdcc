@@ -11,9 +11,15 @@ export const defaultWikiPages: Omit<WikiPage, 'updatedAt' | 'updatedBy'>[] = [
 
 Welcome to the Dungeon Crawler Carl companion app! This tool helps a Dungeon Master (DM) run tabletop RPG sessions with real-time maps, combat tracking, dice rolling, and more. Everything syncs across all connected players in real time via Firebase.
 
+## Landing Page
+
+When you first visit the site, you'll see the **Landing Page** — a cinematic overview of what the app offers, including living maps, real-time combat, character management, and more. Click **Enter the Dungeon** to sign in or create an account.
+
 ## Sign In & Set Up Your Profile
 
-1. **Sign in** using Google or email/password.
+An account is **required** to access any game features. Anonymous browsing of the app is not available — you must sign in first.
+
+1. **Sign in** using Google or email/password (click "Enter the Dungeon" on the landing page).
 2. **Choose a username** and display name when prompted (first time only).
 3. You'll be taken to the **Campaign Selection** screen.
 
@@ -822,12 +828,13 @@ The app requires user accounts for all game interactions. Your account is how th
 
 ## How It Works
 
-- **Anonymous users** (not signed in) cannot access any campaigns or game data.
+- **All users must sign in** before accessing the app. The landing page at the site root introduces the app and prompts you to create an account or sign in.
 - **Signed-in users** (via Google or email/password) can create campaigns, join campaigns, and interact with all game features.
+- If you sign out, you'll be redirected back to the landing page.
 
 ## Creating an Account
 
-1. Click the **Sign In** button on any screen.
+1. Click **Enter the Dungeon** on the landing page, or click **Sign In** if you see it.
 2. Click **CREATE ACCOUNT** and fill in your email and password (at least 6 characters).
 3. Alternatively, click **Continue with Google** for one-click account creation.
 4. On first sign-in, you'll be prompted to choose a **username** (unique, 3-24 characters, letters/numbers/underscores) and **display name**.

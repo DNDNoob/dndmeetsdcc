@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import AuthModal from "@/components/AuthModal";
 import UsernameSetupModal from "@/components/UsernameSetupModal";
+import LandingPage from "./pages/LandingPage";
 import Index from "./pages/Index";
 import JoinCampaign from "./pages/JoinCampaign";
 
@@ -19,8 +20,9 @@ const App = () => (
       <AuthProvider>
         <BrowserRouter basename={import.meta.env.BASE_URL}>
           <Routes>
+            <Route path="/" element={<LandingPage />} />
             <Route path="/join/:inviteCode" element={<JoinCampaign />} />
-            <Route path="/*" element={<Index />} />
+            <Route path="/app/*" element={<Index />} />
           </Routes>
         </BrowserRouter>
         <AuthModal />

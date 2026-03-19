@@ -2,6 +2,9 @@
   {
     "date": "2026-03-19",
     "changes": [
+      "🏠 New cinematic landing page — immersive hero section, feature showcase, combat mockup, map visualization, and animated scroll-reveal sections",
+      "🔒 Authentication required — all app content is now gated behind sign-in; anonymous access to game features is no longer allowed",
+      "🛤️ New /app route — the app now lives under /app/* with the landing page at /; authenticated users are auto-redirected to the app",
       "🐛 Fixed crash when clicking Short Rest / Long Rest — PingPanel TDZ error resolved (playerCrawlers was referenced before its useMemo declaration)",
       "🐛 Fixed health bars showing NaN when max HP/mana is 0 — HealthBar now guards against division by zero",
       "🐛 Fixed effective HP/Mana stats not updating in real-time while editing a crawler's equipped items in ProfilesView",
