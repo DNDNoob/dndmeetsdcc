@@ -545,6 +545,18 @@ const Index = () => {
     setGameActiveRef.current = fn;
   }, []);
 
+  // While auth is still loading, show a loading indicator to avoid flashing
+  // the splash screen before we know if the user should be redirected to landing
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-primary animate-pulse font-display tracking-widest">
+          LOADING SYSTEM...
+        </div>
+      </div>
+    );
+  }
+
   // If authenticated and no campaign selected, show campaign selection
   if (showCampaignSelect) {
     return (

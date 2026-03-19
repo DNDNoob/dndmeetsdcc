@@ -132,7 +132,7 @@ const LandingPage = () => {
   const navigate = useNavigate();
   const { isAuthenticated, loading, openAuthModal } = useAuth();
 
-  // If already authenticated, redirect to the app
+  // If already authenticated, redirect to the app (runs silently in the background)
   useEffect(() => {
     if (!loading && isAuthenticated) {
       navigate("/app", { replace: true });
@@ -142,16 +142,6 @@ const LandingPage = () => {
   const handleCTA = () => {
     openAuthModal();
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-primary animate-pulse font-display tracking-widest">
-          LOADING...
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen overflow-x-hidden">
