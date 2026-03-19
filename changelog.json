@@ -1,5 +1,17 @@
 [
   {
+    "date": "2026-03-18",
+    "changes": [
+      "✨ Added Spell System — crawlers can now learn and cast spells with mana costs, damage dice, schools, durations, and special effects",
+      "📖 Added Spell Library — DMs can create reusable spells with full stat configuration (damage type, dice, hit modifiers, AoE, saving throws, etc.)",
+      "🧙 Added Spell Tomes — consumable inventory items that teach crawlers a spell when used; supports both library spells and embedded custom one-off spells",
+      "⭐ Added Spell Mastery — spells level up through repeated casting (10, 30, 60 casts…), reducing mana cost by 5% per mastery level",
+      "🎯 Added Spells page — browse the spell library, grant spells directly to crawlers, track cast counts and mastery progression per crawler",
+      "🗡️ Spell Tomes in inventory show a Wand icon and a Use button — clicking Use consumes the tome and adds the spell to the crawler's known spells",
+      "⚡ Spells support Action or Bonus Action casting, variable mana cost (can be 0), optional self-targeting, and combat/noncombat turn durations"
+    ]
+  },
+  {
     "date": "2026-03-11",
     "changes": [
       "🐛 Added confirmation dialog before deleting maps — prevents accidental deletion with a single misclick",

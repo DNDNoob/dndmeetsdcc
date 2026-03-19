@@ -13,6 +13,10 @@ import {
   WikiPage,
   Quest,
   AssignedQuest,
+  Spell,
+  KnownSpell,
+  SpellLearnedFrom,
+  getSpellMasteryLevel,
   getEquippedModifiers,
   defaultCrawlers,
   defaultInventory,
@@ -23,6 +27,7 @@ import type { BatchOperation } from "@/hooks/useFirebaseStore";
 import { storage } from "@/lib/firebase";
 import { ref as storageRef, deleteObject } from "firebase/storage";
 import { logger } from "@/lib/logger";
+import { toast } from "sonner";
 
 export interface DiceRollEntry {
   id: string;
@@ -1088,6 +1093,149 @@ export const useGameState = () => {
     logger.log('[GameState] ➕ Added', toAdd.length, 'combatant(s) to active combat');
   };
 
+  // ======== Spells ========
+  const spells = useMemo(() => {
+    return getStableCollection<Spell>('spells');
+  }, [getCollection, isLoaded]);
+
+  const addSpell = async (spell: Spell) => {
+    await addItem('spells', spell as unknown as Record<string, unknown>);
+  };
+
+  const updateSpell = async (id: string, updates: Partial<Spell>) => {
+    await updateItem('spells', id, updates as unknown as Record<string, unknown>);
+  };
+
+  const deleteSpell = async (id: string) => {
+    await deleteItem('spells', id);
+  };
+
+  // Add a spell to a crawler's knownSpells; blocks duplicates
+  const learnSpell = async (crawlerId: string, spell: Spell, source: SpellLearnedFrom) => {
+    const crawler = crawlers.find(c => c.id === crawlerId);
+    if (!crawler) return;
+    const existing = crawler.knownSpells ?? [];
+    if (existing.some(ks => ks.spellId === spell.id)) {
+      toast.error(`${crawler.name} already knows ${spell.name}!`);
+      return;
+    }
+    const newEntry: KnownSpell = {
+      spellId: spell.id,
+      spellName: spell.name,
+      learnedFrom: source,
+      learnedAt: new Date().toISOString(),
+      castCount: 0,
+    };
+    await updateCrawler(crawlerId, { knownSpells: [...existing, newEntry] });
+    toast.success(`${crawler.name} learned ${spell.name}!`);
+  };
+
+  // Remove a spell from a crawler's knownSpells
+  const forgetSpell = async (crawlerId: string, spellId: string) => {
+    const crawler = crawlers.find(c => c.id === crawlerId);
+    if (!crawler) return;
+    const updated = (crawler.knownSpells ?? []).filter(ks => ks.spellId !== spellId);
+    await updateCrawler(crawlerId, { knownSpells: updated });
+  };
+
+  // Increment cast count for a spell; fires toast if mastery level increases
+  const castSpell = async (crawlerId: string, spellId: string) => {
+    const crawler = crawlers.find(c => c.id === crawlerId);
+    if (!crawler) return;
+    const knownSpells = [...(crawler.knownSpells ?? [])];
+    const idx = knownSpells.findIndex(ks => ks.spellId === spellId);
+    if (idx === -1) return;
+    const prev = knownSpells[idx];
+    const newCastCount = prev.castCount + 1;
+    const prevMastery = getSpellMasteryLevel(prev.castCount);
+    const newMastery = getSpellMasteryLevel(newCastCount);
+    knownSpells[idx] = { ...prev, castCount: newCastCount };
+    await updateCrawler(crawlerId, { knownSpells });
+    if (newMastery > prevMastery) {
+      toast.success(`${crawler.name} leveled up ${prev.spellName} to mastery level ${newMastery}!`);
+    }
+  };
+
+  // Consume a spell tome item: learn all spells in the tome (skipping known ones) and remove the item
+  const consumeSpellTome = async (crawlerId: string, itemId: string) => {
+    const crawlerInv = getCrawlerInventory(crawlerId);
+    const item = crawlerInv.find(i => i.id === itemId);
+    if (!item?.isSpellTome || !item.spellTomeData) return;
+
+    const entries = item.spellTomeData.entries ?? [];
+    if (entries.length === 0) {
+      toast.error('This spell tome has no spells.');
+      return;
+    }
+
+    const crawler = crawlers.find(c => c.id === crawlerId);
+    if (!crawler) return;
+
+    // Resolve each entry to a Spell, skipping unresolvable and already-known
+    const alreadyKnown = new Set((crawler.knownSpells ?? []).map(ks => ks.spellId));
+    const toLearn: Spell[] = [];
+    const skippedAlreadyKnown: string[] = [];
+
+    for (const entry of entries) {
+      let spell: Spell | undefined;
+      if (entry.customSpell) {
+        spell = entry.customSpell;
+      } else if (entry.spellId) {
+        spell = spells.find(s => s.id === entry.spellId);
+      }
+      if (!spell) continue;
+      if (alreadyKnown.has(spell.id)) {
+        skippedAlreadyKnown.push(spell.name);
+      } else {
+        toLearn.push(spell);
+        alreadyKnown.add(spell.id); // prevent learning same spell twice within one tome
+      }
+    }
+
+    if (toLearn.length === 0) {
+      toast.error(`${crawler.name} already knows all spells in this tome!`);
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const newKnownSpells: KnownSpell[] = toLearn.map(spell => ({
+      spellId: spell.id,
+      spellName: spell.name,
+      learnedFrom: 'tome',
+      learnedAt: now,
+      castCount: 0,
+    }));
+
+    await batchWrite([
+      {
+        type: 'update' as const,
+        collection: 'inventory' as const,
+        id: crawlerId,
+        data: { items: crawlerInv.filter(i => i.id !== itemId) } as Record<string, unknown>,
+      },
+      {
+        type: 'update' as const,
+        collection: 'crawlers' as const,
+        id: crawlerId,
+        data: { knownSpells: [...(crawler.knownSpells ?? []), ...newKnownSpells] } as Record<string, unknown>,
+      },
+    ]);
+
+    const learnedNames = toLearn.map(s => s.name).join(', ');
+    if (skippedAlreadyKnown.length > 0) {
+      toast.success(`${crawler.name} learned ${learnedNames}! (Skipped: ${skippedAlreadyKnown.join(', ')} — already known)`);
+    } else {
+      toast.success(`${crawler.name} consumed the tome and learned: ${learnedNames}!`);
+    }
+  };
+
+  // Promote an embedded custom spell from a tome to the shared spell library
+  const promoteSpellToLibrary = async (spell: Spell) => {
+    if (spells.some(s => s.id === spell.id)) return; // already in library
+    await addSpell(spell);
+    toast.success(`${spell.name} added to the spell library.`);
+  };
+
   // ======== Wiki ========
   const wikiPages = useMemo(() => {
     return getStableCollection<WikiPage>('wiki');
@@ -1170,6 +1318,15 @@ export const useGameState = () => {
     wikiPages,
     addWikiPage,
     updateWikiPage,
+    spells,
+    addSpell,
+    updateSpell,
+    deleteSpell,
+    learnSpell,
+    forgetSpell,
+    castSpell,
+    consumeSpellTome,
+    promoteSpellToLibrary,
     roomId,
     setRoomId,
     isLoaded,

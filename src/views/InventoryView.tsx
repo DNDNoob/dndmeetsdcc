@@ -2,8 +2,9 @@ import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
-import { Crawler, InventoryItem, EquipmentSlot as SlotType, StatModifiers, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType } from "@/lib/gameData";
-import { Coins, Package, Sword, Shield, Plus, Trash2, Edit2, Save, HardHat, Search, BookOpen, Gem, Footprints, Shirt, Hand, Crosshair, ChevronDown, ChevronUp } from "lucide-react";
+import { Crawler, InventoryItem, EquipmentSlot as SlotType, StatModifiers, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, Spell, SpellData } from "@/lib/gameData";
+import { Coins, Package, Sword, Shield, Plus, Trash2, Edit2, Save, HardHat, Search, BookOpen, Gem, Footprints, Shirt, Hand, Crosshair, ChevronDown, ChevronUp, Wand2 } from "lucide-react";
+import { SpellDataEditor } from "@/views/SpellsView";
 
 // Inline SVG for legs/pants slot
 const LegsIcon: React.FC<{ className?: string }> = ({ className = "w-4 h-4" }) => (
@@ -45,6 +46,10 @@ interface InventoryViewProps {
   onUpdateCrawler: (id: string, updates: Partial<Crawler>) => void;
   getSharedInventory: () => InventoryItem[];
   onUpdateSharedInventory: (items: InventoryItem[]) => void;
+  spells?: Spell[];
+  onConsumeSpellTome?: (crawlerId: string, itemId: string) => Promise<void>;
+  onPromoteSpellToLibrary?: (spell: Spell) => Promise<void>;
+  isAdmin?: boolean;
 }
 
 // Helper to create item signature for grouping
@@ -85,6 +90,10 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   onUpdateCrawler,
   getSharedInventory,
   onUpdateSharedInventory,
+  spells = [],
+  onConsumeSpellTome,
+  onPromoteSpellToLibrary,
+  isAdmin = false,
 }) => {
   const [editMode, setEditMode] = useState(false);
   // Expanded item details state
@@ -117,10 +126,22 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   };
 
   // Library item form state
-  const [newLibraryItem, setNewLibraryItem] = useState<{ name: string; description: string; equipSlot?: SlotType; goldValue?: number; statModifiers?: StatModifiers; weaponData?: WeaponData }>({
+  const [newLibraryItem, setNewLibraryItem] = useState<{
+    name: string;
+    description: string;
+    equipSlot?: SlotType;
+    goldValue?: number;
+    statModifiers?: StatModifiers;
+    weaponData?: WeaponData;
+    isSpellTome?: boolean;
+    spellTomeData?: { entries: Array<{ spellId?: string; customSpell?: Spell }> };
+  }>({
     name: "", description: "", equipSlot: undefined, goldValue: undefined, statModifiers: undefined, weaponData: undefined,
   });
   const [showWeaponConfig, setShowWeaponConfig] = useState(false);
+  const [showSpellTomeConfig, setShowSpellTomeConfig] = useState(false);
+  // Which custom-spell entry index has its SpellDataEditor expanded
+  const [expandedTomeEntry, setExpandedTomeEntry] = useState<number | null>(null);
   // Track which library item is being edited (null = adding new)
   const [editingLibraryItemId, setEditingLibraryItemId] = useState<string | null>(null);
   // Per-crawler search queries
@@ -186,8 +207,12 @@ const InventoryView: React.FC<InventoryViewProps> = ({
       goldValue: item.goldValue,
       statModifiers: item.statModifiers,
       weaponData: item.weaponData,
+      isSpellTome: item.isSpellTome,
+      spellTomeData: item.spellTomeData,
     });
     setShowWeaponConfig(!!item.weaponData);
+    setShowSpellTomeConfig(!!item.isSpellTome);
+    setExpandedTomeEntry(null);
   };
 
   const handleSaveOrAddLibraryItem = () => {
@@ -200,6 +225,10 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     const weaponFields = newLibraryItem.weaponData
       ? { weaponData: newLibraryItem.weaponData }
       : { weaponData: undefined };
+
+    const spellTomeFields = newLibraryItem.isSpellTome
+      ? { isSpellTome: true as const, spellTomeData: newLibraryItem.spellTomeData }
+      : { isSpellTome: undefined, spellTomeData: undefined };
 
     if (editingLibraryItemId) {
       // Get the old item for matching in crawler inventories
@@ -216,6 +245,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
               goldValue: newLibraryItem.goldValue,
               ...(mods && Object.keys(mods).length > 0 ? { statModifiers: mods } : { statModifiers: undefined }),
               ...weaponFields,
+              ...spellTomeFields,
             }
           : item
       );
@@ -241,6 +271,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 goldValue: newLibraryItem.goldValue,
                 ...(mods && Object.keys(mods).length > 0 ? { statModifiers: mods } : { statModifiers: undefined }),
                 ...weaponFields,
+                ...spellTomeFields,
               };
             }
             return ci;
@@ -260,18 +291,23 @@ const InventoryView: React.FC<InventoryViewProps> = ({
         goldValue: newLibraryItem.goldValue,
         ...(mods && Object.keys(mods).length > 0 ? { statModifiers: mods } : {}),
         ...weaponFields,
+        ...spellTomeFields,
       };
       onUpdateSharedInventory([...items, item]);
     }
     setEditingLibraryItemId(null);
     setNewLibraryItem({ name: "", description: "", equipSlot: undefined, goldValue: undefined, statModifiers: undefined, weaponData: undefined });
     setShowWeaponConfig(false);
+    setShowSpellTomeConfig(false);
+    setExpandedTomeEntry(null);
   };
 
   const handleCancelEditLibraryItem = () => {
     setEditingLibraryItemId(null);
     setNewLibraryItem({ name: "", description: "", equipSlot: undefined, goldValue: undefined, statModifiers: undefined, weaponData: undefined });
     setShowWeaponConfig(false);
+    setShowSpellTomeConfig(false);
+    setExpandedTomeEntry(null);
   };
 
   const handleAddLibraryItemToCrawler = (crawlerId: string, libraryItem: InventoryItem, quantity: number = 1) => {
@@ -355,6 +391,27 @@ const InventoryView: React.FC<InventoryViewProps> = ({
       {item.isUpgraded && (
         <div>
           <span className="text-accent text-[10px] font-display">UPGRADED</span>
+        </div>
+      )}
+      {item.isSpellTome && (
+        <div className="border border-primary/20 bg-primary/5 p-2 space-y-1">
+          <span className="text-primary font-display text-[10px] flex items-center gap-1">
+            <Wand2 className="w-3 h-3" /> SPELL TOME
+          </span>
+          {(item.spellTomeData?.entries ?? []).map((entry, i) => {
+            const libSpell = entry.spellId ? spells.find(s => s.id === entry.spellId) : undefined;
+            const name = libSpell?.name ?? entry.customSpell?.name ?? 'Unknown';
+            const isCustom = !!entry.customSpell && !libSpell;
+            return (
+              <div key={i}>
+                <span className="text-muted-foreground">Spell {i + 1}: </span>
+                <span className={isCustom ? 'text-accent' : ''}>{name}{isCustom ? ' (custom)' : ''}</span>
+              </div>
+            );
+          })}
+          {(item.spellTomeData?.entries ?? []).length === 0 && (
+            <span className="text-muted-foreground italic">No spells configured</span>
+          )}
         </div>
       )}
     </div>
@@ -800,6 +857,183 @@ const InventoryView: React.FC<InventoryViewProps> = ({
               )}
             </div>
           )}
+
+          {/* Spell Tome Configuration */}
+          <div className="border border-primary/30 bg-primary/5 p-3 rounded space-y-3">
+            <button
+              type="button"
+              onClick={() => {
+                const next = !showSpellTomeConfig;
+                setShowSpellTomeConfig(next);
+                setNewLibraryItem(prev => ({
+                  ...prev,
+                  isSpellTome: next || undefined,
+                  spellTomeData: next ? (prev.spellTomeData ?? { entries: [] }) : undefined,
+                }));
+              }}
+              className="flex items-center gap-2 text-xs text-primary font-display w-full"
+            >
+              <Wand2 className="w-4 h-4" />
+              SPELL TOME
+              {showSpellTomeConfig ? <ChevronUp className="w-3 h-3 ml-auto" /> : <ChevronDown className="w-3 h-3 ml-auto" />}
+            </button>
+
+            {showSpellTomeConfig && (() => {
+              const entries = newLibraryItem.spellTomeData?.entries ?? [];
+
+              const updateEntry = (index: number, patch: Partial<{ spellId?: string; customSpell?: Spell }>) => {
+                const next = entries.map((e, i) => i === index ? { ...e, ...patch } : e);
+                setNewLibraryItem(prev => ({ ...prev, spellTomeData: { entries: next } }));
+              };
+
+              const removeEntry = (index: number) => {
+                const next = entries.filter((_, i) => i !== index);
+                setNewLibraryItem(prev => ({ ...prev, spellTomeData: { entries: next } }));
+                if (expandedTomeEntry === index) setExpandedTomeEntry(null);
+              };
+
+              const addLibraryEntry = () => {
+                setNewLibraryItem(prev => ({
+                  ...prev,
+                  spellTomeData: { entries: [...entries, { spellId: undefined }] },
+                }));
+              };
+
+              const addCustomEntry = () => {
+                const newSpell: Spell = {
+                  id: crypto.randomUUID(),
+                  name: '',
+                  description: '',
+                  spellData: {
+                    manaCost: 10, spellLevel: 1, school: 'Evocation',
+                    actionType: 'Action', range: 30, canTargetSelf: false, target: 'Single',
+                  },
+                };
+                const newIndex = entries.length;
+                setNewLibraryItem(prev => ({
+                  ...prev,
+                  spellTomeData: { entries: [...entries, { customSpell: newSpell }] },
+                }));
+                setExpandedTomeEntry(newIndex);
+              };
+
+              return (
+                <div className="space-y-3">
+                  <p className="text-[10px] text-muted-foreground">When a crawler uses this item, they learn all spells in the tome and it is consumed.</p>
+
+                  {/* Entry list */}
+                  {entries.length > 0 && (
+                    <div className="space-y-2">
+                      {entries.map((entry, i) => {
+                        const isCustom = !!entry.customSpell && !entry.spellId;
+                        const isExpanded = expandedTomeEntry === i;
+                        return (
+                          <div key={i} className="border border-border bg-muted/30 p-2 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] text-muted-foreground shrink-0">#{i + 1}</span>
+                              {isCustom ? (
+                                <>
+                                  <input
+                                    type="text"
+                                    value={entry.customSpell?.name ?? ''}
+                                    onChange={(e) => {
+                                      const cs = entry.customSpell!;
+                                      updateEntry(i, { customSpell: { ...cs, name: e.target.value } });
+                                    }}
+                                    placeholder="Custom spell name"
+                                    className="bg-muted border border-border px-2 py-0.5 text-xs flex-1"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => setExpandedTomeEntry(isExpanded ? null : i)}
+                                    className="text-[10px] text-primary hover:underline shrink-0"
+                                  >
+                                    {isExpanded ? 'Collapse' : 'Configure'}
+                                  </button>
+                                </>
+                              ) : (
+                                <select
+                                  value={entry.spellId ?? ''}
+                                  onChange={(e) => updateEntry(i, { spellId: e.target.value || undefined })}
+                                  className="bg-muted border border-border px-2 py-0.5 text-xs flex-1"
+                                >
+                                  <option value="">— Select a spell —</option>
+                                  {spells.map(s => (
+                                    <option key={s.id} value={s.id}>
+                                      {s.name} (Lvl {s.spellData.spellLevel} {s.spellData.school})
+                                    </option>
+                                  ))}
+                                </select>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => removeEntry(i)}
+                                className="text-destructive hover:text-destructive/70 shrink-0"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+
+                            {/* Custom spell details (collapsible) */}
+                            {isCustom && isExpanded && (
+                              <div className="space-y-2 pl-2 border-l border-primary/30">
+                                <div>
+                                  <label className="text-[10px] text-muted-foreground block mb-0.5">Description</label>
+                                  <textarea
+                                    value={entry.customSpell?.description ?? ''}
+                                    onChange={(e) => {
+                                      const cs = entry.customSpell!;
+                                      updateEntry(i, { customSpell: { ...cs, description: e.target.value } });
+                                    }}
+                                    placeholder="What does this spell do?"
+                                    className="bg-muted border border-border px-2 py-1 text-xs w-full resize-none"
+                                    rows={2}
+                                  />
+                                </div>
+                                <SpellDataEditor
+                                  spellData={entry.customSpell!.spellData}
+                                  onChange={(updates) => {
+                                    const cs = entry.customSpell!;
+                                    updateEntry(i, { customSpell: { ...cs, spellData: { ...cs.spellData, ...updates } } });
+                                  }}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {entries.length === 0 && (
+                    <p className="text-[10px] text-muted-foreground italic">No spells added yet.</p>
+                  )}
+
+                  {/* Add buttons */}
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={addLibraryEntry}
+                      className="text-xs text-primary border border-primary/40 px-2 py-1 hover:bg-primary/10 transition-colors flex items-center gap-1"
+                    >
+                      <Plus className="w-3 h-3" /> Library Spell
+                    </button>
+                    <button
+                      type="button"
+                      onClick={addCustomEntry}
+                      className="text-xs text-accent border border-accent/40 px-2 py-1 hover:bg-accent/10 transition-colors flex items-center gap-1"
+                    >
+                      <Plus className="w-3 h-3" /> Custom Spell
+                    </button>
+                  </div>
+
+                  {spells.length === 0 && (
+                    <p className="text-[10px] text-muted-foreground italic">No library spells yet — create them on the Spells page, or use Custom Spell above.</p>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
         </div>
 
         {/* Crawler inventories */}
@@ -908,7 +1142,9 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                               className="flex items-center gap-3 text-sm py-2 border-b border-border/50 last:border-0"
                             >
                               {/* Item type icon */}
-                              {getEquipmentIcon(item.equipSlot)}
+                              {item.isSpellTome
+                                ? <Wand2 className="w-4 h-4 shrink-0 text-primary" />
+                                : getEquipmentIcon(item.equipSlot)}
                               {editingItemId === `${crawler.id}:${item.id}` ? (
                                 <div className="flex flex-col flex-1 gap-1">
                                   <input
@@ -974,11 +1210,28 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                                         <Coins className="w-3 h-3" /> {item.goldValue}G
                                       </span>
                                     )}
+                                    {item.isSpellTome && (
+                                      <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded flex items-center gap-1">
+                                        <Wand2 className="w-3 h-3" /> Spell Tome
+                                      </span>
+                                    )}
                                   </div>
                                   {!expandedItems.has(`${crawler.id}:${item.id}`) && item.description && (
                                     <span className="text-muted-foreground text-xs">({item.description})</span>
                                   )}
                                   {expandedItems.has(`${crawler.id}:${item.id}`) && renderExpandedItemDetails(item)}
+                                </div>
+                              )}
+                              {/* Use Tome button (always visible for spell tomes, not just in edit mode) */}
+                              {item.isSpellTome && onConsumeSpellTome && !editMode && editingItemId !== `${crawler.id}:${item.id}` && (
+                                <div className="shrink-0">
+                                  <button
+                                    onClick={() => onConsumeSpellTome(crawler.id, item.id)}
+                                    className="text-xs text-primary border border-primary/50 px-2 py-0.5 hover:bg-primary/10 transition-colors flex items-center gap-1"
+                                    title="Use this tome to learn the spell"
+                                  >
+                                    <Wand2 className="w-3 h-3" /> Use
+                                  </button>
                                 </div>
                               )}
                               {editMode && editingItemId !== `${crawler.id}:${item.id}` && (

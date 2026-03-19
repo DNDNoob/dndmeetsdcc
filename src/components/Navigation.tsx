@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DungeonButton } from "./ui/DungeonButton";
-import { Home, User, Map, Backpack, Skull, Presentation, Volume2, FileText, Brain, Pin, ChevronDown, BookOpen, ArrowLeft, Menu, X } from "lucide-react";
+import { Home, User, Map, Backpack, Skull, Presentation, Volume2, FileText, Brain, Pin, ChevronDown, BookOpen, ArrowLeft, Menu, X, Wand2 } from "lucide-react";
 import { Crawler } from "@/lib/gameData";
 import GoogleAuthButton from "./GoogleAuthButton";
 
@@ -26,6 +26,7 @@ const navItems = [
   { id: "maps", label: "Maps", icon: Map },
   { id: "inventory", label: "Inventory", icon: Backpack },
   { id: "mobs", label: "Mobs", icon: Skull },
+  { id: "spells", label: "Spells", icon: Wand2 },
 ];
 
 const Navigation: React.FC<NavigationProps> = ({
