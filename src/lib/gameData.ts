@@ -151,8 +151,10 @@ export interface InventoryItem {
   isUpgraded?: boolean; // Whether this item has been upgraded by a crawler
   isSpellTome?: boolean; // Consumable that teaches a spell when used
   spellTomeData?: {
-    spellId?: string; // References a spell in the library
-    customSpell?: Spell; // Embedded one-off spell (not in library)
+    entries: Array<{
+      spellId?: string; // References a spell in the library
+      customSpell?: Spell; // Embedded one-off spell (not in library)
+    }>;
   };
 }
 

@@ -134,13 +134,14 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     statModifiers?: StatModifiers;
     weaponData?: WeaponData;
     isSpellTome?: boolean;
-    spellTomeData?: { spellId?: string; customSpell?: Spell };
+    spellTomeData?: { entries: Array<{ spellId?: string; customSpell?: Spell }> };
   }>({
     name: "", description: "", equipSlot: undefined, goldValue: undefined, statModifiers: undefined, weaponData: undefined,
   });
   const [showWeaponConfig, setShowWeaponConfig] = useState(false);
   const [showSpellTomeConfig, setShowSpellTomeConfig] = useState(false);
-  const [spellTomeMode, setSpellTomeMode] = useState<'library' | 'custom'>('library');
+  // Which custom-spell entry index has its SpellDataEditor expanded
+  const [expandedTomeEntry, setExpandedTomeEntry] = useState<number | null>(null);
   // Track which library item is being edited (null = adding new)
   const [editingLibraryItemId, setEditingLibraryItemId] = useState<string | null>(null);
   // Per-crawler search queries
@@ -211,7 +212,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     });
     setShowWeaponConfig(!!item.weaponData);
     setShowSpellTomeConfig(!!item.isSpellTome);
-    setSpellTomeMode(item.spellTomeData?.customSpell ? 'custom' : 'library');
+    setExpandedTomeEntry(null);
   };
 
   const handleSaveOrAddLibraryItem = () => {
@@ -298,6 +299,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     setNewLibraryItem({ name: "", description: "", equipSlot: undefined, goldValue: undefined, statModifiers: undefined, weaponData: undefined });
     setShowWeaponConfig(false);
     setShowSpellTomeConfig(false);
+    setExpandedTomeEntry(null);
   };
 
   const handleCancelEditLibraryItem = () => {
@@ -305,6 +307,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     setNewLibraryItem({ name: "", description: "", equipSlot: undefined, goldValue: undefined, statModifiers: undefined, weaponData: undefined });
     setShowWeaponConfig(false);
     setShowSpellTomeConfig(false);
+    setExpandedTomeEntry(null);
   };
 
   const handleAddLibraryItemToCrawler = (crawlerId: string, libraryItem: InventoryItem, quantity: number = 1) => {
@@ -395,17 +398,19 @@ const InventoryView: React.FC<InventoryViewProps> = ({
           <span className="text-primary font-display text-[10px] flex items-center gap-1">
             <Wand2 className="w-3 h-3" /> SPELL TOME
           </span>
-          {item.spellTomeData?.spellId && (
-            <div>
-              <span className="text-muted-foreground">Spell: </span>
-              <span>{spells.find(s => s.id === item.spellTomeData?.spellId)?.name ?? 'Unknown'}</span>
-            </div>
-          )}
-          {item.spellTomeData?.customSpell && (
-            <div>
-              <span className="text-muted-foreground">Spell: </span>
-              <span className="text-accent">{item.spellTomeData.customSpell.name} (custom)</span>
-            </div>
+          {(item.spellTomeData?.entries ?? []).map((entry, i) => {
+            const libSpell = entry.spellId ? spells.find(s => s.id === entry.spellId) : undefined;
+            const name = libSpell?.name ?? entry.customSpell?.name ?? 'Unknown';
+            const isCustom = !!entry.customSpell && !libSpell;
+            return (
+              <div key={i}>
+                <span className="text-muted-foreground">Spell {i + 1}: </span>
+                <span className={isCustom ? 'text-accent' : ''}>{name}{isCustom ? ' (custom)' : ''}</span>
+              </div>
+            );
+          })}
+          {(item.spellTomeData?.entries ?? []).length === 0 && (
+            <span className="text-muted-foreground italic">No spells configured</span>
           )}
         </div>
       )}
@@ -860,7 +865,11 @@ const InventoryView: React.FC<InventoryViewProps> = ({
               onClick={() => {
                 const next = !showSpellTomeConfig;
                 setShowSpellTomeConfig(next);
-                setNewLibraryItem(prev => ({ ...prev, isSpellTome: next || undefined }));
+                setNewLibraryItem(prev => ({
+                  ...prev,
+                  isSpellTome: next || undefined,
+                  spellTomeData: next ? (prev.spellTomeData ?? { entries: [] }) : undefined,
+                }));
               }}
               className="flex items-center gap-2 text-xs text-primary font-display w-full"
             >
@@ -869,117 +878,161 @@ const InventoryView: React.FC<InventoryViewProps> = ({
               {showSpellTomeConfig ? <ChevronUp className="w-3 h-3 ml-auto" /> : <ChevronDown className="w-3 h-3 ml-auto" />}
             </button>
 
-            {showSpellTomeConfig && (
-              <div className="space-y-3">
-                <p className="text-[10px] text-muted-foreground">When a crawler uses this item, they learn the spell and the tome is consumed.</p>
+            {showSpellTomeConfig && (() => {
+              const entries = newLibraryItem.spellTomeData?.entries ?? [];
 
-                {/* Library vs Custom toggle */}
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setSpellTomeMode('library')}
-                    className={`text-xs px-3 py-1 border transition-colors ${spellTomeMode === 'library' ? 'border-primary text-primary bg-primary/10' : 'border-border text-muted-foreground'}`}
-                  >
-                    Library Spell
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSpellTomeMode('custom')}
-                    className={`text-xs px-3 py-1 border transition-colors ${spellTomeMode === 'custom' ? 'border-primary text-primary bg-primary/10' : 'border-border text-muted-foreground'}`}
-                  >
-                    Custom Spell
-                  </button>
-                </div>
+              const updateEntry = (index: number, patch: Partial<{ spellId?: string; customSpell?: Spell }>) => {
+                const next = entries.map((e, i) => i === index ? { ...e, ...patch } : e);
+                setNewLibraryItem(prev => ({ ...prev, spellTomeData: { entries: next } }));
+              };
 
-                {spellTomeMode === 'library' ? (
-                  <div>
-                    <label className="text-[10px] text-muted-foreground block mb-0.5">Select Spell from Library</label>
-                    <select
-                      value={newLibraryItem.spellTomeData?.spellId ?? ''}
-                      onChange={(e) => setNewLibraryItem(prev => ({
-                        ...prev,
-                        spellTomeData: { spellId: e.target.value || undefined, customSpell: undefined },
-                      }))}
-                      className="bg-muted border border-border px-2 py-1 text-xs w-full"
+              const removeEntry = (index: number) => {
+                const next = entries.filter((_, i) => i !== index);
+                setNewLibraryItem(prev => ({ ...prev, spellTomeData: { entries: next } }));
+                if (expandedTomeEntry === index) setExpandedTomeEntry(null);
+              };
+
+              const addLibraryEntry = () => {
+                setNewLibraryItem(prev => ({
+                  ...prev,
+                  spellTomeData: { entries: [...entries, { spellId: undefined }] },
+                }));
+              };
+
+              const addCustomEntry = () => {
+                const newSpell: Spell = {
+                  id: crypto.randomUUID(),
+                  name: '',
+                  description: '',
+                  spellData: {
+                    manaCost: 10, spellLevel: 1, school: 'Evocation',
+                    actionType: 'Action', range: 30, canTargetSelf: false, target: 'Single',
+                  },
+                };
+                const newIndex = entries.length;
+                setNewLibraryItem(prev => ({
+                  ...prev,
+                  spellTomeData: { entries: [...entries, { customSpell: newSpell }] },
+                }));
+                setExpandedTomeEntry(newIndex);
+              };
+
+              return (
+                <div className="space-y-3">
+                  <p className="text-[10px] text-muted-foreground">When a crawler uses this item, they learn all spells in the tome and it is consumed.</p>
+
+                  {/* Entry list */}
+                  {entries.length > 0 && (
+                    <div className="space-y-2">
+                      {entries.map((entry, i) => {
+                        const isCustom = !!entry.customSpell && !entry.spellId;
+                        const isExpanded = expandedTomeEntry === i;
+                        return (
+                          <div key={i} className="border border-border bg-muted/30 p-2 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] text-muted-foreground shrink-0">#{i + 1}</span>
+                              {isCustom ? (
+                                <>
+                                  <input
+                                    type="text"
+                                    value={entry.customSpell?.name ?? ''}
+                                    onChange={(e) => {
+                                      const cs = entry.customSpell!;
+                                      updateEntry(i, { customSpell: { ...cs, name: e.target.value } });
+                                    }}
+                                    placeholder="Custom spell name"
+                                    className="bg-muted border border-border px-2 py-0.5 text-xs flex-1"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => setExpandedTomeEntry(isExpanded ? null : i)}
+                                    className="text-[10px] text-primary hover:underline shrink-0"
+                                  >
+                                    {isExpanded ? 'Collapse' : 'Configure'}
+                                  </button>
+                                </>
+                              ) : (
+                                <select
+                                  value={entry.spellId ?? ''}
+                                  onChange={(e) => updateEntry(i, { spellId: e.target.value || undefined })}
+                                  className="bg-muted border border-border px-2 py-0.5 text-xs flex-1"
+                                >
+                                  <option value="">— Select a spell —</option>
+                                  {spells.map(s => (
+                                    <option key={s.id} value={s.id}>
+                                      {s.name} (Lvl {s.spellData.spellLevel} {s.spellData.school})
+                                    </option>
+                                  ))}
+                                </select>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => removeEntry(i)}
+                                className="text-destructive hover:text-destructive/70 shrink-0"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+
+                            {/* Custom spell details (collapsible) */}
+                            {isCustom && isExpanded && (
+                              <div className="space-y-2 pl-2 border-l border-primary/30">
+                                <div>
+                                  <label className="text-[10px] text-muted-foreground block mb-0.5">Description</label>
+                                  <textarea
+                                    value={entry.customSpell?.description ?? ''}
+                                    onChange={(e) => {
+                                      const cs = entry.customSpell!;
+                                      updateEntry(i, { customSpell: { ...cs, description: e.target.value } });
+                                    }}
+                                    placeholder="What does this spell do?"
+                                    className="bg-muted border border-border px-2 py-1 text-xs w-full resize-none"
+                                    rows={2}
+                                  />
+                                </div>
+                                <SpellDataEditor
+                                  spellData={entry.customSpell!.spellData}
+                                  onChange={(updates) => {
+                                    const cs = entry.customSpell!;
+                                    updateEntry(i, { customSpell: { ...cs, spellData: { ...cs.spellData, ...updates } } });
+                                  }}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {entries.length === 0 && (
+                    <p className="text-[10px] text-muted-foreground italic">No spells added yet.</p>
+                  )}
+
+                  {/* Add buttons */}
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={addLibraryEntry}
+                      className="text-xs text-primary border border-primary/40 px-2 py-1 hover:bg-primary/10 transition-colors flex items-center gap-1"
                     >
-                      <option value="">— Select a spell —</option>
-                      {spells.map(s => (
-                        <option key={s.id} value={s.id}>
-                          {s.name} (Lvl {s.spellData.spellLevel} {s.spellData.school})
-                        </option>
-                      ))}
-                    </select>
-                    {spells.length === 0 && (
-                      <p className="text-[10px] text-muted-foreground mt-1 italic">No spells in library yet. Add spells on the Spells page first, or use a Custom Spell.</p>
-                    )}
+                      <Plus className="w-3 h-3" /> Library Spell
+                    </button>
+                    <button
+                      type="button"
+                      onClick={addCustomEntry}
+                      className="text-xs text-accent border border-accent/40 px-2 py-1 hover:bg-accent/10 transition-colors flex items-center gap-1"
+                    >
+                      <Plus className="w-3 h-3" /> Custom Spell
+                    </button>
                   </div>
-                ) : (
-                  <div className="space-y-2">
-                    <div>
-                      <label className="text-[10px] text-muted-foreground block mb-0.5">Custom Spell Name</label>
-                      <input
-                        type="text"
-                        value={newLibraryItem.spellTomeData?.customSpell?.name ?? ''}
-                        onChange={(e) => {
-                          const current = newLibraryItem.spellTomeData?.customSpell;
-                          const base: import('@/lib/gameData').Spell = current ?? {
-                            id: crypto.randomUUID(),
-                            name: '',
-                            description: '',
-                            spellData: {
-                              manaCost: 10,
-                              spellLevel: 1,
-                              school: 'Evocation',
-                              actionType: 'Action',
-                              range: 30,
-                              canTargetSelf: false,
-                              target: 'Single',
-                            },
-                          };
-                          setNewLibraryItem(prev => ({
-                            ...prev,
-                            spellTomeData: { customSpell: { ...base, name: e.target.value } },
-                          }));
-                        }}
-                        placeholder="e.g. Shadow Bolt"
-                        className="bg-muted border border-border px-2 py-1 text-xs w-full"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-muted-foreground block mb-0.5">Description</label>
-                      <textarea
-                        value={newLibraryItem.spellTomeData?.customSpell?.description ?? ''}
-                        onChange={(e) => {
-                          const current = newLibraryItem.spellTomeData?.customSpell;
-                          if (!current) return;
-                          setNewLibraryItem(prev => ({
-                            ...prev,
-                            spellTomeData: { customSpell: { ...current, description: e.target.value } },
-                          }));
-                        }}
-                        placeholder="What does this spell do?"
-                        className="bg-muted border border-border px-2 py-1 text-xs w-full resize-none"
-                        rows={2}
-                      />
-                    </div>
-                    {newLibraryItem.spellTomeData?.customSpell && (
-                      <SpellDataEditor
-                        spellData={newLibraryItem.spellTomeData.customSpell.spellData}
-                        onChange={(updates) => {
-                          const current = newLibraryItem.spellTomeData!.customSpell!;
-                          setNewLibraryItem(prev => ({
-                            ...prev,
-                            spellTomeData: {
-                              customSpell: { ...current, spellData: { ...current.spellData, ...updates } },
-                            },
-                          }));
-                        }}
-                      />
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
+
+                  {spells.length === 0 && (
+                    <p className="text-[10px] text-muted-foreground italic">No library spells yet — create them on the Spells page, or use Custom Spell above.</p>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </div>
 

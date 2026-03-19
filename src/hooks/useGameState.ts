@@ -1156,56 +1156,77 @@ export const useGameState = () => {
     }
   };
 
-  // Consume a spell tome item: learn the spell (if not a duplicate) and remove the item
+  // Consume a spell tome item: learn all spells in the tome (skipping known ones) and remove the item
   const consumeSpellTome = async (crawlerId: string, itemId: string) => {
     const crawlerInv = getCrawlerInventory(crawlerId);
     const item = crawlerInv.find(i => i.id === itemId);
     if (!item?.isSpellTome || !item.spellTomeData) return;
 
-    let spell: Spell | undefined;
-    if (item.spellTomeData.customSpell) {
-      spell = item.spellTomeData.customSpell;
-    } else if (item.spellTomeData.spellId) {
-      spell = spells.find(s => s.id === item.spellTomeData!.spellId);
-    }
-    if (!spell) {
-      toast.error('This spell tome has no spell data.');
+    const entries = item.spellTomeData.entries ?? [];
+    if (entries.length === 0) {
+      toast.error('This spell tome has no spells.');
       return;
     }
 
     const crawler = crawlers.find(c => c.id === crawlerId);
     if (!crawler) return;
 
-    if ((crawler.knownSpells ?? []).some(ks => ks.spellId === spell!.id)) {
-      toast.error(`${crawler.name} already knows ${spell.name}!`);
+    // Resolve each entry to a Spell, skipping unresolvable and already-known
+    const alreadyKnown = new Set((crawler.knownSpells ?? []).map(ks => ks.spellId));
+    const toLearn: Spell[] = [];
+    const skippedAlreadyKnown: string[] = [];
+
+    for (const entry of entries) {
+      let spell: Spell | undefined;
+      if (entry.customSpell) {
+        spell = entry.customSpell;
+      } else if (entry.spellId) {
+        spell = spells.find(s => s.id === entry.spellId);
+      }
+      if (!spell) continue;
+      if (alreadyKnown.has(spell.id)) {
+        skippedAlreadyKnown.push(spell.name);
+      } else {
+        toLearn.push(spell);
+        alreadyKnown.add(spell.id); // prevent learning same spell twice within one tome
+      }
+    }
+
+    if (toLearn.length === 0) {
+      toast.error(`${crawler.name} already knows all spells in this tome!`);
       return;
     }
 
-    const newItems = crawlerInv.filter(i => i.id !== itemId);
-    const newKnownSpell: KnownSpell = {
+    const now = new Date().toISOString();
+    const newKnownSpells: KnownSpell[] = toLearn.map(spell => ({
       spellId: spell.id,
       spellName: spell.name,
       learnedFrom: 'tome',
-      learnedAt: new Date().toISOString(),
+      learnedAt: now,
       castCount: 0,
-    };
+    }));
 
     await batchWrite([
       {
         type: 'update' as const,
         collection: 'inventory' as const,
         id: crawlerId,
-        data: { items: newItems } as Record<string, unknown>,
+        data: { items: crawlerInv.filter(i => i.id !== itemId) } as Record<string, unknown>,
       },
       {
         type: 'update' as const,
         collection: 'crawlers' as const,
         id: crawlerId,
-        data: { knownSpells: [...(crawler.knownSpells ?? []), newKnownSpell] } as Record<string, unknown>,
+        data: { knownSpells: [...(crawler.knownSpells ?? []), ...newKnownSpells] } as Record<string, unknown>,
       },
     ]);
 
-    toast.success(`${crawler.name} consumed the tome and learned ${spell.name}!`);
+    const learnedNames = toLearn.map(s => s.name).join(', ');
+    if (skippedAlreadyKnown.length > 0) {
+      toast.success(`${crawler.name} learned ${learnedNames}! (Skipped: ${skippedAlreadyKnown.join(', ')} — already known)`);
+    } else {
+      toast.success(`${crawler.name} consumed the tome and learned: ${learnedNames}!`);
+    }
   };
 
   // Promote an embedded custom spell from a tome to the shared spell library
