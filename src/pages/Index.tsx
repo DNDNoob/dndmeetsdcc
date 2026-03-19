@@ -84,8 +84,8 @@ const Index = () => {
 
   const [activeCampaign, setActiveCampaign] = useState<Campaign | null>(loadSavedCampaign);
 
-  // Derive screen and currentView from the URL path
-  const pathSegment = location.pathname.replace(/^\//, '').split('/')[0] || '';
+  // Derive screen and currentView from the URL path (strip /app prefix)
+  const pathSegment = location.pathname.replace(/^\/app\/?/, '').split('/')[0] || '';
 
   const { screen, currentView } = useMemo((): { screen: AppScreen; currentView: GameView } => {
     if (pathSegment === '') {
@@ -296,13 +296,14 @@ const Index = () => {
     }
   }, [activeCampaign]);
 
-  // When user signs out or becomes unauthenticated, clear campaign
-  // Guard with authLoading so we don't clear the campaign before auth resolves
+  // When user signs out or becomes unauthenticated, redirect to landing page
+  // Guard with authLoading so we don't redirect before auth resolves
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       setActiveCampaign(null);
+      navigate('/', { replace: true });
     }
-  }, [isAuthenticated, authLoading]);
+  }, [isAuthenticated, authLoading, navigate]);
 
   // Determine if we should show campaign selection
   const showCampaignSelect = !authLoading && isAuthenticated && !needsUsername && !activeCampaign;
@@ -311,17 +312,17 @@ const Index = () => {
   useEffect(() => {
     // Unknown route → splash
     if (pathSegment !== '' && pathSegment !== 'menu' && !GAME_VIEWS.includes(pathSegment)) {
-      navigate('/', { replace: true });
+      navigate('/app', { replace: true });
       return;
     }
     // No player selected but trying to access menu or game views → splash
     if (!currentPlayer && pathSegment !== '') {
-      navigate('/', { replace: true });
+      navigate('/app', { replace: true });
       return;
     }
     // Non-admin trying to access dungeonai → menu
     if (pathSegment === 'dungeonai' && !isAdmin) {
-      navigate('/menu', { replace: true });
+      navigate('/app/menu', { replace: true });
       return;
     }
   }, [pathSegment, currentPlayer, navigate, isAdmin]);
@@ -345,25 +346,25 @@ const Index = () => {
 
   const handlePlayerSelect = (playerId: string, playerName: string, playerType: "crawler" | "ai" | "npc") => {
     setCurrentPlayer({ id: playerId, name: playerName, type: playerType });
-    navigate('/menu');
+    navigate('/app/menu');
   };
 
   const handleNavigate = (view: string) => {
-    navigate('/' + view);
+    navigate('/app/' + view);
   };
 
   const handleDungeonAI = () => {
-    navigate('/dungeonai');
+    navigate('/app/dungeonai');
   };
 
   const handleReturnToMenu = () => {
-    navigate('/menu');
+    navigate('/app/menu');
   };
 
   const handleBackToCampaigns = () => {
     setActiveCampaign(null);
     setCurrentPlayer(null);
-    navigate('/', { replace: true });
+    navigate('/app', { replace: true });
   };
 
   const handleSelectCampaign = (campaign: Campaign) => {
@@ -387,7 +388,7 @@ const Index = () => {
 
     setCurrentPlayer(restoredPlayer);
     // If we have a player (DM or restored), skip splash and go to menu
-    navigate(restoredPlayer ? '/menu' : '/');
+    navigate(restoredPlayer ? '/app/menu' : '/app');
   };
 
   const handleStatRoll = (crawlerName: string, crawlerId: string, stat: string, totalStat: number) => {

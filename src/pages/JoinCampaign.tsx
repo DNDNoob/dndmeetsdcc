@@ -32,7 +32,7 @@ const JoinCampaign: React.FC = () => {
     if (campaign) {
       setJoined(true);
       // Navigate to the main page — the campaign will appear in their list
-      setTimeout(() => navigate('/', { replace: true }), 1500);
+      setTimeout(() => navigate('/app', { replace: true }), 1500);
     } else {
       setError('Failed to join campaign. The invite code may be invalid or the campaign is full.');
     }
@@ -83,7 +83,7 @@ const JoinCampaign: React.FC = () => {
           <div className="space-y-4">
             <p className="text-sm text-destructive">{error}</p>
             <div className="flex gap-2">
-              <DungeonButton variant="menu" className="flex-1" onClick={() => navigate('/', { replace: true })}>
+              <DungeonButton variant="menu" className="flex-1" onClick={() => navigate('/app', { replace: true })}>
                 Go Home
               </DungeonButton>
               <DungeonButton variant="default" className="flex-1" onClick={handleJoin}>
