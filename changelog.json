@@ -11,7 +11,8 @@
       "🏷️ Creator attribution — items and spells display the username of whoever created them",
       "📋 Decision audit log — significant account setting changes (e.g. enabling/disabling public content) are recorded to a personal decision history in Firestore",
       "🕐 Decision history panel — Account Settings now includes a collapsible Decision History section showing a timestamped log of past decisions",
-      "✖️ Added X close button to the Dice Roller panel header for easy dismissal on mobile"
+      "✖️ Added X close button to the Dice Roller panel header for easy dismissal on mobile",
+      "⚡ Added Reaction as a spell action type — reaction spells show a Reaction Trigger field to describe when they fire (e.g. 'when you are hit by an attack')"
     ]
   },
   {

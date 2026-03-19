@@ -390,6 +390,20 @@ function SpellDataEditor({ spellData, onChange }: SpellDataEditorProps) {
         </div>
       </div>
 
+      {/* Reaction Trigger (only for Reaction spells) */}
+      {sd.actionType === 'Reaction' && (
+        <div>
+          <label className="text-[10px] text-muted-foreground block mb-0.5">Reaction Trigger <span className="text-destructive">*</span></label>
+          <input
+            type="text"
+            value={sd.reactionTrigger ?? ''}
+            onChange={(e) => onChange({ reactionTrigger: e.target.value || undefined })}
+            placeholder="e.g. When you are hit by an attack"
+            className="bg-muted border border-border px-2 py-1 text-xs w-full"
+          />
+        </div>
+      )}
+
       {/* Special Effect */}
       <div>
         <label className="text-[10px] text-muted-foreground block mb-0.5">Special Effect</label>
@@ -474,6 +488,7 @@ function SpellCard({
             {durationParts.length > 0 && <div className="col-span-2"><span className="text-muted-foreground">Duration: </span>{durationParts.join(', ')}</div>}
             {sd.canTargetSelf && <div className="col-span-2 text-muted-foreground italic">Can target self</div>}
             {sd.splashDamage && <div className="col-span-2 text-muted-foreground italic">Splash damage</div>}
+            {sd.reactionTrigger && <div className="col-span-2"><span className="text-muted-foreground">Trigger: </span><span className="text-accent italic">{sd.reactionTrigger}</span></div>}
           </div>
           {sd.specialEffect && (
             <div className="text-accent italic text-[11px]">
@@ -654,6 +669,12 @@ function KnownSpellCard({
                     <span className="text-destructive">
                       {spell.spellData.damageDice!.map(d => `${d.count}d${d.sides}`).join(' + ')}
                     </span>
+                  </div>
+                )}
+                {spell.spellData.reactionTrigger && (
+                  <div className="col-span-2">
+                    <span className="text-muted-foreground">Trigger: </span>
+                    <span className="text-accent italic">{spell.spellData.reactionTrigger}</span>
                   </div>
                 )}
               </div>

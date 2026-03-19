@@ -65,7 +65,7 @@ export interface WeaponData {
 export const SPELL_SCHOOLS = ['Evocation', 'Necromancy', 'Illusion', 'Conjuration', 'Abjuration', 'Divination', 'Transmutation', 'Enchantment'] as const;
 export type SpellSchool = typeof SPELL_SCHOOLS[number];
 
-export const SPELL_ACTION_TYPES = ['Action', 'Bonus Action'] as const;
+export const SPELL_ACTION_TYPES = ['Action', 'Bonus Action', 'Reaction'] as const;
 export type SpellActionType = typeof SPELL_ACTION_TYPES[number];
 
 export const SPELL_DAMAGE_TYPES = [...DAMAGE_TYPES, 'Healing'] as const;
@@ -95,6 +95,7 @@ export interface SpellData {
   savingThrow?: string; // e.g. 'DEX', 'CON'
   specialEffect?: string;
   splashDamage?: boolean;
+  reactionTrigger?: string; // For Reaction spells: describes what triggers the reaction (e.g. "when you are hit by an attack")
 }
 
 export interface Spell {
