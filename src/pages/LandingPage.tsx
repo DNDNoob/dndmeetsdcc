@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, useInView } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
@@ -32,7 +32,7 @@ function RevealSection({
     <motion.section
       ref={ref}
       initial={{ opacity: 0, y: 60 }}
-      animate={isInView ? { opacity: 1, y: 0 } : {}}
+      animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 60 }}
       transition={{ duration: 0.8, ease: "easeOut" }}
       className={className}
     >
@@ -42,27 +42,45 @@ function RevealSection({
 }
 
 /* ------------------------------------------------------------------ */
+/*  Generate stable random particle data (computed once per mount)     */
+/* ------------------------------------------------------------------ */
+function useParticleData(count: number) {
+  return useMemo(
+    () =>
+      Array.from({ length: count }, () => ({
+        left: Math.random() * 100,
+        top: Math.random() * 100,
+        duration: 3 + Math.random() * 4,
+        delay: Math.random() * 3,
+      })),
+    [count],
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Floating particle background                                       */
 /* ------------------------------------------------------------------ */
 function ParticleField() {
+  const particles = useParticleData(30);
+
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      {Array.from({ length: 30 }).map((_, i) => (
+      {particles.map((p, i) => (
         <motion.div
           key={i}
           className="absolute w-1 h-1 rounded-full bg-primary/30"
           style={{
-            left: `${Math.random() * 100}%`,
-            top: `${Math.random() * 100}%`,
+            left: `${p.left}%`,
+            top: `${p.top}%`,
           }}
           animate={{
             y: [0, -30, 0],
             opacity: [0.2, 0.6, 0.2],
           }}
           transition={{
-            duration: 3 + Math.random() * 4,
+            duration: p.duration,
             repeat: Infinity,
-            delay: Math.random() * 3,
+            delay: p.delay,
             ease: "easeInOut",
           }}
         />
