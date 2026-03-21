@@ -26,7 +26,7 @@ const navItems = [
   { id: "maps", label: "Maps", icon: Map },
   { id: "inventory", label: "Inventory", icon: Backpack },
   { id: "mobs", label: "Mobs", icon: Skull },
-  { id: "spells", label: "Spells", icon: Wand2 },
+  { id: "spells", label: "Vernon's Library", icon: Wand2 },
 ];
 
 const Navigation: React.FC<NavigationProps> = ({

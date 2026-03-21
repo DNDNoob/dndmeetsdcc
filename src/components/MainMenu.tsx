@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DungeonButton } from "./ui/DungeonButton";
-import { User, Map, Backpack, Skull, Brain, Presentation, Volume2, ChevronDown, ArrowLeft } from "lucide-react";
+import { User, Map, Backpack, Skull, Brain, Presentation, Volume2, ChevronDown, ArrowLeft, Wand2 } from "lucide-react";
 import { Crawler } from "@/lib/gameData";
 import GoogleAuthButton from "./GoogleAuthButton";
 
@@ -22,6 +22,7 @@ const menuItems = [
   { id: "maps", label: "World Map", icon: Map },
   { id: "inventory", label: "Inventory", icon: Backpack },
   { id: "mobs", label: "Mob Profiles", icon: Skull },
+  { id: "spells", label: "Vernon's Library", icon: Wand2 },
   { id: "showtime", label: "Show Time", icon: Presentation },
   { id: "sounds", label: "Sound Effects", icon: Volume2 },
 ];
