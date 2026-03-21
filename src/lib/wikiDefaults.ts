@@ -864,7 +864,7 @@ Click the **⚙ Account Settings** section on the Campaign Select screen to mana
 Toggle **Show Public Content** to opt in to seeing items and spells shared publicly by other players:
 
 - **Off (default)** — you only see your own campaign's content
-- **On** — a "Community Items" section appears in Inventory and a "Community Spells" section appears in Spells, showing publicly shared content from all players
+- **On** — a "Community Items" section appears in Inventory and a "Community Spells" section appears in Vernon's Library, showing publicly shared content from all players
 
 When you enable this setting, an **age warning** is displayed reminding you that public content is user-generated and may not be suitable for all ages. You must acknowledge this warning to continue.
 
@@ -943,32 +943,87 @@ Players can leave a campaign at any time from the Campaign Selection screen. The
 Click the **Campaigns** button (or back arrow) in the navigation bar, Main Menu, or Splash Screen to return to the Campaign Selection screen and switch campaigns.`,
   },
   {
-    id: 'spells',
-    slug: 'spells',
-    title: 'Spell System',
-    category: 'Game Mechanics',
-    order: 50,
-    content: `# Spell System
+    id: 'spells-overview',
+    slug: 'spells-overview',
+    title: "Vernon's Library Overview",
+    category: 'Spells',
+    order: 0,
+    content: `# Vernon's Library
+
+Welcome to **Vernon's Library** — the spell management system for your campaign. Access it from the **Vernon's Library** button in the navigation bar or Main Menu.
 
 Crawlers can learn and cast spells. Each spell consumes **mana** when cast and belongs to a **spell school** (Evocation, Necromancy, Illusion, etc.).
 
-## Learning Spells
+## The Library Interface
+
+Vernon's Library is split into two panels:
+
+- **Left panel — Spell Library**: The shared collection of reusable spells. DMs can create, edit, and delete spells here. Any library spell can be granted directly to a crawler.
+- **Right panel — Known Spells**: Per-crawler spell lists showing cast counts, mastery levels, and effective mana costs.
+
+## Spell Schools
+
+Every spell belongs to one of eight schools of magic:
+
+| School | Focus |
+|--------|-------|
+| **Evocation** | Direct damage and energy manipulation |
+| **Necromancy** | Death, undead, and life-force manipulation |
+| **Illusion** | Deception, trickery, and sensory manipulation |
+| **Conjuration** | Summoning creatures and creating objects |
+| **Abjuration** | Protection, wards, and defensive magic |
+| **Divination** | Knowledge, foresight, and detection |
+| **Transmutation** | Altering matter, shape, and form |
+| **Enchantment** | Mind control, charm, and influence |
+
+## Quick Links
+
+- [Learning Spells](/wiki/learning-spells) — How crawlers acquire new spells
+- [Casting & Mastery](/wiki/casting-mastery) — Mana costs, action types, and mastery progression
+- [Spell Properties](/wiki/spell-properties) — All configurable spell data fields
+- [Spell Tomes](/wiki/spell-tomes) — Consumable items that teach spells
+- [Sharing Spells](/wiki/sharing-spells) — Community spell sharing system`,
+  },
+  {
+    id: 'learning-spells',
+    slug: 'learning-spells',
+    title: 'Learning Spells',
+    category: 'Spells',
+    order: 1,
+    content: `# Learning Spells
 
 Spells can be learned in several ways:
 
 | Source | How |
 |--------|-----|
-| **Spell Tome** | Consume a Spell Tome item from your inventory — the tome is destroyed and you learn the spell |
-| **Granted** | A DM grants the spell directly from the Spells page |
+| **Spell Tome** | Consume a [Spell Tome](/wiki/spell-tomes) item from your inventory — the tome is destroyed and you learn the spell |
+| **Granted** | A DM grants the spell directly from Vernon's Library |
 | **Quest** | Awarded as a quest reward |
 | **Level Up** | Granted by the DM when leveling up |
 | **Race / Class** | Innate spells from your race or class (set during character creation) |
 
-A crawler cannot learn the same spell twice.
+A crawler **cannot learn the same spell twice**. If a crawler already knows a spell, attempting to learn it again will have no effect.
+
+## Granting Spells (DM)
+
+From Vernon's Library, DMs can grant any spell in the library directly to a specific crawler:
+
+1. Open **Vernon's Library** from the navigation bar
+2. Find the spell in the **Spell Library** panel (left side)
+3. Click the spell to expand it
+4. Use the **Grant** button and select which crawler should learn it`,
+  },
+  {
+    id: 'casting-mastery',
+    slug: 'casting-mastery',
+    title: 'Casting & Mastery',
+    category: 'Spells',
+    order: 2,
+    content: `# Casting & Mastery
 
 ## Casting Spells
 
-Each spell costs **mana** to cast. Spells are cast using either an **Action** or **Bonus Action** depending on how the spell was designed.
+Each spell costs **mana** to cast. Spells are cast using either an **Action**, **Bonus Action**, or **Reaction** depending on how the spell was designed.
 
 Spells can optionally:
 - Target a single enemy, multiple targets, an area, or the caster themselves
@@ -976,6 +1031,15 @@ Spells can optionally:
 - Apply effects lasting for a set number of **combat turns** or **noncombat turns**
 - Require a saving throw from the target
 - Have a splash damage effect (hits multiple enemies)
+
+## Reaction Spells
+
+Spells with **Action Type: Reaction** are cast in response to a specific trigger event outside your turn. When creating a reaction spell, fill in the **Reaction Trigger** field to describe exactly when it can be used. The trigger is displayed on the spell card so players know when to declare it.
+
+Examples of reaction triggers:
+- "When you are hit by an attack"
+- "When an ally within 30 ft takes damage"
+- "When you fail a saving throw"
 
 ## Spell Mastery
 
@@ -990,63 +1054,123 @@ Every time a crawler casts a spell, their **cast count** increases. Reaching cas
 
 The reduction per level is **ceil(base cost × 5%)**, stacked per mastery level. Mana cost never goes below 0.
 
-## Spell Tomes
+## Mastery Example
 
-Spell Tomes are consumable inventory items. When a crawler **Uses** a tome:
-1. The tome is removed from their inventory
-2. They learn the spell contained in the tome
-
-Tomes can contain either a **library spell** (selected from the shared spell library) or a **custom spell** (designed specifically for that tome). DMs can promote a custom spell to the shared library from the Spells page.
-
-## Spell Library
-
-The **Spells page** (accessible from the navigation bar) shows:
-- **Left panel**: The shared spell library — DMs can create, edit, and delete reusable spells
-- **Right panel**: Per-crawler known spells, cast counts, mastery levels, and an effective mana cost display
-
-DMs can also grant any library spell directly to a specific crawler from the library panel.
-
-## Spell Data Fields
+A spell with a base mana cost of **20**:
+- **Mastery 1** (10 casts): discount = ceil(20 × 0.05) = 1 → effective cost = **19**
+- **Mastery 2** (30 casts): discount = 1 × 2 = 2 → effective cost = **18**
+- **Mastery 3** (60 casts): discount = 1 × 3 = 3 → effective cost = **17**
+- **Mastery 4** (100 casts): discount = 1 × 4 = 4 → effective cost = **16**`,
+  },
+  {
+    id: 'spell-properties',
+    slug: 'spell-properties',
+    title: 'Spell Properties',
+    category: 'Spells',
+    order: 3,
+    content: `# Spell Properties
 
 Each spell has the following configurable properties:
 
 | Field | Description |
 |-------|-------------|
-| Mana Cost | Mana consumed per cast (0 = free) |
-| Spell Level | D&D-style level 1–9 |
-| School | Evocation, Necromancy, Illusion, etc. |
-| Action Type | Action, Bonus Action, or **Reaction** |
-| Range | Feet, Self, or Touch |
-| Target | Single, Area, Self, or Multiple |
-| Area of Effect | Shape (sphere/cone/line/cube) and size in feet |
-| Damage Dice | One or more dice (e.g., 2d6 + 1d4) |
-| Damage Type | Fire, Poison, Healing, Spiritual, etc. |
-| Hit Die | Bonus die added to the spell attack roll |
-| Hit Modifiers | Stat bonuses applied to hit roll (STR/DEX/CON/INT/CHA) |
-| Damage Modifiers | Stat bonuses applied to damage roll |
-| Duration | Combat turns, noncombat turns, or a custom label |
-| Saving Throw | Which stat the target rolls to resist |
-| Splash Damage | Whether the spell can hit multiple targets |
-| Special Effect | Free-text description of any on-hit effects |
-| Can Target Self | Whether the caster can target themselves |
-| Reaction Trigger | *(Reaction spells only)* What event triggers the reaction, e.g. "When you are hit by an attack" |
+| **Mana Cost** | Mana consumed per cast (0 = free) |
+| **Spell Level** | D&D-style level 1–9 |
+| **School** | Evocation, Necromancy, Illusion, etc. |
+| **Action Type** | Action, Bonus Action, or Reaction |
+| **Range** | Feet, Self, or Touch |
+| **Target** | Single, Area, Self, or Multiple |
+| **Area of Effect** | Shape (sphere/cone/line/cube) and size in feet |
+| **Damage Dice** | One or more dice (e.g., 2d6 + 1d4) |
+| **Damage Type** | Fire, Poison, Healing, Spiritual, etc. |
+| **Hit Die** | Bonus die added to the spell attack roll |
+| **Hit Modifiers** | Stat bonuses applied to hit roll (STR/DEX/CON/INT/CHA) |
+| **Damage Modifiers** | Stat bonuses applied to damage roll |
+| **Duration** | Combat turns, noncombat turns, or a custom label |
+| **Saving Throw** | Which stat the target rolls to resist |
+| **Splash Damage** | Whether the spell can hit multiple targets |
+| **Special Effect** | Free-text description of any on-hit effects |
+| **Can Target Self** | Whether the caster can target themselves |
+| **Reaction Trigger** | *(Reaction spells only)* What event triggers the reaction |
 
-## Reaction Spells
+## Damage Types
 
-Spells with **Action Type: Reaction** are cast in response to a specific trigger event outside your turn. When creating a reaction spell, fill in the **Reaction Trigger** field to describe exactly when it can be used. The trigger is displayed on the spell card so players know when to declare it.
+Spells can deal one of the following damage types:
 
-Examples of reaction triggers:
-- "When you are hit by an attack"
-- "When an ally within 30 ft takes damage"
-- "When you fail a saving throw"
+Fire, Cold, Lightning, Poison, Acid, Necrotic, Radiant, Psychic, Thunder, Force, Spiritual, or **Healing** (restores HP instead of dealing damage).
 
-## Sharing Spells
+## Area of Effect Shapes
+
+| Shape | Description |
+|-------|-------------|
+| **Sphere** | Radiates outward from a point |
+| **Cone** | Fans out from the caster |
+| **Line** | Extends in a straight line from the caster |
+| **Cube** | Fills a cubic area |`,
+  },
+  {
+    id: 'spell-tomes',
+    slug: 'spell-tomes',
+    title: 'Spell Tomes',
+    category: 'Spells',
+    order: 4,
+    content: `# Spell Tomes
+
+Spell Tomes are **consumable inventory items** that teach a crawler a spell when used.
+
+## Using a Spell Tome
+
+When a crawler **Uses** a tome from their inventory:
+1. The tome is removed from their inventory
+2. They learn the spell contained in the tome
+
+If the crawler already knows the spell, the tome is **not consumed** and a warning is shown.
+
+## Types of Spell Tomes
+
+Tomes can contain either:
+
+- **Library spell**: A spell selected from the shared spell library. The tome references the library spell by ID.
+- **Custom spell**: A one-off spell designed specifically for that tome. The spell data is embedded directly in the tome item.
+
+## Promoting Custom Spells
+
+DMs can **promote** a custom spell (from a tome) to the shared library from Vernon's Library. This makes the spell available for all crawlers to learn and for DMs to grant directly.
+
+## Creating Spell Tomes (DM)
+
+DMs create spell tomes from the **Inventory** page:
+1. Create a new item and set its type to **Spell Tome**
+2. Choose an existing library spell or design a custom spell
+3. Add the tome to a crawler's inventory or place it in a loot box`,
+  },
+  {
+    id: 'sharing-spells',
+    slug: 'sharing-spells',
+    title: 'Sharing Spells',
+    category: 'Spells',
+    order: 5,
+    content: `# Sharing Spells
 
 Authenticated players can **share spells publicly** so other players across all campaigns can discover and use them.
 
+## Privacy Controls
+
 - **Creator attribution**: every spell shows who created it ("by username")
 - **Privacy toggle**: if you created a spell, a **globe/lock** button appears when the spell is expanded — click it to make it public or private. Spells are **private by default**.
-- **Community Spells**: if you have [Public Content](/wiki/public-content) enabled in Account Settings, a **Community Spells** panel appears at the bottom of the Spell Library showing public spells from other players. DMs can add any community spell to their campaign library with the **+** button.`,
+
+## Community Spells
+
+If you have [Public Content](/wiki/public-content) enabled in Account Settings, a **Community Spells** panel appears at the bottom of Vernon's Library showing public spells from other players.
+
+DMs can add any community spell to their campaign library with the **+** button. The spell is copied into your campaign's library and can be freely edited without affecting the original.
+
+## Best Practices
+
+- Give your spells **descriptive names** so other players can find them
+- Write clear **descriptions** explaining what the spell does narratively
+- Fill in all relevant **spell data fields** so the mechanics are complete
+- Use **tags** to help categorize spells (e.g., "fire", "healing", "buff")`,
   },
   {
     id: 'public-content',

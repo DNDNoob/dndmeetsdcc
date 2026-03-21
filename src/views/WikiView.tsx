@@ -110,7 +110,7 @@ const WikiView: React.FC<WikiViewProps> = ({
 
   const categories = useMemo(() => {
     const cats = new Map<string, WikiPage[]>();
-    const catOrder = ['Basics', 'Game Mechanics', 'DM Guide', 'Features'];
+    const catOrder = ['Basics', 'Game Mechanics', 'Spells', 'DM Guide', 'Features'];
     for (const page of pages) {
       const cat = page.category || 'Uncategorized';
       if (!cats.has(cat)) cats.set(cat, []);

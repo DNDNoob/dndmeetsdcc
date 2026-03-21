@@ -1071,7 +1071,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                   </div>
 
                   {spells.length === 0 && (
-                    <p className="text-[10px] text-muted-foreground italic">No library spells yet — create them on the Spells page, or use Custom Spell above.</p>
+                    <p className="text-[10px] text-muted-foreground italic">No library spells yet — create them in Vernon's Library, or use Custom Spell above.</p>
                   )}
                 </div>
               );
