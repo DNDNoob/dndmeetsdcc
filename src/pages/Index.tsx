@@ -182,6 +182,7 @@ const Index = () => {
     cancelCombat,
     removeCombatant,
     addCombatant,
+    updateCombatTimer,
     wikiPages,
     addWikiPage,
     updateWikiPage,
@@ -863,6 +864,7 @@ const Index = () => {
               runtimeCrawlerPlacements={runtimeCrawlerPlacements}
               runtimeMobPlacements={runtimeMobPlacements}
               onAddCombatant={addCombatant}
+              onUpdateCombatTimer={updateCombatTimer}
             />
           )}
 

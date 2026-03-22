@@ -1,5 +1,14 @@
 [
   {
+    "date": "2026-03-22",
+    "changes": [
+      "⚔️ Combat Turn Timer — configurable countdown or stopwatch timer displayed in the combat order bar during active combat",
+      "⏱️ DM can toggle between countdown mode (30s/60s/90s/120s presets) and stopwatch mode from the PingPanel",
+      "🔔 Audio alert beep plays when countdown timer expires; timer flashes red to signal time's up",
+      "⏸️ DM can pause and resume the turn timer mid-combat"
+    ]
+  },
+  {
     "date": "2026-03-21",
     "changes": [
       "🧙 Renamed Spells page to Vernon's Library — a themed name for the spell management system",

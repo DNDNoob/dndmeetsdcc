@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Clock, ChevronUp, ChevronDown, RotateCcw, Sun, Moon, Swords, Zap, SkipForward, XCircle, Heart, Plus, Play, Square } from "lucide-react";
+import { Clock, ChevronUp, ChevronDown, RotateCcw, Sun, Moon, Swords, Zap, SkipForward, XCircle, Heart, Plus, Play, Square, Timer, Pause } from "lucide-react";
 import { type Crawler, type Mob, type NoncombatTurnState, type GameClockState, type Episode, type CombatState, type CrawlerPlacement, type EpisodeMobPlacement, type CombatantEntry } from "@/lib/gameData";
 
 interface PingPanelProps {
@@ -26,6 +26,7 @@ interface PingPanelProps {
   onAddCombatant?: (combatants: CombatantEntry[]) => Promise<void>;
   isGameActive?: boolean;
   onToggleGameActive?: (active: boolean) => Promise<void>;
+  onUpdateCombatTimer?: (settings: { turnTimerMode?: 'countdown' | 'stopwatch'; turnTimerDuration?: number; turnTimerPaused?: boolean }) => Promise<void>;
 }
 
 const PingPanel: React.FC<PingPanelProps> = ({
@@ -51,6 +52,7 @@ const PingPanel: React.FC<PingPanelProps> = ({
   onAddCombatant,
   isGameActive,
   onToggleGameActive,
+  onUpdateCombatTimer,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showRestDropdown, setShowRestDropdown] = useState<'short' | 'long' | null>(null);
@@ -647,6 +649,58 @@ const PingPanel: React.FC<PingPanelProps> = ({
                     <span className="text-xs text-destructive font-display">COMBAT ROUND {combatState.combatRound}</span>
                   </div>
                 </div>
+
+                {/* Timer Controls (DM only) */}
+                {isAdmin && onUpdateCombatTimer && (
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {/* Mode toggle */}
+                    <button
+                      onClick={() => onUpdateCombatTimer({ turnTimerMode: (combatState.turnTimerMode ?? 'countdown') === 'countdown' ? 'stopwatch' : 'countdown' })}
+                      className={`flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
+                        (combatState.turnTimerMode ?? 'countdown') === 'countdown'
+                          ? 'border-accent/50 bg-accent/10 text-accent'
+                          : 'border-primary/50 bg-primary/10 text-primary'
+                      }`}
+                      title={`Switch to ${(combatState.turnTimerMode ?? 'countdown') === 'countdown' ? 'stopwatch' : 'countdown'} mode`}
+                    >
+                      {(combatState.turnTimerMode ?? 'countdown') === 'countdown' ? (
+                        <><Timer className="w-3 h-3" /> Countdown</>
+                      ) : (
+                        <><Clock className="w-3 h-3" /> Stopwatch</>
+                      )}
+                    </button>
+                    {/* Duration presets (countdown only) */}
+                    {(combatState.turnTimerMode ?? 'countdown') === 'countdown' && (
+                      <div className="flex items-center gap-0.5">
+                        {[30, 60, 90, 120].map(d => (
+                          <button
+                            key={d}
+                            onClick={() => onUpdateCombatTimer({ turnTimerDuration: d })}
+                            className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
+                              (combatState.turnTimerDuration ?? 60) === d
+                                ? 'border-accent/50 bg-accent/10 text-accent font-bold'
+                                : 'border-border bg-muted/30 text-muted-foreground hover:text-accent hover:border-accent/30'
+                            }`}
+                          >
+                            {d}s
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {/* Pause/Resume */}
+                    <button
+                      onClick={() => onUpdateCombatTimer({ turnTimerPaused: !(combatState.turnTimerPaused ?? false) })}
+                      className={`flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
+                        combatState.turnTimerPaused
+                          ? 'border-accent/50 bg-accent/10 text-accent'
+                          : 'border-border bg-muted/30 text-muted-foreground hover:text-accent hover:border-accent/30'
+                      }`}
+                      title={combatState.turnTimerPaused ? 'Resume timer' : 'Pause timer'}
+                    >
+                      {combatState.turnTimerPaused ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
+                    </button>
+                  </div>
+                )}
 
                 {/* Turn order list */}
                 <div className="space-y-1">

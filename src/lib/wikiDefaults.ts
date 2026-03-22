@@ -279,6 +279,16 @@ Combat proceeds in turn order (highest initiative first). On your turn:
 
 The DM advances turns with the "Next Turn" button.
 
+## Turn Timer
+
+A configurable timer appears in the combat order bar during active combat, helping keep turns moving.
+
+**Countdown Mode**: Set a time limit per turn (30s, 60s, 90s, or 120s). When the timer reaches zero, it flashes red and plays an alert beep. The DM still manually advances turns — the timer is a reminder, not auto-advance.
+
+**Stopwatch Mode**: Counts up from 0:00 showing how long the current turn has taken. Turns yellow after 60 seconds and red after 2 minutes.
+
+The DM can toggle between modes, change the countdown duration, and pause/resume the timer from the combat controls in the game clock panel. The timer automatically resets each time a turn advances.
+
 ## Damage
 
 When you attack a target:
