@@ -838,6 +838,10 @@ export const useGameState = () => {
       combatRound: 1,
       episodeId: episodeId || undefined,
       combatCount: prevCount + 1,
+      turnTimerMode: 'countdown',
+      turnTimerDuration: 60,
+      turnTimerPaused: false,
+      turnStartedAt: undefined,
     };
 
     const current = combatState;
@@ -897,6 +901,8 @@ export const useGameState = () => {
       phase: 'combat',
       currentTurnIndex: 0,
       combatRound: 1,
+      turnStartedAt: Date.now(),
+      turnTimerPaused: false,
     } as Record<string, unknown>);
     logger.log('[GameState] ⚔️ Combat order confirmed, starting combat phase');
   };
@@ -916,7 +922,22 @@ export const useGameState = () => {
       combatants: resetCombatants,
       currentTurnIndex: isNewRound ? 0 : nextIndex,
       combatRound: isNewRound ? combatState.combatRound + 1 : combatState.combatRound,
+      turnStartedAt: Date.now(),
+      turnTimerPaused: false,
     } as Record<string, unknown>);
+  };
+
+  const updateCombatTimer = async (settings: { turnTimerMode?: 'countdown' | 'stopwatch'; turnTimerDuration?: number; turnTimerPaused?: boolean }) => {
+    if (!combatState) return;
+    const updates: Record<string, unknown> = {};
+    if (settings.turnTimerMode !== undefined) updates.turnTimerMode = settings.turnTimerMode;
+    if (settings.turnTimerDuration !== undefined) updates.turnTimerDuration = settings.turnTimerDuration;
+    if (settings.turnTimerPaused !== undefined) updates.turnTimerPaused = settings.turnTimerPaused;
+    // When switching modes or unpausing, reset the timer start
+    if (settings.turnTimerMode !== undefined || settings.turnTimerPaused === false) {
+      updates.turnStartedAt = Date.now();
+    }
+    await updateItem('combatState', 'current', updates);
   };
 
   const recordCombatAction = async (combatantId: string, actionType: 'action' | 'bonus') => {
@@ -1315,6 +1336,7 @@ export const useGameState = () => {
     cancelCombat,
     removeCombatant,
     addCombatant,
+    updateCombatTimer,
     wikiPages,
     addWikiPage,
     updateWikiPage,

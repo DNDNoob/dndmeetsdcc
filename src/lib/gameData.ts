@@ -320,6 +320,10 @@ export interface CombatState {
   combatRound: number;
   episodeId?: string; // ties combat to a specific episode
   combatCount?: number; // how many times combat has been started (cumulative counter)
+  turnTimerMode?: 'countdown' | 'stopwatch'; // default: 'countdown'
+  turnTimerDuration?: number; // countdown seconds, default: 60
+  turnTimerPaused?: boolean; // DM can pause the timer
+  turnStartedAt?: number; // epoch ms when current turn started
 }
 
 export interface Episode {

@@ -16,6 +16,7 @@ import { CrawlerIcon } from "@/components/ui/CrawlerIcon";
 import { db } from "@/lib/firebase";
 import { doc, setDoc, onSnapshot, serverTimestamp, Timestamp } from "firebase/firestore";
 import { useThrottledCallback } from "@/hooks/useDebounce";
+import CombatTurnTimer from "@/components/CombatTurnTimer";
 
 interface ShowTimeViewProps {
   maps: string[];
@@ -2772,6 +2773,14 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       {combatState?.active && combatState.phase === 'combat' && combatState.combatants.length > 0 && (
         <div className="w-full bg-background/90 border-b-2 border-destructive/50 px-4 py-2 flex items-center gap-1 overflow-x-auto shrink-0">
           <span className="text-[10px] text-destructive font-display mr-2 shrink-0">R{combatState.combatRound}</span>
+          {combatState.turnStartedAt && (
+            <CombatTurnTimer
+              mode={combatState.turnTimerMode ?? 'countdown'}
+              durationSeconds={combatState.turnTimerDuration ?? 60}
+              turnStartedAt={combatState.turnStartedAt}
+              paused={combatState.turnTimerPaused ?? false}
+            />
+          )}
           {combatState.combatants.map((c, i) => {
             const isCurrent = i === combatState.currentTurnIndex;
             const crawlerData = c.type === 'crawler' ? crawlers.find(cr => cr.id === c.id) : null;
