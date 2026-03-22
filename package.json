@@ -11,6 +11,7 @@
     "preview": "vite preview",
     "start:sfx-server": "node server/sound-server.js",
     "test:firebase": "node scripts/firebase-crud-test.mjs",
+    "link-content": "node scripts/link-content-publish.mjs",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist"
   },
