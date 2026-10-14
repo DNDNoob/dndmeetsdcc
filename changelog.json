@@ -1,5 +1,14 @@
 [
   {
+    "date": "2026-10-14",
+    "changes": [
+      "🐛 Fixed new email/password accounts failing to save their profile (username setup) — missing avatar was sent to Firebase as an invalid value",
+      "🐛 Fixed sharing items/spells publicly and other saves failing when optional fields were empty",
+      "🐛 Fixed edits to the sample crawlers in a brand-new campaign not saving — the crawler is now saved to the campaign on first save",
+      "⚠️ Failed saves now show an error toast instead of failing silently"
+    ]
+  },
+  {
     "date": "2026-03-22",
     "changes": [
       "⚔️ Combat Turn Timer — configurable countdown or stopwatch timer displayed in the combat order bar during active combat",

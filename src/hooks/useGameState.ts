@@ -376,6 +376,17 @@ export const useGameState = () => {
 
   const updateCrawler = async (id: string, updates: Partial<Crawler>) => {
     logger.log('[GameState] 📝 Updating crawler:', { id, updates });
+    // New campaigns display the built-in defaultCrawlers until one is saved. Those
+    // don't exist in Firestore, so updateDoc would fail with "No document to update".
+    // Persist the full crawler (default + edits) the first time it's saved.
+    const persisted = getCollection<Crawler>('crawlers').some((c) => c.id === id);
+    if (!persisted) {
+      const base = crawlers.find((c) => c.id === id);
+      if (base) {
+        logger.log('[GameState] ➕ Persisting default crawler on first save:', id);
+        return addItem('crawlers', { ...base, ...updates, id } as Record<string, unknown>);
+      }
+    }
     return updateItem('crawlers', id, updates as Record<string, unknown>);
   };
 
