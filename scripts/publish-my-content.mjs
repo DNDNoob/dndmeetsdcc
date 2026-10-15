@@ -17,7 +17,7 @@
  *   node scripts/publish-my-content.mjs --user you@example.com            # dry-run (default)
  *   node scripts/publish-my-content.mjs --user YourUsername --commit      # actually write
  *
- * Requires the same .env as the app (VITE_FIREBASE_*).
+ * Requires the app's Firebase config (VITE_FIREBASE_*) in .env or as environment variables.
  */
 
 import fs from 'fs';
@@ -127,12 +127,10 @@ async function main() {
     console.error('❌ Usage: node scripts/publish-my-content.mjs --user <email|username> [--commit]');
     process.exit(1);
   }
+  // Read config from .env if present, otherwise from environment variables
+  // (e.g. a Claude Code cloud environment). Environment variables win.
   const envPath = path.resolve(__dirname, '..', '.env');
-  if (!fs.existsSync(envPath)) {
-    console.error('❌ .env file not found at', envPath);
-    process.exit(1);
-  }
-  const env = loadEnv(envPath);
+  const env = { ...(fs.existsSync(envPath) ? loadEnv(envPath) : {}), ...process.env };
   const firebaseConfig = {
     apiKey: env.VITE_FIREBASE_API_KEY,
     authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -142,7 +140,7 @@ async function main() {
     appId: env.VITE_FIREBASE_APP_ID,
   };
   if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
-    console.error('❌ Missing Firebase config in .env');
+    console.error('❌ Missing Firebase config: set VITE_FIREBASE_* in .env or as environment variables');
     process.exit(1);
   }
 
