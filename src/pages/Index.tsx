@@ -379,6 +379,101 @@ const Index = () => {
     }
   }, [updateSpell, publishSpell, unpublishSpell]);
 
+  // One-click "share everything I made in this campaign" for the DM. Content with no creator was
+  // made here before creator tracking existed, so the DM claims it. Content created by others is untouched.
+  const handleShareAllMyContent = async () => {
+    if (!roomId || !user || !isAdmin) return;
+    const isMine = (createdBy?: string) => !createdBy || createdBy === user.uid;
+    const creatorOf = (c: { createdBy?: string; createdByUsername?: string }) =>
+      c.createdBy ? { createdBy: c.createdBy, ...(c.createdByUsername ? { createdByUsername: c.createdByUsername } : {}) } : creatorFields();
+
+    const libraryItems = getSharedInventory();
+    const itemsToShare = libraryItems.filter(i => isMine(i.createdBy) && !(i.isPublic && i.createdBy));
+    const spellsToShare = spells.filter(s => isMine(s.createdBy) && !(s.isPublic && s.createdBy));
+    const mapsToShare = mapDocs.map((m, index) => ({ m, index })).filter(({ m }) => m.image && isMine(m.createdBy) && !m.isPublic);
+    const mobsToShare = mobs.filter(m => isMine(m.createdBy) && !m.isPublic);
+    const episodesToShare = episodes.filter(e => isMine(e.createdBy) && !e.isPublic);
+
+    const total = itemsToShare.length + spellsToShare.length + mapsToShare.length + mobsToShare.length + episodesToShare.length;
+    if (total === 0) {
+      toast.info('Everything you made in this campaign is already shared');
+      return;
+    }
+    const summary = [
+      [itemsToShare.length, 'item'], [spellsToShare.length, 'spell'], [mapsToShare.length, 'map'],
+      [mobsToShare.length, 'mob type'], [episodesToShare.length, 'episode'],
+    ].filter(([n]) => n).map(([n, label]) => `${n} ${label}${n === 1 ? '' : 's'}`).join(', ');
+    if (!confirm(`Share ${summary} with the community? Content made by other players is not touched.`)) return;
+
+    let shared = 0;
+    let failed = 0;
+    const attempt = async (label: string, fn: () => Promise<void>) => {
+      try {
+        await fn();
+        shared++;
+      } catch (err) {
+        failed++;
+        console.error(`[Index] Failed to share ${label}:`, err);
+      }
+    };
+
+    if (itemsToShare.length > 0) {
+      const ids = new Set(itemsToShare.map(i => i.id));
+      const updated = libraryItems.map(i => ids.has(i.id) ? { ...i, ...creatorOf(i), isPublic: true } : i);
+      updateSharedInventory(updated);
+      for (const item of updated.filter(i => ids.has(i.id))) {
+        await attempt(`item ${item.name}`, () => publishItem(item));
+      }
+    }
+    for (const spell of spellsToShare) {
+      const stamp = { ...creatorOf(spell), isPublic: true };
+      await attempt(`spell ${spell.name}`, async () => {
+        await updateSpell(spell.id, stamp);
+        await publishSpell({ ...spell, ...stamp });
+      });
+    }
+    for (const { m, index } of mapsToShare) {
+      const creator = creatorOf(m);
+      await attempt(`map ${m.name}`, async () => {
+        await publishMap({
+          id: publicDocId(roomId, m.id), sourceId: m.id, sourceCampaignId: roomId,
+          name: m.name || `Map ${index + 1}`, image: m.image, ...creator, publishedAt: Date.now(),
+        });
+        await setMapPublic(index, { isPublic: true, ...creator });
+      });
+    }
+    // Mobs are saved in one setMobs call at the end, since setMobs replaces the whole list
+    const sharedMobIds = new Set<string>();
+    for (const mob of mobsToShare) {
+      await attempt(`mob ${mob.name}`, async () => {
+        await publishMob({
+          ...mob, ...creatorOf(mob), id: publicDocId(roomId, mob.id), sourceId: mob.id,
+          sourceCampaignId: roomId, encountered: false, publishedAt: Date.now(),
+        });
+        sharedMobIds.add(mob.id);
+      });
+    }
+    if (sharedMobIds.size > 0) {
+      await setMobs(mobs.map(m => sharedMobIds.has(m.id) ? { ...m, ...creatorOf(m), isPublic: true } : m));
+    }
+    for (const episode of episodesToShare) {
+      const bundle = buildEpisodeBundle(episode, mapDocs, mobs, lootBoxTemplates, quests);
+      if (bundle.assets.maps.length === 0) continue;
+      const creator = creatorOf(episode);
+      await attempt(`episode ${episode.name}`, async () => {
+        await publishEpisode({
+          ...bundle.episode, ...creator, id: publicDocId(roomId, episode.id), sourceId: episode.id,
+          sourceCampaignId: roomId, publishedAt: Date.now(),
+        }, bundle.assets);
+        await markMapsShared(episode.mapIds.map(i => mapDocs[parseInt(i, 10)]?.id).filter((id): id is string => !!id));
+        await updateEpisode(episode.id, { ...creator, isPublic: true });
+      });
+    }
+
+    if (failed > 0) toast.error(`Shared ${shared}, but ${failed} failed. Check the console for details.`);
+    else toast.success(`Shared ${shared} with the community`);
+  };
+
   // Restore campaign from URL query param on cold load (deep linking)
   const campaignRestoredRef = useRef(false);
   useEffect(() => {
@@ -901,6 +996,7 @@ const Index = () => {
                 onToggleMapPublic={handleToggleMapPublic}
                 onToggleMobPublic={handleToggleMobPublic}
                 onToggleEpisodePublic={handleToggleEpisodePublic}
+                onShareAllMyContent={handleShareAllMyContent}
                 onImportPublicMap={handleImportPublicMap}
                 onImportPublicMob={handleImportPublicMob}
                 onImportPublicEpisode={handleImportPublicEpisode}
