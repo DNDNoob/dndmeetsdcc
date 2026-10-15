@@ -7,7 +7,7 @@ import { GridOverlay } from "@/components/ui/GridOverlay";
 import RulerOverlay from "@/components/ui/RulerOverlay";
 import { MobIcon } from "@/components/ui/MobIcon";
 import { FogOfWar } from "@/components/ui/FogOfWar";
-import { Episode, Mob, MapSettings, Crawler, CrawlerPlacement, EpisodeMobPlacement, SentLootBox, LootBoxTemplate, getLootBoxTierColor, InventoryItem, CombatState, getEquippedModifiers, getEffectiveMoveSpeed, getMapDistanceFeet, Quest, AssignedQuest, QuestActionItem, LootBoxTier } from "@/lib/gameData";
+import { Episode, Mob, MapSettings, Crawler, CrawlerPlacement, EpisodeMobPlacement, SentLootBox, LootBoxTemplate, getLootBoxTierColor, InventoryItem, CombatState, getEquippedModifiers, getEffectiveMoveSpeed, getMapDistanceFeet, NONCOMBAT_MOVE_MULTIPLIER, Quest, AssignedQuest, QuestActionItem, LootBoxTier } from "@/lib/gameData";
 import { Map as MapIcon, X, Eye, EyeOff, Layers, ChevronLeft, ChevronRight, PlayCircle, Grid3x3, CloudFog, Eraser, Trash2, Target, ZoomIn, ZoomOut, Package, Lock, Unlock, Search, Plus, Heart, ScrollText, CheckSquare, Check } from "lucide-react";
 import { PingEffect, Ping } from "@/components/ui/PingEffect";
 import { MapBox, MapBoxData, ShapeType } from "@/components/ui/MapBox";
@@ -1878,20 +1878,31 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   }, [gridSize, iconCounterScale]);
 
   const isCombatTurnPhase = !!(combatState?.active && combatState.phase === 'combat');
+  const isCombatActive = !!(combatState?.active && combatState.phase !== 'ended');
 
-  // Movement budget for a crawler during combat. Returns null when movement isn't limited
-  // (DM, outside combat, or a crawler that isn't in the fight).
+  // Movement budget for a crawler. In combat: their speed per combat turn, only on their turn.
+  // Outside combat, while noncombat turns are running for this episode: NONCOMBAT_MOVE_MULTIPLIER
+  // times their speed per noncombat turn. Returns null when movement isn't limited (DM, a crawler
+  // not in the fight, the initiative phase, or no noncombat turn running).
   const getCrawlerMoveBudget = useCallback((crawlerId: string) => {
-    if (isAdmin || !isCombatTurnPhase || !combatState) return null;
-    const combatant = combatState.combatants.find(c => c.type === 'crawler' && c.id === crawlerId);
-    if (!combatant) return null;
+    if (isAdmin) return null;
     const crawler = crawlers.find(c => c.id === crawlerId);
     const speed = crawler ? getEffectiveMoveSpeed(crawler, getCrawlerInventory?.(crawlerId) ?? []) : 0;
-    const isTheirTurn = combatState.combatants[combatState.currentTurnIndex]?.id === crawlerId;
     const isOwner = !currentPlayerId || currentPlayerId === crawlerId;
-    const used = combatant.feetMovedThisTurn ?? 0;
-    return { speed, used, remaining: Math.max(0, speed - used), canMove: isTheirTurn && isOwner };
-  }, [isAdmin, isCombatTurnPhase, combatState, crawlers, getCrawlerInventory, currentPlayerId]);
+    if (isCombatTurnPhase && combatState) {
+      const combatant = combatState.combatants.find(c => c.type === 'crawler' && c.id === crawlerId);
+      if (!combatant) return null;
+      const isTheirTurn = combatState.combatants[combatState.currentTurnIndex]?.id === crawlerId;
+      const used = combatant.feetMovedThisTurn ?? 0;
+      return { speed, used, remaining: Math.max(0, speed - used), canMove: isTheirTurn && isOwner, label: 'per combat turn' };
+    }
+    if (isCombatActive) return null;
+    const turnEpisodeId = noncombatTurnState?.episodeId;
+    if (!noncombatTurnState || (turnEpisodeId && selectedEpisode && turnEpisodeId !== selectedEpisode.id)) return null;
+    const turnSpeed = speed * NONCOMBAT_MOVE_MULTIPLIER;
+    const used = noncombatTurnState.feetMoved?.[crawlerId] ?? 0;
+    return { speed: turnSpeed, used, remaining: Math.max(0, turnSpeed - used), canMove: isOwner, label: 'per noncombat turn' };
+  }, [isAdmin, isCombatTurnPhase, isCombatActive, combatState, noncombatTurnState, selectedEpisode, crawlers, getCrawlerInventory, currentPlayerId]);
 
   // Where the current crawler drag started (to measure and limit the move)
   const crawlerDragStartRef = useRef<{ index: number; x: number; y: number } | null>(null);
@@ -1900,7 +1911,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     const placement = crawlerPlacements[index];
     if (!placement) return;
     const budget = getCrawlerMoveBudget(placement.crawlerId);
-    if (budget && !budget.canMove) return; // Locked: not this crawler's turn
+    if (budget && !budget.canMove) return; // Locked: not this player's crawler, or not its combat turn
     crawlerDragStartRef.current = { index, x: placement.x, y: placement.y };
     setDraggingRuntimeId(`crawler-${index}`);
   };
@@ -3300,13 +3311,13 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                       />
                     );
                   })()}
-                  {/* Movement left this turn (combat, on this crawler's turn) */}
+                  {/* Movement left this turn (combat or noncombat turn) */}
                   {moveBudget?.canMove && feetLeft !== null && (
                     <div
                       className={`absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full px-1.5 py-0.5 rounded text-[10px] font-bold whitespace-nowrap shadow-lg pointer-events-none ${
                         feetLeft === 0 ? 'bg-destructive text-destructive-foreground' : 'bg-background/90 border border-primary/60 text-primary'
                       }`}
-                      title={`Movement: ${moveBudget.speed} ft per turn`}
+                      title={`Movement: ${moveBudget.speed} ft ${moveBudget.label}`}
                     >
                       {feetLeft} ft left
                     </div>

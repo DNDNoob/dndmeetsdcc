@@ -48,6 +48,9 @@ export interface CrawlerTrophy {
 // Default movement speed (feet per combat turn) when a crawler has none set
 export const DEFAULT_MOVE_SPEED = 60;
 
+// Noncombat turns allow this multiple of a crawler's combat movement speed
+export const NONCOMBAT_MOVE_MULTIPLIER = 2;
+
 // Activity counters recorded automatically during play
 export interface CrawlerActivityStats {
   feetMoved?: number; // total feet moved by the crawler's own player
@@ -358,6 +361,7 @@ export interface NoncombatTurnState {
   turnNumber: number;
   rollsUsed: Record<string, number>; // crawlerId -> number of rolls used
   maxRolls: number; // rolls per player per turn (default 3)
+  feetMoved?: Record<string, number>; // crawlerId -> feet moved this noncombat turn
   episodeId?: string; // tracks which episode this turn state belongs to
 }
 

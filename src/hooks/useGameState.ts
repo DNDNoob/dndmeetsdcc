@@ -828,6 +828,7 @@ export const useGameState = () => {
     const turnData = {
       turnNumber: (current?.turnNumber ?? 0) + 1,
       rollsUsed: {},
+      feetMoved: {},
       maxRolls: 3,
       episodeId: episodeId || current?.episodeId,
     };
@@ -843,6 +844,7 @@ export const useGameState = () => {
     const turnData = {
       turnNumber: 0,
       rollsUsed: {},
+      feetMoved: {},
       maxRolls: 3,
       episodeId,
     };
@@ -1219,16 +1221,19 @@ export const useGameState = () => {
     await applyCombatDamageBatch([{ targetId, targetType, damage }], attackerId);
   };
 
-  // Record feet a crawler moved. In combat this also spends the crawler's per-turn movement.
+  // Record feet a crawler moved. When movement is limited this also spends the crawler's
+  // movement for the current combat turn, or for the current noncombat turn outside combat.
   const recordCrawlerMove = async (crawlerId: string, feet: number, spendTurnMovement: boolean) => {
     if (feet <= 0) return;
+    const addFeet = (used: number | undefined) => Math.round(((used ?? 0) + feet) * 10) / 10;
     if (spendTurnMovement && combatState?.active && combatState.phase === 'combat') {
       const combatants = combatState.combatants.map(c =>
-        c.id === crawlerId && c.type === 'crawler'
-          ? { ...c, feetMovedThisTurn: Math.round(((c.feetMovedThisTurn ?? 0) + feet) * 10) / 10 }
-          : c
+        c.id === crawlerId && c.type === 'crawler' ? { ...c, feetMovedThisTurn: addFeet(c.feetMovedThisTurn) } : c
       );
       await updateItem('combatState', 'current', { combatants } as Record<string, unknown>);
+    } else if (spendTurnMovement && noncombatTurnState) {
+      const feetMoved = { ...(noncombatTurnState.feetMoved ?? {}), [crawlerId]: addFeet(noncombatTurnState.feetMoved?.[crawlerId]) };
+      await updateItem('noncombatTurns', 'current', { feetMoved } as Record<string, unknown>);
     }
     const crawler = crawlers.find(c => c.id === crawlerId);
     const rounded = Math.round(feet);

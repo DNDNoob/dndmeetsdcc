@@ -128,7 +128,7 @@ These are tracked automatically as you play:
 
 | Stat | What counts |
 |------|-------------|
-| Feet Moved | Feet you move your own crawler on the map (the DM moving your token doesn't count) |
+| Feet Moved | Feet you move your own crawler on the map, in or out of combat (the DM moving your token doesn't count) |
 | Damage Dealt | HP removed from targets by your attacks |
 | Killing Blows | Attacks that bring a mob to 0 HP |
 | Fight Finishers | Killing blows that take down the last mob standing in a combat |
@@ -341,7 +341,7 @@ Each crawler has a **movement speed**: how many feet they can move per combat tu
 - You can move several times in one turn until your feet run out. Your movement refills when the turn passes.
 - The DM can move any token at any time without using up anyone's movement.
 
-Outside combat, movement isn't limited.
+Outside combat, while the DM is running noncombat turns, you can move **twice your speed** per noncombat turn (120 ft at the default speed). See [Game Clock & Turns](/wiki/game-clock). When no noncombat turn is running, movement isn't limited.
 
 ## Turn Timer
 
@@ -697,6 +697,7 @@ During exploration (outside of combat), the DM can track noncombat turns. Each t
 - The turn counter increments
 - The game clock advances 1 hour
 - Each crawler gets a limited number of rolls per turn (default: 3)
+- Each crawler can move up to **twice their movement speed** (120 ft at the default 60 ft speed). A badge above your token shows the feet you have left, and only you can move your crawler. The DM can still move any token freely.
 
 The DM starts a new noncombat turn from the game clock panel.
 
