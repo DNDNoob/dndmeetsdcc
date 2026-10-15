@@ -104,9 +104,46 @@ Click on any stat value on your profile page to roll a d20 plus your stat modifi
 
 Crawlers can equip items in the following slots: Head, Chest, Legs, Feet, Left Hand, Right Hand, Ring Finger, and Weapon. Equipped items modify your stats and appear on your character sheet. See the Equipment page for more details.
 
+## Activity and Trophies
+
+Your profile tracks activity stats like feet moved, damage dealt and killing blows, and shows trophies the DM awards you. See [Activity Stats & Trophies](/wiki/activity-trophies).
+
 ## Avatars
 
 You can upload a profile image (avatar) for your crawler. Images are automatically compressed to keep things fast. Avatars appear on map icons and in the navigation dropdown.`,
+  },
+  {
+    id: 'activity-trophies',
+    slug: 'activity-trophies',
+    title: 'Activity Stats & Trophies',
+    category: 'Basics',
+    order: 1.5,
+    content: `# Activity Stats & Trophies
+
+Every crawler's profile has an **Activity** section and a **Trophies** section.
+
+## Activity Stats
+
+These are tracked automatically as you play:
+
+| Stat | What counts |
+|------|-------------|
+| Feet Moved | Feet you move your own crawler on the map (the DM moving your token doesn't count) |
+| Damage Dealt | HP removed from targets by your attacks |
+| Killing Blows | Attacks that bring a mob to 0 HP |
+| Fight Finishers | Killing blows that take down the last mob standing in a combat |
+| HP Lost | Hit points you lose, from attacks or from HP being lowered on your profile |
+| Near Death | Times your HP drops below 10% of your max HP |
+
+Your **Speed** (feet per combat turn) is shown next to the Activity heading. See [Combat System](/wiki/combat) for how movement works in combat.
+
+## Trophies
+
+Trophies are for things that can't be measured automatically, like great roleplay, a clever plan or a heroic save. Only the DM can award them.
+
+- On a crawler's profile, the DM enters a trophy name and an optional note, then clicks **Award Trophy**.
+- Awarding a trophy with the same name again counts it up, for example *Best Roleplay ×3*.
+- The **−** button next to a trophy takes back one award, and removes the trophy when its count reaches zero.`,
   },
   {
     id: 'equipment',
@@ -294,6 +331,18 @@ Combat proceeds in turn order (highest initiative first). On your turn:
 
 The DM advances turns with the "Next Turn" button.
 
+## Movement
+
+Each crawler has a **movement speed**: how many feet they can move per combat turn. It starts at **60 ft**. Equipment with a Speed modifier (for example, fast boots) raises or lowers it, and the DM can change a crawler's base speed in edit mode on their profile.
+
+- During combat you can only move **your own crawler**, and only on **its turn**.
+- Distance uses the same scale as the Ruler: **5 ft per grid square**, where a square is the size of one token.
+- While dragging, a badge above your token shows how many feet you have left. If you drag farther than you're allowed, the token stops at the edge of your range.
+- You can move several times in one turn until your feet run out. Your movement refills when the turn passes.
+- The DM can move any token at any time without using up anyone's movement.
+
+Outside combat, movement isn't limited.
+
 ## Turn Timer
 
 A configurable timer appears in the combat order bar during active combat, helping keep turns moving.
@@ -318,6 +367,10 @@ Splash damage weapons can target multiple enemies at once.
 ## Health Tracking
 
 Each combatant's HP is tracked independently during combat. For mobs that appear multiple times (like "Greg A" and "Greg B"), each instance has its own health pool. The DM can manually override any combatant's HP.
+
+## Activity Stats
+
+Damage you deal, killing blows (including the blow that takes down the last enemy) and damage you take are recorded on your profile automatically. See [Activity Stats & Trophies](/wiki/activity-trophies).
 
 ## Ending Combat
 

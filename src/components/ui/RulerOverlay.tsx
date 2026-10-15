@@ -1,4 +1,5 @@
 import React from "react";
+import { getMapDistanceFeet } from "@/lib/gameData";
 
 interface RulerOverlayProps {
   start: { x: number; y: number };
@@ -15,10 +16,7 @@ const RulerOverlay: React.FC<RulerOverlayProps> = ({
   imageHeight,
   gridSize = 64,
 }) => {
-  const dx = ((end.x - start.x) / 100) * imageWidth;
-  const dy = ((end.y - start.y) / 100) * imageHeight;
-  const pixelDist = Math.sqrt(dx * dx + dy * dy);
-  const feet = Math.round((pixelDist / gridSize) * 5);
+  const feet = Math.round(getMapDistanceFeet(start, end, imageWidth, imageHeight, gridSize));
 
   const midX = (start.x + end.x) / 2;
   const midY = (start.y + end.y) / 2;

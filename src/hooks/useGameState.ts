@@ -18,6 +18,10 @@ import {
   SpellLearnedFrom,
   getSpellMasteryLevel,
   getEquippedModifiers,
+  addActivityStats,
+  getHPLossStats,
+  type CrawlerActivityStats,
+  type CrawlerTrophy,
   defaultCrawlers,
   defaultInventory,
   defaultMobs,
@@ -473,8 +477,8 @@ export const useGameState = () => {
     return plan.episode;
   };
 
-  const updateCrawler = async (id: string, updates: Partial<Crawler>) => {
-    logger.log('[GameState] 📝 Updating crawler:', { id, updates });
+  // Persist crawler changes as-is (no activity stat bookkeeping)
+  const writeCrawler = async (id: string, updates: Partial<Crawler>) => {
     // New campaigns display the built-in defaultCrawlers until one is saved. Those
     // don't exist in Firestore, so updateDoc would fail with "No document to update".
     // Persist the full crawler (default + edits) the first time it's saved.
@@ -487,6 +491,27 @@ export const useGameState = () => {
       }
     }
     return updateItem('crawlers', id, updates as Record<string, unknown>);
+  };
+
+  // HP-loss stat deltas for a crawler, measured against effective (equipment-adjusted) HP
+  const getCrawlerHPLossStats = (crawler: Crawler, oldHP: number, newHP: number, maxHP = crawler.maxHP): CrawlerActivityStats => {
+    const mods = getEquippedModifiers(crawler, getCrawlerInventory(crawler.id));
+    const hpMod = mods.hp ?? 0;
+    return getHPLossStats(oldHP + hpMod, newHP + hpMod, (maxHP ?? 0) + (mods.maxHP ?? 0));
+  };
+
+  const updateCrawler = async (id: string, updates: Partial<Crawler>) => {
+    logger.log('[GameState] 📝 Updating crawler:', { id, updates });
+    const current = crawlers.find((c) => c.id === id);
+    // Activity stats and trophies are only changed by their own helpers, never by a full-profile save
+    const { activityStats: _stats, trophies: _trophies, ...rest } = updates;
+    void _stats; void _trophies;
+    const finalUpdates: Partial<Crawler> = rest;
+    if (current && rest.hp !== undefined && rest.hp < (current.hp ?? 0)) {
+      const deltas = getCrawlerHPLossStats(current, current.hp ?? 0, rest.hp, rest.maxHP ?? current.maxHP);
+      finalUpdates.activityStats = addActivityStats(current.activityStats, deltas);
+    }
+    return writeCrawler(id, finalUpdates);
   };
 
   const addCrawler = async (crawler: Crawler) => {
@@ -1076,7 +1101,7 @@ export const useGameState = () => {
     // Reset action flags for the combatant whose turn just ended
     const resetCombatants = combatState.combatants.map((c, i) => {
       if (i === combatState.currentTurnIndex) {
-        return { ...c, hasUsedAction: false, hasUsedBonusAction: false };
+        return { ...c, hasUsedAction: false, hasUsedBonusAction: false, feetMovedThisTurn: 0 };
       }
       return c;
     });
@@ -1116,33 +1141,135 @@ export const useGameState = () => {
     await updateItem('combatState', 'current', { combatants: updatedCombatants } as Record<string, unknown>);
   };
 
-  const applyCombatDamage = async (targetId: string, targetType: 'crawler' | 'mob', damage: number) => {
-    if (targetType === 'crawler') {
-      const crawler = crawlers.find(c => c.id === targetId);
-      if (crawler) {
-        const newHP = Math.max(0, (crawler.hp || 0) - damage);
-        await updateItem('crawlers', targetId, { hp: newHP } as Record<string, unknown>);
+  // Apply damage to one or more combat targets in a single pass, so splash hits don't
+  // overwrite each other, and credit the attacking crawler's activity stats.
+  const applyCombatDamageBatch = async (
+    hits: { targetId: string; targetType: 'crawler' | 'mob'; damage: number }[],
+    attackerId?: string,
+  ) => {
+    let combatants = combatState?.combatants ?? [];
+    let combatantsChanged = false;
+    const crawlerHP = new Map<string, number>();
+    const statDeltas = new Map<string, CrawlerActivityStats>();
+    const addDeltas = (crawlerId: string, deltas: CrawlerActivityStats) => {
+      statDeltas.set(crawlerId, addActivityStats(statDeltas.get(crawlerId), deltas));
+    };
+    let killingBlows = 0;
+
+    for (const { targetId, targetType, damage } of hits) {
+      let dealt = 0;
+      if (targetType === 'crawler') {
+        const crawler = crawlers.find(c => c.id === targetId);
+        if (!crawler) continue;
+        const oldHP = crawlerHP.get(targetId) ?? crawler.hp ?? 0;
+        const newHP = Math.max(0, oldHP - damage);
+        crawlerHP.set(targetId, newHP);
+        addDeltas(targetId, getCrawlerHPLossStats(crawler, oldHP, newHP));
+        dealt = oldHP - newHP;
         logger.log('[GameState] ⚔️ Damage applied to crawler', crawler.name, ':', damage, '→ HP:', newHP);
-      }
-    } else {
-      const combatant = combatState?.combatants.find(c => c.id === targetId);
-      const mobId = combatant?.sourceId || targetId;
-      const mob = mobs.find(m => m.id === mobId);
-      if (mob) {
+      } else {
+        const combatant = combatants.find(c => c.id === targetId);
+        const mobId = combatant?.sourceId || targetId;
+        const mob = mobs.find(m => m.id === mobId);
+        if (!mob) continue;
         const hpBefore = combatant?.currentHP ?? mob.hitPoints ?? 0;
         const newHP = Math.max(0, hpBefore - damage);
-        // Update per-combatant HP in combat state (independent per instance)
+        // Per-combatant HP in combat state (independent per instance). The shared mob
+        // document's hitPoints is the base/max HP for the mob type and is not changed.
         if (combatState) {
-          const updatedCombatants = combatState.combatants.map(c =>
-            c.id === targetId ? { ...c, currentHP: newHP } : c
-          );
-          await updateItem('combatState', 'current', { combatants: updatedCombatants } as Record<string, unknown>);
+          combatants = combatants.map(c => (c.id === targetId ? { ...c, currentHP: newHP } : c));
+          combatantsChanged = true;
         }
-        // Do NOT update the shared mob document — each combatant instance tracks HP independently
-        // The mob document's hitPoints represents the base/max HP for the mob type
+        dealt = hpBefore - newHP;
+        if (hpBefore > 0 && newHP === 0) killingBlows++;
         logger.log('[GameState] ⚔️ Damage applied to mob', combatant?.name ?? mob.name, ':', damage, '→ HP:', newHP);
       }
+      if (attackerId && dealt > 0) addDeltas(attackerId, { damageDealt: dealt });
     }
+
+    if (attackerId && killingBlows > 0) {
+      // A killing blow ends the fight when no mob combatant is left standing
+      const mobCombatants = combatants.filter(c => c.type === 'mob');
+      const isDown = (c: CombatantEntry) =>
+        (c.currentHP ?? mobs.find(m => m.id === (c.sourceId || c.id))?.hitPoints ?? 1) <= 0;
+      const endsCombat = mobCombatants.length > 0 && mobCombatants.every(isDown);
+      addDeltas(attackerId, { killingBlows, combatEndingBlows: endsCombat ? 1 : 0 });
+      if (endsCombat) {
+        const attacker = crawlers.find(c => c.id === attackerId);
+        if (attacker) toast.success(`${attacker.name} landed the final blow!`);
+      }
+    }
+
+    if (combatantsChanged) {
+      await updateItem('combatState', 'current', { combatants } as Record<string, unknown>);
+    }
+    const crawlerIds = new Set([...crawlerHP.keys(), ...statDeltas.keys()]);
+    for (const id of crawlerIds) {
+      const crawler = crawlers.find(c => c.id === id);
+      if (!crawler) continue;
+      const updates: Partial<Crawler> = {};
+      if (crawlerHP.has(id)) updates.hp = crawlerHP.get(id);
+      const deltas = statDeltas.get(id);
+      if (deltas) updates.activityStats = addActivityStats(crawler.activityStats, deltas);
+      await writeCrawler(id, updates);
+    }
+  };
+
+  const applyCombatDamage = async (targetId: string, targetType: 'crawler' | 'mob', damage: number, attackerId?: string) => {
+    await applyCombatDamageBatch([{ targetId, targetType, damage }], attackerId);
+  };
+
+  // Record feet a crawler moved. In combat this also spends the crawler's per-turn movement.
+  const recordCrawlerMove = async (crawlerId: string, feet: number, spendTurnMovement: boolean) => {
+    if (feet <= 0) return;
+    if (spendTurnMovement && combatState?.active && combatState.phase === 'combat') {
+      const combatants = combatState.combatants.map(c =>
+        c.id === crawlerId && c.type === 'crawler'
+          ? { ...c, feetMovedThisTurn: Math.round(((c.feetMovedThisTurn ?? 0) + feet) * 10) / 10 }
+          : c
+      );
+      await updateItem('combatState', 'current', { combatants } as Record<string, unknown>);
+    }
+    const crawler = crawlers.find(c => c.id === crawlerId);
+    const rounded = Math.round(feet);
+    if (crawler && rounded > 0) {
+      await writeCrawler(crawlerId, { activityStats: addActivityStats(crawler.activityStats, { feetMoved: rounded }) });
+    }
+  };
+
+  // DM trophies: awarding an existing trophy name again increments its count
+  const awardTrophy = async (crawlerId: string, name: string, description?: string) => {
+    const crawler = crawlers.find(c => c.id === crawlerId);
+    const trimmed = name.trim();
+    if (!crawler || !trimmed) return;
+    const trophies = [...(crawler.trophies ?? [])];
+    const awardedAt = new Date().toISOString();
+    const idx = trophies.findIndex(t => t.name.toLowerCase() === trimmed.toLowerCase());
+    if (idx >= 0) {
+      const prev = trophies[idx];
+      trophies[idx] = { ...prev, count: prev.count + 1, awardedAt, description: description?.trim() || prev.description };
+    } else {
+      const trophy: CrawlerTrophy = {
+        id: `trophy-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        name: trimmed,
+        description: description?.trim() || undefined,
+        count: 1,
+        awardedAt,
+      };
+      trophies.push(trophy);
+    }
+    await writeCrawler(crawlerId, { trophies });
+    toast.success(`🏆 ${crawler.name} earned "${trimmed}"!`);
+  };
+
+  // Take back one award of a trophy; removes it when the count reaches 0
+  const revokeTrophy = async (crawlerId: string, trophyId: string) => {
+    const crawler = crawlers.find(c => c.id === crawlerId);
+    if (!crawler) return;
+    const trophies = (crawler.trophies ?? [])
+      .map(t => (t.id === trophyId ? { ...t, count: t.count - 1 } : t))
+      .filter(t => t.count > 0);
+    await writeCrawler(crawlerId, { trophies });
   };
 
   const overrideMobHealth = async (combatantId: string, newHP: number) => {
@@ -1502,6 +1629,10 @@ export const useGameState = () => {
     advanceCombatTurn,
     recordCombatAction,
     applyCombatDamage,
+    applyCombatDamageBatch,
+    recordCrawlerMove,
+    awardTrophy,
+    revokeTrophy,
     overrideMobHealth,
     endCombat,
     cancelCombat,

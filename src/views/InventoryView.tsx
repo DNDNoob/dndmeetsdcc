@@ -706,9 +706,9 @@ const InventoryView: React.FC<InventoryViewProps> = ({
               <div>
                 <p className="text-xs text-muted-foreground mb-1">Stat Modifiers (when equipped)</p>
                 <div className="grid grid-cols-3 gap-1">
-                  {(['str', 'dex', 'con', 'int', 'cha', 'hp', 'maxHP', 'mana', 'maxMana'] as const).map((stat) => (
+                  {(['str', 'dex', 'con', 'int', 'cha', 'hp', 'maxHP', 'mana', 'maxMana', 'moveSpeed'] as const).map((stat) => (
                     <div key={stat} className="flex items-center gap-1">
-                      <label className="text-xs text-muted-foreground w-12 uppercase">{stat}</label>
+                      <label className="text-xs text-muted-foreground w-12 uppercase">{stat === 'moveSpeed' ? 'spd ft' : stat}</label>
                       <input type="number" value={newLibraryItem.statModifiers?.[stat] ?? ""}
                         onChange={(e) => setNewLibraryItem({
                           ...newLibraryItem,

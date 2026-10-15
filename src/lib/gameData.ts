@@ -31,9 +31,79 @@ export interface Crawler {
   avatar?: string;
   equippedItems?: EquippedItems;
   knownSpells?: KnownSpell[];
+  moveSpeed?: number; // feet per combat turn; defaults to DEFAULT_MOVE_SPEED
+  activityStats?: CrawlerActivityStats;
+  trophies?: CrawlerTrophy[]; // DM-awarded recognition for things that can't be measured automatically
 }
 
-export type StatModifiers = Partial<Record<'str' | 'dex' | 'con' | 'int' | 'cha' | 'hp' | 'maxHP' | 'mana' | 'maxMana', number>>;
+// A trophy the DM awards by hand. Awarding the same name again increments count.
+export interface CrawlerTrophy {
+  id: string;
+  name: string;
+  description?: string;
+  count: number;
+  awardedAt: string; // ISO timestamp of the most recent award
+}
+
+// Default movement speed (feet per combat turn) when a crawler has none set
+export const DEFAULT_MOVE_SPEED = 60;
+
+// Activity counters recorded automatically during play
+export interface CrawlerActivityStats {
+  feetMoved?: number; // total feet moved by the crawler's own player
+  damageDealt?: number;
+  damageTaken?: number; // hit points lost
+  lowHealthCount?: number; // times HP dropped below 10% of max HP
+  killingBlows?: number; // mobs brought to 0 HP
+  combatEndingBlows?: number; // killing blows that took down the last mob standing
+}
+
+export type ActivityStatKey = keyof CrawlerActivityStats;
+
+// Returns a new stats object with each delta added (missing counters start at 0)
+export function addActivityStats(stats: CrawlerActivityStats | undefined, deltas: CrawlerActivityStats): CrawlerActivityStats {
+  const next: CrawlerActivityStats = { ...(stats ?? {}) };
+  for (const [key, val] of Object.entries(deltas) as [ActivityStatKey, number | undefined][]) {
+    if (!val) continue;
+    next[key] = (next[key] ?? 0) + val;
+  }
+  return next;
+}
+
+// Stat deltas for a crawler's HP going from oldHP to newHP (only HP loss is recorded)
+export function getHPLossStats(oldHP: number, newHP: number, maxHP: number): CrawlerActivityStats {
+  if (newHP >= oldHP) return {};
+  const lowThreshold = maxHP * 0.1;
+  return {
+    damageTaken: oldHP - newHP,
+    lowHealthCount: maxHP > 0 && oldHP >= lowThreshold && newHP < lowThreshold ? 1 : 0,
+  };
+}
+
+// Ruler scale: one grid square (the size of a token) is 5 feet
+export const FEET_PER_GRID_SQUARE = 5;
+
+// Distance in feet between two map points given as percentages of the map image
+export function getMapDistanceFeet(
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+  imageWidth: number,
+  imageHeight: number,
+  gridSize: number,
+): number {
+  if (gridSize <= 0) return 0;
+  const dx = ((to.x - from.x) / 100) * imageWidth;
+  const dy = ((to.y - from.y) / 100) * imageHeight;
+  return (Math.sqrt(dx * dx + dy * dy) / gridSize) * FEET_PER_GRID_SQUARE;
+}
+
+export type StatModifiers = Partial<Record<'str' | 'dex' | 'con' | 'int' | 'cha' | 'hp' | 'maxHP' | 'mana' | 'maxMana' | 'moveSpeed', number>>;
+
+// Effective movement speed: base speed (or the default) plus equipment modifiers
+export function getEffectiveMoveSpeed(crawler: Crawler, inventory: InventoryItem[]): number {
+  const mods = getEquippedModifiers(crawler, inventory);
+  return Math.max(0, (crawler.moveSpeed ?? DEFAULT_MOVE_SPEED) + (mods.moveSpeed ?? 0));
+}
 
 // Weapon system types
 export const DAMAGE_TYPES = ['Basic', 'Poison', 'Disease', 'Spiritual', 'Radiation', 'Fire', 'Electric', 'Emotional'] as const;
@@ -311,6 +381,7 @@ export interface CombatantEntry {
   hasUsedBonusAction: boolean;
   avatar?: string; // cached avatar/image for display
   currentHP?: number; // per-combatant HP tracking (used for mob instances)
+  feetMovedThisTurn?: number; // crawler movement used this turn (reset when the turn ends)
 }
 
 // Combat state - synced via Firebase (singleton doc, id = 'current')
