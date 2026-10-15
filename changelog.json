@@ -2,6 +2,7 @@
   {
     "date": "2026-10-15",
     "changes": [
+      "🎲 DMs can now force an initiative roll from the Show Time panel, rolling d20 + DEX for every crawler still waiting so combat can start",
       "🗺️ Fixed wide maps getting squished in Show Time when an episode starts; maps now keep their shape and fit the screen",
       "🎯 The gold selection ring on map tokens now hugs the round portrait and grows with it, instead of wrapping the health bar too",
       "🐛 Fixed selecting or deleting a crawler token sometimes picking the wrong crawler",

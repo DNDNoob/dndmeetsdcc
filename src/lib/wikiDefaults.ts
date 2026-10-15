@@ -319,7 +319,8 @@ The DM starts combat from the game clock panel during Show Time. They select whi
 1. Each participant rolls for initiative (d20 + modifiers)
 2. Mobs automatically roll their initiative
 3. Crawlers must roll manually by clicking the "Roll Initiative" button on their profile
-4. Once everyone has rolled, the DM clicks "Start Combat" to sort by initiative and begin
+4. If someone is away or taking too long, the DM can click "Force Initiative Roll" in the Show Time panel to roll d20 + DEX modifier for everyone still waiting
+5. Once everyone has rolled, the DM clicks "Start Combat" to sort by initiative and begin
 
 ## Combat Phase
 
