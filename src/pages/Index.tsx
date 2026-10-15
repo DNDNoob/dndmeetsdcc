@@ -24,7 +24,8 @@ import { useCampaigns } from "@/hooks/useCampaigns";
 import { useFriends } from "@/hooks/useFriends";
 import { usePublicContent } from "@/hooks/usePublicContent";
 import { toast } from "sonner";
-import type { Episode, Campaign, CrawlerPlacement, EpisodeMobPlacement } from "@/lib/gameData";
+import type { Episode, Campaign, CrawlerPlacement, EpisodeMobPlacement, Mob, PublicMap, PublicMob, PublicEpisode } from "@/lib/gameData";
+import { publicDocId, buildEpisodeBundle } from "@/lib/publicContent";
 
 type AppScreen = "splash" | "menu" | "game";
 type GameView = "profiles" | "maps" | "inventory" | "mobs" | "dungeonai" | "showtime" | "sounds" | "wiki" | "spells";
@@ -141,8 +142,14 @@ const Index = () => {
     setMobs,
     maps,
     mapNames: firestoreMapNames,
+    mapDocs,
     updateMapName,
     setMaps,
+    setMapPublic,
+    markMapsShared,
+    importMaps,
+    importMob,
+    importEpisode,
     cleanupEmptyMaps,
     episodes,
     addEpisode,
@@ -220,7 +227,138 @@ const Index = () => {
 
   // Public content (cross-campaign sharing)
   const showPublicContent = userProfile?.showPublicContent ?? false;
-  const { publicItems, publicSpells, publishItem, unpublishItem, publishSpell, unpublishSpell } = usePublicContent(showPublicContent);
+  const {
+    publicItems, publicSpells, publicMaps, publicMobs, publicEpisodes,
+    publishItem, unpublishItem, publishSpell, unpublishSpell,
+    publishMap, unpublishMap, publishMob, unpublishMob,
+    publishEpisode, unpublishEpisode, fetchEpisodeAssets,
+  } = usePublicContent(showPublicContent);
+
+  // ── Community maps / mobs / episodes (DM console) ─────────────────────────
+  // Content without createdBy was made in this campaign by its DM; it's stamped with the
+  // publisher's uid on first publish. Imported content keeps its original creator, so it
+  // can't be re-published by the importer.
+  const creatorFields = () => ({
+    createdBy: user?.uid ?? '',
+    ...(userProfile?.username ? { createdByUsername: userProfile.username } : {}),
+  });
+
+  const handleToggleMapPublic = async (index: number, isPublic: boolean) => {
+    const map = mapDocs[index];
+    if (!map || !roomId || !user) return;
+    const creator = map.createdBy ? { createdBy: map.createdBy, createdByUsername: map.createdByUsername } : creatorFields();
+    const publicId = publicDocId(roomId, map.id);
+    try {
+      if (isPublic) {
+        const pub: PublicMap = {
+          id: publicId,
+          sourceId: map.id,
+          sourceCampaignId: roomId,
+          name: map.name || `Map ${index + 1}`,
+          image: map.image,
+          ...creator,
+          publishedAt: Date.now(),
+        };
+        await publishMap(pub);
+      } else {
+        await unpublishMap(publicId);
+      }
+      await setMapPublic(index, { isPublic, ...creator });
+      toast.success(isPublic ? 'Map shared with the community' : 'Map is now private');
+    } catch (err) {
+      console.error('[Index] Failed to toggle map public:', err);
+      toast.error('Failed to update map sharing');
+    }
+  };
+
+  const handleToggleMobPublic = async (mob: Mob, isPublic: boolean) => {
+    if (!roomId || !user) return;
+    const creator = mob.createdBy ? { createdBy: mob.createdBy, createdByUsername: mob.createdByUsername } : creatorFields();
+    const publicId = publicDocId(roomId, mob.id);
+    try {
+      if (isPublic) {
+        const pub: PublicMob = {
+          ...mob,
+          ...creator,
+          id: publicId,
+          sourceId: mob.id,
+          sourceCampaignId: roomId,
+          encountered: false,
+          publishedAt: Date.now(),
+        };
+        await publishMob(pub);
+      } else {
+        await unpublishMob(publicId);
+      }
+      await setMobs(mobs.map(m => m.id === mob.id ? { ...m, ...creator, isPublic } : m));
+      toast.success(isPublic ? `${mob.name} shared with the community` : `${mob.name} is now private`);
+    } catch (err) {
+      console.error('[Index] Failed to toggle mob public:', err);
+      toast.error('Failed to update mob sharing');
+    }
+  };
+
+  // Publishing an episode snapshots it; editing it afterwards requires "Update shared copy"
+  const handleToggleEpisodePublic = async (episode: Episode, isPublic: boolean) => {
+    if (!roomId || !user) return;
+    const creator = episode.createdBy ? { createdBy: episode.createdBy, createdByUsername: episode.createdByUsername } : creatorFields();
+    const publicId = publicDocId(roomId, episode.id);
+    try {
+      if (isPublic) {
+        const bundle = buildEpisodeBundle(episode, mapDocs, mobs, lootBoxTemplates);
+        if (bundle.assets.maps.length === 0) {
+          toast.error('Add at least one map to this episode before sharing it');
+          return;
+        }
+        const pub: PublicEpisode = {
+          ...bundle.episode,
+          ...creator,
+          id: publicId,
+          sourceId: episode.id,
+          sourceCampaignId: roomId,
+          publishedAt: Date.now(),
+        };
+        await publishEpisode(pub, bundle.assets);
+        await markMapsShared(episode.mapIds.map(i => mapDocs[parseInt(i, 10)]?.id).filter((id): id is string => !!id));
+      } else {
+        await unpublishEpisode(publicId);
+      }
+      await updateEpisode(episode.id, { ...creator, isPublic });
+      toast.success(isPublic ? `"${episode.name}" shared with the community` : `"${episode.name}" is now private`);
+    } catch (err) {
+      console.error('[Index] Failed to toggle episode public:', err);
+      toast.error('Failed to update episode sharing');
+    }
+  };
+
+  const handleImportPublicMap = async (map: PublicMap) => {
+    try {
+      await importMaps([{ name: map.name, image: map.image, createdBy: map.createdBy, ...(map.createdByUsername ? { createdByUsername: map.createdByUsername } : {}) }]);
+      toast.success(`Added "${map.name}" to your maps`);
+    } catch (err) {
+      console.error('[Index] Failed to import map:', err);
+    }
+  };
+
+  const handleImportPublicMob = async (mob: PublicMob) => {
+    try {
+      await importMob(mob);
+      toast.success(`Added ${mob.name} to your mobs`);
+    } catch (err) {
+      console.error('[Index] Failed to import mob:', err);
+    }
+  };
+
+  const handleImportPublicEpisode = async (episode: PublicEpisode) => {
+    try {
+      const assets = await fetchEpisodeAssets(episode.id);
+      await importEpisode(episode, assets);
+      toast.success(`Imported "${episode.name}" with ${assets.maps.length} map(s) and ${assets.mobs.length} mob type(s)`);
+    } catch (err) {
+      console.error('[Index] Failed to import episode:', err);
+      toast.error('Failed to import episode');
+    }
+  };
 
   const handleToggleItemPublic = useCallback(async (item: import('@/lib/gameData').InventoryItem, isPublic: boolean) => {
     const sharedItems = getSharedInventory();
@@ -753,6 +891,19 @@ const Index = () => {
                 onAddQuest={addQuest}
                 onUpdateQuest={updateQuest}
                 onDeleteQuest={deleteQuest}
+                currentUserId={user?.uid}
+                currentCampaignId={roomId}
+                mapDocs={mapDocs}
+                showPublicContent={showPublicContent}
+                publicMaps={publicMaps}
+                publicMobs={publicMobs}
+                publicEpisodes={publicEpisodes}
+                onToggleMapPublic={handleToggleMapPublic}
+                onToggleMobPublic={handleToggleMobPublic}
+                onToggleEpisodePublic={handleToggleEpisodePublic}
+                onImportPublicMap={handleImportPublicMap}
+                onImportPublicMob={handleImportPublicMob}
+                onImportPublicEpisode={handleImportPublicEpisode}
               />
             )}
             {currentView === "showtime" && (

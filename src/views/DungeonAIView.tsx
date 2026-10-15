@@ -4,9 +4,10 @@ import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import MapMobPlacementEditor from "@/components/ui/MapMobPlacementEditor";
 import MapDesignerPopout from "@/components/ui/MapDesignerPopout";
-import { Mob, Episode, EpisodeMobPlacement, Crawler, CrawlerPlacement, InventoryItem, LootBoxTemplate, LootBoxTier, getLootBoxTierColor, type EquipmentSlot, type EquippedItems, Quest, QuestReward, QuestActionItem, QuestRewardTier } from "@/lib/gameData";
-import { Brain, Upload, Plus, Trash2, Map, Skull, Image as ImageIcon, Save, Edit2, X, Layers, ChevronLeft, ChevronRight, User, Package, Search, Maximize2, Shield, ChevronDown as ChevronDownIcon, ScrollText, Eye, EyeOff, CheckSquare, GripVertical } from "lucide-react";
+import { Mob, Episode, EpisodeMobPlacement, Crawler, CrawlerPlacement, InventoryItem, LootBoxTemplate, LootBoxTier, getLootBoxTierColor, type EquipmentSlot, type EquippedItems, Quest, QuestReward, QuestActionItem, QuestRewardTier, type CampaignMapDoc, type PublicMap, type PublicMob, type PublicEpisode } from "@/lib/gameData";
+import { Brain, Upload, Plus, Trash2, Map, Skull, Image as ImageIcon, Save, Edit2, X, Layers, ChevronLeft, ChevronRight, User, Package, Search, Maximize2, Shield, ChevronDown as ChevronDownIcon, ScrollText, Eye, EyeOff, CheckSquare, GripVertical, Users, Globe } from "lucide-react";
 import { storage } from "@/lib/firebase";
+import { ShareToggle, ImportButton } from "@/components/ui/ShareToggle";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 
 interface DungeonAIViewProps {
@@ -32,7 +33,29 @@ interface DungeonAIViewProps {
   onAddQuest?: (quest: Quest) => void;
   onUpdateQuest?: (id: string, updates: Partial<Quest>) => void;
   onDeleteQuest?: (id: string) => void;
+  // Community sharing
+  currentUserId?: string;
+  currentCampaignId?: string | null;
+  mapDocs?: CampaignMapDoc[]; // aligned with `maps`
+  showPublicContent?: boolean;
+  publicMaps?: PublicMap[];
+  publicMobs?: PublicMob[];
+  publicEpisodes?: PublicEpisode[];
+  onToggleMapPublic?: (index: number, isPublic: boolean) => Promise<void>;
+  onToggleMobPublic?: (mob: Mob, isPublic: boolean) => Promise<void>;
+  onToggleEpisodePublic?: (episode: Episode, isPublic: boolean) => Promise<void>;
+  onImportPublicMap?: (map: PublicMap) => Promise<void>;
+  onImportPublicMob?: (mob: PublicMob) => Promise<void>;
+  onImportPublicEpisode?: (episode: PublicEpisode) => Promise<void>;
 }
+
+/** Shown in place of a community list when the user hasn't opted in to public content. */
+const CommunityOptInHint: React.FC<{ what: string }> = ({ what }) => (
+  <p className="text-xs text-muted-foreground border border-dashed border-primary/30 p-3 flex items-center gap-2">
+    <Users className="w-4 h-4 text-primary/60 shrink-0" />
+    Turn on <span className="text-primary">Show Public Content</span> in Account Settings (Campaign Select screen) to browse community {what}.
+  </p>
+);
 
 const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   mobs,
@@ -57,7 +80,27 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   onAddQuest,
   onUpdateQuest,
   onDeleteQuest,
+  currentUserId,
+  currentCampaignId,
+  mapDocs = [],
+  showPublicContent = false,
+  publicMaps = [],
+  publicMobs = [],
+  publicEpisodes = [],
+  onToggleMapPublic,
+  onToggleMobPublic,
+  onToggleEpisodePublic,
+  onImportPublicMap,
+  onImportPublicMob,
+  onImportPublicEpisode,
 }) => {
+  // Content without a creator was made here by the DM; imported content keeps its original creator
+  const canShare = (createdBy?: string) => !!currentUserId && (!createdBy || createdBy === currentUserId);
+  // Hide this campaign's own shared content from the community lists
+  const communityMaps = publicMaps.filter(m => m.sourceCampaignId !== currentCampaignId);
+  const communityMobs = publicMobs.filter(m => m.sourceCampaignId !== currentCampaignId);
+  const communityEpisodes = publicEpisodes.filter(e => e.sourceCampaignId !== currentCampaignId);
+
   const [activeTab, setActiveTab] = useState<"mobs" | "maps" | "episodes" | "lootboxes" | "quests">("mobs");
   const [newMob, setNewMob] = useState<Partial<Mob>>({
     name: "",
@@ -1256,12 +1299,62 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                           <DungeonButton variant="danger" size="sm" onClick={() => handleDeleteMob(mob.id)}>
                             <Trash2 className="w-4 h-4" />
                           </DungeonButton>
+                          {onToggleMobPublic && canShare(mob.createdBy) && (
+                            <ShareToggle isPublic={!!mob.isPublic} onToggle={(isPublic) => onToggleMobPublic(mob, isPublic)} />
+                          )}
+                          {mob.createdByUsername && mob.createdBy !== currentUserId && (
+                            <span className="text-[10px] text-primary/60 flex items-center gap-0.5 self-center">
+                              <Globe className="w-2.5 h-2.5" /> by {mob.createdByUsername}
+                            </span>
+                          )}
                         </div>
                       </div>
                     )}
                   </div>
                 );
               })}
+            </div>
+
+            {/* Community mob types */}
+            <div className="border border-primary/20 bg-primary/5 p-4">
+              <h3 className="font-display text-lg text-primary flex items-center gap-2 mb-3">
+                <Users className="w-5 h-5" /> COMMUNITY MOBS
+                <span className="text-xs text-muted-foreground font-normal ml-1">mob types shared by other DMs</span>
+              </h3>
+              {!showPublicContent ? (
+                <CommunityOptInHint what="mobs" />
+              ) : communityMobs.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No community mobs yet.</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-96 overflow-y-auto pr-1">
+                  {communityMobs.map(pm => (
+                    <div key={pm.id} className="flex items-start gap-3 border border-primary/20 bg-background/50 p-2">
+                      {pm.image ? (
+                        <img src={pm.image} alt={pm.name} className="w-12 h-12 object-cover shrink-0" />
+                      ) : (
+                        <div className="w-12 h-12 bg-muted flex items-center justify-center shrink-0">
+                          <Skull className="w-6 h-6 text-muted-foreground" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-display text-sm text-foreground">{pm.name}</span>
+                          <span className="text-xs text-muted-foreground">Lvl {pm.level}</span>
+                          {pm.type === "boss" && <span className="text-[10px] bg-destructive/20 text-destructive px-1.5">BOSS</span>}
+                          {pm.type === "npc" && <span className="text-[10px] bg-primary/20 text-primary px-1.5">NPC</span>}
+                        </div>
+                        {pm.description && <p className="text-xs text-muted-foreground line-clamp-2">{pm.description}</p>}
+                        {pm.createdByUsername && (
+                          <span className="text-[10px] text-primary/60 flex items-center gap-0.5 mt-0.5">
+                            <Globe className="w-2.5 h-2.5" /> by {pm.createdByUsername}
+                          </span>
+                        )}
+                      </div>
+                      {onImportPublicMob && <ImportButton onImport={() => onImportPublicMob(pm)} label="Add" />}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1337,8 +1430,16 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                       </div>
                     ) : (
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">
-                          {mapNames?.[index] || `Map ${index + 1}`}
+                        <span className="text-sm font-medium flex items-center gap-2 min-w-0">
+                          <span className="truncate">{mapNames?.[index] || `Map ${index + 1}`}</span>
+                          {onToggleMapPublic && mapDocs[index] && canShare(mapDocs[index].createdBy) && (
+                            <ShareToggle isPublic={!!mapDocs[index].isPublic} onToggle={(isPublic) => onToggleMapPublic(index, isPublic)} />
+                          )}
+                          {mapDocs[index]?.createdByUsername && mapDocs[index].createdBy !== currentUserId && (
+                            <span className="text-[10px] text-primary/60 flex items-center gap-0.5 shrink-0">
+                              <Globe className="w-2.5 h-2.5" /> by {mapDocs[index].createdByUsername}
+                            </span>
+                          )}
                         </span>
                         <DungeonButton
                           variant="default"
@@ -1369,6 +1470,38 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                 <p className="text-muted-foreground text-sm col-span-2 text-center py-8">
                   No maps uploaded yet. Upload your first map!
                 </p>
+              )}
+            </div>
+
+            {/* Community maps */}
+            <div className="border border-primary/20 bg-primary/5 p-4">
+              <h3 className="font-display text-lg text-primary flex items-center gap-2 mb-3">
+                <Users className="w-5 h-5" /> COMMUNITY MAPS
+                <span className="text-xs text-muted-foreground font-normal ml-1">shared by other DMs</span>
+              </h3>
+              {!showPublicContent ? (
+                <CommunityOptInHint what="maps" />
+              ) : communityMaps.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No community maps yet.</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-[32rem] overflow-y-auto pr-1">
+                  {communityMaps.map(pm => (
+                    <div key={pm.id} className="border border-primary/20 bg-background/50 p-2 flex flex-col gap-2">
+                      <img src={pm.image} alt={pm.name} loading="lazy" className="w-full h-32 object-cover border border-border" />
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-sm truncate">{pm.name}</p>
+                          {pm.createdByUsername && (
+                            <span className="text-[10px] text-primary/60 flex items-center gap-0.5">
+                              <Globe className="w-2.5 h-2.5" /> by {pm.createdByUsername}
+                            </span>
+                          )}
+                        </div>
+                        {onImportPublicMap && <ImportButton onImport={() => onImportPublicMap(pm)} label="Add" />}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           </div>
@@ -1825,9 +1958,64 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                       >
                         <Trash2 className="w-4 h-4 mr-1" /> Delete
                       </DungeonButton>
+                      {onToggleEpisodePublic && canShare(episode.createdBy) && (
+                        <>
+                          <ShareToggle isPublic={!!episode.isPublic} onToggle={(isPublic) => onToggleEpisodePublic(episode, isPublic)} />
+                          {/* Sharing snapshots the episode — republish after editing it */}
+                          {episode.isPublic && (
+                            <ImportButton
+                              onImport={() => onToggleEpisodePublic(episode, true)}
+                              label="Update Shared Copy"
+                            />
+                          )}
+                        </>
+                      )}
+                      {episode.createdByUsername && episode.createdBy !== currentUserId && (
+                        <span className="text-[10px] text-primary/60 flex items-center gap-0.5 self-center">
+                          <Globe className="w-2.5 h-2.5" /> by {episode.createdByUsername}
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))
+              )}
+            </div>
+
+            {/* Community episodes */}
+            <div className="border border-primary/20 bg-primary/5 p-4">
+              <h3 className="font-display text-lg text-primary flex items-center gap-2 mb-1">
+                <Users className="w-5 h-5" /> COMMUNITY EPISODES
+                <span className="text-xs text-muted-foreground font-normal ml-1">custom adventures shared by other DMs</span>
+              </h3>
+              <p className="text-xs text-muted-foreground mb-3">
+                Adding an episode copies its maps, mob types, mob placements and loot boxes into this campaign.
+              </p>
+              {!showPublicContent ? (
+                <CommunityOptInHint what="episodes" />
+              ) : communityEpisodes.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No community episodes yet.</p>
+              ) : (
+                <div className="space-y-2 max-h-[32rem] overflow-y-auto pr-1">
+                  {communityEpisodes.map(pe => (
+                    <div key={pe.id} className="border border-primary/20 bg-background/50 p-3 flex flex-wrap items-start justify-between gap-3">
+                      <div className="flex-1 min-w-[12rem]">
+                        <h4 className="font-display text-foreground">{pe.name}</h4>
+                        {pe.description && <p className="text-sm text-muted-foreground line-clamp-3">{pe.description}</p>}
+                        <div className="flex flex-wrap gap-3 text-xs text-muted-foreground mt-1">
+                          <span>📍 {pe.mapNames?.length ?? 0} map{(pe.mapNames?.length ?? 0) !== 1 ? "s" : ""}</span>
+                          <span>👹 {pe.mobPlacements?.length ?? 0} mob{(pe.mobPlacements?.length ?? 0) !== 1 ? "s" : ""} ({pe.mobNames?.length ?? 0} type{(pe.mobNames?.length ?? 0) !== 1 ? "s" : ""})</span>
+                          <span>📦 {pe.lootBoxTemplates?.length ?? 0} loot box{(pe.lootBoxTemplates?.length ?? 0) !== 1 ? "es" : ""}</span>
+                        </div>
+                        {pe.createdByUsername && (
+                          <span className="text-[10px] text-primary/60 flex items-center gap-0.5 mt-1">
+                            <Globe className="w-2.5 h-2.5" /> by {pe.createdByUsername}
+                          </span>
+                        )}
+                      </div>
+                      {onImportPublicEpisode && <ImportButton onImport={() => onImportPublicEpisode(pe)} />}
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           </div>

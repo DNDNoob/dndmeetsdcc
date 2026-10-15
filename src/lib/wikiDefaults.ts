@@ -1192,7 +1192,7 @@ DMs can add any community spell to their campaign library with the **+** button.
     order: 6,
     content: `# Public Content & Sharing
 
-Players can share inventory items and spells publicly so other players across all campaigns can discover and use them. This system is opt-in — public content is disabled by default.
+Players can share inventory items and spells, and DMs can share maps, mob types and whole episodes, so other players across all campaigns can discover and use them. This system is opt-in — public content is disabled by default.
 
 ## Privacy Model
 
@@ -1212,6 +1212,29 @@ Click the badge to toggle. The change takes effect immediately.
 
 > Items created by others show a read-only attribution badge ("by username") so you know who made them.
 
+## Sharing Maps, Mobs & Episodes (DMs)
+
+In the **Dungeon AI — DM Console**, each map, mob and episode you made has the same 🔒 **Private** / 🌐 **Public** toggle:
+
+- **Maps tab** — the toggle sits next to each map's name.
+- **Mobs tab** — shares the **mob type** (name, image, stats, weaknesses, default inventory). Where you placed it on your maps is not shared.
+- **Episodes tab** — shares the episode as a complete, playable custom adventure: its maps, the mob types it uses, where each mob is placed, per-map settings, and its loot boxes.
+
+Sharing an episode takes a **snapshot**. If you edit it afterwards, click **Update Shared Copy** to publish the new version.
+
+What is *not* shared from an episode: your crawlers and where they stand, fog of war you've already revealed, mob HP left over from combat, and quests.
+
+Content you added from the community keeps its original creator's "by username" badge and can't be re-shared by you.
+
+## Adding Community Maps, Mobs & Episodes
+
+With **Show Public Content** on, the DM Console shows **Community Maps**, **Community Mobs** and **Community Episodes** at the bottom of each tab:
+
+- **Add** copies a map or mob type into your campaign.
+- **Add to Campaign** on an episode copies the episode plus its maps, mob types and loot boxes, ready to run in Show Time. Mobs start unencountered and fog of war starts fresh.
+
+Copies are independent: editing or deleting your copy doesn't affect the original, and the creator can't change your copy.
+
 ## Enabling Public Content
 
 To see content shared by other players:
@@ -1224,6 +1247,7 @@ To see content shared by other players:
 Once enabled:
 - A **Community Items** section appears in the Inventory page's Item Library.
 - A **Community Spells** panel appears in the Spell Library.
+- **Community Maps**, **Community Mobs** and **Community Episodes** appear in the DM Console.
 
 These sections show public content from all other players. DMs can copy community items/spells into their campaign library with the **+** button.
 

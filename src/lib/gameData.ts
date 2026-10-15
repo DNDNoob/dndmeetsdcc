@@ -197,6 +197,9 @@ export interface Mob {
   defaultInventory?: InventoryItem[]; // Default items this mob type carries
   defaultGold?: number; // Default gold this mob type carries
   equippedItems?: EquippedItems; // Equipment mapping (slot → item ID)
+  createdBy?: string;        // Firebase uid of creator (absent = made in this campaign by its DM)
+  createdByUsername?: string; // Denormalized for display
+  isPublic?: boolean;        // Shared to the community (publicMobs)
 }
 
 export interface EpisodeMobPlacement {
@@ -339,8 +342,74 @@ export interface Episode {
   lootBoxIds?: string[]; // IDs of loot box templates assigned to this episode
   questIds?: string[]; // IDs of quests assigned to this episode
   startingGameTime?: number; // epoch ms for the game clock starting time
+  createdBy?: string;        // Firebase uid of creator (absent = made in this campaign by its DM)
+  createdByUsername?: string; // Denormalized for display
+  isPublic?: boolean;        // Shared to the community (publicEpisodes)
   createdAt?: string;
   updatedAt?: string;
+}
+
+// ── Public (community) content ──────────────────────────────────────────────
+// Stored in root-level collections, not scoped to a campaign room.
+// Public doc IDs are `${sourceCampaignId}__${sourceId}` so copies of a campaign never collide.
+
+/** A map document in a campaign's `maps` collection, aligned with the `maps: string[]` index. */
+export interface CampaignMapDoc {
+  id: string;
+  name: string;
+  image: string;
+  createdBy?: string;
+  createdByUsername?: string;
+  isPublic?: boolean;
+}
+
+/** publicMaps/{id} */
+export interface PublicMap {
+  id: string;
+  sourceId: string;
+  sourceCampaignId: string;
+  name: string;
+  image: string;
+  createdBy: string;
+  createdByUsername?: string;
+  publishedAt: number;
+}
+
+/** publicMobs/{id} — a mob type (no placements or campaign state) */
+export interface PublicMob extends Mob {
+  sourceId: string;
+  sourceCampaignId: string;
+  publishedAt: number;
+}
+
+/**
+ * publicEpisodes/{id} — a self-contained, playable episode.
+ * Heavy assets live in subcollections so the doc stays under Firestore's 1 MB limit:
+ *   publicEpisodes/{id}/maps/{index}  → { index, name, image }
+ *   publicEpisodes/{id}/mobs/{mobId}  → Mob
+ * Inside the bundle, map IDs are bundle indices ("0", "1", ...).
+ */
+export interface PublicEpisode {
+  id: string;
+  sourceId: string;
+  sourceCampaignId: string;
+  name: string;
+  description: string;
+  createdBy: string;
+  createdByUsername?: string;
+  publishedAt: number;
+  mapNames: string[];
+  mobNames: string[];
+  mobPlacements: EpisodeMobPlacement[];
+  mapSettings?: { [bundleMapIndex: string]: MapSettings };
+  defaultFogOfWar?: boolean;
+  startingGameTime?: number;
+  lootBoxTemplates: LootBoxTemplate[];
+}
+
+export interface PublicEpisodeAssets {
+  maps: { name: string; image: string }[]; // ordered by bundle index
+  mobs: Mob[];
 }
 
 // Quest system types
