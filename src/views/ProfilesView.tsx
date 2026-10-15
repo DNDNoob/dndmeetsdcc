@@ -4,9 +4,9 @@ import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import { HealthBar } from "@/components/ui/HealthBar";
 import { EquipmentSlot } from "@/components/ui/EquipmentSlot";
-import { Crawler, Mob, InventoryItem, createEmptyCrawler, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed } from "@/lib/gameData";
+import { Crawler, Mob, InventoryItem, createEmptyCrawler, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery } from "@/lib/gameData";
 import type { DiceRollEntry } from "@/hooks/useGameState";
-import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Backpack, HardHat, Package, Lock, Unlock, ChevronDown, ChevronUp, Check, Search, Send, BookOpen, Filter, X, Gem, Footprints, Shirt, Hand, Target, Swords, RefreshCw, Timer, ScrollText, Eye, EyeOff, CheckSquare, Trophy, Skull, HeartCrack, Crown, Minus } from "lucide-react";
+import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Backpack, HardHat, Package, Lock, Unlock, ChevronDown, ChevronUp, Check, Search, Send, BookOpen, Filter, X, Gem, Footprints, Shirt, Hand, Target, Swords, RefreshCw, Timer, ScrollText, Eye, EyeOff, CheckSquare, Trophy, Skull, HeartCrack, Crown, Minus, Wand2, Star } from "lucide-react";
 
 type SortOption = 'name-asc' | 'name-desc' | 'gold-desc' | 'gold-asc';
 
@@ -98,7 +98,164 @@ interface ProfilesViewProps {
   getCrawlerAssignedQuests?: (crawlerId: string) => import("@/lib/gameData").AssignedQuest[];
   quests?: import("@/lib/gameData").Quest[];
   onUpdateQuest?: (id: string, updates: Partial<import("@/lib/gameData").Quest>) => void;
+  spells?: Spell[];
+  onCastSpell?: (crawlerId: string, spellId: string) => Promise<boolean>;
+  onForgetSpell?: (crawlerId: string, spellId: string) => Promise<void>;
+  onHealCrawler?: (crawlerId: string, amount: number) => Promise<void>;
 }
+
+const SPELL_LEARNED_FROM_LABELS: Record<string, string> = {
+  tome: 'Spell Tome',
+  quest: 'Quest',
+  level: 'Level Up',
+  race: 'Race',
+  class: 'Class',
+  granted: 'Granted by DM',
+};
+
+const SPELL_SECTION_LABELS: Record<SpellActionType, string> = {
+  'Action': 'ACTION SPELLS',
+  'Bonus Action': 'BONUS ACTION SPELLS',
+  'Reaction': 'REACTION SPELLS',
+};
+
+const formatSpellDice = (dice: WeaponDie[]): string =>
+  dice.filter(d => d.count > 0).map(d => `${d.count}d${d.sides}`).join(' + ');
+
+// One known spell on the crawler's Spells tab: details, mastery progress and a Cast button
+const ProfileSpellCard: React.FC<{
+  knownSpell: KnownSpell;
+  spell?: Spell;
+  currentMana: number;
+  lockedReason: string | null; // why the spell can't be cast right now (turn/action), or null
+  isAdmin: boolean;
+  onCast: () => void;
+  onForget?: () => void;
+}> = ({ knownSpell, spell, currentMana, lockedReason, isAdmin, onCast, onForget }) => {
+  const [expanded, setExpanded] = useState(false);
+  const masteryLevel = getSpellMasteryLevel(knownSpell.castCount);
+  const castsUntilNext = getCastsUntilNextMastery(knownSpell.castCount);
+  const prevThreshold = 5 * masteryLevel * (masteryLevel + 1);
+  const nextThreshold = 5 * (masteryLevel + 1) * (masteryLevel + 2);
+  const masteryProgress = ((knownSpell.castCount - prevThreshold) / (nextThreshold - prevThreshold)) * 100;
+
+  if (!spell) {
+    return (
+      <div className="border-2 border-border/50 rounded-lg p-3 bg-muted/20">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm font-display text-muted-foreground">{knownSpell.spellName}</span>
+          {isAdmin && onForget && (
+            <button onClick={onForget} className="text-[10px] text-destructive hover:underline">Forget</button>
+          )}
+        </div>
+        <p className="text-[10px] text-muted-foreground italic mt-1">This spell's details are missing from the spell library, so it can't be cast.</p>
+      </div>
+    );
+  }
+
+  const sd = spell.spellData;
+  const cost = getEffectiveManaCost(sd.manaCost, masteryLevel);
+  const notEnoughMana = cost > currentMana;
+  const disabledReason = lockedReason ?? (notEnoughMana ? `Needs ${cost} MP` : null);
+  const canCast = !disabledReason;
+  const diceStr = formatSpellDice(sd.damageDice ?? []);
+  const isHealing = sd.damageType === 'Healing';
+  const rangeStr = typeof sd.range === 'number' ? `${sd.range} ft` : sd.range;
+  const durationParts: string[] = [];
+  if (sd.duration?.combatTurns) durationParts.push(`${sd.duration.combatTurns} combat turn${sd.duration.combatTurns === 1 ? '' : 's'}`);
+  if (sd.duration?.noncombatTurns) durationParts.push(`${sd.duration.noncombatTurns} noncombat turn${sd.duration.noncombatTurns === 1 ? '' : 's'}`);
+  if (sd.duration?.description) durationParts.push(sd.duration.description);
+
+  return (
+    <div className={`flex flex-col border-2 rounded-lg overflow-hidden transition-colors ${
+      canCast ? 'border-primary/50 bg-primary/5' : 'border-border/50 bg-muted/20'
+    }`}>
+      <div className="px-3 pt-3 pb-2 space-y-1">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <Wand2 className={`w-4 h-4 shrink-0 ${canCast ? 'text-primary' : 'text-muted-foreground'}`} />
+              <span className={`text-sm font-display truncate ${canCast ? 'text-primary' : 'text-muted-foreground'}`}>{spell.name}</span>
+              {masteryLevel > 0 && (
+                <span className="flex items-center gap-0.5 text-[10px] text-accent shrink-0" title={`Mastery level ${masteryLevel}`}>
+                  <Star className="w-2.5 h-2.5" />M{masteryLevel}
+                </span>
+              )}
+            </div>
+            <div className="text-[10px] text-muted-foreground">Lvl {sd.spellLevel} {sd.school}</div>
+          </div>
+          <div className="text-right shrink-0">
+            <div className={`text-xs font-display ${notEnoughMana ? 'text-destructive' : 'text-accent'}`}>{cost} MP</div>
+            {cost < sd.manaCost && <div className="text-[9px] text-muted-foreground line-through">{sd.manaCost} MP</div>}
+          </div>
+        </div>
+
+        <div className="text-[10px] text-muted-foreground space-y-0.5">
+          <div>
+            {rangeStr} · {sd.target}
+            {sd.target === 'Area' && sd.areaOfEffect ? ` (${sd.areaOfEffect.size} ft ${sd.areaOfEffect.shape})` : ''}
+            {sd.canTargetSelf && sd.target !== 'Self' ? ' · can target self' : ''}
+          </div>
+          {diceStr && (
+            <div>
+              <span className={isHealing ? 'text-green-400' : 'text-destructive'}>{diceStr}</span>
+              {sd.damageType ? ` ${isHealing ? 'healing' : `${sd.damageType} damage`}` : ''}
+              {sd.hitDie && sd.hitDie.count > 0 ? ` · +${sd.hitDie.count}d${sd.hitDie.sides} to hit` : ''}
+            </div>
+          )}
+          {sd.savingThrow && <div>{sd.savingThrow} saving throw</div>}
+          {durationParts.length > 0 && <div>Lasts {durationParts.join(', ')}</div>}
+          {sd.splashDamage && <div className="text-orange-400 font-bold">Splash / Multi-Target</div>}
+          {sd.reactionTrigger && <div className="italic text-accent/80">Trigger: {sd.reactionTrigger}</div>}
+        </div>
+
+        {expanded && (
+          <div className="border-t border-border/50 pt-1.5 mt-1 space-y-1 text-[11px]">
+            {spell.description && <p className="text-muted-foreground whitespace-pre-wrap">{spell.description}</p>}
+            {sd.specialEffect && <p className="text-accent italic">{sd.specialEffect}</p>}
+            <p className="text-muted-foreground">Learned from: <span className="text-foreground">{SPELL_LEARNED_FROM_LABELS[knownSpell.learnedFrom] ?? knownSpell.learnedFrom}</span></p>
+            {isAdmin && onForget && (
+              <button onClick={onForget} className="text-[10px] text-destructive hover:underline">Forget spell</button>
+            )}
+          </div>
+        )}
+
+        {/* Mastery progress */}
+        <div className="pt-1">
+          <div className="flex items-center justify-between text-[9px] text-muted-foreground mb-0.5">
+            <span>{knownSpell.castCount} cast{knownSpell.castCount === 1 ? '' : 's'}</span>
+            <span>{castsUntilNext} to Mastery {masteryLevel + 1}</span>
+          </div>
+          <div className="h-1 bg-muted rounded-full overflow-hidden">
+            <div className="h-full bg-accent transition-all" style={{ width: `${Math.max(0, Math.min(100, masteryProgress))}%` }} />
+          </div>
+        </div>
+      </div>
+
+      <div className="flex gap-1 p-2 mt-auto">
+        <button
+          onClick={onCast}
+          disabled={!canCast}
+          title={disabledReason ?? `Cast ${spell.name} for ${cost} MP`}
+          className={`flex-1 py-1.5 rounded text-[10px] font-display transition-colors ${
+            canCast
+              ? 'bg-primary/20 text-primary hover:bg-primary/40'
+              : 'bg-muted/30 text-muted-foreground cursor-not-allowed'
+          }`}
+        >
+          {disabledReason ? disabledReason.toUpperCase() : 'CAST'}
+        </button>
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="px-2 py-1.5 rounded text-[10px] font-display bg-muted/30 text-muted-foreground hover:text-foreground transition-colors"
+          title={expanded ? 'Hide details' : 'Show details'}
+        >
+          {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+        </button>
+      </div>
+    </div>
+  );
+};
 
 // Loot Box display section for crawler profiles
 const LootBoxSection: React.FC<{
@@ -272,6 +429,10 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   getCrawlerAssignedQuests,
   quests: questsProp = [],
   onUpdateQuest,
+  spells: spellLibrary = [],
+  onCastSpell,
+  onForgetSpell,
+  onHealCrawler,
 }) => {
   const [selectedId, setSelectedId] = useState(crawlers[0]?.id || "");
   const [editMode, setEditMode] = useState(false);
@@ -302,6 +463,10 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   const [damageRollResult, setDamageRollResult] = useState<number | null>(null);
   const [splashTargetIds, setSplashTargetIds] = useState<{ id: string; type: 'crawler' | 'mob' }[]>([]);
   const [splashDamageResults, setSplashDamageResults] = useState<Record<string, number>>({});
+
+  // Healing spell targeting state
+  const [pendingHeal, setPendingHeal] = useState<{ spellName: string; dice: WeaponDie[]; bonus: number; canTargetSelf: boolean; multiTarget: boolean } | null>(null);
+  const [healedTargets, setHealedTargets] = useState<Record<string, number>>({});
 
   // Weapon advantage/disadvantage menu
   const [weaponAdvMenu, setWeaponAdvMenu] = useState<{ weaponId: string; x: number; y: number } | null>(null);
@@ -1943,15 +2108,208 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             })()}
 
             {/* Spells Tab */}
-            {activeTab === 'spells' && (
-              <div className="text-center py-12">
-                <BookOpen className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-                <h3 className="font-display text-xl text-primary mb-2">Spells Coming Soon</h3>
-                <p className="text-muted-foreground">
-                  The spell system is currently under development.
-                </p>
-              </div>
-            )}
+            {activeTab === 'spells' && (() => {
+              const isAnyCombatActive = combatState?.active && combatState.phase !== 'ended';
+              const isCombatPhaseLocal = combatState?.active && combatState.phase === 'combat';
+              const isMyTurn = isCombatPhaseLocal && combatState && combatState.combatants[combatState.currentTurnIndex]?.id === selected.id;
+              const myCombatant = combatState?.combatants.find(c => c.id === selected.id);
+              const hasUsedAction = myCombatant?.hasUsedAction ?? false;
+              const hasUsedBonusAction = myCombatant?.hasUsedBonusAction ?? false;
+              const combatTargets = combatState?.combatants.filter(c => c.id !== selected.id) ?? [];
+
+              const knownSpells = selected.knownSpells ?? [];
+              const currentMana = selected.mana ?? 0;
+              const effectiveMaxMana = (selected.maxMana || 0) + (equippedMods.maxMana ?? 0);
+              const resolveSpell = (ks: KnownSpell): Spell | undefined =>
+                spellLibrary.find(s => s.id === ks.spellId) ?? ks.customSpell;
+
+              // Same turn rules as the Attacks, Bonus Actions and Reactions tabs
+              const getLockedReason = (actionType: SpellActionType): string | null => {
+                if (actionType === 'Reaction' || !isAnyCombatActive) return null;
+                if (combatState?.phase === 'initiative') return 'Rolling initiative';
+                if (!isMyTurn) return 'Not your turn';
+                if (actionType === 'Action' && hasUsedAction) return 'Action used';
+                if (actionType === 'Bonus Action' && hasUsedBonusAction) return 'Bonus action used';
+                return null;
+              };
+
+              // Ability modifier (equipment included) for each stat the spell adds
+              const sumStatMods = (mods: StatModifiers | undefined): number => {
+                if (!mods) return 0;
+                let total = 0;
+                for (const stat of ['str', 'dex', 'con', 'int', 'cha'] as const) {
+                  if (!mods[stat]) continue;
+                  const score = (selected[stat] ?? 10) + (equippedMods[stat] ?? 0);
+                  total += Math.floor((score - 10) / 2);
+                }
+                return total;
+              };
+
+              const rollSpellDice = (dice: WeaponDie[]) => {
+                const results: { dice: string; result: number }[] = [];
+                let total = 0;
+                for (const die of dice) {
+                  for (let i = 0; i < die.count; i++) {
+                    const roll = Math.floor(Math.random() * die.sides) + 1;
+                    results.push({ dice: `d${die.sides}`, result: roll });
+                    total += roll;
+                  }
+                }
+                return { results, total };
+              };
+
+              const handleCastSpell = async (ks: KnownSpell, spell: Spell) => {
+                const sd = spell.spellData;
+                if (getLockedReason(sd.actionType)) return;
+                const cast = await onCastSpell?.(selected.id, ks.spellId);
+                if (!cast) return;
+
+                if (isCombatPhaseLocal && isMyTurn && sd.actionType !== 'Reaction') {
+                  onRecordCombatAction?.(selected.id, sd.actionType === 'Action' ? 'action' : 'bonus');
+                }
+
+                const dice = (sd.damageDice ?? []).filter(d => d.count > 0);
+                const isHealing = sd.damageType === 'Healing';
+
+                // Damage spells without a saving throw make a spell attack roll
+                if (dice.length > 0 && !isHealing && !sd.savingThrow && addDiceRoll) {
+                  const rawRoll = Math.floor(Math.random() * 20) + 1;
+                  const hitDie = sd.hitDie && sd.hitDie.count > 0 ? rollSpellDice([sd.hitDie]) : null;
+                  const hitMod = sumStatMods(sd.hitModifiers);
+                  const results = [{ dice: 'D20', result: rawRoll }];
+                  if (hitDie && sd.hitDie) results.push({ dice: `${sd.hitDie.count}d${sd.hitDie.sides} (hit bonus)`, result: hitDie.total });
+                  addDiceRoll({
+                    id: crypto.randomUUID(),
+                    crawlerName: selected.name,
+                    crawlerId: selected.id,
+                    timestamp: Date.now(),
+                    results,
+                    total: rawRoll + (hitDie?.total ?? 0) + hitMod,
+                    statRoll: { stat: `${spell.name} (Spell Attack)`, modifier: (hitDie?.total ?? 0) + hitMod, rawRoll, rollType: 'Attack roll' },
+                  });
+                }
+
+                if (dice.length === 0) return;
+                const bonus = sumStatMods(sd.damageModifiers);
+                const multiTarget = !!sd.splashDamage || sd.target === 'Area' || sd.target === 'Multiple';
+
+                if (isHealing) {
+                  if (sd.target === 'Self' || sd.range === 'Self') {
+                    const { results, total } = rollSpellDice(dice);
+                    const healed = Math.max(0, total + bonus);
+                    await onHealCrawler?.(selected.id, healed);
+                    addDiceRoll?.({
+                      id: crypto.randomUUID(),
+                      crawlerName: selected.name,
+                      crawlerId: selected.id,
+                      timestamp: Date.now(),
+                      results,
+                      total: healed,
+                      statRoll: { stat: `${spell.name} (Healing → ${selected.name})`, modifier: bonus, rawRoll: total, diceLabel: formatSpellDice(dice), rollType: 'Healing' },
+                    });
+                    return;
+                  }
+                  setHealedTargets({});
+                  setPendingHeal({ spellName: spell.name, dice, bonus, canTargetSelf: sd.canTargetSelf, multiTarget });
+                  return;
+                }
+
+                if (isCombatPhaseLocal && combatTargets.length > 0) {
+                  setPendingDamageRoll({ dice: formatSpellDice(dice), bonus, actionName: spell.name, isSplash: multiTarget });
+                  setShowDamageTargetModal(true);
+                  setDamageRollResult(null);
+                  setDamageTargetId('');
+                  setSplashTargetIds([]);
+                  setSplashDamageResults({});
+                  return;
+                }
+
+                // Outside combat, roll the damage straight away
+                const { results, total } = rollSpellDice(dice);
+                addDiceRoll?.({
+                  id: crypto.randomUUID(),
+                  crawlerName: selected.name,
+                  crawlerId: selected.id,
+                  timestamp: Date.now(),
+                  results,
+                  total: total + bonus,
+                  statRoll: { stat: `${spell.name} (${sd.damageType ?? 'Spell'} Damage)`, modifier: bonus, rawRoll: total, diceLabel: formatSpellDice(dice), rollType: 'Damage' },
+                });
+              };
+
+              const turnBanner = (() => {
+                if (!isAnyCombatActive) return null;
+                if (combatState?.phase === 'initiative') return 'Rolling initiative — only reaction spells can be cast';
+                if (!isMyTurn) return 'Waiting for your turn — only reaction spells can be cast';
+                if (hasUsedAction && hasUsedBonusAction) return 'Action and bonus action used — only reaction spells left';
+                return 'YOUR TURN — Cast a spell';
+              })();
+              const bannerActive = isMyTurn && !(hasUsedAction && hasUsedBonusAction);
+
+              return (
+                <div className="space-y-6">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h2 className="font-display text-xl text-primary flex items-center gap-2">
+                      <BookOpen className="w-6 h-6" /> SPELLS
+                    </h2>
+                    <div className="flex items-center gap-2 text-xs min-w-[180px] flex-1 max-w-xs">
+                      <Sparkles className="w-4 h-4 text-primary shrink-0" />
+                      <span className="text-muted-foreground">Mana</span>
+                      <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-primary transition-all"
+                          style={{ width: `${Math.min(100, (currentMana / (effectiveMaxMana || 1)) * 100)}%` }}
+                        />
+                      </div>
+                      <span className="text-primary font-display shrink-0">{currentMana} / {effectiveMaxMana}</span>
+                    </div>
+                  </div>
+
+                  {turnBanner && (
+                    <div className={`border-2 rounded-lg px-4 py-2 ${bannerActive ? 'border-accent bg-accent/10' : 'border-border bg-muted/30'}`}>
+                      <span className={`text-sm font-display ${bannerActive ? 'text-accent' : 'text-muted-foreground'}`}>{turnBanner}</span>
+                    </div>
+                  )}
+
+                  {knownSpells.length === 0 ? (
+                    <div className="text-center py-12">
+                      <Wand2 className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                      <h3 className="font-display text-xl text-primary mb-2">No Spells Yet</h3>
+                      <p className="text-muted-foreground text-sm">
+                        {selected.name} hasn&apos;t learned any spells. Use a spell tome from the inventory, or ask the DM to grant one in Vernon&apos;s Library.
+                      </p>
+                    </div>
+                  ) : (
+                    SPELL_ACTION_TYPES.map(actionType => {
+                      const group = knownSpells
+                        .map(ks => ({ ks, spell: resolveSpell(ks) }))
+                        .filter(({ spell }) => (spell?.spellData.actionType ?? 'Action') === actionType)
+                        .sort((a, b) => (a.spell?.spellData.spellLevel ?? 0) - (b.spell?.spellData.spellLevel ?? 0) || a.ks.spellName.localeCompare(b.ks.spellName));
+                      if (group.length === 0) return null;
+                      return (
+                        <div key={actionType} className="space-y-2">
+                          <h3 className="font-display text-sm text-muted-foreground">{SPELL_SECTION_LABELS[actionType]} ({group.length})</h3>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                            {group.map(({ ks, spell }) => (
+                              <ProfileSpellCard
+                                key={ks.spellId}
+                                knownSpell={ks}
+                                spell={spell}
+                                currentMana={currentMana}
+                                lockedReason={getLockedReason(actionType)}
+                                isAdmin={isAdmin}
+                                onCast={() => { if (spell) void handleCastSpell(ks, spell); }}
+                                onForget={onForgetSpell ? () => { void onForgetSpell(selected.id, ks.spellId); } : undefined}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Reactions Tab */}
             {activeTab === 'reactions' && (() => {
@@ -3030,6 +3388,92 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                   SAVE UPGRADE
                 </button>
               </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {pendingHeal && (() => {
+        const inCombat = combatState?.active && combatState.phase !== 'ended';
+        // In combat only crawlers in the fight can be healed; otherwise any crawler
+        const healTargets = (inCombat
+          ? crawlers.filter(c => combatState!.combatants.some(cb => cb.type === 'crawler' && cb.id === c.id))
+          : crawlers
+        ).filter(c => pendingHeal.canTargetSelf || c.id !== selected.id);
+        const closeHeal = () => { setPendingHeal(null); setHealedTargets({}); };
+        const healTarget = async (target: Crawler) => {
+          const results: { dice: string; result: number }[] = [];
+          let total = 0;
+          for (const die of pendingHeal.dice) {
+            for (let i = 0; i < die.count; i++) {
+              const roll = Math.floor(Math.random() * die.sides) + 1;
+              results.push({ dice: `d${die.sides}`, result: roll });
+              total += roll;
+            }
+          }
+          const healed = Math.max(0, total + pendingHeal.bonus);
+          await onHealCrawler?.(target.id, healed);
+          addDiceRoll?.({
+            id: crypto.randomUUID(),
+            crawlerName: selected.name,
+            crawlerId: selected.id,
+            timestamp: Date.now(),
+            results,
+            total: healed,
+            statRoll: { stat: `${pendingHeal.spellName} (Healing → ${target.name})`, modifier: pendingHeal.bonus, rawRoll: total, diceLabel: formatSpellDice(pendingHeal.dice), rollType: 'Healing' },
+          });
+          if (pendingHeal.multiTarget) {
+            setHealedTargets(prev => ({ ...prev, [target.id]: healed }));
+          } else {
+            closeHeal();
+          }
+        };
+        return (
+          <div className="fixed inset-0 bg-background/80 z-50 flex items-center justify-center p-4">
+            <div className="bg-background border-2 border-green-500 rounded-lg p-6 max-w-md w-full shadow-xl max-h-[80vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-display text-lg text-green-400">
+                  {pendingHeal.spellName} — {pendingHeal.multiTarget ? 'Heal Targets' : 'Heal Target'}
+                </h3>
+                <button onClick={closeHeal}>
+                  <X className="w-5 h-5 text-muted-foreground hover:text-foreground" />
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground mb-3">
+                Rolls {formatSpellDice(pendingHeal.dice)}{pendingHeal.bonus ? ` ${pendingHeal.bonus > 0 ? '+' : '−'} ${Math.abs(pendingHeal.bonus)}` : ''} healing{pendingHeal.multiTarget ? ' for each crawler you pick' : ''}.
+              </p>
+              <div className="space-y-1">
+                {healTargets.length === 0 && (
+                  <p className="text-sm text-muted-foreground italic">No crawlers can be healed by this spell right now.</p>
+                )}
+                {healTargets.map(c => {
+                  const healed = healedTargets[c.id];
+                  return (
+                    <button
+                      key={c.id}
+                      disabled={healed !== undefined}
+                      onClick={() => { void healTarget(c); }}
+                      className={`w-full text-left px-3 py-2 border rounded text-sm transition-colors ${
+                        healed !== undefined
+                          ? 'bg-green-500/10 border-green-500/50 cursor-not-allowed'
+                          : 'bg-muted/30 border-border hover:border-green-500/50'
+                      }`}
+                    >
+                      <span className="text-primary">{c.name}</span>
+                      <span className="text-muted-foreground ml-2">({c.hp}/{c.maxHP} HP)</span>
+                      {healed !== undefined && <span className="text-green-400 font-display ml-2">+{healed} HP</span>}
+                    </button>
+                  );
+                })}
+              </div>
+              {pendingHeal.multiTarget && (
+                <button
+                  onClick={closeHeal}
+                  className="w-full mt-4 py-2 bg-green-600 text-white font-display text-sm rounded hover:bg-green-700 transition-colors"
+                >
+                  DONE
+                </button>
+              )}
             </div>
           </div>
         );

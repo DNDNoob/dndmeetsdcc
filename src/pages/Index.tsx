@@ -209,6 +209,7 @@ const Index = () => {
     learnSpell,
     forgetSpell,
     castSpell,
+    healCrawler,
     consumeSpellTome,
     promoteSpellToLibrary,
     quests,
@@ -966,6 +967,10 @@ const Index = () => {
                 getCrawlerAssignedQuests={getCrawlerAssignedQuests}
                 quests={quests}
                 onUpdateQuest={updateQuest}
+                spells={spells}
+                onCastSpell={castSpell}
+                onForgetSpell={forgetSpell}
+                onHealCrawler={healCrawler}
               />
             )}
             {currentView === "maps" && (
