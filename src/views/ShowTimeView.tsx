@@ -3021,8 +3021,11 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
           </div>
         )}
 
+        {/* Absolutely positioned so the map never stretches its container: the container's
+            height must come from the screen, or a scaled-up map grows the container, which
+            refits the map larger again (tall maps ballooned past their episode scale) */}
         <div
-          className="relative"
+          className="absolute top-1 left-1"
           data-map-container
           style={{
             transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${mapScale / 100})`,

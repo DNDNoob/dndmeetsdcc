@@ -2,6 +2,8 @@
   {
     "date": "2026-10-15",
     "changes": [
+      "🗺️ Fixed maps looking squished in the DM's Map Designer — the map scale was stretching only the width. Maps now keep their shape at every scale",
+      "🗺️ Fixed tall maps in Show Time growing far past their episode scale (150% now really means 1.5x)",
       "🗺️ Fixed wide maps getting squished in Show Time when an episode starts; maps now keep their shape and fit the screen",
       "🎯 The gold selection ring on map tokens now hugs the round portrait and grows with it, instead of wrapping the health bar too",
       "🐛 Fixed selecting or deleting a crawler token sometimes picking the wrong crawler",
