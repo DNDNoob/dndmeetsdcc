@@ -23,9 +23,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCampaigns } from "@/hooks/useCampaigns";
 import { useFriends } from "@/hooks/useFriends";
 import { usePublicContent } from "@/hooks/usePublicContent";
+import { useMyContent } from "@/hooks/useMyContent";
 import { toast } from "sonner";
-import type { Episode, Campaign, CrawlerPlacement, EpisodeMobPlacement, Mob, PublicMap, PublicMob, PublicEpisode } from "@/lib/gameData";
+import type { Episode, Campaign, CrawlerPlacement, EpisodeMobPlacement, Mob, PublicMap, PublicMob, PublicEpisode, InventoryItem, Spell } from "@/lib/gameData";
 import { publicDocId, buildEpisodeBundle } from "@/lib/publicContent";
+import { legacyPlanCounts } from "@/lib/legacyImport";
 
 type AppScreen = "splash" | "menu" | "game";
 type GameView = "profiles" | "maps" | "inventory" | "mobs" | "dungeonai" | "showtime" | "sounds" | "wiki" | "spells";
@@ -150,6 +152,9 @@ const Index = () => {
     importMaps,
     importMob,
     importEpisode,
+    planOldContentImport,
+    applyOldContentImport,
+    setCreator,
     cleanupEmptyMaps,
     episodes,
     addEpisode,
@@ -233,6 +238,16 @@ const Index = () => {
     publishMap, unpublishMap, publishMob, unpublishMob,
     publishEpisode, unpublishEpisode, fetchEpisodeAssets,
   } = usePublicContent(showPublicContent);
+
+  // Personal content: items and spells linked to the user's profile, not to a campaign
+  const { myItems, mySpells, saveMyItem, deleteMyItem, saveMySpell, deleteMySpell } =
+    useMyContent(isAuthenticated ? user?.uid ?? null : null, userProfile?.username);
+  const handleSaveItemToMyContent = (item: InventoryItem) => {
+    saveMyItem(item).then(() => toast.success(`Saved ${item.name} to My Content`)).catch(() => {});
+  };
+  const handleSaveSpellToMyContent = (spell: Spell) => {
+    saveMySpell(spell).then(() => toast.success(`Saved ${spell.name} to My Content`)).catch(() => {});
+  };
 
   // ── Community maps / mobs / episodes (DM console) ─────────────────────────
   // Content without createdBy was made in this campaign by its DM; it's stamped with the
@@ -472,6 +487,34 @@ const Index = () => {
 
     if (failed > 0) toast.error(`Shared ${shared}, but ${failed} failed. Check the console for details.`);
     else toast.success(`Shared ${shared} with the community`);
+  };
+
+  // Link everything the signed-in user creates to their profile
+  useEffect(() => {
+    setCreator(isAuthenticated && user ? { uid: user.uid, ...(userProfile?.username ? { username: userProfile.username } : {}) } : null);
+  }, [isAuthenticated, user, userProfile?.username, setCreator]);
+
+  // Copy content saved before campaigns existed into this campaign (owner only). Originals are kept.
+  const handleImportOldContent = async () => {
+    if (!roomId || !user || !isAdmin) return;
+    try {
+      const plan = await planOldContentImport(creatorFields());
+      const counts = legacyPlanCounts(plan);
+      const summary = ([
+        [counts.items, 'library item'], [counts.crawlers, 'crawler'], [counts.mobs, 'mob'],
+        [counts.maps, 'map'], [counts.episodes, 'episode'], [counts.quests, 'quest'], [counts.lootBoxes, 'loot box'],
+      ] as [number, string][]).filter(([n]) => n).map(([n, label]) => `${n} ${label}${n === 1 ? '' : 's'}`).join(', ');
+      if (!summary) {
+        toast.info('No old content left to import');
+        return;
+      }
+      if (!confirm(`Copy ${summary} from before campaigns into this campaign? The originals are not changed.`)) return;
+      await applyOldContentImport(plan);
+      toast.success(`Imported ${summary}`);
+    } catch (err) {
+      console.error('[Index] Import old content failed:', err);
+      toast.error('Import failed. Check the console for details.');
+    }
   };
 
   // Restore campaign from URL query param on cold load (deep linking)
@@ -817,6 +860,11 @@ const Index = () => {
         onCancelFriendRequest={cancelFriendRequest}
         onUpdateUserProfile={updateUserProfile}
         onLogDecision={logDecision}
+        myItems={myItems}
+        mySpells={mySpells}
+        onSaveMyItem={saveMyItem}
+        onDeleteMyItem={deleteMyItem}
+        onDeleteMySpell={deleteMySpell}
       />
     );
   }
@@ -939,6 +987,8 @@ const Index = () => {
                 currentUsername={userProfile?.username}
                 publicItems={publicItems}
                 onToggleItemPublic={handleToggleItemPublic}
+                myItems={myItems}
+                onSaveItemToMyContent={isAuthenticated ? handleSaveItemToMyContent : undefined}
                 showPublicContent={showPublicContent}
               />
             )}
@@ -957,6 +1007,8 @@ const Index = () => {
                 currentUserId={user?.uid}
                 currentUsername={userProfile?.username}
                 publicSpells={publicSpells}
+                mySpells={mySpells}
+                onSaveSpellToMyContent={isAuthenticated ? handleSaveSpellToMyContent : undefined}
                 onToggleSpellPublic={handleToggleSpellPublic}
                 showPublicContent={showPublicContent}
               />
@@ -997,6 +1049,7 @@ const Index = () => {
                 onToggleMobPublic={handleToggleMobPublic}
                 onToggleEpisodePublic={handleToggleEpisodePublic}
                 onShareAllMyContent={handleShareAllMyContent}
+                onImportOldContent={isAdmin ? handleImportOldContent : undefined}
                 onImportPublicMap={handleImportPublicMap}
                 onImportPublicMob={handleImportPublicMob}
                 onImportPublicEpisode={handleImportPublicEpisode}

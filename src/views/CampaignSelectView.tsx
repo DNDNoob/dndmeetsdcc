@@ -6,10 +6,11 @@ import GoogleAuthButton from '@/components/GoogleAuthButton';
 import {
   Plus, Crown, Users, Copy, Trash2, Link, RefreshCw,
   LogOut, UserMinus, X, Shield, UserPlus, Check, Clock,
-  Heart, Settings, Globe, Lock, AlertTriangle,
+  Heart, Settings, Globe, Lock, AlertTriangle, Bookmark,
 } from 'lucide-react';
+import MyContentPanel from '@/components/MyContentPanel';
 import { toast } from 'sonner';
-import type { Campaign, UserProfile, FriendRequest, UserDecision } from '@/lib/gameData';
+import type { Campaign, UserProfile, FriendRequest, UserDecision, InventoryItem, Spell } from '@/lib/gameData';
 import { db, collection, query, where, getDocs } from '@/lib/firebase';
 
 interface CampaignSelectViewProps {
@@ -36,6 +37,12 @@ interface CampaignSelectViewProps {
   onCancelFriendRequest: (requestId: string) => Promise<void>;
   onUpdateUserProfile: (updates: Partial<UserProfile>) => Promise<void>;
   onLogDecision: (action: string, label: string, opts?: { oldValue?: unknown; newValue?: unknown; context?: string }) => Promise<void>;
+  // Personal content (linked to the profile, not a campaign)
+  myItems: InventoryItem[];
+  mySpells: Spell[];
+  onSaveMyItem: (item: InventoryItem) => Promise<void>;
+  onDeleteMyItem: (id: string) => Promise<void>;
+  onDeleteMySpell: (id: string) => Promise<void>;
 }
 
 const CampaignSelectView: React.FC<CampaignSelectViewProps> = ({
@@ -61,6 +68,11 @@ const CampaignSelectView: React.FC<CampaignSelectViewProps> = ({
   onCancelFriendRequest,
   onUpdateUserProfile,
   onLogDecision,
+  myItems,
+  mySpells,
+  onSaveMyItem,
+  onDeleteMyItem,
+  onDeleteMySpell,
 }) => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showJoinForm, setShowJoinForm] = useState(false);
@@ -73,6 +85,7 @@ const CampaignSelectView: React.FC<CampaignSelectViewProps> = ({
   const [copyName, setCopyName] = useState('');
   const [showCopyForm, setShowCopyForm] = useState<string | null>(null);
   const [showFriends, setShowFriends] = useState(false);
+  const [showMyContent, setShowMyContent] = useState(false);
   const [friendUsername, setFriendUsername] = useState('');
   const [confirmRemoveFriend, setConfirmRemoveFriend] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -561,6 +574,43 @@ const CampaignSelectView: React.FC<CampaignSelectViewProps> = ({
             </p>
           </div>
         )}
+
+        {/* My Content Section */}
+        <div className="border-t border-border pt-6">
+          <button
+            onClick={() => setShowMyContent(!showMyContent)}
+            className="flex items-center gap-2 w-full text-left mb-4"
+          >
+            <Bookmark className="w-4 h-4 text-accent" />
+            <h2 className="font-display text-sm text-accent tracking-[0.2em]">
+              MY CONTENT
+            </h2>
+            <span className="text-[10px] text-muted-foreground">
+              {myItems.length + mySpells.length}
+            </span>
+            <span className="text-[10px] text-muted-foreground ml-auto">
+              {showMyContent ? 'Hide' : 'Show'}
+            </span>
+          </button>
+          <AnimatePresence>
+            {showMyContent && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="overflow-hidden"
+              >
+                <MyContentPanel
+                  myItems={myItems}
+                  mySpells={mySpells}
+                  onSaveItem={onSaveMyItem}
+                  onDeleteItem={onDeleteMyItem}
+                  onDeleteSpell={onDeleteMySpell}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
 
         {/* Friends Section */}
         <div className="border-t border-border pt-6">

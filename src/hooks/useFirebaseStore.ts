@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
-import { db, auth, getCollectionRef, setDoc, doc, deleteDoc, updateDoc, onSnapshot, initAuth, writeBatch } from '../lib/firebase';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { db, auth, getCollectionRef, setDoc, doc, deleteDoc, updateDoc, onSnapshot, initAuth, writeBatch, runTransaction, getDocs, collection as fsCollection } from '../lib/firebase';
+import { diffById, applyDiff, isEmptyDiff } from '../lib/arrayMerge';
 import { isAuthenticatedUser } from '../lib/firebase';
 import { toast } from 'sonner';
 import type { CollectionName } from '../types/collections';
@@ -29,7 +30,25 @@ interface UseFirebaseStoreReturn {
   isLoaded: boolean;
   setRoomId: (roomId: string | null) => void;
   roomId: string | null;
+  setCreator: (creator: Creator | null) => void;
+  mergeArrayById: (
+    collection: CollectionName,
+    docId: string,
+    field: string,
+    base: Record<string, unknown>[],
+    next: Record<string, unknown>[],
+    extra?: Record<string, unknown>,
+  ) => Promise<void>;
+  readRootCollection: (collection: string) => Promise<Record<string, unknown>[]>;
 }
+
+interface Creator {
+  uid: string;
+  username?: string;
+}
+
+// New documents in these collections are stamped with the signed-in user as their creator
+const CREATOR_COLLECTIONS: readonly string[] = ['maps', 'mobs', 'episodes', 'spells', 'quests', 'lootBoxTemplates'];
 
 /**
  * Firebase Data Store Hook - Real-time multiplayer support
@@ -54,6 +73,18 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [roomId, setRoomId] = useState<string | null>(null);
+  const dataRef = useRef<DataStore>(data);
+  dataRef.current = data;
+  const creatorRef = useRef<Creator | null>(null);
+  const setCreator = useCallback((creator: Creator | null) => { creatorRef.current = creator; }, []);
+
+  // Content made by a signed-in user is linked to their profile. Existing attribution
+  // (e.g. content imported from the community) is kept.
+  const withCreator = (collection: CollectionName, item: Record<string, unknown>): Record<string, unknown> => {
+    const creator = creatorRef.current;
+    if (!creator || item.createdBy || !CREATOR_COLLECTIONS.includes(collection)) return item;
+    return { ...item, createdBy: creator.uid, ...(creator.username ? { createdByUsername: creator.username } : {}) };
+  };
 
   // Collections to sync
   const collections: CollectionName[] = ['crawlers', 'mobs', 'maps', 'inventory', 'episodes', 'soundEffects', 'diceRolls', 'lootBoxes', 'lootBoxTemplates', 'noncombatTurns', 'gameClock', 'combatState', 'wiki', 'quests', 'assignedQuests', 'spells'];
@@ -175,7 +206,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
     if (!requireAuth()) return;
     try {
       const itemId = (item.id as string) || crypto.randomUUID();
-      const itemWithId = { ...item, id: itemId };
+      const itemWithId = { ...withCreator(collection, item), id: itemId };
 
       if (roomId) {
         itemWithId.roomId = roomId;
@@ -360,7 +391,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
         switch (op.type) {
           case 'add':
             if (op.data) {
-              newData[collection] = [...currentItems, { ...op.data, id: op.id }];
+              newData[collection] = [...currentItems, { ...withCreator(collection, op.data), id: op.id }];
             }
             break;
           case 'update':
@@ -389,7 +420,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
         switch (op.type) {
           case 'add': {
             if (!op.data) continue;
-            const itemData = { ...op.data, id: op.id };
+            const itemData = { ...withCreator(op.collection, op.data), id: op.id };
             if (roomId) {
               itemData.roomId = roomId;
             }
@@ -449,6 +480,65 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
     }
   }, [roomId]);
 
+  // Save changes to an array field (e.g. inventory items) without overwriting changes other
+  // people made since this client loaded it: only the difference between `base` (what
+  // this client started from) and `next` is replayed onto the server's current array.
+  const mergeArrayById = useCallback(async (
+    collection: CollectionName,
+    docId: string,
+    field: string,
+    base: Record<string, unknown>[],
+    next: Record<string, unknown>[],
+    extra: Record<string, unknown> = {},
+  ) => {
+    if (!db) return;
+    if (!requireAuth()) return;
+    const diff = diffById(base, next);
+
+    const previous = dataRef.current[collection] || [];
+    const existsLocally = previous.some(d => d.id === docId);
+    if (isEmptyDiff(diff) && existsLocally) return;
+    setData(prevData => {
+      const current = prevData[collection] || [];
+      const merged = current.some(d => d.id === docId)
+        ? current.map(d => (d.id === docId ? { ...d, ...extra, [field]: applyDiff((d[field] as Record<string, unknown>[]) || [], diff) } : d))
+        : [...current, { id: docId, ...extra, [field]: next }];
+      return { ...prevData, [collection]: merged };
+    });
+
+    try {
+      const firestore = db;
+      const docRef = doc(getCollectionRef(collection, roomId || undefined), docId);
+      await runTransaction(firestore, async (tx) => {
+        const snap = await tx.get(docRef);
+        if (snap.exists()) {
+          const server = (snap.data()[field] as Record<string, unknown>[]) || [];
+          tx.update(docRef, cleanObject({ ...extra, [field]: applyDiff(server, diff) }) as Record<string, unknown>);
+        } else {
+          // Nothing saved yet: save the whole list this client shows
+          tx.set(docRef, cleanObject({ id: docId, ...(roomId ? { roomId } : {}), ...extra, [field]: next }) as Record<string, unknown>);
+        }
+      });
+      logger.log('[FirebaseStore] ✅ Merged array field:', collection, docId, field, {
+        added: diff.added.length, removed: diff.removed.size, changed: diff.changed.size,
+      });
+    } catch (err) {
+      console.error('[FirebaseStore] ❌ Merge error:', err);
+      toast.error('Failed to save changes. Please try again.', { id: 'save-error' });
+      setData(prevData => ({ ...prevData, [collection]: previous }));
+      setError(err instanceof Error ? err.message : 'Failed to save changes');
+      throw err;
+    }
+  }, [roomId, requireAuth]);
+
+  // One-off read of a top-level collection (outside any campaign), e.g. content saved
+  // before campaigns existed
+  const readRootCollection = useCallback(async (collectionName: string) => {
+    if (!db) return [];
+    const snap = await getDocs(fsCollection(db, collectionName));
+    return snap.docs.map(d => ({ ...d.data(), id: d.id }) as Record<string, unknown>);
+  }, []);
+
   const getCollection = useCallback(<T = Record<string, unknown>>(collection: CollectionName): T[] => {
     return (data[collection] || []) as T[];
   }, [data]);
@@ -472,7 +562,10 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
     setCollection,
     isLoaded,
     setRoomId,
-    roomId
+    roomId,
+    setCreator,
+    mergeArrayById,
+    readRootCollection,
   };
 }
 

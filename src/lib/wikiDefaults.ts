@@ -231,6 +231,19 @@ Click any item name in the inventory to expand its full details, including descr
 
 ## Creator Attribution
 
+Any member of a campaign can add items to its library. Several people can add or edit library items at the same time: each save only changes the item that person touched, so nobody's new item gets wiped out by someone else's save.
+
+Everything you create (items, spells, maps, mobs, episodes, quests and loot boxes) is linked to your profile.
+
+## My Content (personal items and spells)
+
+Content you want to keep for yourself, outside any one campaign, goes in **My Content**. It is linked to your profile only and only you can see it.
+
+- Open **My Content** on the campaign list screen to create, edit or delete personal items (name, description, equipment slot and gold value).
+- In a campaign, items and spells you made have a **Mine** button. Click it to save a copy to My Content, with all its stats, weapon details and spell data. Clicking it again updates that copy.
+- In a campaign, the Inventory page shows **My Items**. Click **+** to add one to the campaign's item library. On the Spells page the DM sees **My Spells** and can add them the same way.
+- Deleting something from My Content never removes copies already added to a campaign.
+
 Every item in the shared library shows who created it. The creator's username appears as a small badge on the item card. This helps the DM and players know the origin of each item.
 
 ## Public & Private Items
@@ -754,7 +767,17 @@ Configure the game clock, starting time, and other global settings.
 
 ## Episode Management
 
-The DM Console provides a full visual editor for episodes, including drag-and-drop mob placement, per-map fog of war defaults, and scale configuration.`,
+The DM Console provides a full visual editor for episodes, including drag-and-drop mob placement, per-map fog of war defaults, and scale configuration.
+
+## Import Old Content
+
+Content made before campaigns existed (early 2026) was saved outside any campaign, so campaigns don't show it. The campaign owner sees an **Import old content** button at the top of the DM Console. It copies that old content into the current campaign:
+
+- Item library items
+- Crawlers, with their inventories and equipped items
+- Mobs, maps (with their names), episodes, quests and loot boxes
+
+Episodes keep pointing at the right maps, mobs, crawlers, quests and loot boxes after the copy. The button first shows how many of each it will copy and asks you to confirm. The originals are never changed, and clicking it again only copies what hasn't been copied yet. Imported content is credited to you.`,
   },
   {
     id: 'multiplayer',
