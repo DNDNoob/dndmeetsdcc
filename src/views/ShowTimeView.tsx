@@ -7,7 +7,7 @@ import { GridOverlay } from "@/components/ui/GridOverlay";
 import RulerOverlay from "@/components/ui/RulerOverlay";
 import { MobIcon } from "@/components/ui/MobIcon";
 import { FogOfWar } from "@/components/ui/FogOfWar";
-import { Episode, Mob, MapSettings, Crawler, CrawlerPlacement, EpisodeMobPlacement, SentLootBox, LootBoxTemplate, getLootBoxTierColor, InventoryItem, CombatState, getEquippedModifiers, Quest, AssignedQuest, QuestActionItem, LootBoxTier } from "@/lib/gameData";
+import { Episode, Mob, MapSettings, Crawler, CrawlerPlacement, EpisodeMobPlacement, SentLootBox, LootBoxTemplate, getLootBoxTierColor, InventoryItem, CombatState, getEquippedModifiers, getEffectiveMoveSpeed, getMapDistanceFeet, NONCOMBAT_MOVE_MULTIPLIER, Quest, AssignedQuest, QuestActionItem, LootBoxTier } from "@/lib/gameData";
 import { Map as MapIcon, X, Eye, EyeOff, Layers, ChevronLeft, ChevronRight, PlayCircle, Grid3x3, CloudFog, Eraser, Trash2, Target, ZoomIn, ZoomOut, Package, Lock, Unlock, Search, Plus, Heart, ScrollText, CheckSquare, Check } from "lucide-react";
 import { PingEffect, Ping } from "@/components/ui/PingEffect";
 import { MapBox, MapBoxData, ShapeType } from "@/components/ui/MapBox";
@@ -54,6 +54,8 @@ interface ShowTimeViewProps {
   onUpdateQuest?: (id: string, updates: Partial<Quest>) => void;
   onUpdateAssignedQuest?: (id: string, updates: Partial<AssignedQuest>) => void;
   onDeleteAssignedQuest?: (id: string) => void;
+  currentPlayerId?: string; // crawler id of the player at this screen (DMs may have none)
+  onRecordCrawlerMove?: (crawlerId: string, feet: number, spendTurnMovement: boolean) => Promise<void>;
 }
 
 const SHOWTIME_STORAGE_KEY = 'dcc_showtime_state';
@@ -726,7 +728,7 @@ const InventoryPanel: React.FC<{
   );
 };
 
-const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock, noncombatTurnState, resetNoncombatTurns, combatState, onRemoveCombatant, onRuntimePlacementsChange, onGameActiveChange, onRegisterGameToggle, roomId, quests = [], assignedQuests = [], onAssignQuest, onUpdateQuest, onUpdateAssignedQuest, onDeleteAssignedQuest }) => {
+const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock, noncombatTurnState, resetNoncombatTurns, combatState, onRemoveCombatant, onRuntimePlacementsChange, onGameActiveChange, onRegisterGameToggle, roomId, quests = [], assignedQuests = [], onAssignQuest, onUpdateQuest, onUpdateAssignedQuest, onDeleteAssignedQuest, currentPlayerId, onRecordCrawlerMove }) => {
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
   const selectedEpisodeIdRef = useRef<string | null>(null);
   const [currentMapIndex, setCurrentMapIndex] = useState(0);
@@ -1868,8 +1870,70 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   const lastCrawlerBroadcastTime = useRef<number>(0);
   const lastRuntimeMobBroadcastTime = useRef<number>(0);
 
-  // Handle dragging runtime crawlers (all users can drag)
-  const handleRuntimeCrawlerDrag = useCallback((index: number, x: number, y: number) => {
+  // Feet between two map points, using the Ruler's scale (5 ft per token-sized grid square)
+  const mapDistanceFeet = useCallback((from: { x: number; y: number }, to: { x: number; y: number }) => {
+    const img = mapImageRef.current;
+    if (!img) return 0;
+    return getMapDistanceFeet(from, to, img.clientWidth, img.clientHeight, gridSize * iconCounterScale);
+  }, [gridSize, iconCounterScale]);
+
+  const isCombatTurnPhase = !!(combatState?.active && combatState.phase === 'combat');
+  const isCombatActive = !!(combatState?.active && combatState.phase !== 'ended');
+
+  // Movement budget for a crawler. In combat: their speed per combat turn, only on their turn.
+  // Outside combat, while noncombat turns are running for this episode: NONCOMBAT_MOVE_MULTIPLIER
+  // times their speed per noncombat turn. Returns null when movement isn't limited (DM, a crawler
+  // not in the fight, the initiative phase, or no noncombat turn running).
+  const getCrawlerMoveBudget = useCallback((crawlerId: string) => {
+    if (isAdmin) return null;
+    const crawler = crawlers.find(c => c.id === crawlerId);
+    const speed = crawler ? getEffectiveMoveSpeed(crawler, getCrawlerInventory?.(crawlerId) ?? []) : 0;
+    const isOwner = !currentPlayerId || currentPlayerId === crawlerId;
+    if (isCombatTurnPhase && combatState) {
+      const combatant = combatState.combatants.find(c => c.type === 'crawler' && c.id === crawlerId);
+      if (!combatant) return null;
+      const isTheirTurn = combatState.combatants[combatState.currentTurnIndex]?.id === crawlerId;
+      const used = combatant.feetMovedThisTurn ?? 0;
+      return { speed, used, remaining: Math.max(0, speed - used), canMove: isTheirTurn && isOwner, label: 'per combat turn' };
+    }
+    if (isCombatActive) return null;
+    const turnEpisodeId = noncombatTurnState?.episodeId;
+    if (!noncombatTurnState || (turnEpisodeId && selectedEpisode && turnEpisodeId !== selectedEpisode.id)) return null;
+    const turnSpeed = speed * NONCOMBAT_MOVE_MULTIPLIER;
+    const used = noncombatTurnState.feetMoved?.[crawlerId] ?? 0;
+    return { speed: turnSpeed, used, remaining: Math.max(0, turnSpeed - used), canMove: isOwner, label: 'per noncombat turn' };
+  }, [isAdmin, isCombatTurnPhase, isCombatActive, combatState, noncombatTurnState, selectedEpisode, crawlers, getCrawlerInventory, currentPlayerId]);
+
+  // Where the current crawler drag started (to measure and limit the move)
+  const crawlerDragStartRef = useRef<{ index: number; x: number; y: number } | null>(null);
+
+  const startCrawlerDrag = (index: number) => {
+    const placement = crawlerPlacements[index];
+    if (!placement) return;
+    const budget = getCrawlerMoveBudget(placement.crawlerId);
+    if (budget && !budget.canMove) return; // Locked: not this player's crawler, or not its combat turn
+    crawlerDragStartRef.current = { index, x: placement.x, y: placement.y };
+    setDraggingRuntimeId(`crawler-${index}`);
+  };
+
+  // Handle dragging runtime crawlers (all users can drag; limited by movement speed in combat)
+  const handleRuntimeCrawlerDrag = useCallback((index: number, rawX: number, rawY: number) => {
+    let x = rawX;
+    let y = rawY;
+    const start = crawlerDragStartRef.current;
+    const placement = crawlerPlacements[index];
+    if (start && start.index === index && placement) {
+      const budget = getCrawlerMoveBudget(placement.crawlerId);
+      if (budget) {
+        const dist = mapDistanceFeet(start, { x, y });
+        if (dist > budget.remaining) {
+          // Stop the token on the drag line at exactly the remaining distance
+          const t = dist > 0 ? budget.remaining / dist : 0;
+          x = start.x + (x - start.x) * t;
+          y = start.y + (y - start.y) * t;
+        }
+      }
+    }
     const updated = crawlerPlacements.map((p, i) =>
       i === index ? { ...p, x, y } : p
     );
@@ -1881,12 +1945,24 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       lastCrawlerBroadcastTime.current = now;
       broadcastCrawlerPlacements(updated);
     }
-  }, [crawlerPlacements, broadcastCrawlerPlacements]);
+  }, [crawlerPlacements, broadcastCrawlerPlacements, getCrawlerMoveBudget, mapDistanceFeet]);
 
   const handleRuntimeCrawlerDragEnd = useCallback((index: number) => {
     // Final broadcast to ensure position is synced
     broadcastCrawlerPlacements(crawlerPlacements);
-  }, [crawlerPlacements, broadcastCrawlerPlacements]);
+
+    // Record the move: a player's own drags count toward their stats and, in combat,
+    // spend their movement for the turn. DM repositioning doesn't count.
+    const start = crawlerDragStartRef.current;
+    crawlerDragStartRef.current = null;
+    const placement = crawlerPlacements[index];
+    if (!start || start.index !== index || !placement || isAdmin) return;
+    if (!currentPlayerId || currentPlayerId !== placement.crawlerId) return;
+    const feet = mapDistanceFeet(start, placement);
+    if (feet > 0) {
+      onRecordCrawlerMove?.(placement.crawlerId, feet, !!getCrawlerMoveBudget(placement.crawlerId));
+    }
+  }, [crawlerPlacements, broadcastCrawlerPlacements, isAdmin, currentPlayerId, mapDistanceFeet, onRecordCrawlerMove, getCrawlerMoveBudget]);
 
   // Handle dragging runtime mobs (all users can drag)
   const handleRuntimeMobDrag = useCallback((index: number, x: number, y: number) => {
@@ -3164,8 +3240,15 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
               .filter(p => p.crawlerId === placement.crawlerId).length;
             // Only show letter if there are duplicates (sameIdBefore > 0 means this is 2nd, 3rd, etc.)
             const letter = sameIdBefore > 0 ? String.fromCharCode(65 + sameIdBefore) : '';
-            const isDragging = draggingRuntimeId === `crawler-${index}`;
+            // Index into the full placements array (drag handlers index into it, not the per-map list)
+            const placementIndex = crawlerPlacements.indexOf(placement);
+            const isDragging = draggingRuntimeId === `crawler-${placementIndex}`;
             const canInteract = isPointVisible(placement.x, placement.y);
+            const moveBudget = getCrawlerMoveBudget(placement.crawlerId);
+            const dragStart = crawlerDragStartRef.current;
+            const feetLeft = moveBudget
+              ? Math.max(0, Math.round(moveBudget.remaining - (isDragging && dragStart ? mapDistanceFeet(dragStart, placement) : 0)))
+              : null;
 
             return (
               <motion.div
@@ -3185,7 +3268,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                 onMouseDown={(e) => {
                   if (!canInteract) return;
                   e.stopPropagation();
-                  setDraggingRuntimeId(`crawler-${index}`);
+                  startCrawlerDrag(placementIndex);
                 }}
                 onClick={(e) => {
                   if (!isDragging && isAdmin) {
@@ -3204,7 +3287,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                 onTouchStart={(e) => {
                   if (!canInteract) return;
                   e.stopPropagation();
-                  setDraggingRuntimeId(`crawler-${index}`);
+                  startCrawlerDrag(placementIndex);
                 }}
               >
                 <div className={`relative ${selectedMapEntity?.type === 'crawler' && selectedMapEntity?.index === index ? 'ring-2 ring-accent ring-offset-2 ring-offset-background rounded-full' : ''}`}>
@@ -3228,6 +3311,17 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                       />
                     );
                   })()}
+                  {/* Movement left this turn (combat or noncombat turn) */}
+                  {moveBudget?.canMove && feetLeft !== null && (
+                    <div
+                      className={`absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full px-1.5 py-0.5 rounded text-[10px] font-bold whitespace-nowrap shadow-lg pointer-events-none ${
+                        feetLeft === 0 ? 'bg-destructive text-destructive-foreground' : 'bg-background/90 border border-primary/60 text-primary'
+                      }`}
+                      title={`Movement: ${moveBudget.speed} ft ${moveBudget.label}`}
+                    >
+                      {feetLeft} ft left
+                    </div>
+                  )}
                   {/* Letter badge - only show if there are duplicates */}
                   {letter && (
                     <div className="absolute -top-1 -left-1 w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-sm font-bold shadow-lg">

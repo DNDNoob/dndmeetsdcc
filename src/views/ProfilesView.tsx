@@ -4,9 +4,9 @@ import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import { HealthBar } from "@/components/ui/HealthBar";
 import { EquipmentSlot } from "@/components/ui/EquipmentSlot";
-import { Crawler, Mob, InventoryItem, createEmptyCrawler, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie } from "@/lib/gameData";
+import { Crawler, Mob, InventoryItem, createEmptyCrawler, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed } from "@/lib/gameData";
 import type { DiceRollEntry } from "@/hooks/useGameState";
-import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Backpack, HardHat, Package, Lock, Unlock, ChevronDown, ChevronUp, Check, Search, Send, BookOpen, Filter, X, Gem, Footprints, Shirt, Hand, Target, Swords, RefreshCw, Timer, ScrollText, Eye, EyeOff, CheckSquare } from "lucide-react";
+import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Backpack, HardHat, Package, Lock, Unlock, ChevronDown, ChevronUp, Check, Search, Send, BookOpen, Filter, X, Gem, Footprints, Shirt, Hand, Target, Swords, RefreshCw, Timer, ScrollText, Eye, EyeOff, CheckSquare, Trophy, Skull, HeartCrack, Crown, Minus } from "lucide-react";
 
 type SortOption = 'name-asc' | 'name-desc' | 'gold-desc' | 'gold-asc';
 
@@ -88,7 +88,11 @@ interface ProfilesViewProps {
   combatState?: CombatState | null;
   onRecordCombatInitiative?: (combatantId: string, roll: number) => Promise<void>;
   onRecordCombatAction?: (combatantId: string, actionType: 'action' | 'bonus') => Promise<void>;
-  onApplyCombatDamage?: (targetId: string, targetType: 'crawler' | 'mob', damage: number) => Promise<void>;
+  onApplyCombatDamage?: (targetId: string, targetType: 'crawler' | 'mob', damage: number, attackerId?: string) => Promise<void>;
+  onApplyCombatDamageBatch?: (hits: { targetId: string; targetType: 'crawler' | 'mob'; damage: number }[], attackerId?: string) => Promise<void>;
+  isAdmin?: boolean;
+  onAwardTrophy?: (crawlerId: string, name: string, description?: string) => Promise<void>;
+  onRevokeTrophy?: (crawlerId: string, trophyId: string) => Promise<void>;
   addDiceRoll?: (entry: DiceRollEntry) => Promise<void>;
   mobs?: Mob[];
   getCrawlerAssignedQuests?: (crawlerId: string) => import("@/lib/gameData").AssignedQuest[];
@@ -259,6 +263,10 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   onRecordCombatInitiative,
   onRecordCombatAction,
   onApplyCombatDamage,
+  onApplyCombatDamageBatch,
+  isAdmin = false,
+  onAwardTrophy,
+  onRevokeTrophy,
   addDiceRoll,
   mobs: mobsProp,
   getCrawlerAssignedQuests,
@@ -297,6 +305,10 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
 
   // Weapon advantage/disadvantage menu
   const [weaponAdvMenu, setWeaponAdvMenu] = useState<{ weaponId: string; x: number; y: number } | null>(null);
+
+  // DM trophy award form
+  const [trophyName, setTrophyName] = useState('');
+  const [trophyDescription, setTrophyDescription] = useState('');
 
   // Weapon upgrade modal
   const [upgradingWeapon, setUpgradingWeapon] = useState<InventoryItem | null>(null);
@@ -1188,6 +1200,124 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             )}
           </div>
         </div>
+
+        {/* Activity stats and DM trophies row */}
+        {(() => {
+          const stats = selected.activityStats ?? {};
+          const speed = getEffectiveMoveSpeed(selected, inventory);
+          const baseSpeed = selected.moveSpeed ?? DEFAULT_MOVE_SPEED;
+          const tiles = [
+            { label: 'Feet Moved', value: stats.feetMoved ?? 0, icon: Footprints },
+            { label: 'Damage Dealt', value: stats.damageDealt ?? 0, icon: Swords },
+            { label: 'Killing Blows', value: stats.killingBlows ?? 0, icon: Skull },
+            { label: 'Fight Finishers', value: stats.combatEndingBlows ?? 0, icon: Crown },
+            { label: 'HP Lost', value: stats.damageTaken ?? 0, icon: Heart },
+            { label: 'Near Death', value: stats.lowHealthCount ?? 0, icon: HeartCrack },
+          ];
+          const trophies = selected.trophies ?? [];
+          const handleAward = async () => {
+            if (!trophyName.trim()) return;
+            await onAwardTrophy?.(selected.id, trophyName, trophyDescription);
+            setTrophyName('');
+            setTrophyDescription('');
+          };
+          return (
+            <div className="grid md:grid-cols-2 gap-8 mb-8">
+              <div>
+                <div className="mb-4 flex items-center justify-between gap-2">
+                  <h3 className="font-display text-primary text-xl flex items-center gap-2"><Target className="w-6 h-6 shrink-0" /> ACTIVITY</h3>
+                  {editMode ? (
+                    <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                      Speed
+                      <input
+                        type="number"
+                        min={0}
+                        step={5}
+                        value={editData?.moveSpeed ?? baseSpeed}
+                        onChange={(e) => setEditData({ ...editData, moveSpeed: Math.max(0, parseInt(e.target.value) || 0) })}
+                        className="bg-transparent border-b border-primary w-16 text-right text-base text-foreground"
+                      />
+                      ft
+                    </label>
+                  ) : (
+                    <span className="text-sm text-muted-foreground" title="Feet this crawler can move per combat turn">
+                      Speed <span className="text-foreground font-bold">{speed} ft</span>
+                      {speed !== baseSpeed && (
+                        <span className={speed > baseSpeed ? 'text-green-400' : 'text-red-400'}> ({speed > baseSpeed ? '+' : ''}{speed - baseSpeed})</span>
+                      )}
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {tiles.map(({ label, value, icon: Icon }) => (
+                    <div key={label} className="bg-muted/50 px-3 py-2 rounded">
+                      <div className="flex items-center gap-1 text-muted-foreground text-xs">
+                        <Icon className="w-3.5 h-3.5 shrink-0" /> {label}
+                      </div>
+                      <div className="text-foreground font-bold text-lg">{value.toLocaleString()}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <h3 className="font-display text-accent text-xl mb-4 flex items-center gap-2 text-glow-gold">
+                  <Trophy className="w-6 h-6 shrink-0" /> TROPHIES
+                </h3>
+                <div className="bg-muted/30 border border-border/50 rounded p-3 space-y-2">
+                  {trophies.length === 0 && (
+                    <p className="text-muted-foreground text-sm">No trophies yet. The DM awards these for standout moments.</p>
+                  )}
+                  {trophies.map(t => (
+                    <div key={t.id} className="flex items-start gap-2 bg-accent/10 border border-accent/30 rounded px-3 py-2">
+                      <Trophy className="w-4 h-4 text-accent shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-accent font-display text-sm break-words">
+                          {t.name}{t.count > 1 && <span className="text-foreground"> ×{t.count}</span>}
+                        </p>
+                        {t.description && <p className="text-muted-foreground text-xs break-words">{t.description}</p>}
+                      </div>
+                      {isAdmin && (
+                        <button
+                          onClick={() => onRevokeTrophy?.(selected.id, t.id)}
+                          className="text-muted-foreground hover:text-destructive shrink-0"
+                          title={t.count > 1 ? 'Take back one award' : 'Remove trophy'}
+                        >
+                          <Minus className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  {isAdmin && (
+                    <div className="pt-2 border-t border-border/50 space-y-2">
+                      <input
+                        value={trophyName}
+                        onChange={(e) => setTrophyName(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleAward(); }}
+                        placeholder="Trophy name (e.g. Best Roleplay)"
+                        list="trophy-name-suggestions"
+                        className="w-full bg-muted border border-border px-2 py-1 text-sm rounded"
+                      />
+                      <datalist id="trophy-name-suggestions">
+                        {trophies.map(t => <option key={t.id} value={t.name} />)}
+                      </datalist>
+                      <input
+                        value={trophyDescription}
+                        onChange={(e) => setTrophyDescription(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleAward(); }}
+                        placeholder="What it was for (optional)"
+                        className="w-full bg-muted border border-border px-2 py-1 text-sm rounded"
+                      />
+                      <DungeonButton variant="default" size="sm" onClick={handleAward} disabled={!trophyName.trim()}>
+                        <Trophy className="w-4 h-4 mr-1" /> Award Trophy
+                      </DungeonButton>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Inventory Summary - on profile tab */}
         <div className="bg-muted/30 border border-border rounded-lg p-4">
@@ -3045,7 +3175,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                       <p className="font-display text-2xl text-destructive">{damageRollResult} DAMAGE</p>
                       <button
                         onClick={async () => {
-                          await onApplyCombatDamage?.(damageTargetId, damageTargetType, damageRollResult);
+                          await onApplyCombatDamage?.(damageTargetId, damageTargetType, damageRollResult, selected.id);
                           setShowDamageTargetModal(false);
                           setPendingDamageRoll(null);
                           setDamageRollResult(null);
@@ -3118,11 +3248,13 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                       </div>
                       <button
                         onClick={async () => {
-                          for (const target of splashTargetIds) {
-                            const dmg = splashDamageResults[target.id];
-                            if (dmg !== undefined) {
-                              await onApplyCombatDamage?.(target.id, target.type, dmg);
-                            }
+                          const hits = splashTargetIds
+                            .filter(target => splashDamageResults[target.id] !== undefined)
+                            .map(target => ({ targetId: target.id, targetType: target.type, damage: splashDamageResults[target.id] }));
+                          if (onApplyCombatDamageBatch) {
+                            await onApplyCombatDamageBatch(hits, selected.id);
+                          } else {
+                            for (const hit of hits) await onApplyCombatDamage?.(hit.targetId, hit.targetType, hit.damage, selected.id);
                           }
                           setShowDamageTargetModal(false);
                           setPendingDamageRoll(null);

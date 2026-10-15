@@ -189,6 +189,10 @@ const Index = () => {
     advanceCombatTurn,
     recordCombatAction,
     applyCombatDamage,
+    applyCombatDamageBatch,
+    recordCrawlerMove,
+    awardTrophy,
+    revokeTrophy,
     overrideMobHealth,
     endCombat,
     cancelCombat,
@@ -953,6 +957,10 @@ const Index = () => {
                 onRecordCombatInitiative={recordCombatInitiative}
                 onRecordCombatAction={recordCombatAction}
                 onApplyCombatDamage={applyCombatDamage}
+                onApplyCombatDamageBatch={applyCombatDamageBatch}
+                isAdmin={isAdmin}
+                onAwardTrophy={awardTrophy}
+                onRevokeTrophy={revokeTrophy}
                 addDiceRoll={addDiceRoll}
                 mobs={mobs}
                 getCrawlerAssignedQuests={getCrawlerAssignedQuests}
@@ -1092,6 +1100,8 @@ const Index = () => {
                 onUpdateQuest={updateQuest}
                 onUpdateAssignedQuest={updateAssignedQuest}
                 onDeleteAssignedQuest={deleteAssignedQuest}
+                currentPlayerId={currentPlayer?.id}
+                onRecordCrawlerMove={recordCrawlerMove}
               />
             )}
             {currentView === "sounds" && <SoundEffectsView />}

@@ -2,6 +2,12 @@
   {
     "date": "2026-10-15",
     "changes": [
+      "🏃 Crawlers now have a movement speed (60 ft by default). In combat you can only move your own crawler on its turn, and only up to your speed, with a feet-left badge while you drag",
+      "🧭 During noncombat turns each crawler can move up to twice their movement speed per turn, refilled when the DM starts the next turn",
+      "📊 New Activity section on crawler profiles: feet moved, damage dealt, killing blows, fight finishers, HP lost and near-death moments are tracked automatically",
+      "🏆 DMs can award trophies on a crawler's profile for things that can't be measured, like great roleplay. Awarding the same trophy again counts it up",
+      "🥾 Items can now have a Speed modifier that changes a crawler's movement speed",
+      "⚔️ Fixed splash damage on several targets sometimes only keeping the last target's damage",
       "🌐 DMs can now share maps, mob types and whole episodes with the community from the DM Console (Public/Private toggle)",
       "📜 Shared episodes are complete custom adventures — maps, mob types, mob placements, map settings and loot boxes — that other DMs can add to their campaign in one click",
       "👥 New Community Maps, Community Mobs and Community Episodes sections in the DM Console (requires Show Public Content)",
