@@ -191,6 +191,7 @@ export interface KnownSpell {
   learnedFrom: SpellLearnedFrom;
   learnedAt: string; // ISO timestamp
   castCount: number; // total casts, drives mastery level
+  customSpell?: Spell; // full spell data for one-off tome spells that aren't in the library
 }
 
 // Mastery threshold: level N requires 5*N*(N+1) total casts (10, 30, 60, 100, ...)

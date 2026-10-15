@@ -1050,6 +1050,8 @@ Vernon's Library is split into two panels:
 - **Left panel — Spell Library**: The shared collection of reusable spells. DMs can create, edit, and delete spells here. Any library spell can be granted directly to a crawler.
 - **Right panel — Known Spells**: Per-crawler spell lists showing cast counts, mastery levels, and effective mana costs.
 
+Players cast their spells from the **Spells** tab on their crawler's profile. See [Casting & Mastery](/wiki/casting-mastery).
+
 ## Spell Schools
 
 Every spell belongs to one of eight schools of magic:
@@ -1120,6 +1122,21 @@ Spells can optionally:
 - Apply effects lasting for a set number of **combat turns** or **noncombat turns**
 - Require a saving throw from the target
 - Have a splash damage effect (hits multiple enemies)
+
+## Casting From Your Profile
+
+Open your crawler's profile and pick the **Spells** tab. It shows your mana bar and every spell you know, grouped into **Action**, **Bonus Action** and **Reaction** spells. Each card shows the mana cost after your mastery discount, range, target, dice, saving throw, duration and how many casts until the next mastery level. Tap the arrow on a card for its full description.
+
+Pressing **Cast**:
+- Spends the spell's mana. If you don't have enough mana, the button is disabled and shows how much you need.
+- Adds one to the spell's cast count, which drives mastery.
+- **Damage spells** without a saving throw roll a spell attack (d20, plus the spell's hit die and any hit stat modifiers). In combat you then pick the target, or several targets for splash, area or multi-target spells, roll damage and apply it, the same as weapon attacks. Outside combat the damage is rolled straight away.
+- **Healing spells** heal you right away if they only target yourself. Otherwise you pick which crawler to heal (several, for area or multi-target spells). Healing never goes above a crawler's max HP, including equipment bonuses.
+- Spell stat modifiers add the crawler's ability modifier for that stat (for example, INT 14 adds +2).
+
+In combat, spells follow the same turn rules as the Attacks and Bonus Actions tabs: Action spells use your action and Bonus Action spells use your bonus action, both only on your turn. Reaction spells can be cast at any time.
+
+DMs can remove a spell from a crawler with **Forget spell** in the card's details.
 
 ## Reaction Spells
 

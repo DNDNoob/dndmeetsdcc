@@ -31,7 +31,7 @@ interface SpellsViewProps {
   onDeleteSpell: (id: string) => Promise<void>;
   onLearnSpell: (crawlerId: string, spell: Spell, source: SpellLearnedFrom) => Promise<void>;
   onForgetSpell: (crawlerId: string, spellId: string) => Promise<void>;
-  onCastSpell: (crawlerId: string, spellId: string) => Promise<void>;
+  onCastSpell: (crawlerId: string, spellId: string) => Promise<boolean>;
   onPromoteSpellToLibrary: (spell: Spell) => Promise<void>;
   isAdmin: boolean;
   currentUserId?: string;
@@ -589,7 +589,7 @@ function SpellCard({
 
 function KnownSpellCard({
   knownSpell,
-  spell,
+  spell: librarySpell,
   isAdmin,
   onForget,
   onCast,
@@ -604,7 +604,8 @@ function KnownSpellCard({
 }) {
   const [expanded, setExpanded] = useState(false);
   const masteryLevel = getSpellMasteryLevel(knownSpell.castCount);
-  const isCustom = !spell; // embedded custom spell, not in library
+  const spell = librarySpell ?? knownSpell.customSpell;
+  const isCustom = !librarySpell; // embedded custom spell, not in library
   const effectiveMana = spell
     ? getEffectiveManaCost(spell.spellData.manaCost, masteryLevel)
     : 0;
@@ -1098,15 +1099,8 @@ const SpellsView: React.FC<SpellsViewProps> = ({
                             onForget={() => onForgetSpell(selectedCrawler.id, ks.spellId)}
                             onCast={() => onCastSpell(selectedCrawler.id, ks.spellId)}
                             onPromoteToLibrary={
-                              !libSpell
-                                ? () => {
-                                    const custom = (selectedCrawler.knownSpells ?? [])
-                                      .find(k => k.spellId === ks.spellId);
-                                    if (custom) {
-                                      // We'd need the customSpell object; in practice this is on the tome item
-                                      // For now just show a placeholder path
-                                    }
-                                  }
+                              !libSpell && ks.customSpell
+                                ? () => onPromoteSpellToLibrary(ks.customSpell!)
                                 : undefined
                             }
                           />
