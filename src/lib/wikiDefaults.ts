@@ -73,6 +73,8 @@ Use the **Campaigns** button to return to the campaign list at any time.`,
 
 Crawlers are the player characters in the game. Each crawler has a name, race, job, level, and a set of core stats.
 
+> **New campaigns:** until you create or save a crawler, a brand-new campaign shows the sample crawlers (Carl and Princess Donut). Editing and saving a sample crawler saves it to your campaign as a real crawler.
+
 ## Stats
 
 Every crawler has these core attributes:
@@ -863,7 +865,7 @@ Click **Sign Out** to sign out. You can sign back in at any time.
 Your profile includes:
 - **Username** — unique identifier, used for lookups
 - **Display Name** — shown in campaigns and as the DM name
-- **Avatar** — pulled from your Google account if applicable
+- **Avatar** — pulled from your Google account if applicable (optional — email/password accounts simply have no avatar)
 
 ## Account Settings
 

@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, doc, setDoc, getDoc, getDocs, deleteDoc, updateDoc, onSnapshot, query, where, writeBatch } from 'firebase/firestore';
+import { getFirestore, initializeFirestore, collection, doc, setDoc, getDoc, getDocs, deleteDoc, updateDoc, onSnapshot, query, where, writeBatch } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import {
   getAuth,
@@ -40,7 +40,10 @@ let auth: ReturnType<typeof getAuth> | null = null;
 try {
   if (configPresent) {
     app = initializeApp(firebaseConfig);
-    db = getFirestore(app);
+    // ignoreUndefinedProperties: optional fields (e.g. avatarUrl for email/password
+    // users with no photo) are often undefined. Without this, setDoc/updateDoc reject
+    // the whole write with "Unsupported field value: undefined".
+    db = initializeFirestore(app, { ignoreUndefinedProperties: true });
     storage = getStorage(app);
     auth = getAuth(app);
   } else {

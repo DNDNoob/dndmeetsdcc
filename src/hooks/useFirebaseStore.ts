@@ -243,6 +243,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
       logger.log('[FirebaseStore] ✅ Added item:', collection, itemId);
     } catch (err) {
       console.error('[FirebaseStore] ❌ Add error:', err);
+      toast.error('Failed to save changes. Please try again.', { id: 'save-error' });
       setError(err instanceof Error ? err.message : 'Failed to add item');
       throw err;
     }
@@ -302,6 +303,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
       logger.log('[FirebaseStore] ✅ Updated item:', collection, id);
     } catch (err) {
       console.error('[FirebaseStore] ❌ Update error:', err);
+      toast.error('Failed to save changes. Please try again.', { id: 'save-error' });
       setError(err instanceof Error ? err.message : 'Failed to update item');
       throw err;
     }
@@ -439,6 +441,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
       logger.log('[FirebaseStore] ✅ Batch write completed:', operations.length, 'operations');
     } catch (err) {
       console.error('[FirebaseStore] ❌ Batch write error:', err);
+      toast.error('Failed to save changes. Please try again.', { id: 'save-error' });
       // Rollback optimistic update on error
       setData(previousData);
       setError(err instanceof Error ? err.message : 'Failed to batch write');

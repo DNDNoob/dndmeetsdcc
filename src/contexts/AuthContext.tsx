@@ -211,8 +211,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           id: user.uid,
           username,
           displayName,
-          avatarUrl: user.photoURL || undefined,
-          email: user.email || undefined,
+          // Email/password accounts have no photoURL; never write undefined to Firestore
+          ...(user.photoURL ? { avatarUrl: user.photoURL } : {}),
+          ...(user.email ? { email: user.email } : {}),
           createdAt: now,
           updatedAt: now,
         };
