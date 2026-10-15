@@ -17,6 +17,9 @@ import {
   KnownSpell,
   SpellLearnedFrom,
   getSpellMasteryLevel,
+  getNoChildLeftBehindBump,
+  NO_CHILD_LEFT_BEHIND_TROPHY,
+  NO_CHILD_LEFT_BEHIND_DESCRIPTION,
   getEffectiveManaCost,
   getEquippedModifiers,
   addActivityStats,
@@ -1268,6 +1271,20 @@ export const useGameState = () => {
     toast.success(`🏆 ${crawler.name} earned "${trimmed}"!`);
   };
 
+  // "No Child Left Behind": if exactly one saved crawler is slower than everyone else, raise
+  // their base speed so their effective speed matches the second slowest, and award the trophy.
+  const applyNoChildLeftBehind = async () => {
+    const stored = getCollection<Crawler>('crawlers');
+    const bump = getNoChildLeftBehindBump(stored, getCrawlerInventory);
+    if (!bump) return;
+    const crawler = stored.find(c => c.id === bump.crawlerId);
+    if (!crawler) return;
+    logger.log('[GameState] 🐢 No Child Left Behind:', bump);
+    await writeCrawler(bump.crawlerId, { moveSpeed: bump.moveSpeed });
+    await awardTrophy(bump.crawlerId, NO_CHILD_LEFT_BEHIND_TROPHY, NO_CHILD_LEFT_BEHIND_DESCRIPTION);
+    toast.info(`${crawler.name}'s speed went from ${bump.fromSpeed} ft to ${bump.toSpeed} ft.`);
+  };
+
   // Take back one award of a trophy; removes it when the count reaches 0
   const revokeTrophy = async (crawlerId: string, trophyId: string) => {
     const crawler = crawlers.find(c => c.id === crawlerId);
@@ -1659,6 +1676,7 @@ export const useGameState = () => {
     applyCombatDamageBatch,
     recordCrawlerMove,
     awardTrophy,
+    applyNoChildLeftBehind,
     revokeTrophy,
     overrideMobHealth,
     endCombat,
