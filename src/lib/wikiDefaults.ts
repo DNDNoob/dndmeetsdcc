@@ -1226,6 +1226,15 @@ What is *not* shared from an episode: your crawlers and where they stand, fog of
 
 Content you added from the community keeps its original creator's "by username" badge and can't be re-shared by you.
 
+## Share All My Content (DMs)
+
+The **Share all my content** button at the top of the DM Console shares everything you made in the current campaign in one go: library items, spells, maps, mob types and episodes. It first shows how many of each will be shared and asks you to confirm.
+
+- Anything already public is skipped.
+- Items and spells made before creator tracking existed have no creator yet. The button credits them to you, the campaign's DM, so they get a 🌐 toggle like your other content.
+- Content created by other players, and content you added from the community, is never touched.
+- Episodes with no maps are skipped, the same as with the episode toggle.
+
 ## Adding Community Maps, Mobs & Episodes
 
 With **Show Public Content** on, the DM Console shows **Community Maps**, **Community Mobs** and **Community Episodes** at the bottom of each tab:

@@ -44,6 +44,7 @@ interface DungeonAIViewProps {
   onToggleMapPublic?: (index: number, isPublic: boolean) => Promise<void>;
   onToggleMobPublic?: (mob: Mob, isPublic: boolean) => Promise<void>;
   onToggleEpisodePublic?: (episode: Episode, isPublic: boolean) => Promise<void>;
+  onShareAllMyContent?: () => Promise<void>;
   onImportPublicMap?: (map: PublicMap) => Promise<void>;
   onImportPublicMob?: (mob: PublicMob) => Promise<void>;
   onImportPublicEpisode?: (episode: PublicEpisode) => Promise<void>;
@@ -90,6 +91,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   onToggleMapPublic,
   onToggleMobPublic,
   onToggleEpisodePublic,
+  onShareAllMyContent,
   onImportPublicMap,
   onImportPublicMob,
   onImportPublicEpisode,
@@ -102,6 +104,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   const communityEpisodes = publicEpisodes.filter(e => e.sourceCampaignId !== currentCampaignId);
 
   const [activeTab, setActiveTab] = useState<"mobs" | "maps" | "episodes" | "lootboxes" | "quests">("mobs");
+  const [sharingAll, setSharingAll] = useState(false);
   const [newMob, setNewMob] = useState<Partial<Mob>>({
     name: "",
     level: 1,
@@ -688,6 +691,25 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
           <h2 className="font-display text-2xl text-accent text-glow-gold">
             DUNGEON AI - DM CONSOLE
           </h2>
+          {onShareAllMyContent && (
+            <DungeonButton
+              variant="default"
+              size="sm"
+              className="ml-auto"
+              disabled={sharingAll}
+              onClick={async () => {
+                setSharingAll(true);
+                try {
+                  await onShareAllMyContent();
+                } finally {
+                  setSharingAll(false);
+                }
+              }}
+              title="Share every item, spell, map, mob type and episode you made in this campaign with the community"
+            >
+              <Globe className="w-4 h-4 mr-2" /> {sharingAll ? 'Sharing...' : 'Share all my content'}
+            </DungeonButton>
+          )}
         </div>
 
         {/* Tab Navigation */}
