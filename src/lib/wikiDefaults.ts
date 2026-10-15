@@ -231,6 +231,10 @@ Click any item name in the inventory to expand its full details, including descr
 
 ## Creator Attribution
 
+Any member of a campaign can add items to its library. Several people can add or edit library items at the same time: each save only changes the item that person touched, so nobody's new item gets wiped out by someone else's save.
+
+Everything you create (items, spells, maps, mobs, episodes, quests and loot boxes) is linked to your profile.
+
 Every item in the shared library shows who created it. The creator's username appears as a small badge on the item card. This helps the DM and players know the origin of each item.
 
 ## Public & Private Items
@@ -754,7 +758,17 @@ Configure the game clock, starting time, and other global settings.
 
 ## Episode Management
 
-The DM Console provides a full visual editor for episodes, including drag-and-drop mob placement, per-map fog of war defaults, and scale configuration.`,
+The DM Console provides a full visual editor for episodes, including drag-and-drop mob placement, per-map fog of war defaults, and scale configuration.
+
+## Import Old Content
+
+Content made before campaigns existed (early 2026) was saved outside any campaign, so campaigns don't show it. The campaign owner sees an **Import old content** button at the top of the DM Console. It copies that old content into the current campaign:
+
+- Item library items
+- Crawlers, with their inventories and equipped items
+- Mobs, maps (with their names), episodes, quests and loot boxes
+
+Episodes keep pointing at the right maps, mobs, crawlers, quests and loot boxes after the copy. The button first shows how many of each it will copy and asks you to confirm. The originals are never changed, and clicking it again only copies what hasn't been copied yet. Imported content is credited to you.`,
   },
   {
     id: 'multiplayer',
