@@ -6,6 +6,7 @@ import { HealthBar } from "@/components/ui/HealthBar";
 import { EquipmentSlot } from "@/components/ui/EquipmentSlot";
 import { Crawler, Mob, InventoryItem, createEmptyCrawler, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery } from "@/lib/gameData";
 import type { DiceRollEntry } from "@/hooks/useGameState";
+import UndoTurnButton, { canUndoCombatTurn } from "@/components/UndoTurnButton";
 import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Backpack, HardHat, Package, Lock, Unlock, ChevronDown, ChevronUp, Check, Search, Send, BookOpen, Filter, X, Gem, Footprints, Shirt, Hand, Target, Swords, RefreshCw, Timer, ScrollText, Eye, EyeOff, CheckSquare, Trophy, Skull, HeartCrack, Crown, Minus, Wand2, Star } from "lucide-react";
 
 type SortOption = 'name-asc' | 'name-desc' | 'gold-desc' | 'gold-asc';
@@ -88,6 +89,7 @@ interface ProfilesViewProps {
   combatState?: CombatState | null;
   onRecordCombatInitiative?: (combatantId: string, roll: number) => Promise<void>;
   onRecordCombatAction?: (combatantId: string, actionType: 'action' | 'bonus') => Promise<void>;
+  onUndoCombatTurn?: () => Promise<boolean>;
   onApplyCombatDamage?: (targetId: string, targetType: 'crawler' | 'mob', damage: number, attackerId?: string) => Promise<void>;
   onApplyCombatDamageBatch?: (hits: { targetId: string; targetType: 'crawler' | 'mob'; damage: number }[], attackerId?: string) => Promise<void>;
   isAdmin?: boolean;
@@ -419,6 +421,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   combatState,
   onRecordCombatInitiative,
   onRecordCombatAction,
+  onUndoCombatTurn,
   onApplyCombatDamage,
   onApplyCombatDamageBatch,
   isAdmin = false,
@@ -1017,6 +1020,13 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
 
           {/* Tab Content */}
           <div className="flex-1 min-w-0">
+            {/* Undo this crawler's combat turn (their own player or the DM) */}
+            {selected && (isAdmin || currentPlayerId === selected.id) && canUndoCombatTurn(combatState, selected.id) && (
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-4 border border-accent/40 bg-accent/5 rounded-lg px-3 py-2">
+                <span className="text-xs text-muted-foreground">Moved by accident or clicked the wrong action?</span>
+                <UndoTurnButton combatState={combatState} crawlerId={selected.id} onUndo={onUndoCombatTurn} />
+              </div>
+            )}
             {activeTab === 'profile' && (
               <div className="flex flex-col lg:flex-row gap-6">
                 {/* Equipment Slots - Left Side */}

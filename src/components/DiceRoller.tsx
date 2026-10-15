@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DungeonButton } from "./ui/DungeonButton";
-import { Dices, ChevronUp, ChevronDown, Plus, X, Package, ScrollText } from "lucide-react";
+import { Dices, ChevronUp, ChevronDown, Plus, X, Package, ScrollText, Undo2 } from "lucide-react";
 import { getLootBoxTierColor } from "@/lib/gameData";
 import { DiceRollEntry } from "@/hooks/useGameState";
 
@@ -212,6 +212,17 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
                               <span className="text-muted-foreground"> sent to </span>
                             )}
                             <span className="text-primary">{entry.lootBoxNotification.recipientNames.join(', ')}</span>
+                          </div>
+                          <span className="text-[10px] text-muted-foreground/60 ml-auto">{formatTimestamp(entry.timestamp)}</span>
+                        </div>
+                      ) : entry.turnResetNotification ? (
+                        // A player undid their combat turn
+                        <div className="flex items-center gap-2">
+                          <Undo2 className="w-4 h-4 flex-shrink-0 text-accent" />
+                          <div>
+                            <span className="font-display text-primary">{entry.crawlerName}</span>
+                            <span className="text-muted-foreground"> reset their turn</span>
+                            <span className="text-muted-foreground/70"> (round {entry.turnResetNotification.round})</span>
                           </div>
                           <span className="text-[10px] text-muted-foreground/60 ml-auto">{formatTimestamp(entry.timestamp)}</span>
                         </div>
