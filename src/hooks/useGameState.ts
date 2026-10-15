@@ -21,6 +21,10 @@ import {
   defaultCrawlers,
   defaultInventory,
   defaultMobs,
+  type CampaignMapDoc,
+  type PublicMob,
+  type PublicEpisode,
+  type PublicEpisodeAssets,
 } from "@/lib/gameData";
 import { useGame } from "@/contexts/GameContext";
 import type { BatchOperation } from "@/hooks/useFirebaseStore";
@@ -28,6 +32,7 @@ import { storage } from "@/lib/firebase";
 import { ref as storageRef, deleteObject } from "firebase/storage";
 import { logger } from "@/lib/logger";
 import { toast } from "sonner";
+import { sortableMapIds, planEpisodeImport } from "@/lib/publicContent";
 
 export interface DiceRollEntry {
   id: string;
@@ -152,6 +157,57 @@ export const useGameState = () => {
       })
       .map((m) => (m?.name as string) || '');
   }, [getCollection, isLoaded]);
+
+  // Map documents aligned with `maps` (same filtering/order), for publishing
+  const mapDocs = useMemo((): CampaignMapDoc[] => {
+    const docs = getStableCollection<Record<string, unknown>>('maps');
+    return (docs || [])
+      .map((m) => ({
+        doc: m,
+        image: (m?.image as string) || (m?.imageUrl as string) || (m?.url as string) || (m?.value as string) || '',
+      }))
+      .filter(({ image }) => !!image)
+      .map(({ doc, image }) => ({
+        id: doc.id as string,
+        name: (doc.name as string) || '',
+        image,
+        ...(doc.createdBy ? { createdBy: doc.createdBy as string } : {}),
+        ...(doc.createdByUsername ? { createdByUsername: doc.createdByUsername as string } : {}),
+        ...(doc.isPublic ? { isPublic: true } : {}),
+      }));
+  }, [getCollection, isLoaded]);
+
+  // Mark a map (by positional index) public/private. `sharedImage` is sticky: once
+  // published, deleting the map never deletes its Storage file.
+  const setMapPublic = async (index: number, updates: { isPublic: boolean; createdBy?: string; createdByUsername?: string }) => {
+    const target = mapDocs[index];
+    if (!target) return;
+    await updateItem('maps', target.id, {
+      ...updates,
+      ...(updates.isPublic ? { sharedImage: true } : {}),
+    } as Record<string, unknown>);
+  };
+
+  // Mark maps whose images were copied into a public episode, so deleting them later
+  // never deletes the Storage file the community copy still points at
+  const markMapsShared = async (mapIds: string[]) => {
+    const ops: BatchOperation[] = mapIds
+      .filter((id) => !(getCollection('maps') as Record<string, unknown>[]).find((d) => d.id === id)?.sharedImage)
+      .map((id) => ({ type: 'update' as const, collection: 'maps' as const, id, data: { sharedImage: true } }));
+    if (ops.length > 0) await batchWrite(ops);
+  };
+
+  // Import community maps into this campaign; returns nothing (maps append at the end)
+  const importMaps = async (newMaps: { name: string; image: string; createdBy?: string; createdByUsername?: string }[]) => {
+    const existingIds = (getCollection('maps') as Record<string, unknown>[]).map(d => d?.id as string).filter(Boolean);
+    const ids = sortableMapIds(existingIds, newMaps.length);
+    const now = new Date().toISOString();
+    // One write per map: each image can be close to Firestore's 1 MB limit.
+    // No storagePath: the Storage file belongs to the original campaign and must not be deleted from here.
+    for (const [i, m] of newMaps.entries()) {
+      await addItem('maps', { id: ids[i], ...m, createdAt: now, updatedAt: now } as Record<string, unknown>);
+    }
+  };
 
   // Update a map's name in Firestore by its positional index
   const updateMapName = async (index: number, name: string) => {
@@ -296,10 +352,12 @@ export const useGameState = () => {
     // Use batch writes for fast, atomic updates
     const operations: BatchOperation[] = [];
 
-    // Add new maps
-    for (const mapIdx of mapsToAddIndices) {
+    // Add new maps — IDs sort after existing ones so new maps are appended and
+    // episodes' index-based mapIds keep pointing at the same maps
+    const newMapIds = sortableMapIds((existingDocs || []).map(d => d?.id as string).filter(Boolean), mapsToAddIndices.length);
+    for (const [n, mapIdx] of mapsToAddIndices.entries()) {
       const img = newMaps[mapIdx];
-      const newId = crypto.randomUUID();
+      const newId = newMapIds[n];
       const data: Record<string, unknown> = {
         image: img,
         createdAt: new Date().toISOString(),
@@ -323,7 +381,8 @@ export const useGameState = () => {
       // Check if the map has a Storage-backed image that needs cleanup
       const docWithId = existingDocs.find(d => d?.id === id);
       const sp = (docWithId?.storagePath as string) || null;
-      if (sp && storage) {
+      // Once a map has been published, community copies may still point at its Storage file
+      if (sp && storage && !docWithId?.sharedImage) {
         try {
           await deleteObject(storageRef(storage, sp));
           logger.log('[GameState] 🗑️ Deleted map from Firebase Storage:', sp);
@@ -372,6 +431,39 @@ export const useGameState = () => {
 
     await batchWrite(operations);
     logger.log('[GameState] ✅ Cleanup complete');
+  };
+
+  // Import a community mob type as a new mob in this campaign
+  const importMob = async (mob: Mob) => {
+    const { sourceId: _s, sourceCampaignId: _c, publishedAt: _p, isPublic: _ip, roomId: _r, ...rest } = mob as PublicMob & { roomId?: string };
+    await addItem('mobs', { ...rest, id: crypto.randomUUID(), encountered: false } as Record<string, unknown>);
+  };
+
+  // Import a community episode with its maps, mob types and loot box templates.
+  // Maps are written first (sortable IDs → appended at maps.length + i), episode last.
+  const importEpisode = async (pub: PublicEpisode, assets: PublicEpisodeAssets) => {
+    const existingIds = (getCollection('maps') as Record<string, unknown>[]).map(d => d?.id as string).filter(Boolean);
+    const plan = planEpisodeImport(pub, assets, {
+      baseMapIndex: maps.length,
+      mapDocIds: sortableMapIds(existingIds, assets.maps.length),
+      newId: () => crypto.randomUUID(),
+    });
+    const now = new Date().toISOString();
+    const attribution = {
+      createdBy: pub.createdBy,
+      ...(pub.createdByUsername ? { createdByUsername: pub.createdByUsername } : {}),
+    };
+    for (const m of plan.maps) {
+      await addItem('maps', { ...m, ...attribution, createdAt: now, updatedAt: now } as Record<string, unknown>);
+    }
+    for (const mob of plan.mobs) {
+      await addItem('mobs', { ...mob } as Record<string, unknown>);
+    }
+    for (const t of plan.lootBoxTemplates) {
+      await addItem('lootBoxTemplates', { ...t } as Record<string, unknown>);
+    }
+    await addItem('episodes', { ...plan.episode } as Record<string, unknown>);
+    return plan.episode;
   };
 
   const updateCrawler = async (id: string, updates: Partial<Crawler>) => {
@@ -1295,8 +1387,14 @@ export const useGameState = () => {
     setMobs,
     maps,
     mapNames,
+    mapDocs,
     updateMapName,
     setMaps,
+    setMapPublic,
+    markMapsShared,
+    importMaps,
+    importMob,
+    importEpisode,
     cleanupEmptyMaps,
     episodes,
     addEpisode,

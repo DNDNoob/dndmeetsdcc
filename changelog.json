@@ -1,5 +1,14 @@
 [
   {
+    "date": "2026-10-15",
+    "changes": [
+      "🌐 DMs can now share maps, mob types and whole episodes with the community from the DM Console (Public/Private toggle)",
+      "📜 Shared episodes are complete custom adventures — maps, mob types, mob placements, map settings and loot boxes — that other DMs can add to their campaign in one click",
+      "👥 New Community Maps, Community Mobs and Community Episodes sections in the DM Console (requires Show Public Content)",
+      "🗺️ Fixed newly uploaded maps sometimes shifting existing episodes onto the wrong map"
+    ]
+  },
+  {
     "date": "2026-10-14",
     "changes": [
       "🐛 Fixed new email/password accounts failing to save their profile (username setup) — missing avatar was sent to Firebase as an invalid value",
