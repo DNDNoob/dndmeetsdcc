@@ -830,17 +830,7 @@ Configure the game clock, starting time, and other global settings.
 
 ## Episode Management
 
-The DM Console provides a full visual editor for episodes, including drag-and-drop mob placement, per-map fog of war defaults, and scale configuration.
-
-## Import Old Content
-
-Content made before campaigns existed (early 2026) was saved outside any campaign, so campaigns don't show it. The campaign owner sees an **Import old content** button at the top of the DM Console. It copies that old content into the current campaign:
-
-- Item library items
-- Crawlers, with their inventories and equipped items
-- Mobs, maps (with their names), episodes, quests and loot boxes
-
-Episodes keep pointing at the right maps, mobs, crawlers, quests and loot boxes after the copy. The button first shows how many of each it will copy and asks you to confirm. The originals are never changed, and clicking it again only copies what hasn't been copied yet. Imported content is credited to you.`,
+The DM Console provides a full visual editor for episodes, including drag-and-drop mob placement, per-map fog of war defaults, and scale configuration.`,
   },
   {
     id: 'multiplayer',

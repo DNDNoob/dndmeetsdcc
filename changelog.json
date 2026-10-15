@@ -2,6 +2,7 @@
   {
     "date": "2026-10-15",
     "changes": [
+      "🧹 Removed the one-time \"Import old content\" button from the DM Console now that the old content has been brought into the campaign",
       "🐢 New automatic trophy, This Is For You, Bud, No Child Left Behind: when one crawler is the slowest in the campaign, their speed is raised to match the second slowest crawler (ties for slowest do nothing)",
       "🗺️ Fixed wide maps getting squished in Show Time when an episode starts; maps now keep their shape and fit the screen",
       "🎯 The gold selection ring on map tokens now hugs the round portrait and grows with it, instead of wrapping the health bar too",

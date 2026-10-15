@@ -41,7 +41,6 @@ import { ref as storageRef, deleteObject } from "firebase/storage";
 import { logger } from "@/lib/logger";
 import { toast } from "sonner";
 import { sortableMapIds, planEpisodeImport } from "@/lib/publicContent";
-import { planLegacyImport, type LegacyImportPlan } from "@/lib/legacyImport";
 
 export interface DiceRollEntry {
   id: string;
@@ -84,7 +83,6 @@ export const useGameState = () => {
     setRoomId,
     setCreator,
     mergeArrayById,
-    readRootCollection,
   } = useGame();
 
   // Cache for memoization - store previous collection values and their serialized forms
@@ -558,54 +556,6 @@ export const useGameState = () => {
       items as unknown as Record<string, unknown>[],
       { crawlerId },
     );
-  };
-
-  // ── Import old content (saved before campaigns existed, at the top level of Firestore) ──
-  const planOldContentImport = async (creator: { createdBy: string; createdByUsername?: string }) => {
-    const [inv, oldCrawlers, oldMobs, oldMaps, oldEpisodes, oldQuests, oldTemplates] = await Promise.all(
-      ['inventory', 'crawlers', 'mobs', 'maps', 'episodes', 'quests', 'lootBoxTemplates'].map(readRootCollection),
-    );
-    const raw = (name: string) => getCollection(name) as Record<string, unknown>[];
-    const existingMapIds = raw('maps').map((d) => d.id as string).filter(Boolean);
-    return planLegacyImport(
-      { inventory: inv, crawlers: oldCrawlers, mobs: oldMobs, maps: oldMaps, episodes: oldEpisodes, quests: oldQuests, lootBoxTemplates: oldTemplates },
-      {
-        crawlers: raw('crawlers'),
-        mobs: raw('mobs'),
-        maps: raw('maps'),
-        episodes: raw('episodes'),
-        quests: raw('quests'),
-        lootBoxTemplates: raw('lootBoxTemplates'),
-        inventory: raw('inventory'),
-        libraryItems: getSharedInventory() as unknown as Record<string, unknown>[],
-      },
-      { creator, newId: () => crypto.randomUUID(), mapDocIds: (n) => sortableMapIds(existingMapIds, n) },
-    );
-  };
-
-  const applyOldContentImport = async (plan: LegacyImportPlan) => {
-    // Maps one at a time (each image can be close to Firestore's 1 MB limit), in order so they append
-    for (const m of plan.maps) {
-      await addItem('maps', m);
-    }
-    const ops: BatchOperation[] = [
-      ...plan.mobs.map((d) => ({ type: 'add' as const, collection: 'mobs' as const, id: d.id as string, data: d })),
-      ...plan.quests.map((d) => ({ type: 'add' as const, collection: 'quests' as const, id: d.id as string, data: d })),
-      ...plan.lootBoxTemplates.map((d) => ({ type: 'add' as const, collection: 'lootBoxTemplates' as const, id: d.id as string, data: d })),
-      ...plan.crawlers.map((d) => ({ type: 'add' as const, collection: 'crawlers' as const, id: d.id as string, data: d })),
-    ];
-    if (ops.length > 0) await batchWrite(ops);
-    for (const inv of plan.crawlerInventories) {
-      await mergeArrayById('inventory', inv.crawlerId, 'items', [], inv.items, { crawlerId: inv.crawlerId });
-    }
-    if (plan.libraryItems.length > 0) {
-      const current = getSharedInventory();
-      await updateSharedInventory([...current, ...(plan.libraryItems as unknown as InventoryItem[])]);
-    }
-    // Episodes last, once everything they point at exists
-    for (const e of plan.episodes) {
-      await addItem('episodes', e);
-    }
   };
 
   // Episode management
@@ -1625,8 +1575,6 @@ export const useGameState = () => {
     importMaps,
     importMob,
     importEpisode,
-    planOldContentImport,
-    applyOldContentImport,
     setCreator,
     cleanupEmptyMaps,
     episodes,
