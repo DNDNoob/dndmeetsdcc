@@ -17,6 +17,7 @@ import {
   KnownSpell,
   SpellLearnedFrom,
   getSpellMasteryLevel,
+  getEffectiveManaCost,
   getEquippedModifiers,
   addActivityStats,
   getHPLossStats,
@@ -1453,22 +1454,41 @@ export const useGameState = () => {
     await updateCrawler(crawlerId, { knownSpells: updated });
   };
 
-  // Increment cast count for a spell; fires toast if mastery level increases
-  const castSpell = async (crawlerId: string, spellId: string) => {
+  // Spend the spell's mana (after mastery discount) and increment its cast count.
+  // Returns false without changing anything when the crawler can't afford it.
+  const castSpell = async (crawlerId: string, spellId: string): Promise<boolean> => {
     const crawler = crawlers.find(c => c.id === crawlerId);
-    if (!crawler) return;
+    if (!crawler) return false;
     const knownSpells = [...(crawler.knownSpells ?? [])];
     const idx = knownSpells.findIndex(ks => ks.spellId === spellId);
-    if (idx === -1) return;
+    if (idx === -1) return false;
     const prev = knownSpells[idx];
-    const newCastCount = prev.castCount + 1;
+    const spell = spells.find(s => s.id === spellId) ?? prev.customSpell;
     const prevMastery = getSpellMasteryLevel(prev.castCount);
+    const cost = spell ? getEffectiveManaCost(spell.spellData.manaCost, prevMastery) : 0;
+    const currentMana = crawler.mana ?? 0;
+    if (cost > currentMana) {
+      toast.error(`${crawler.name} doesn't have enough mana for ${prev.spellName} (${cost} MP needed, ${currentMana} left)`);
+      return false;
+    }
+    const newCastCount = prev.castCount + 1;
     const newMastery = getSpellMasteryLevel(newCastCount);
     knownSpells[idx] = { ...prev, castCount: newCastCount };
-    await updateCrawler(crawlerId, { knownSpells });
+    await updateCrawler(crawlerId, { knownSpells, mana: currentMana - cost });
     if (newMastery > prevMastery) {
       toast.success(`${crawler.name} leveled up ${prev.spellName} to mastery level ${newMastery}!`);
     }
+    return true;
+  };
+
+  // Restore HP to a crawler, capped at their effective max HP (equipment included)
+  const healCrawler = async (crawlerId: string, amount: number) => {
+    const crawler = crawlers.find(c => c.id === crawlerId);
+    if (!crawler || amount <= 0) return;
+    const mods = getEquippedModifiers(crawler, getCrawlerInventory(crawlerId));
+    const effectiveMaxHP = (crawler.maxHP || 0) + (mods.maxHP ?? 0);
+    const newHP = Math.min(effectiveMaxHP, (crawler.hp ?? 0) + amount);
+    await updateCrawler(crawlerId, { hp: newHP });
   };
 
   // Consume a spell tome item: learn all spells in the tome (skipping known ones) and remove the item
@@ -1519,6 +1539,8 @@ export const useGameState = () => {
       learnedFrom: 'tome',
       learnedAt: now,
       castCount: 0,
+      // Keep the full data of one-off tome spells so the crawler can still see and cast them
+      ...(spells.some(s => s.id === spell.id) ? {} : { customSpell: spell }),
     }));
 
     await batchWrite([
@@ -1654,6 +1676,7 @@ export const useGameState = () => {
     learnSpell,
     forgetSpell,
     castSpell,
+    healCrawler,
     consumeSpellTome,
     promoteSpellToLibrary,
     roomId,
