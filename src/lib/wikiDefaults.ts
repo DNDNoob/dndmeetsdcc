@@ -1218,11 +1218,11 @@ In the **Dungeon AI — DM Console**, each map, mob and episode you made has the
 
 - **Maps tab** — the toggle sits next to each map's name.
 - **Mobs tab** — shares the **mob type** (name, image, stats, weaknesses, default inventory). Where you placed it on your maps is not shared.
-- **Episodes tab** — shares the episode as a complete, playable custom adventure: its maps, the mob types it uses, where each mob is placed, per-map settings, and its loot boxes.
+- **Episodes tab** — shares the episode as a complete, playable custom adventure: its maps, the mob types it uses, where each mob is placed, per-map settings, its loot boxes, and its quests (rewards and action items included).
 
 Sharing an episode takes a **snapshot**. If you edit it afterwards, click **Update Shared Copy** to publish the new version.
 
-What is *not* shared from an episode: your crawlers and where they stand, fog of war you've already revealed, mob HP left over from combat, and quests.
+What is *not* shared from an episode: your crawlers and where they stand, fog of war you've already revealed, mob HP left over from combat, and quest progress — who a quest is assigned to, which rewards were claimed, which action items were completed, and players' quest notes.
 
 Content you added from the community keeps its original creator's "by username" badge and can't be re-shared by you.
 
@@ -1231,7 +1231,7 @@ Content you added from the community keeps its original creator's "by username" 
 With **Show Public Content** on, the DM Console shows **Community Maps**, **Community Mobs** and **Community Episodes** at the bottom of each tab:
 
 - **Add** copies a map or mob type into your campaign.
-- **Add to Campaign** on an episode copies the episode plus its maps, mob types and loot boxes, ready to run in Show Time. Mobs start unencountered and fog of war starts fresh.
+- **Add to Campaign** on an episode copies the episode plus its maps, mob types, loot boxes and quests, ready to run in Show Time. Quests arrive unassigned — assign them to crawlers from Show Time as usual. Mobs start unencountered and fog of war starts fresh.
 
 Copies are independent: editing or deleting your copy doesn't affect the original, and the creator can't change your copy.
 

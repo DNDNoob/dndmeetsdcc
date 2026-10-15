@@ -6,7 +6,7 @@
  *   • Library items (inventory/__shared__) and spells created by the user, in ANY campaign
  *   • In campaigns the user OWNS (is DM of):
  *       - library items and spells with no creator → claimed by the user, then published
- *       - maps, mob types and episodes with no creator (or created by the user)
+ *       - maps, mob types and episodes (with their quests) with no creator (or created by the user)
  *   Content created by other players is never touched.
  *
  * Writes go to: publicItems, publicSpells, publicMaps, publicMobs,
@@ -57,10 +57,22 @@ function toMobType(mob) {
   const { createdBy, createdByUsername, isPublic, sourceId, sourceCampaignId, publishedAt, roomId, ...rest } = mob;
   return { ...rest, encountered: false };
 }
+function toQuestTemplate(q) {
+  return {
+    id: q.id,
+    name: q.name,
+    description: q.description || '',
+    rewards: (q.rewards || []).map(({ claimedBy, ...r }) => r),
+    actionItems: (q.actionItems || []).map((a) => ({ ...a, completedBy: [] })),
+    notes: [],
+    createdAt: q.createdAt,
+    updatedAt: q.updatedAt,
+  };
+}
 function resetMapSettings(settings) {
   return { ...settings, fogOfWar: { enabled: settings.fogOfWar?.enabled ?? false, revealedAreas: [] } };
 }
-function buildEpisodeBundle(episode, mapDocs, mobs, lootBoxTemplates) {
+function buildEpisodeBundle(episode, mapDocs, mobs, lootBoxTemplates, quests = []) {
   const mapIndexToBundle = new Map();
   const bundleMaps = [];
   for (const mapId of episode.mapIds || []) {
@@ -89,6 +101,8 @@ function buildEpisodeBundle(episode, mapDocs, mobs, lootBoxTemplates) {
     ...lootBoxTemplates.filter((t) => templateIds.has(t.id)),
     ...(episode.lootBoxes || []).filter((t) => !templateIds.has(t.id)),
   ].map(({ id, name, tier, items, gold }) => ({ id, name, tier, items: items || [], ...(gold !== undefined ? { gold } : {}) }));
+  const questIds = new Set(episode.questIds || []);
+  const bundleQuests = quests.filter((q) => questIds.has(q.id)).map(toQuestTemplate);
   return {
     episode: {
       name: episode.name,
@@ -100,6 +114,7 @@ function buildEpisodeBundle(episode, mapDocs, mobs, lootBoxTemplates) {
       ...(episode.defaultFogOfWar !== undefined ? { defaultFogOfWar: episode.defaultFogOfWar } : {}),
       ...(episode.startingGameTime !== undefined ? { startingGameTime: episode.startingGameTime } : {}),
       lootBoxTemplates: bundleTemplates,
+      quests: bundleQuests,
     },
     assets: { maps: bundleMaps, mobs: bundleMobs },
   };
@@ -254,11 +269,13 @@ async function main() {
     // ── Episodes ─────────────────────────────────────────────────────────
     const templatesSnap = await getDocs(collection(db, `rooms/${roomId}/lootBoxTemplates`));
     const templates = templatesSnap.docs.map((d) => ({ ...d.data(), id: d.id }));
+    const questsSnap = await getDocs(collection(db, `rooms/${roomId}/quests`));
+    const quests = questsSnap.docs.map((d) => ({ ...d.data(), id: d.id }));
     const episodesSnap = await getDocs(collection(db, `rooms/${roomId}/episodes`));
     for (const ed of episodesSnap.docs) {
       const episode = { ...ed.data(), id: ed.id };
       if (!isMine(episode.createdBy)) continue;
-      const bundle = buildEpisodeBundle(episode, mapDocs, mobs, templates);
+      const bundle = buildEpisodeBundle(episode, mapDocs, mobs, templates, quests);
       if (bundle.assets.maps.length === 0) {
         console.log(`    skip episode "${episode.name}" (no maps)`);
         continue;
@@ -267,7 +284,7 @@ async function main() {
       const publicId = publicDocId(roomId, episode.id);
       const pub = { ...bundle.episode, ...by, id: publicId, sourceId: episode.id, sourceCampaignId: roomId, publishedAt: Date.now() };
       totals.episodes++;
-      await write(`episode "${episode.name}" (${bundle.assets.maps.length} maps, ${bundle.assets.mobs.length} mob types)`, async () => {
+      await write(`episode "${episode.name}" (${bundle.assets.maps.length} maps, ${bundle.assets.mobs.length} mob types, ${bundle.episode.quests.length} quests)`, async () => {
         for (const sub of ['maps', 'mobs']) {
           const old = await getDocs(collection(db, 'publicEpisodes', publicId, sub));
           await Promise.all(old.docs.map((d) => deleteDoc(d.ref)));

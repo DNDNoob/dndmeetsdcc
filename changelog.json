@@ -5,7 +5,8 @@
       "🌐 DMs can now share maps, mob types and whole episodes with the community from the DM Console (Public/Private toggle)",
       "📜 Shared episodes are complete custom adventures — maps, mob types, mob placements, map settings and loot boxes — that other DMs can add to their campaign in one click",
       "👥 New Community Maps, Community Mobs and Community Episodes sections in the DM Console (requires Show Public Content)",
-      "🗺️ Fixed newly uploaded maps sometimes shifting existing episodes onto the wrong map"
+      "🗺️ Fixed newly uploaded maps sometimes shifting existing episodes onto the wrong map",
+      "📜 Shared episodes now include their quests (rewards and action items) — quest progress, assignments and player notes are not shared"
     ]
   },
   {

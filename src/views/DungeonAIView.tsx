@@ -1988,7 +1988,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                 <span className="text-xs text-muted-foreground font-normal ml-1">custom adventures shared by other DMs</span>
               </h3>
               <p className="text-xs text-muted-foreground mb-3">
-                Adding an episode copies its maps, mob types, mob placements and loot boxes into this campaign.
+                Adding an episode copies its maps, mob types, mob placements, loot boxes and quests into this campaign.
               </p>
               {!showPublicContent ? (
                 <CommunityOptInHint what="episodes" />
@@ -2005,6 +2005,9 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                           <span>📍 {pe.mapNames?.length ?? 0} map{(pe.mapNames?.length ?? 0) !== 1 ? "s" : ""}</span>
                           <span>👹 {pe.mobPlacements?.length ?? 0} mob{(pe.mobPlacements?.length ?? 0) !== 1 ? "s" : ""} ({pe.mobNames?.length ?? 0} type{(pe.mobNames?.length ?? 0) !== 1 ? "s" : ""})</span>
                           <span>📦 {pe.lootBoxTemplates?.length ?? 0} loot box{(pe.lootBoxTemplates?.length ?? 0) !== 1 ? "es" : ""}</span>
+                          {(pe.quests?.length ?? 0) > 0 && (
+                            <span>📜 {pe.quests!.length} quest{pe.quests!.length !== 1 ? "s" : ""}</span>
+                          )}
                         </div>
                         {pe.createdByUsername && (
                           <span className="text-[10px] text-primary/60 flex items-center gap-0.5 mt-1">

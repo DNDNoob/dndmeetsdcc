@@ -405,6 +405,7 @@ export interface PublicEpisode {
   defaultFogOfWar?: boolean;
   startingGameTime?: number;
   lootBoxTemplates: LootBoxTemplate[];
+  quests?: Quest[]; // Progress (claimedBy/completedBy/notes) cleared; absent on episodes shared before quests were supported
 }
 
 export interface PublicEpisodeAssets {

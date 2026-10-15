@@ -7,6 +7,7 @@ import type {
   Mob,
   PublicEpisode,
   PublicEpisodeAssets,
+  Quest,
 } from './gameData';
 
 /**
@@ -47,6 +48,18 @@ const resetMapSettings = (settings: MapSettings): MapSettings => ({
   fogOfWar: { enabled: settings.fogOfWar?.enabled ?? false, revealedAreas: [] },
 });
 
+/** A quest as a reusable template: keep its design, clear every crawler's progress and notes. */
+const toQuestTemplate = (quest: Quest): Quest => ({
+  id: quest.id,
+  name: quest.name,
+  description: quest.description || '',
+  rewards: (quest.rewards || []).map(({ claimedBy: _c, ...r }) => r),
+  actionItems: (quest.actionItems || []).map((a) => ({ ...a, completedBy: [] })),
+  notes: [],
+  createdAt: quest.createdAt,
+  updatedAt: quest.updatedAt,
+});
+
 /** Drop per-playthrough state from a placement (HP after combat). */
 const resetPlacement = (p: EpisodeMobPlacement, mapId: string): EpisodeMobPlacement => {
   const { currentHP: _hp, ...rest } = p;
@@ -62,6 +75,7 @@ export const buildEpisodeBundle = (
   mapDocs: CampaignMapDoc[],
   mobs: Mob[],
   lootBoxTemplates: LootBoxTemplate[],
+  quests: Quest[] = [],
 ): {
   episode: Omit<PublicEpisode, 'id' | 'sourceId' | 'sourceCampaignId' | 'createdBy' | 'createdByUsername' | 'publishedAt'>;
   assets: PublicEpisodeAssets;
@@ -101,6 +115,9 @@ export const buildEpisodeBundle = (
     ...(episode.lootBoxes || []).filter((t) => !templateIds.has(t.id)), // deprecated embedded templates
   ].map(({ id, name, tier, items, gold }) => ({ id, name, tier, items, ...(gold !== undefined ? { gold } : {}) }));
 
+  const questIds = new Set(episode.questIds || []);
+  const bundleQuests = quests.filter((q) => questIds.has(q.id)).map(toQuestTemplate);
+
   return {
     episode: {
       name: episode.name,
@@ -112,6 +129,7 @@ export const buildEpisodeBundle = (
       ...(episode.defaultFogOfWar !== undefined ? { defaultFogOfWar: episode.defaultFogOfWar } : {}),
       ...(episode.startingGameTime !== undefined ? { startingGameTime: episode.startingGameTime } : {}),
       lootBoxTemplates: bundleTemplates,
+      quests: bundleQuests,
     },
     assets: { maps: bundleMaps, mobs: bundleMobs },
   };
@@ -130,6 +148,7 @@ export const planEpisodeImport = (
   maps: { id: string; name: string; image: string }[];
   mobs: Mob[];
   lootBoxTemplates: LootBoxTemplate[];
+  quests: Quest[];
   episode: Episode;
 } => {
   const maps = assets.maps
@@ -161,6 +180,9 @@ export const planEpisodeImport = (
     return { ...t, id };
   });
 
+  const now = new Date().toISOString();
+  const quests = (pub.quests || []).map((q) => ({ ...toQuestTemplate(q), id: opts.newId(), createdAt: now, updatedAt: now }));
+
   const mobPlacements = (pub.mobPlacements || [])
     .filter((p) => bundleToCampaign.has(p.mapId) && mobIdMap.has(p.mobId))
     .map((p) => ({ ...p, mapId: bundleToCampaign.get(p.mapId)!, mobId: mobIdMap.get(p.mobId)! }));
@@ -171,11 +193,11 @@ export const planEpisodeImport = (
     if (mapId !== undefined) mapSettings[mapId] = resetMapSettings(settings);
   }
 
-  const now = new Date().toISOString();
   return {
     maps,
     mobs,
     lootBoxTemplates,
+    quests,
     episode: {
       id: opts.newId(),
       name: pub.name,
@@ -186,6 +208,7 @@ export const planEpisodeImport = (
       ...(pub.defaultFogOfWar !== undefined ? { defaultFogOfWar: pub.defaultFogOfWar } : {}),
       ...(pub.startingGameTime !== undefined ? { startingGameTime: pub.startingGameTime } : {}),
       lootBoxIds: lootBoxTemplates.map((t) => t.id),
+      ...(quests.length > 0 ? { questIds: quests.map((q) => q.id) } : {}),
       createdBy: pub.createdBy,
       ...(pub.createdByUsername ? { createdByUsername: pub.createdByUsername } : {}),
       createdAt: now,
