@@ -12,9 +12,11 @@ interface MobIconProps {
   combatHP?: number;
   /** Max HP for this mob (from mob.hitPoints or original value) */
   maxHP?: number;
+  /** Draw the gold selection ring around the avatar circle */
+  selected?: boolean;
 }
 
-export const MobIcon: React.FC<MobIconProps> = ({ mob, size = 40, isDragging = false, onClick, inCombat = false, combatHP, maxHP }) => {
+export const MobIcon: React.FC<MobIconProps> = ({ mob, size = 40, isDragging = false, onClick, inCombat = false, combatHP, maxHP, selected = false }) => {
   const displayMaxHP = maxHP ?? mob.hitPoints ?? 0;
   const displayCurrentHP = inCombat ? (combatHP ?? mob.hitPoints ?? 0) : displayMaxHP;
   const hpPercentage = displayMaxHP > 0 ? Math.min(100, Math.max(0, (displayCurrentHP / displayMaxHP) * 100)) : 0;
@@ -32,7 +34,7 @@ export const MobIcon: React.FC<MobIconProps> = ({ mob, size = 40, isDragging = f
     >
       {/* Circular container */}
       <div
-        className="absolute inset-x-0 top-0 rounded-full border-2 border-primary shadow-lg overflow-hidden bg-muted"
+        className={`absolute inset-x-0 top-0 rounded-full border-2 ${selected ? "ring-2 ring-accent ring-offset-2 ring-offset-background " : ""}border-primary shadow-lg overflow-hidden bg-muted`}
         style={{
           width: size,
           height: size,

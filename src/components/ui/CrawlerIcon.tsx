@@ -15,6 +15,8 @@ interface CrawlerIconProps {
   baseMaxHP?: number;
   /** Whether to show the health bar (default true) */
   showHealthBar?: boolean;
+  /** Draw the gold selection ring around the avatar circle */
+  selected?: boolean;
 }
 
 export const CrawlerIcon: React.FC<CrawlerIconProps> = ({
@@ -26,6 +28,7 @@ export const CrawlerIcon: React.FC<CrawlerIconProps> = ({
   effectiveMaxHP,
   baseMaxHP,
   showHealthBar = true,
+  selected = false,
 }) => {
   const currentHP = effectiveHP ?? crawler.hp ?? 0;
   const maxHP = effectiveMaxHP ?? crawler.maxHP ?? 1;
@@ -50,7 +53,7 @@ export const CrawlerIcon: React.FC<CrawlerIconProps> = ({
     >
       {/* Circular container with blue border for crawlers */}
       <div
-        className="absolute inset-x-0 top-0 rounded-full border-2 border-blue-400 shadow-lg overflow-hidden bg-muted"
+        className={`absolute inset-x-0 top-0 rounded-full border-2 ${selected ? "ring-2 ring-accent ring-offset-2 ring-offset-background " : ""}border-blue-400 shadow-lg overflow-hidden bg-muted`}
         style={{
           width: size,
           height: size,

@@ -984,16 +984,19 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   const zoomMin = 1;
   const zoomMax = 500;
 
-  // Track map container size for responsive image sizing (no black bars)
+  // Track map container size for responsive image sizing (no black bars).
+  // The container only mounts once a map is showing (episode picker renders first),
+  // so re-attach whenever the map view mounts instead of only on first render.
+  const isMapViewMounted = !!selectedEpisode && !!selectedMap;
   useEffect(() => {
-    if (!mapContainerRef.current) return;
+    if (!isMapViewMounted || !mapContainerRef.current) return;
     const ro = new ResizeObserver(entries => {
       const { width, height } = entries[0].contentRect;
       setContainerSize({ width, height });
     });
     ro.observe(mapContainerRef.current);
     return () => ro.disconnect();
-  }, []);
+  }, [isMapViewMounted]);
 
   // Calculate image display dimensions to fill container without black bars
   const mapDisplaySize = useMemo(() => {
@@ -1083,10 +1086,13 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   // Centering is handled solely via panOffset (not CSS flex centering) to avoid double-centering
   useEffect(() => {
     if (!needsCentering.current) return;
-    if (!mapImageDimensions || !containerSize.width || !containerSize.height) return;
+    // Prefer the fitted size: on the image's first load mapImageDimensions still holds the
+    // pre-fit placeholder size until the effect above syncs it in the same commit
+    const dims = mapDisplaySize ?? mapImageDimensions;
+    if (!dims || !containerSize.width || !containerSize.height) return;
     needsCentering.current = false;
-    const scaledW = mapImageDimensions.width * mapBaseScale / 100;
-    const scaledH = mapImageDimensions.height * mapBaseScale / 100;
+    const scaledW = dims.width * mapBaseScale / 100;
+    const scaledH = dims.height * mapBaseScale / 100;
     const cw = containerSize.width;
     const ch = containerSize.height;
     // Center map in container: positive offset centers smaller maps,
@@ -1094,7 +1100,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     const offsetX = (cw - scaledW) / 2;
     const offsetY = (ch - scaledH) / 2;
     setPanOffset({ x: offsetX, y: offsetY });
-  }, [mapImageDimensions, containerSize, mapBaseScale]);
+  }, [mapImageDimensions, mapDisplaySize, containerSize, mapBaseScale]);
 
   // Listen for real-time drag updates from other players
   useEffect(() => {
@@ -2217,6 +2223,11 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     setCrawlerPlacements([]);
     setRuntimeMobPlacements([]);
     fogInitialLoadDone.current = null;
+    // Forget the previous map's size so the new map is fitted and centered from its own
+    // dimensions (the per-map reset effect doesn't run when both episodes start on the same map)
+    setNaturalImageSize(null);
+    setMapImageDimensions(null);
+    needsCentering.current = true;
     // Set game clock to episode's starting time if available
     if (episode.startingGameTime && onSetGameClock) {
       onSetGameClock(episode.startingGameTime);
@@ -3057,6 +3068,10 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
               // Responsive: fill container without black bars
               height: mapDisplaySize ? `${mapDisplaySize.height}px` : '80vh',
               width: mapDisplaySize ? `${mapDisplaySize.width}px` : 'auto',
+              // Tailwind's base styles cap images at max-width: 100% of their parent,
+              // which squishes wide maps to the placeholder box's 1.6:1 width
+              maxWidth: 'none',
+              maxHeight: 'none',
               display: 'block',
             }}
             draggable={false}
@@ -3162,10 +3177,11 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                 animate={{ opacity: canInteract ? 1 : 0.5 }}
                 transition={{ opacity: { duration: 0.2 } }}
               >
-                <div className={`relative ${selectedMapEntity?.type === 'episode-mob' && selectedMapEntity?.index === globalIndex ? 'ring-2 ring-accent ring-offset-2 ring-offset-background rounded-full' : ''}`}>
+                <div className="relative">
                   <MobIcon
                     mob={mob}
                     size={64}
+                    selected={selectedMapEntity?.type === 'episode-mob' && selectedMapEntity?.index === globalIndex}
                     isDragging={isDragging}
                     inCombat={(() => {
                       if (!combatState?.active || combatState.phase === 'ended') return false;
@@ -3273,7 +3289,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                 onClick={(e) => {
                   if (!isDragging && isAdmin) {
                     e.stopPropagation();
-                    setSelectedMapEntity({ type: 'crawler', index });
+                    setSelectedMapEntity({ type: 'crawler', index: placementIndex });
                     setContextMenu(null);
                   }
                 }}
@@ -3281,8 +3297,8 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                   if (!isAdmin) return;
                   e.preventDefault();
                   e.stopPropagation();
-                  setSelectedMapEntity({ type: 'crawler', index });
-                  setContextMenu({ x: e.clientX, y: e.clientY, type: 'crawler', index });
+                  setSelectedMapEntity({ type: 'crawler', index: placementIndex });
+                  setContextMenu({ x: e.clientX, y: e.clientY, type: 'crawler', index: placementIndex });
                 }}
                 onTouchStart={(e) => {
                   if (!canInteract) return;
@@ -3290,7 +3306,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                   startCrawlerDrag(placementIndex);
                 }}
               >
-                <div className={`relative ${selectedMapEntity?.type === 'crawler' && selectedMapEntity?.index === index ? 'ring-2 ring-accent ring-offset-2 ring-offset-background rounded-full' : ''}`}>
+                <div className="relative">
                   {(() => {
                     const crawlerInv = getCrawlerInventory?.(crawler.id) ?? [];
                     const mods = getEquippedModifiers(crawler, crawlerInv);
@@ -3303,6 +3319,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                       <CrawlerIcon
                         crawler={crawler}
                         size={64}
+                        selected={selectedMapEntity?.type === 'crawler' && selectedMapEntity?.index === placementIndex}
                         isDragging={isDragging}
                         effectiveHP={effectiveHP}
                         effectiveMaxHP={effectiveMaxHP}
@@ -3431,10 +3448,11 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                   setDraggingRuntimeId(`mob-${index}`);
                 }}
               >
-                <div className={`relative ${selectedMapEntity?.type === 'runtime-mob' && selectedMapEntity?.index === index ? 'ring-2 ring-accent ring-offset-2 ring-offset-background rounded-full' : ''}`}>
+                <div className="relative">
                   <MobIcon
                     mob={mob}
                     size={64}
+                    selected={selectedMapEntity?.type === 'runtime-mob' && selectedMapEntity?.index === index}
                     isDragging={isDragging}
                     inCombat={(() => {
                       if (!combatState?.active || combatState.phase === 'ended') return false;

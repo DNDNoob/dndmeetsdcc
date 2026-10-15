@@ -2,6 +2,9 @@
   {
     "date": "2026-10-15",
     "changes": [
+      "🗺️ Fixed wide maps getting squished in Show Time when an episode starts; maps now keep their shape and fit the screen",
+      "🎯 The gold selection ring on map tokens now hugs the round portrait and grows with it, instead of wrapping the health bar too",
+      "🐛 Fixed selecting or deleting a crawler token sometimes picking the wrong crawler",
       "🏃 Crawlers now have a movement speed (60 ft by default). In combat you can only move your own crawler on its turn, and only up to your speed, with a feet-left badge while you drag",
       "🧭 During noncombat turns each crawler can move up to twice their movement speed per turn, refilled when the DM starts the next turn",
       "📊 New Activity section on crawler profiles: feet moved, damage dealt, killing blows, fight finishers, HP lost and near-death moments are tracked automatically",
