@@ -305,7 +305,7 @@ const Index = () => {
     const publicId = publicDocId(roomId, episode.id);
     try {
       if (isPublic) {
-        const bundle = buildEpisodeBundle(episode, mapDocs, mobs, lootBoxTemplates);
+        const bundle = buildEpisodeBundle(episode, mapDocs, mobs, lootBoxTemplates, quests);
         if (bundle.assets.maps.length === 0) {
           toast.error('Add at least one map to this episode before sharing it');
           return;
@@ -353,7 +353,7 @@ const Index = () => {
     try {
       const assets = await fetchEpisodeAssets(episode.id);
       await importEpisode(episode, assets);
-      toast.success(`Imported "${episode.name}" with ${assets.maps.length} map(s) and ${assets.mobs.length} mob type(s)`);
+      toast.success(`Imported "${episode.name}" with ${assets.maps.length} map(s), ${assets.mobs.length} mob type(s) and ${episode.quests?.length ?? 0} quest(s)`);
     } catch (err) {
       console.error('[Index] Failed to import episode:', err);
       toast.error('Failed to import episode');

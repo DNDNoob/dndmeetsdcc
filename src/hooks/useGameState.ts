@@ -462,6 +462,9 @@ export const useGameState = () => {
     for (const t of plan.lootBoxTemplates) {
       await addItem('lootBoxTemplates', { ...t } as Record<string, unknown>);
     }
+    for (const q of plan.quests) {
+      await addItem('quests', { ...q } as Record<string, unknown>);
+    }
     await addItem('episodes', { ...plan.episode } as Record<string, unknown>);
     return plan.episode;
   };
