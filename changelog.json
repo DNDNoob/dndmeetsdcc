@@ -2,6 +2,9 @@
   {
     "date": "2026-10-15",
     "changes": [
+      "🗺️ Fixed wide maps getting squished in Show Time when an episode starts; maps now keep their shape and fit the screen",
+      "🎯 The gold selection ring on map tokens now hugs the round portrait and grows with it, instead of wrapping the health bar too",
+      "🐛 Fixed selecting or deleting a crawler token sometimes picking the wrong crawler",
       "🪄 The Spells tab on crawler profiles is finished: see your mana and every spell you know, grouped by Action, Bonus Action and Reaction, with costs, dice, range and mastery progress",
       "🔮 Casting a spell now spends its mana (after the mastery discount) and is blocked when you don't have enough",
       "🎯 Damage spells roll a spell attack and let you pick targets and apply damage in combat; healing spells let you pick who to heal, capped at their max HP",
