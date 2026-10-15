@@ -23,8 +23,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCampaigns } from "@/hooks/useCampaigns";
 import { useFriends } from "@/hooks/useFriends";
 import { usePublicContent } from "@/hooks/usePublicContent";
+import { useMyContent } from "@/hooks/useMyContent";
 import { toast } from "sonner";
-import type { Episode, Campaign, CrawlerPlacement, EpisodeMobPlacement, Mob, PublicMap, PublicMob, PublicEpisode } from "@/lib/gameData";
+import type { Episode, Campaign, CrawlerPlacement, EpisodeMobPlacement, Mob, PublicMap, PublicMob, PublicEpisode, InventoryItem, Spell } from "@/lib/gameData";
 import { publicDocId, buildEpisodeBundle } from "@/lib/publicContent";
 import { legacyPlanCounts } from "@/lib/legacyImport";
 
@@ -237,6 +238,16 @@ const Index = () => {
     publishMap, unpublishMap, publishMob, unpublishMob,
     publishEpisode, unpublishEpisode, fetchEpisodeAssets,
   } = usePublicContent(showPublicContent);
+
+  // Personal content: items and spells linked to the user's profile, not to a campaign
+  const { myItems, mySpells, saveMyItem, deleteMyItem, saveMySpell, deleteMySpell } =
+    useMyContent(isAuthenticated ? user?.uid ?? null : null, userProfile?.username);
+  const handleSaveItemToMyContent = (item: InventoryItem) => {
+    saveMyItem(item).then(() => toast.success(`Saved ${item.name} to My Content`)).catch(() => {});
+  };
+  const handleSaveSpellToMyContent = (spell: Spell) => {
+    saveMySpell(spell).then(() => toast.success(`Saved ${spell.name} to My Content`)).catch(() => {});
+  };
 
   // ── Community maps / mobs / episodes (DM console) ─────────────────────────
   // Content without createdBy was made in this campaign by its DM; it's stamped with the
@@ -849,6 +860,11 @@ const Index = () => {
         onCancelFriendRequest={cancelFriendRequest}
         onUpdateUserProfile={updateUserProfile}
         onLogDecision={logDecision}
+        myItems={myItems}
+        mySpells={mySpells}
+        onSaveMyItem={saveMyItem}
+        onDeleteMyItem={deleteMyItem}
+        onDeleteMySpell={deleteMySpell}
       />
     );
   }
@@ -971,6 +987,8 @@ const Index = () => {
                 currentUsername={userProfile?.username}
                 publicItems={publicItems}
                 onToggleItemPublic={handleToggleItemPublic}
+                myItems={myItems}
+                onSaveItemToMyContent={isAuthenticated ? handleSaveItemToMyContent : undefined}
                 showPublicContent={showPublicContent}
               />
             )}
@@ -989,6 +1007,8 @@ const Index = () => {
                 currentUserId={user?.uid}
                 currentUsername={userProfile?.username}
                 publicSpells={publicSpells}
+                mySpells={mySpells}
+                onSaveSpellToMyContent={isAuthenticated ? handleSaveSpellToMyContent : undefined}
                 onToggleSpellPublic={handleToggleSpellPublic}
                 showPublicContent={showPublicContent}
               />

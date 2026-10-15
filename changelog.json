@@ -10,7 +10,8 @@
       "🌐 New \"Share all my content\" button in the DM Console shares every item, spell, map, mob type and episode you made in the campaign at once, including older items and spells that had no creator yet",
       "🐛 Fixed items disappearing from the item library when two people saved it at the same time — each save now only changes the items that person touched",
       "📦 New \"Import old content\" button in the DM Console copies items, crawlers, mobs, maps and episodes made before campaigns existed into your campaign",
-      "👤 Maps, mobs, episodes, quests and loot boxes you create are now linked to your profile, like items and spells already were"
+      "👤 Maps, mobs, episodes, quests and loot boxes you create are now linked to your profile, like items and spells already were",
+      "🔖 New My Content: keep your own items and spells on your profile, outside any campaign, and add them to any campaign you play in"
     ]
   },
   {

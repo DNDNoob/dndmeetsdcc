@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Plus, Trash2, ChevronDown, ChevronUp, BookOpen, Zap, Star, Wand2, X, Check, Globe, Lock, Users } from "lucide-react";
+import { Plus, Trash2, ChevronDown, ChevronUp, BookOpen, Zap, Star, Wand2, X, Check, Globe, Lock, Users, Bookmark } from "lucide-react";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import {
@@ -39,6 +39,8 @@ interface SpellsViewProps {
   publicSpells?: Spell[];
   onToggleSpellPublic?: (spell: Spell, isPublic: boolean) => void;
   showPublicContent?: boolean;
+  mySpells?: Spell[];
+  onSaveSpellToMyContent?: (spell: Spell) => void;
 }
 
 const createDefaultSpellData = (): SpellData => ({
@@ -430,6 +432,8 @@ function SpellCard({
   crawlers,
   currentUserId,
   onTogglePublic,
+  onSaveToMyContent,
+  savedToMyContent,
 }: {
   spell: Spell;
   isAdmin: boolean;
@@ -439,6 +443,8 @@ function SpellCard({
   crawlers: Crawler[];
   currentUserId?: string;
   onTogglePublic?: (isPublic: boolean) => void;
+  onSaveToMyContent?: () => void;
+  savedToMyContent?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [showGrantMenu, setShowGrantMenu] = useState(false);
@@ -524,6 +530,20 @@ function SpellCard({
                   ? <><Globe className="w-2.5 h-2.5" /> Public</>
                   : <><Lock className="w-2.5 h-2.5" /> Private</>
                 }
+              </button>
+            )}
+            {currentUserId && spell.createdBy === currentUserId && onSaveToMyContent && (
+              <button
+                type="button"
+                onClick={onSaveToMyContent}
+                title={savedToMyContent ? 'Update the copy in My Content' : 'Save to My Content'}
+                className={`flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 border transition-colors ${
+                  savedToMyContent
+                    ? 'border-accent/50 text-accent hover:bg-accent/10'
+                    : 'border-border text-muted-foreground hover:border-accent/30 hover:text-accent'
+                }`}
+              >
+                <Bookmark className="w-2.5 h-2.5" /> Mine
               </button>
             )}
           </div>
@@ -849,6 +869,8 @@ const SpellsView: React.FC<SpellsViewProps> = ({
   publicSpells = [],
   onToggleSpellPublic,
   showPublicContent = false,
+  mySpells = [],
+  onSaveSpellToMyContent,
 }) => {
   const [selectedCrawlerId, setSelectedCrawlerId] = useState<string>(crawlers[0]?.id ?? '');
   const [editingSpell, setEditingSpell] = useState<Spell | null>(null);
@@ -948,8 +970,38 @@ const SpellsView: React.FC<SpellsViewProps> = ({
                   onGrant={(crawlerId) => onLearnSpell(crawlerId, spell, 'granted')}
                   currentUserId={currentUserId}
                   onTogglePublic={onToggleSpellPublic ? (isPublic) => onToggleSpellPublic(spell, isPublic) : undefined}
+                  onSaveToMyContent={onSaveSpellToMyContent ? () => onSaveSpellToMyContent(spell) : undefined}
+                  savedToMyContent={mySpells.some(ms => ms.id === spell.id)}
                 />
               ))}
+            </div>
+          )}
+          {/* My Content: personal spells not tied to a campaign */}
+          {isAdmin && mySpells.some(ms => !spells.some(s => s.id === ms.id)) && (
+            <div className="border border-accent/20 bg-accent/5 p-3 rounded space-y-2 mt-3">
+              <h3 className="font-display text-xs text-accent flex items-center gap-1.5">
+                <Bookmark className="w-3.5 h-3.5" />
+                MY SPELLS
+              </h3>
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin' }}>
+                {mySpells.filter(ms => !spells.some(s => s.id === ms.id)).map(spell => (
+                  <div key={spell.id} className="flex items-center justify-between gap-2 py-1.5 px-2 border border-accent/20 bg-background/50 text-xs">
+                    <div className="min-w-0">
+                      <span className="font-display text-accent truncate block">{spell.name}</span>
+                      {spell.spellData && <span className="text-muted-foreground">Lvl {spell.spellData.spellLevel} {spell.spellData.school}</span>}
+                    </div>
+                    <button
+                      type="button"
+                      // Keeps the personal ID, so "Mine" on the campaign copy updates the same personal spell
+                      onClick={() => onAddSpell({ ...spell, isPublic: false })}
+                      className="text-accent hover:text-accent/80 shrink-0"
+                      title="Add to library"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
           {/* Community Spells */}

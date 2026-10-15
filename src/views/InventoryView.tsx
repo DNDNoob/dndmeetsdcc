@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import { Crawler, InventoryItem, EquipmentSlot as SlotType, StatModifiers, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, Spell, SpellData } from "@/lib/gameData";
-import { Coins, Package, Sword, Shield, Plus, Trash2, Edit2, Save, HardHat, Search, BookOpen, Gem, Footprints, Shirt, Hand, Crosshair, ChevronDown, ChevronUp, Wand2, Globe, Lock, Users } from "lucide-react";
+import { Coins, Package, Sword, Shield, Plus, Trash2, Edit2, Save, HardHat, Search, BookOpen, Gem, Footprints, Shirt, Hand, Crosshair, ChevronDown, ChevronUp, Wand2, Globe, Lock, Users, Bookmark } from "lucide-react";
 import { SpellDataEditor } from "@/views/SpellsView";
 
 // Inline SVG for legs/pants slot
@@ -36,6 +36,7 @@ const getEquipmentIcon = (slot?: string, className: string = "w-4 h-4 shrink-0")
       return <Package className={`${className} text-muted-foreground`} />;
   }
 };
+import { toast } from "sonner";
 import { useDebouncedCallback } from "@/hooks/useDebounce";
 
 interface InventoryViewProps {
@@ -53,6 +54,8 @@ interface InventoryViewProps {
   currentUserId?: string;
   currentUsername?: string;
   publicItems?: InventoryItem[];
+  myItems?: InventoryItem[];
+  onSaveItemToMyContent?: (item: InventoryItem) => void;
   onToggleItemPublic?: (item: InventoryItem, isPublic: boolean) => void;
   showPublicContent?: boolean;
 }
@@ -102,6 +105,8 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   currentUserId,
   currentUsername,
   publicItems = [],
+  myItems = [],
+  onSaveItemToMyContent,
   onToggleItemPublic,
   showPublicContent = false,
 }) => {
@@ -618,6 +623,20 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                               }
                             </button>
                           )}
+                          {/* Save a copy to My Content (own items only) */}
+                          {currentUserId && item.createdBy === currentUserId && onSaveItemToMyContent && (
+                            <button
+                              onClick={() => onSaveItemToMyContent(item)}
+                              title={myItems.some(mi => mi.id === item.id) ? 'Update the copy in My Content' : 'Save to My Content'}
+                              className={`flex items-center gap-0.5 text-[9px] px-1 py-0.5 border transition-colors ${
+                                myItems.some(mi => mi.id === item.id)
+                                  ? 'border-accent/50 text-accent hover:bg-accent/10'
+                                  : 'border-border text-muted-foreground hover:border-accent/30 hover:text-accent'
+                              }`}
+                            >
+                              <Bookmark className="w-2.5 h-2.5" /> Mine
+                            </button>
+                          )}
                           {/* Show public badge on items from others */}
                           {item.isPublic && item.createdBy !== currentUserId && (
                             <span className="flex items-center gap-0.5 text-[9px] text-primary">
@@ -1078,6 +1097,42 @@ const InventoryView: React.FC<InventoryViewProps> = ({
             })()}
           </div>
         </div>
+
+        {/* My Content: personal items not tied to a campaign */}
+        {myItems.some(mi => !libraryItems.some(li => li.id === mi.id)) && (
+          <div className="border border-accent/20 bg-accent/5 p-4 mb-6">
+            <h3 className="font-display text-lg text-accent flex items-center gap-2 mb-4">
+              <Bookmark className="w-5 h-5" />
+              MY ITEMS
+              <span className="text-xs text-muted-foreground font-normal ml-1">from your profile</span>
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-64 overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin' }}>
+              {myItems.filter(mi => !libraryItems.some(li => li.id === mi.id)).map((item) => (
+                <div key={item.id} className="flex items-start gap-2 text-sm py-2 px-3 border border-accent/20 bg-background/50">
+                  {getEquipmentIcon(item.equipSlot, "w-4 h-4 shrink-0 mt-0.5")}
+                  <div className="flex-1 min-w-0">
+                    <span className="text-foreground">{item.name}</span>
+                    {item.description && (
+                      <span className="text-muted-foreground text-xs block">({item.description})</span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => {
+                      const items = getSharedInventory();
+                      // Keeps the personal ID, so "Mine" on the campaign copy updates the same personal item
+                      onUpdateSharedInventory([...items, { ...item, isPublic: false }]);
+                      toast.success(`Added ${item.name} to this campaign's library`);
+                    }}
+                    className="text-accent hover:text-accent/80 shrink-0"
+                    title="Add to campaign library"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Community Items */}
         {showPublicContent && publicItems.length > 0 && (
