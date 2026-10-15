@@ -25,6 +25,7 @@ import { useFriends } from "@/hooks/useFriends";
 import { usePublicContent } from "@/hooks/usePublicContent";
 import { useMyContent } from "@/hooks/useMyContent";
 import { toast } from "sonner";
+import { getNoChildLeftBehindBump } from "@/lib/gameData";
 import type { Episode, Campaign, CrawlerPlacement, EpisodeMobPlacement, Mob, PublicMap, PublicMob, PublicEpisode, InventoryItem, Spell } from "@/lib/gameData";
 import { publicDocId, buildEpisodeBundle } from "@/lib/publicContent";
 import { legacyPlanCounts } from "@/lib/legacyImport";
@@ -192,6 +193,7 @@ const Index = () => {
     applyCombatDamageBatch,
     recordCrawlerMove,
     awardTrophy,
+    applyNoChildLeftBehind,
     revokeTrophy,
     overrideMobHealth,
     endCombat,
@@ -498,6 +500,20 @@ const Index = () => {
   useEffect(() => {
     setCreator(isAuthenticated && user ? { uid: user.uid, ...(userProfile?.username ? { username: userProfile.username } : {}) } : null);
   }, [isAuthenticated, user, userProfile?.username, setCreator]);
+
+  // "No Child Left Behind": the DM's client lifts a sole slowest crawler to the second slowest speed.
+  // Only the DM runs it so the trophy isn't awarded once per connected player.
+  const noChildLeftBehindKey = (() => {
+    const bump = getNoChildLeftBehindBump(crawlers, getCrawlerInventory);
+    return bump ? `${bump.crawlerId}:${bump.moveSpeed}` : '';
+  })();
+  const lastNoChildLeftBehindKey = useRef('');
+  useEffect(() => {
+    if (!isAdmin || !isLoaded || !noChildLeftBehindKey) return;
+    if (lastNoChildLeftBehindKey.current === noChildLeftBehindKey) return;
+    lastNoChildLeftBehindKey.current = noChildLeftBehindKey;
+    applyNoChildLeftBehind().catch(err => console.error('[Index] No Child Left Behind failed:', err));
+  }, [isAdmin, isLoaded, noChildLeftBehindKey, applyNoChildLeftBehind]);
 
   // Copy content saved before campaigns existed into this campaign (owner only). Originals are kept.
   const handleImportOldContent = async () => {

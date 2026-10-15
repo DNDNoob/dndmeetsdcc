@@ -108,6 +108,32 @@ export function getEffectiveMoveSpeed(crawler: Crawler, inventory: InventoryItem
   return Math.max(0, (crawler.moveSpeed ?? DEFAULT_MOVE_SPEED) + (mods.moveSpeed ?? 0));
 }
 
+// Automatic achievement: when exactly one crawler is the slowest in the campaign, their
+// speed is raised to match the second slowest crawler and they earn this trophy.
+export const NO_CHILD_LEFT_BEHIND_TROPHY = 'This Is For You, Bud, No Child Left Behind';
+export const NO_CHILD_LEFT_BEHIND_DESCRIPTION = 'Was the slowest crawler in the campaign, so their speed was raised to keep up with the party.';
+
+// Returns the base moveSpeed that lifts the sole slowest crawler to the second slowest
+// effective speed, or null when there is a tie for slowest or fewer than two crawlers.
+export function getNoChildLeftBehindBump(
+  crawlers: Crawler[],
+  getInventory: (crawlerId: string) => InventoryItem[],
+): { crawlerId: string; moveSpeed: number; fromSpeed: number; toSpeed: number } | null {
+  if (crawlers.length < 2) return null;
+  const speeds = crawlers
+    .map(c => ({ crawler: c, speed: getEffectiveMoveSpeed(c, getInventory(c.id)) }))
+    .sort((a, b) => a.speed - b.speed);
+  const [slowest, secondSlowest] = speeds;
+  if (slowest.speed === secondSlowest.speed) return null;
+  const mods = getEquippedModifiers(slowest.crawler, getInventory(slowest.crawler.id));
+  return {
+    crawlerId: slowest.crawler.id,
+    moveSpeed: Math.max(0, secondSlowest.speed - (mods.moveSpeed ?? 0)),
+    fromSpeed: slowest.speed,
+    toSpeed: secondSlowest.speed,
+  };
+}
+
 // Weapon system types
 export const DAMAGE_TYPES = ['Basic', 'Poison', 'Disease', 'Spiritual', 'Radiation', 'Fire', 'Electric', 'Emotional'] as const;
 export type DamageType = typeof DAMAGE_TYPES[number];

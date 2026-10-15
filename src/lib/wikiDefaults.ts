@@ -143,7 +143,16 @@ Trophies are for things that can't be measured automatically, like great rolepla
 
 - On a crawler's profile, the DM enters a trophy name and an optional note, then clicks **Award Trophy**.
 - Awarding a trophy with the same name again counts it up, for example *Best Roleplay ×3*.
-- The **−** button next to a trophy takes back one award, and removes the trophy when its count reaches zero.`,
+- The **−** button next to a trophy takes back one award, and removes the trophy when its count reaches zero.
+
+## Automatic Trophy: This Is For You, Bud, No Child Left Behind
+
+Nobody gets left behind. If exactly one crawler in the campaign is slower than everyone else, their speed is automatically raised to match the second slowest crawler, and they earn the **This Is For You, Bud, No Child Left Behind** trophy.
+
+- Speed here means the crawler's speed after equipment bonuses.
+- If two or more crawlers are tied for slowest, nothing happens.
+- It happens again any time a single crawler becomes the slowest, and the trophy counts up each time.
+- It runs while the DM has the campaign open.`,
   },
   {
     id: 'equipment',
