@@ -1196,6 +1196,7 @@ const Index = () => {
               runtimeMobPlacements={runtimeMobPlacements}
               onAddCombatant={addCombatant}
               onUpdateCombatTimer={updateCombatTimer}
+              getCrawlerInventory={getCrawlerInventory}
             />
           )}
 
