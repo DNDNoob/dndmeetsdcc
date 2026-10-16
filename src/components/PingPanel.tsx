@@ -265,13 +265,11 @@ const PingPanel: React.FC<PingPanelProps> = ({
         hasRolledInitiative: false,
         hasUsedAction: false,
         hasUsedBonusAction: false,
-        avatar: c.avatar,
       });
     }
     // Add selected mobs (auto-roll initiative)
     for (const entry of availableToAdd.mobs) {
       if (!selectedIds.has(entry.combatId)) continue;
-      const mob = (mobs ?? []).find(m => m.id === entry.mobId);
       const roll = Math.floor(Math.random() * 20) + 1;
       newEntries.push({
         id: entry.combatId,
@@ -282,7 +280,6 @@ const PingPanel: React.FC<PingPanelProps> = ({
         hasRolledInitiative: true,
         hasUsedAction: false,
         hasUsedBonusAction: false,
-        avatar: mob?.image,
         currentHP: entry.hitPoints,
       });
     }

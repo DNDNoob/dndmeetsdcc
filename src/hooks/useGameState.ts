@@ -1013,7 +1013,6 @@ export const useGameState = () => {
           hasRolledInitiative: false,
           hasUsedAction: false,
           hasUsedBonusAction: false,
-          avatar: crawler?.avatar,
         };
       }),
       ...mobEntries.map(entry => {
@@ -1048,7 +1047,6 @@ export const useGameState = () => {
           hasRolledInitiative: true,
           hasUsedAction: false,
           hasUsedBonusAction: false,
-          avatar: mob?.image,
           currentHP: initialHP,
         };
       }),
