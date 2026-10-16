@@ -836,6 +836,7 @@ In the DM Console, open a mob (new or existing) and expand **NPC Personality**. 
 | Secret | Something they hide until you unlock it |
 | Reveals the secret when | The condition for giving it up ("The party pays him") |
 | Attitude toward the party | Friendly, grumpy, scared, hostile... |
+| Persuasion DC | How hard they are to talk into giving up the secret (optional) |
 
 Players never see this card. Only mobs with at least one field filled in will talk.
 
@@ -856,7 +857,13 @@ The AI is **never told the secret** until you unlock it, so it can't let it slip
 
 > Vex: "Here are 10 gold coins." Unlock Grimble's secret?  **Unlock** / **Not yet**
 
-Unlock tells the NPC the secret and it can share it in its next line. You can also lock or unlock any secret by hand in the chat settings.
+Unlock tells the NPC the secret and it shares it right away. You can also lock or unlock any secret by hand in the chat settings.
+
+### Persuasion Rolls
+
+If the NPC has a **Persuasion DC**, a crawler can try to talk them into it: roll **Persuasion** from your profile while standing next to the NPC on the map (or right after talking to them in the chat). If the total meets the DC, the DM gets the same Unlock / Not yet prompt, showing the roll. If it falls short, the NPC brushes you off.
+
+Each crawler gets one try per NPC each noncombat turn (or every 10 minutes when turns aren't running).
 
 ## DM Settings
 

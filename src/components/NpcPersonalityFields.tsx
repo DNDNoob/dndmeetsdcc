@@ -8,7 +8,9 @@ interface NpcPersonalityFieldsProps {
   defaultOpen?: boolean;
 }
 
-const FIELDS: { key: keyof NpcPersonality; label: string; placeholder: string; multiline?: boolean }[] = [
+type TextKey = Exclude<keyof NpcPersonality, "persuasionDC">;
+
+const FIELDS: { key: TextKey; label: string; placeholder: string; multiline?: boolean }[] = [
   { key: "voice", label: "Voice and manner", placeholder: "Gruff dwarf smith. Short sentences, calls everyone \"kid\"" },
   { key: "wants", label: "Wants", placeholder: "The party to clear the rats out of his forge" },
   { key: "knows", label: "Knows", placeholder: "Rats come up from the cellar; the old mine is flooded", multiline: true },
@@ -61,6 +63,24 @@ export const NpcPersonalityFields: React.FC<NpcPersonalityFieldsProps> = ({ valu
               )}
             </div>
           ))}
+          <div>
+            <label className="text-xs text-muted-foreground mb-0.5 block">Persuasion DC (optional)</label>
+            <input
+              type="number"
+              min={1}
+              max={40}
+              value={value?.persuasionDC ?? ""}
+              onChange={(e) => {
+                const n = parseInt(e.target.value, 10);
+                onChange({ ...value, persuasionDC: Number.isFinite(n) && n > 0 ? n : undefined });
+              }}
+              placeholder="15"
+              className="w-24 bg-muted border border-border px-2 py-1 text-sm"
+            />
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              A crawler who rolls Persuasion this high next to this NPC gets you an Unlock / Not yet prompt for the secret.
+            </p>
+          </div>
         </div>
       )}
     </div>

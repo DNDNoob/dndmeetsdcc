@@ -230,6 +230,8 @@ class Room {
     this.lastActivityAt = Date.now();
     this.lastIdleMutterAt = 0;
     this.prevNear = new Set();      // `${crawlerId}:${mobId}` pairs near each other
+    this.lastNpcByCrawler = new Map(); // crawlerId → mobId of the NPC they last talked with
+    this.persuadeTries = new Map();    // `${crawlerId}:${mobId}` → { turn, at } of the last Persuasion try
     this.activeModel = null;
     this.note = '';
     this.busy = false;
@@ -238,7 +240,7 @@ class Room {
     this.baseUnsubs = [
       onSnapshot(doc(db, `${this.path}/showtime-state/current`), (snap) => this.onShowtime(snap.exists() ? snap.data() : null), (e) => warn(`[${name}] showtime listener`, e.message)),
       onSnapshot(doc(db, `${this.path}/npcAi/settings`), (snap) => { this.settings = snap.exists() ? snap.data() : {}; this.publishStatus(); }, (e) => warn(`[${name}] settings listener`, e.message)),
-      onSnapshot(doc(db, `${this.path}/npcAi/secrets`), (snap) => { this.secrets = snap.exists() ? snap.data() : {}; }, (e) => warn(`[${name}] secrets listener`, e.message)),
+      onSnapshot(doc(db, `${this.path}/npcAi/secrets`), (snap) => this.onSecrets(snap.exists() ? snap.data() : {}), (e) => warn(`[${name}] secrets listener`, e.message)),
     ];
   }
 
@@ -281,6 +283,8 @@ class Room {
       sub(doc(db, `${this.path}/gameClock/current`), (s) => { this.state.clock = s.exists() ? s.data() : null; }),
       sub(collection(db, `${this.path}/lootBoxes`), (s) => this.onLootBoxes(s.docs.map((d) => ({ ...d.data(), id: d.id })))),
       sub(collection(db, `${this.path}/chatMessages`), (s) => this.onChat(s)),
+      sub(collection(db, `${this.path}/diceRolls`), (s) => this.onDiceRolls(s)),
+      sub(doc(db, `${this.path}/noncombatTurns/current`), (s) => { this.state.noncombatTurn = s.exists() ? s.data() : null; }),
     ];
     this.watchPlacements();
     this.heartbeat = setInterval(() => this.publishStatus(), CONFIG.heartbeatMs);
@@ -303,7 +307,7 @@ class Room {
     this.state.chat = [];
     this.state.episode = null;
     this.placementKey = null;
-    this.chatPrimed = this.crawlersPrimed = this.combatPrimed = this.lootPrimed = this.primedPlacements = false;
+    this.chatPrimed = this.crawlersPrimed = this.combatPrimed = this.lootPrimed = this.primedPlacements = this.rollsPrimed = false;
     this.prevNear = new Set();
     this.writeStatus({ heartbeatAt: 0, thinking: null, activeModel: null });
     onRoomsChanged();
@@ -436,6 +440,11 @@ class Room {
       if (p.secret && p.revealWhen && state === 'locked') this.enqueue({ kind: 'secret-check', mobId: mob.id, message: m });
     }
 
+    if (m.authorType === 'crawler') {
+      const talkedTo = named[0]?.id ?? nearSpeaker[0]?.mobId;
+      if (talkedTo) this.lastNpcByCrawler.set(m.authorId, talkedTo);
+    }
+
     if (named.length) {
       for (const mob of named.slice(0, 2)) {
         this.enqueue({ kind: 'line', mobId: mob.id, direct: true, near: speakerSpot, trigger: `${m.authorName} spoke to you: "${m.text}"` });
@@ -443,6 +452,68 @@ class Room {
     } else if (nearSpeaker.length) {
       const n = nearSpeaker[0];
       this.enqueue({ kind: 'line', mobId: n.mobId, gated: true, near: speakerSpot, trigger: `${m.authorName} said this right next to you: "${m.text}"` });
+    }
+  }
+
+  onSecrets(data) {
+    const prev = this.secrets;
+    this.secrets = data;
+    if (!this.secretsPrimed) { this.secretsPrimed = true; return; }
+    // When the DM unlocks a secret, that NPC speaks up with it right away.
+    for (const [mobId, entry] of Object.entries(data)) {
+      if (entry?.state === 'unlocked' && prev[mobId]?.state !== 'unlocked') {
+        this.lastActivityAt = Date.now();
+        this.enqueue({ kind: 'line', mobId, direct: true, trigger: 'You have just decided to tell the party your secret. Tell them now.' });
+      }
+    }
+  }
+
+  onDiceRolls(snapshot) {
+    if (!this.rollsPrimed) { this.rollsPrimed = true; return; }
+    for (const change of snapshot.docChanges()) {
+      if (change.type !== 'added') continue;
+      const roll = change.doc.data();
+      if (roll.statRoll?.stat !== 'Persuasion' || !roll.crawlerId) continue;
+      if ((roll.timestamp ?? 0) < Date.now() - 120_000) continue;
+      this.lastActivityAt = Date.now();
+      this.handlePersuasion(roll);
+    }
+  }
+
+  /** A Persuasion roll counts against the NPC next to the crawler, else the NPC they last talked with. */
+  handlePersuasion(roll) {
+    const npcs = this.npcPlacements();
+    const spot = this.crawlerPlacementsOnMap().find((p) => p.crawlerId === roll.crawlerId);
+    const nearest = spot
+      ? npcs.filter((n) => distance(n, spot) <= CONFIG.nearDistance).sort((a, b) => distance(a, spot) - distance(b, spot))[0]
+      : null;
+    const mobId = nearest?.mobId ?? this.lastNpcByCrawler.get(roll.crawlerId);
+    const target = npcs.find((n) => n.mobId === mobId);
+    if (!target) return;
+    const mob = target.mob;
+    const p = mob.personality || {};
+    const dc = Number(p.persuasionDC);
+    const state = this.secrets[mob.id]?.state ?? 'locked';
+    if (!p.secret || !dc || state !== 'locked') return;
+
+    // One try per crawler per NPC each noncombat turn (or every 10 minutes when turns aren't running)
+    const key = `${roll.crawlerId}:${mob.id}`;
+    const turn = this.state.noncombatTurn?.turnNumber ?? null;
+    const prev = this.persuadeTries.get(key);
+    if (prev && (turn !== null ? prev.turn === turn : Date.now() - prev.at < 10 * 60_000)) return;
+    this.persuadeTries.set(key, { turn, at: Date.now() });
+
+    const name = roll.crawlerName || 'A crawler';
+    const near = spot ?? undefined;
+    if (roll.total >= dc) {
+      log(`[${this.name}] ${name} persuaded ${mob.name} (${roll.total} vs DC ${dc}); asking the DM`);
+      setDoc(doc(db, `${this.path}/npcAi/secrets`), {
+        [mob.id]: { state: 'pending', reason: `${name} rolled Persuasion ${roll.total} vs DC ${dc}.`, at: Date.now() },
+      }, { merge: true }).catch((e) => warn(`[${this.name}] secret write failed:`, e.message));
+      this.enqueue({ kind: 'line', mobId: mob.id, direct: true, near, trigger: `${name} just made a very convincing case for you to tell them your secret. You are wavering but haven't given in yet.` });
+    } else {
+      log(`[${this.name}] ${name} failed to persuade ${mob.name} (${roll.total} vs DC ${dc})`);
+      this.enqueue({ kind: 'line', mobId: mob.id, direct: true, near, trigger: `${name} just tried to talk you into telling your secret, but it didn't work on you. Brush them off.` });
     }
   }
 

@@ -356,6 +356,7 @@ export interface NpcPersonality {
   secret?: string;
   revealWhen?: string; // Plain-words reveal condition, e.g. "the party pays or bribes him"
   attitude?: string;   // Attitude toward the party
+  persuasionDC?: number; // A Persuasion roll this high (d20 + CHA mod) asks the DM to unlock the secret
 }
 
 export const hasNpcPersonality = (mob: Pick<Mob, 'personality'>): boolean =>

@@ -37,6 +37,7 @@ npm run npc-voices
 - **Best quality** uses `qwen3:14b`, **Fast** uses `qwen3:8b` (DM picks in the chat settings). If there isn't enough free memory for Best quality it uses Fast and says so in the chat.
 - Unloads the model after 15 minutes without activity.
 - Secrets are only added to the prompt after the DM unlocks them.
+- A Persuasion roll (from the crawler's profile) that meets the NPC's Persuasion DC asks the DM to unlock the secret; one try per crawler per NPC each noncombat turn.
 
 ## Settings (optional, in `.env.npc` or the environment)
 
