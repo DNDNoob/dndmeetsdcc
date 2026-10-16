@@ -1394,4 +1394,31 @@ When enabling public content, you will see a one-time warning:
 
 You must confirm before the toggle activates. This confirmation is recorded in your Decision History.`,
   },
+  {
+    id: 'pixel-icons',
+    slug: 'pixel-icons',
+    title: 'Pixel Icons for Items & Spells',
+    category: 'Game Mechanics',
+    order: 13,
+    content: `# Pixel Icons for Items & Spells
+
+Every new item in the **Item Library**, every new spell in the **Spell Library**, and every item you add to **My Content** gets a pixel-art icon automatically. You don't need to do anything.
+
+## How an Icon Is Picked
+
+1. **Generated** — the app sends the item or spell's name, description, slot, weapon type, damage type or spell school to an AI image generator and turns the picture into a small 48×48 pixel icon. This takes a few seconds; the icon appears once it's ready.
+2. **Matched from the icon library** — the generator is free but has a daily limit (it resets at midnight UTC). When it runs out, the app instead picks the closest icon from every icon made before, using descriptor tags. For example a new "Ember Katana" reuses the icon of a "Flaming Longsword" (sword + fire), and an "Elixir of Mending" reuses a "Healing Potion" icon.
+
+If nothing in the library is related, the item keeps its normal slot icon.
+
+## The Icon Library
+
+Every generated icon is saved to one shared icon library with tags such as *sword*, *fire*, *potion*, *healing*, *ice* or *death*. The library is shared across all campaigns, so the more icons people create, the better the matches get when the daily limit is reached.
+
+## Notes
+
+- Icons are generated only for players signed in with Google. Guests still get matched icons.
+- Copying an item or spell from public content or My Content keeps its icon.
+- Crawler copies of a library item show the library item's icon.`,
+  },
 ];

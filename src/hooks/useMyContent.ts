@@ -74,5 +74,12 @@ export function useMyContent(uid: string | null, username?: string) {
 
   const deleteMySpell = useCallback((id: string) => write('spells', id, null), [write]);
 
-  return { myItems, mySpells, saveMyItem, deleteMyItem, saveMySpell, deleteMySpell };
+  /** Attach a pixel icon to a personal item or spell without touching its other fields. */
+  const setMyContentIcon = useCallback(async (kind: 'items' | 'spells', id: string, iconId: string) => {
+    if (!uid || !db) return;
+    await setDoc(doc(db, 'userContent', uid, kind, id), { iconId }, { merge: true })
+      .catch(err => console.error(`[MyContent] Failed to set icon on ${kind}/${id}:`, err));
+  }, [uid]);
+
+  return { myItems, mySpells, saveMyItem, deleteMyItem, saveMySpell, deleteMySpell, setMyContentIcon };
 }

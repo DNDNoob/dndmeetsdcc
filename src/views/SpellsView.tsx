@@ -1,4 +1,5 @@
 import { useState } from "react";
+import PixelIcon from '@/components/ui/PixelIcon';
 import { motion } from "framer-motion";
 import { Plus, Trash2, ChevronDown, ChevronUp, BookOpen, Zap, Star, Wand2, X, Check, Globe, Lock, Users, Bookmark } from "lucide-react";
 import { DungeonButton } from "@/components/ui/DungeonButton";
@@ -39,6 +40,7 @@ interface SpellsViewProps {
   publicSpells?: Spell[];
   onToggleSpellPublic?: (spell: Spell, isPublic: boolean) => void;
   showPublicContent?: boolean;
+  iconImages?: Record<string, string>; // iconLibrary id -> pixel icon image
   mySpells?: Spell[];
   onSaveSpellToMyContent?: (spell: Spell) => void;
 }
@@ -434,7 +436,9 @@ function SpellCard({
   onTogglePublic,
   onSaveToMyContent,
   savedToMyContent,
+  iconSrc,
 }: {
+  iconSrc?: string;
   spell: Spell;
   isAdmin: boolean;
   onEdit: () => void;
@@ -465,7 +469,7 @@ function SpellCard({
           className="flex items-center gap-2 text-left flex-1 min-w-0"
           onClick={() => setExpanded(!expanded)}
         >
-          <Wand2 className="w-3.5 h-3.5 text-primary shrink-0" />
+          <PixelIcon src={iconSrc} alt={spell.name} fallback={<Wand2 className="w-3.5 h-3.5 text-primary shrink-0" />} />
           <span className="text-sm font-display text-primary truncate">{spell.name}</span>
           <span className="text-[10px] text-muted-foreground shrink-0">
             Lvl {sd.spellLevel} {sd.school}
@@ -590,6 +594,7 @@ function SpellCard({
 function KnownSpellCard({
   knownSpell,
   spell: librarySpell,
+  iconSrc,
   isAdmin,
   onForget,
   onCast,
@@ -597,6 +602,7 @@ function KnownSpellCard({
 }: {
   knownSpell: KnownSpell;
   spell?: Spell;
+  iconSrc?: string;
   isAdmin: boolean;
   onForget: () => void;
   onCast: () => void;
@@ -628,7 +634,7 @@ function KnownSpellCard({
           className="flex items-center gap-2 text-left flex-1 min-w-0"
           onClick={() => setExpanded(!expanded)}
         >
-          <Wand2 className="w-3.5 h-3.5 text-accent shrink-0" />
+          <PixelIcon src={iconSrc} alt={knownSpell.spellName} fallback={<Wand2 className="w-3.5 h-3.5 text-accent shrink-0" />} />
           <span className="text-sm font-display text-accent truncate">{knownSpell.spellName}</span>
           {masteryLevel > 0 && (
             <span className="flex items-center gap-0.5 text-[10px] text-accent shrink-0">
@@ -870,6 +876,7 @@ const SpellsView: React.FC<SpellsViewProps> = ({
   publicSpells = [],
   onToggleSpellPublic,
   showPublicContent = false,
+  iconImages = {},
   mySpells = [],
   onSaveSpellToMyContent,
 }) => {
@@ -973,6 +980,7 @@ const SpellsView: React.FC<SpellsViewProps> = ({
                   onTogglePublic={onToggleSpellPublic ? (isPublic) => onToggleSpellPublic(spell, isPublic) : undefined}
                   onSaveToMyContent={onSaveSpellToMyContent ? () => onSaveSpellToMyContent(spell) : undefined}
                   savedToMyContent={mySpells.some(ms => ms.id === spell.id)}
+                  iconSrc={spell.iconId ? iconImages[spell.iconId] : undefined}
                 />
               ))}
             </div>
@@ -1090,11 +1098,13 @@ const SpellsView: React.FC<SpellsViewProps> = ({
                     <div className="space-y-2">
                       {(selectedCrawler.knownSpells ?? []).map(ks => {
                         const libSpell = spells.find(s => s.id === ks.spellId);
+                        const iconId = (libSpell ?? ks.customSpell)?.iconId;
                         return (
                           <KnownSpellCard
                             key={ks.spellId}
                             knownSpell={ks}
                             spell={libSpell}
+                            iconSrc={iconId ? iconImages[iconId] : undefined}
                             isAdmin={isAdmin}
                             onForget={() => onForgetSpell(selectedCrawler.id, ks.spellId)}
                             onCast={() => onCastSpell(selectedCrawler.id, ks.spellId)}
