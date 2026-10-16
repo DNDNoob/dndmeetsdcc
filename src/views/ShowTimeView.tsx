@@ -17,6 +17,9 @@ import { db } from "@/lib/firebase";
 import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, Timestamp } from "firebase/firestore";
 import { useThrottledCallback } from "@/hooks/useDebounce";
 import CombatTurnTimer from "@/components/CombatTurnTimer";
+import NpcChatPanel, { type NpcChatAuthor } from "@/components/NpcChatPanel";
+import NpcSpeechBubbles from "@/components/ui/NpcSpeechBubbles";
+import { hasNpcPersonality, type ChatMessage, type NpcAiSettings, type NpcAiStatus, type NpcSecretEntry, type NpcSecretState } from "@/lib/gameData";
 
 interface ShowTimeViewProps {
   maps: string[];
@@ -57,6 +60,15 @@ interface ShowTimeViewProps {
   currentPlayerId?: string; // crawler id of the player at this screen (DMs may have none)
   onRecordCrawlerMove?: (crawlerId: string, feet: number, spendTurnMovement: boolean, from?: { episodeId: string; mapId: string; x: number; y: number }) => Promise<void>;
   onSetMobEncountered?: (mobId: string, encountered: boolean) => Promise<void>;
+  // In-game chat & talking NPCs
+  chatMessages?: ChatMessage[];
+  npcAiSettings?: NpcAiSettings | null;
+  npcAiStatus?: NpcAiStatus | null;
+  npcSecrets?: Record<string, NpcSecretEntry>;
+  onSendChatMessage?: (message: Omit<ChatMessage, 'id' | 'createdAt'>) => Promise<void>;
+  onClearChat?: (episodeId?: string) => Promise<void>;
+  onUpdateNpcAiSettings?: (updates: Partial<Omit<NpcAiSettings, 'id'>>) => Promise<void>;
+  onSetNpcSecretState?: (mobId: string, state: NpcSecretState) => Promise<void>;
 }
 
 const SHOWTIME_STORAGE_KEY = 'dcc_showtime_state';
@@ -729,7 +741,7 @@ const InventoryPanel: React.FC<{
   );
 };
 
-const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock, noncombatTurnState, resetNoncombatTurns, combatState, onRemoveCombatant, onRuntimePlacementsChange, onGameActiveChange, onRegisterGameToggle, roomId, quests = [], assignedQuests = [], onAssignQuest, onUpdateQuest, onUpdateAssignedQuest, onDeleteAssignedQuest, currentPlayerId, onRecordCrawlerMove, onSetMobEncountered }) => {
+const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock, noncombatTurnState, resetNoncombatTurns, combatState, onRemoveCombatant, onRuntimePlacementsChange, onGameActiveChange, onRegisterGameToggle, roomId, quests = [], assignedQuests = [], onAssignQuest, onUpdateQuest, onUpdateAssignedQuest, onDeleteAssignedQuest, currentPlayerId, onRecordCrawlerMove, onSetMobEncountered, chatMessages = [], npcAiSettings = null, npcAiStatus = null, npcSecrets = {}, onSendChatMessage, onClearChat, onUpdateNpcAiSettings, onSetNpcSecretState }) => {
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
   const selectedEpisodeIdRef = useRef<string | null>(null);
   const [currentMapIndex, setCurrentMapIndex] = useState(0);
@@ -2197,6 +2209,39 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     );
   }, [selectedEpisode, currentMapId]);
 
+  // ======== In-game chat & talking NPCs ========
+  const episodeChatMessages = useMemo(
+    () => selectedEpisode ? chatMessages.filter(m => !m.episodeId || m.episodeId === selectedEpisode.id) : [],
+    [chatMessages, selectedEpisode]
+  );
+
+  // Mobs with a personality card standing on the current map (episode + runtime placements)
+  const npcsOnMap = useMemo(() => {
+    const ids = new Set([
+      ...currentMapMobPlacements.map(p => p.mobId),
+      ...runtimeMobPlacements.filter(p => p.mapId === currentMapId).map(p => p.mobId),
+    ]);
+    return mobs.filter(m => ids.has(m.id) && hasNpcPersonality(m));
+  }, [currentMapMobPlacements, runtimeMobPlacements, currentMapId, mobs]);
+
+  const chatAuthor = useMemo((): NpcChatAuthor | null => {
+    if (isAdmin) return { type: 'dm', id: 'dm', name: 'DM' };
+    const crawler = currentPlayerId ? crawlers.find(c => c.id === currentPlayerId) : undefined;
+    return crawler ? { type: 'crawler', id: crawler.id, name: crawler.name } : null;
+  }, [isAdmin, currentPlayerId, crawlers]);
+
+  const handleSendChat = useCallback(async (text: string, viaVoice: boolean) => {
+    if (!chatAuthor || !onSendChatMessage) return;
+    await onSendChatMessage({
+      authorType: chatAuthor.type,
+      authorId: chatAuthor.id,
+      authorName: chatAuthor.name,
+      text,
+      ...(selectedEpisode ? { episodeId: selectedEpisode.id } : {}),
+      ...(viaVoice ? { viaVoice: true } : {}),
+    });
+  }, [chatAuthor, onSendChatMessage, selectedEpisode]);
+
   // Get the current map URL
   const currentMapUrl = useMemo(() => {
     if (!selectedEpisode || selectedEpisode.mapIds.length === 0) return null;
@@ -3590,6 +3635,14 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             mapBaseScale={mapBaseScale}
           />
 
+          {/* NPC speech bubbles over their tokens */}
+          <NpcSpeechBubbles
+            messages={episodeChatMessages}
+            thinking={npcAiStatus?.thinking ?? null}
+            mapId={currentMapId}
+            counterScale={iconCounterScale}
+          />
+
           {/* Ping effects - on top of everything */}
           <PingEffect pings={pings} />
         </div>{/* end mapBaseScale wrapper */}
@@ -3734,6 +3787,24 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
         </div>
         );
       })()}
+
+      {/* In-game chat with talking NPCs */}
+      {selectedEpisode && onSendChatMessage && (
+        <NpcChatPanel
+          messages={episodeChatMessages}
+          author={chatAuthor}
+          isAdmin={isAdmin}
+          mobs={mobs}
+          npcsOnMap={npcsOnMap}
+          aiSettings={npcAiSettings}
+          aiStatus={npcAiStatus}
+          secrets={npcSecrets}
+          onSend={handleSendChat}
+          onUpdateSettings={onUpdateNpcAiSettings}
+          onSetSecretState={onSetNpcSecretState}
+          onClearChat={onClearChat ? () => onClearChat(selectedEpisode.id) : undefined}
+        />
+      )}
     </motion.div>
   );
 };

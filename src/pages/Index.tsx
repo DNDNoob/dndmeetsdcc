@@ -204,6 +204,14 @@ const Index = () => {
     wikiPages,
     addWikiPage,
     updateWikiPage,
+    chatMessages,
+    npcAiSettings,
+    npcAiStatus,
+    npcSecrets,
+    sendChatMessage,
+    clearChat,
+    updateNpcAiSettings,
+    setNpcSecretState,
     spells,
     addSpell,
     updateSpell,
@@ -1104,6 +1112,14 @@ const Index = () => {
                 currentPlayerId={currentPlayer?.id}
                 onRecordCrawlerMove={recordCrawlerMove}
                 onSetMobEncountered={setMobEncountered}
+                chatMessages={chatMessages}
+                npcAiSettings={npcAiSettings}
+                npcAiStatus={npcAiStatus}
+                npcSecrets={npcSecrets}
+                onSendChatMessage={sendChatMessage}
+                onClearChat={isAdmin ? clearChat : undefined}
+                onUpdateNpcAiSettings={isAdmin ? updateNpcAiSettings : undefined}
+                onSetNpcSecretState={isAdmin ? setNpcSecretState : undefined}
               />
             )}
             {currentView === "sounds" && <SoundEffectsView />}

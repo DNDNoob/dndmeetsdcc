@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import NpcPersonalityFields from "@/components/NpcPersonalityFields";
 import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
@@ -217,6 +218,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
       hideStrengths: false,
       defaultInventory: newMob.defaultInventory,
       defaultGold: newMob.defaultGold,
+      ...(newMob.personality ? { personality: newMob.personality } : {}),
     };
     console.log('[DungeonAI] ➕ Add Mob clicked', mob);
     try {
@@ -225,7 +227,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
     } catch (err) {
       console.error('[DungeonAI] ❌ Failed to persist mob', err);
     }
-    setNewMob({ name: "", level: 1, type: "normal", description: "", weaknesses: "", strengths: "", hitPoints: 50 });
+    setNewMob({ name: "", level: 1, type: "normal", description: "", weaknesses: "", strengths: "", hitPoints: 50, personality: undefined });
   };
 
   const handleDeleteMob = async (id: string) => {
@@ -854,6 +856,10 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                       className="w-full bg-muted border border-border px-3 py-2"
                     />
                   </div>
+                  <NpcPersonalityFields
+                    value={newMob.personality}
+                    onChange={(personality) => setNewMob({ ...newMob, personality })}
+                  />
                 </div>
                 <div className="flex flex-col items-center justify-center border border-dashed border-border p-4">
                   <label className="text-xs text-muted-foreground mb-2">Mob Image</label>
@@ -1006,6 +1012,13 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                               className="w-full bg-muted border border-border px-2 py-1 text-sm"
                             />
                           </div>
+                        </div>
+
+                        <div className="mt-3">
+                          <NpcPersonalityFields
+                            value={editedMob.personality}
+                            onChange={(personality) => setEditedMobData(prev => prev ? { ...prev, personality } : prev)}
+                          />
                         </div>
 
                         {/* Hide Detail Toggles */}

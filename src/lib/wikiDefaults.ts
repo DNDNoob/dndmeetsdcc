@@ -570,7 +570,11 @@ From the DM Console Mobs tab, the DM can create, edit, and delete mobs. This inc
 
 ## Mobs on Maps
 
-When placed on a map during episode setup or Show Time, mobs appear as circular icons. Each mob instance tracks its own HP independently, so duplicate mobs can take different amounts of damage.`,
+When placed on a map during episode setup or Show Time, mobs appear as circular icons. Each mob instance tracks its own HP independently, so duplicate mobs can take different amounts of damage.
+
+## NPC Personality
+
+Every mob has an optional **NPC Personality** card (DM only) in the DM Console. Fill it in and the mob talks for itself in Show Time when NPC voices are running. See [Talking NPCs](/wiki/talking-npcs).`,
   },
   {
     id: 'dice-roller',
@@ -803,7 +807,77 @@ Everything in Show Time syncs in real time:
 - Combat state and turn order
 - Pings and shape annotations
 - Loot box distribution
-- Quest assignments and progress`,
+- Quest assignments and progress
+- Game chat and NPC speech bubbles
+
+## Game Chat
+
+The chat button in the bottom right opens the **Game Chat** for the running episode. Players talk as their crawler and the DM talks as the DM. Hold the microphone button to speak instead of typing. Mobs with a personality answer in the chat and in speech bubbles over their heads. See [Talking NPCs](/wiki/talking-npcs).`,
+  },
+  {
+    id: 'talking-npcs',
+    slug: 'talking-npcs',
+    title: 'Talking NPCs',
+    category: 'Features',
+    order: 32,
+    content: `# Talking NPCs
+
+Mobs with a personality speak for themselves during Show Time. An AI model running on the DM's computer writes one line of in-character dialogue at a time, based on the personality you wrote and what is happening in the game.
+
+## Giving a Mob a Personality
+
+In the DM Console, open a mob (new or existing) and expand **NPC Personality**. Fill in any of these:
+
+| Field | What it does |
+|-------|--------------|
+| Voice and manner | How they talk ("Gruff dwarf smith. Calls everyone kid") |
+| Wants | What they are after |
+| Knows | Things they can tell the party |
+| Secret | Something they hide until you unlock it |
+| Reveals the secret when | The condition for giving it up ("The party pays him") |
+| Attitude toward the party | Friendly, grumpy, scared, hostile... |
+
+Players never see this card. Only mobs with at least one field filled in will talk.
+
+## When NPCs Speak
+
+NPCs talk on their own, no button needed:
+- **Spoken to by name**: "Grimble, where's the key?" gets an answer
+- **Someone talks nearby**: the closest NPC may chime in
+- **A crawler walks up** to them
+- **A crawler gets badly hurt**, a **fight breaks out**, a **mob dies**, or a **loot box is opened** nearby
+- **Quiet moments**: after about a minute of silence, an NPC near the party may mutter something
+
+Each line appears in a speech bubble over the NPC's head on the map, fades after a few seconds, and is saved in the Game Chat. A "…" bubble shows while the NPC is thinking. An NPC waits about 20 seconds between lines so it doesn't hog the conversation.
+
+## Secrets
+
+The AI is **never told the secret** until you unlock it, so it can't let it slip. When a message in the chat looks like it meets the reveal condition, you get a prompt in the Game Chat:
+
+> Vex: "Here are 10 gold coins." Unlock Grimble's secret?  **Unlock** / **Not yet**
+
+Unlock tells the NPC the secret and it can share it in its next line. You can also lock or unlock any secret by hand in the chat settings.
+
+## DM Settings
+
+Open the Game Chat and tap the gear icon:
+- **NPC voices**: turn the feature on or off for this campaign
+- **Model**: **Best quality** (bigger, slower) or **Fast** (smaller, quicker)
+- **Mute all NPCs**, or mute one NPC
+- **Secret** lock/unlock per NPC
+- **Clear chat** for the current episode
+
+The dot next to the chat button is green when the DM computer is online and listening.
+
+## Voice Input
+
+Hold the microphone button next to the chat box, talk, and let go. Your words appear in the chat as a message. This works in Chrome, Edge and Safari; it isn't available in Firefox.
+
+## Setting Up the DM Computer
+
+The AI runs on the DM's own computer using [Ollama](https://ollama.com), so nothing is sent to an outside AI service. A one-time installer sets it to start automatically when the computer signs in, so on game night there is nothing to run. Setup steps are in \`scripts/npc-voices/README.md\` in the project repository.
+
+If the DM computer is off, asleep, or out of memory, the chat still works and NPCs just stay quiet. The chat header says why.`,
   },
   {
     id: 'sound-effects',

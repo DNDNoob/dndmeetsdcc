@@ -2,6 +2,10 @@
   {
     "date": "2026-10-16",
     "changes": [
+      "💬 New Game Chat in Show Time: players chat as their crawler and the DM as the DM, with a hold-to-talk microphone that turns speech into text",
+      "🗣️ Talking NPCs: give a mob a personality in the DM Console and it speaks for itself in Show Time, with lines in speech bubbles over its head and in the chat",
+      "🤫 NPC secrets stay hidden from the AI until the DM unlocks them; the DM gets an Unlock / Not yet prompt when a player meets the reveal condition",
+      "⚙️ DM chat settings: turn NPC voices on or off, pick Best quality or Fast, mute NPCs, lock secrets and clear the chat",
       "👾 Unencountered mobs can now join combat, and players see them in the turn order. The DM can reveal a mob from the combat panel or by right-clicking its token in Show Time (Mark Encountered)",
       "🎬 Show Time no longer resets when the DM refreshes or visits another page during a game; it picks up the running episode and players stay in the game",
       "🐛 Refreshing the DM Console no longer sends the DM back to the main menu",
