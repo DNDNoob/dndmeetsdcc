@@ -1030,6 +1030,40 @@ export const useGameState = () => {
     logger.log('[GameState] 🎲 Mob initiatives rolled');
   };
 
+  // DM override: roll initiative for every combatant who hasn't rolled yet.
+  // Crawlers use d20 + effective DEX modifier, mobs a plain d20 (same as auto-roll).
+  const forceRollInitiatives = async () => {
+    if (!combatState || combatState.phase !== 'initiative') return;
+    const rolls: DiceRollEntry[] = [];
+    const updatedCombatants = combatState.combatants.map(c => {
+      if (c.hasRolledInitiative) return c;
+      const rawRoll = Math.floor(Math.random() * 20) + 1;
+      let modifier = 0;
+      if (c.type === 'crawler') {
+        const crawler = crawlers.find(cr => cr.id === c.id);
+        if (crawler) {
+          const mods = getEquippedModifiers(crawler, getCrawlerInventory(crawler.id));
+          modifier = Math.floor(((crawler.dex + (mods.dex ?? 0)) - 10) / 2);
+        }
+      }
+      const total = rawRoll + modifier;
+      rolls.push({
+        id: crypto.randomUUID(),
+        crawlerName: c.name,
+        crawlerId: c.id,
+        timestamp: Date.now(),
+        results: [{ dice: 'D20', result: rawRoll }],
+        total,
+        statRoll: { stat: 'Initiative', modifier, rawRoll },
+      });
+      return { ...c, initiative: total, hasRolledInitiative: true };
+    });
+    if (rolls.length === 0) return;
+    await updateItem('combatState', 'current', { combatants: updatedCombatants } as Record<string, unknown>);
+    for (const roll of rolls) await addDiceRoll(roll);
+    logger.log('[GameState] 🎲 DM forced initiative for', rolls.length, 'combatants');
+  };
+
   const recordCombatInitiative = async (combatantId: string, roll: number) => {
     if (!combatState) return;
     const updatedCombatants = combatState.combatants.map(c => {
@@ -1753,6 +1787,7 @@ export const useGameState = () => {
     startCombat,
     rollMobInitiatives,
     recordCombatInitiative,
+    forceRollInitiatives,
     confirmInitiative,
     advanceCombatTurn,
     recordCombatAction,

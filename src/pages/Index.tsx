@@ -184,6 +184,7 @@ const Index = () => {
     startCombat,
     recordCombatInitiative,
     confirmInitiative,
+    forceRollInitiatives,
     advanceCombatTurn,
     recordCombatAction,
     applyCombatDamage,
@@ -1162,6 +1163,7 @@ const Index = () => {
                 await startCombat(crawlerIds, mobEntries, activeEpisode?.id);
               }}
               onConfirmInitiative={confirmInitiative}
+              onForceRollInitiatives={forceRollInitiatives}
               onAdvanceCombatTurn={advanceCombatTurn}
               onEndCombat={endCombat}
               onCancelCombat={cancelCombat}

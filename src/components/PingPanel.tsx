@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Clock, ChevronUp, ChevronDown, RotateCcw, Sun, Moon, Swords, Zap, SkipForward, XCircle, Heart, Plus, Play, Square, Timer, Pause, Footprints } from "lucide-react";
+import { Clock, ChevronUp, ChevronDown, RotateCcw, Sun, Moon, Swords, Zap, SkipForward, XCircle, Heart, Plus, Play, Square, Timer, Pause, Footprints, Dices } from "lucide-react";
 import { type Crawler, type Mob, type NoncombatTurnState, type GameClockState, type Episode, type CombatState, type CrawlerPlacement, type EpisodeMobPlacement, type CombatantEntry, type InventoryItem, getEffectiveMoveSpeed, NONCOMBAT_MOVE_MULTIPLIER } from "@/lib/gameData";
 import UndoTurnButton from "@/components/UndoTurnButton";
 
@@ -17,6 +17,7 @@ interface PingPanelProps {
   combatState?: CombatState | null;
   onStartCombat?: (crawlerIds: string[], mobEntries: { combatId: string; mobId: string; name: string }[]) => Promise<void>;
   onConfirmInitiative?: () => Promise<void>;
+  onForceRollInitiatives?: () => Promise<void>;
   onAdvanceCombatTurn?: () => Promise<void>;
   onEndCombat?: () => Promise<void>;
   onCancelCombat?: () => Promise<void>;
@@ -46,6 +47,7 @@ const PingPanel: React.FC<PingPanelProps> = ({
   combatState,
   onStartCombat,
   onConfirmInitiative,
+  onForceRollInitiatives,
   onAdvanceCombatTurn,
   onEndCombat,
   onCancelCombat,
@@ -641,6 +643,16 @@ const PingPanel: React.FC<PingPanelProps> = ({
                           </div>
                         )}
                       </div>
+                    )}
+                    {onForceRollInitiatives && !combatState.combatants.every(c => c.hasRolledInitiative) && (
+                      <button
+                        onClick={() => onForceRollInitiatives()}
+                        title="Roll d20 + DEX for everyone still waiting"
+                        className="w-full flex items-center justify-center gap-1 bg-accent/10 text-accent font-display text-xs py-2 rounded border border-accent/40 hover:bg-accent/20 transition-colors"
+                      >
+                        <Dices className="w-3 h-3" />
+                        FORCE INITIATIVE ROLL
+                      </button>
                     )}
                     <button
                       onClick={handleConfirmInitiative}
