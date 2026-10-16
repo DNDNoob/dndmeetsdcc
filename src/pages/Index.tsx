@@ -195,6 +195,7 @@ const Index = () => {
     applyNoChildLeftBehind,
     revokeTrophy,
     overrideMobHealth,
+    setMobEncountered,
     endCombat,
     cancelCombat,
     removeCombatant,
@@ -501,18 +502,19 @@ const Index = () => {
   }, [isAuthenticated, user, userProfile?.username, setCreator]);
 
   // "No Child Left Behind": the DM's client lifts a sole slowest crawler to the second slowest speed.
-  // Only the DM runs it so the trophy isn't awarded once per connected player.
+  // Only the DM runs it so the trophy isn't awarded once per connected player, and only while a game
+  // is being played, so speeds the DM sets while creating crawlers aren't overridden mid-setup.
   const noChildLeftBehindKey = (() => {
     const bump = getNoChildLeftBehindBump(crawlers, getCrawlerInventory);
     return bump ? `${bump.crawlerId}:${bump.moveSpeed}` : '';
   })();
   const lastNoChildLeftBehindKey = useRef('');
   useEffect(() => {
-    if (!isAdmin || !isLoaded || !noChildLeftBehindKey) return;
+    if (!isAdmin || !isLoaded || !isGameActive || !noChildLeftBehindKey) return;
     if (lastNoChildLeftBehindKey.current === noChildLeftBehindKey) return;
     lastNoChildLeftBehindKey.current = noChildLeftBehindKey;
     applyNoChildLeftBehind().catch(err => console.error('[Index] No Child Left Behind failed:', err));
-  }, [isAdmin, isLoaded, noChildLeftBehindKey, applyNoChildLeftBehind]);
+  }, [isAdmin, isLoaded, isGameActive, noChildLeftBehindKey, applyNoChildLeftBehind]);
 
   // Restore campaign from URL query param on cold load (deep linking)
   const campaignRestoredRef = useRef(false);
@@ -594,12 +596,13 @@ const Index = () => {
       navigate('/app', { replace: true });
       return;
     }
-    // Non-admin trying to access dungeonai → menu
-    if (pathSegment === 'dungeonai' && !isAdmin) {
+    // Non-admin trying to access dungeonai → menu. Wait for sign-in to restore first,
+    // otherwise a DM refreshing the DM Console is briefly "not admin" and gets bounced.
+    if (pathSegment === 'dungeonai' && !authLoading && !isAdmin) {
       navigate('/app/menu', { replace: true });
       return;
     }
-  }, [pathSegment, currentPlayer, navigate, isAdmin]);
+  }, [pathSegment, currentPlayer, navigate, isAdmin, authLoading]);
 
   // Persist player to localStorage (global + per-campaign)
   useEffect(() => {
@@ -1017,6 +1020,7 @@ const Index = () => {
                 onSaveSpellToMyContent={isAuthenticated ? handleSaveSpellToMyContent : undefined}
                 onToggleSpellPublic={handleToggleSpellPublic}
                 showPublicContent={showPublicContent}
+                currentPlayerId={currentPlayer?.id}
               />
             )}
             {currentView === "mobs" && <MobsView mobs={mobs} />}
@@ -1099,6 +1103,7 @@ const Index = () => {
                 onDeleteAssignedQuest={deleteAssignedQuest}
                 currentPlayerId={currentPlayer?.id}
                 onRecordCrawlerMove={recordCrawlerMove}
+                onSetMobEncountered={setMobEncountered}
               />
             )}
             {currentView === "sounds" && <SoundEffectsView />}
@@ -1168,6 +1173,7 @@ const Index = () => {
               onEndCombat={endCombat}
               onCancelCombat={cancelCombat}
               onOverrideMobHealth={overrideMobHealth}
+              onSetMobEncountered={setMobEncountered}
               onRemoveCombatant={removeCombatant}
               runtimeCrawlerPlacements={runtimeCrawlerPlacements}
               runtimeMobPlacements={runtimeMobPlacements}

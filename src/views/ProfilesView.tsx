@@ -4,7 +4,7 @@ import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import { HealthBar } from "@/components/ui/HealthBar";
 import { EquipmentSlot } from "@/components/ui/EquipmentSlot";
-import { Crawler, Mob, InventoryItem, createEmptyCrawler, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery } from "@/lib/gameData";
+import { Crawler, Mob, InventoryItem, createEmptyCrawler, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery, getInitialCrawlerId } from "@/lib/gameData";
 import type { DiceRollEntry } from "@/hooks/useGameState";
 import UndoTurnButton, { canUndoCombatTurn } from "@/components/UndoTurnButton";
 import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Backpack, HardHat, Package, Lock, Unlock, ChevronDown, ChevronUp, Check, Search, Send, BookOpen, Filter, X, Gem, Footprints, Shirt, Hand, Target, Swords, RefreshCw, Timer, ScrollText, Eye, EyeOff, CheckSquare, Trophy, Skull, HeartCrack, Crown, Minus, Wand2, Star } from "lucide-react";
@@ -437,7 +437,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   onForgetSpell,
   onHealCrawler,
 }) => {
-  const [selectedId, setSelectedId] = useState(crawlers[0]?.id || "");
+  // Players land on their own crawler; the DM (and spectators) start on the first one
+  const [selectedId, setSelectedId] = useState(() => getInitialCrawlerId(crawlers, currentPlayerId));
   const [editMode, setEditMode] = useState(false);
   const [editData, setEditData] = useState<Partial<Crawler>>({});
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -2332,7 +2333,6 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 const rawRoll = Math.floor(Math.random() * 20) + 1;
                 const rollTotal = rawRoll + modifier;
 
-                onStatRoll?.(selected.name, selected.id, actionName, total);
                 if (addDiceRoll) {
                   addDiceRoll({
                     id: crypto.randomUUID(),
@@ -2417,7 +2417,6 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 const rawRoll = Math.floor(Math.random() * 20) + 1;
                 const rollTotal = rawRoll + modifier;
 
-                onStatRoll?.(selected.name, selected.id, attackName, total);
                 if (addDiceRoll) {
                   addDiceRoll({
                     id: crypto.randomUUID(),
@@ -2662,7 +2661,6 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 const rawRoll = Math.floor(Math.random() * 20) + 1;
                 const rollTotal = rawRoll + modifier;
 
-                onStatRoll?.(selected.name, selected.id, actionName, total);
                 if (addDiceRoll) {
                   addDiceRoll({
                     id: crypto.randomUUID(),

@@ -5,6 +5,7 @@ import { DungeonButton } from "@/components/ui/DungeonButton";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import {
   Crawler,
+  getInitialCrawlerId,
   Spell,
   SpellData,
   SpellSchool,
@@ -39,6 +40,7 @@ interface SpellsViewProps {
   publicSpells?: Spell[];
   onToggleSpellPublic?: (spell: Spell, isPublic: boolean) => void;
   showPublicContent?: boolean;
+  currentPlayerId?: string; // crawler id of the player at this screen
   mySpells?: Spell[];
   onSaveSpellToMyContent?: (spell: Spell) => void;
 }
@@ -872,8 +874,9 @@ const SpellsView: React.FC<SpellsViewProps> = ({
   showPublicContent = false,
   mySpells = [],
   onSaveSpellToMyContent,
+  currentPlayerId,
 }) => {
-  const [selectedCrawlerId, setSelectedCrawlerId] = useState<string>(crawlers[0]?.id ?? '');
+  const [selectedCrawlerId, setSelectedCrawlerId] = useState<string>(() => getInitialCrawlerId(crawlers, currentPlayerId));
   const [editingSpell, setEditingSpell] = useState<Spell | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [schoolFilter, setSchoolFilter] = useState<string>('');
