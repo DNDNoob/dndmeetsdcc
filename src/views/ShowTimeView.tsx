@@ -55,7 +55,7 @@ interface ShowTimeViewProps {
   onUpdateAssignedQuest?: (id: string, updates: Partial<AssignedQuest>) => void;
   onDeleteAssignedQuest?: (id: string) => void;
   currentPlayerId?: string; // crawler id of the player at this screen (DMs may have none)
-  onRecordCrawlerMove?: (crawlerId: string, feet: number, spendTurnMovement: boolean) => Promise<void>;
+  onRecordCrawlerMove?: (crawlerId: string, feet: number, spendTurnMovement: boolean, from?: { episodeId: string; mapId: string; x: number; y: number }) => Promise<void>;
 }
 
 const SHOWTIME_STORAGE_KEY = 'dcc_showtime_state';
@@ -1886,12 +1886,11 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   const isCombatTurnPhase = !!(combatState?.active && combatState.phase === 'combat');
   const isCombatActive = !!(combatState?.active && combatState.phase !== 'ended');
 
-  // Movement budget for a crawler. In combat: their speed per combat turn, only on their turn.
+  // Movement status for a crawler. In combat: their speed per combat turn, only on their turn.
   // Outside combat, while noncombat turns are running for this episode: NONCOMBAT_MOVE_MULTIPLIER
-  // times their speed per noncombat turn. Returns null when movement isn't limited (DM, a crawler
+  // times their speed per noncombat turn. Returns null when movement isn't tracked (a crawler
   // not in the fight, the initiative phase, or no noncombat turn running).
-  const getCrawlerMoveBudget = useCallback((crawlerId: string) => {
-    if (isAdmin) return null;
+  const getCrawlerMoveStatus = useCallback((crawlerId: string) => {
     const crawler = crawlers.find(c => c.id === crawlerId);
     const speed = crawler ? getEffectiveMoveSpeed(crawler, getCrawlerInventory?.(crawlerId) ?? []) : 0;
     const isOwner = !currentPlayerId || currentPlayerId === crawlerId;
@@ -1900,15 +1899,20 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       if (!combatant) return null;
       const isTheirTurn = combatState.combatants[combatState.currentTurnIndex]?.id === crawlerId;
       const used = combatant.feetMovedThisTurn ?? 0;
-      return { speed, used, remaining: Math.max(0, speed - used), canMove: isTheirTurn && isOwner, label: 'per combat turn' };
+      return { speed, used, remaining: Math.max(0, speed - used), canMove: isTheirTurn && isOwner, isTheirTurn, label: 'per combat turn' };
     }
     if (isCombatActive) return null;
     const turnEpisodeId = noncombatTurnState?.episodeId;
     if (!noncombatTurnState || (turnEpisodeId && selectedEpisode && turnEpisodeId !== selectedEpisode.id)) return null;
     const turnSpeed = speed * NONCOMBAT_MOVE_MULTIPLIER;
     const used = noncombatTurnState.feetMoved?.[crawlerId] ?? 0;
-    return { speed: turnSpeed, used, remaining: Math.max(0, turnSpeed - used), canMove: isOwner, label: 'per noncombat turn' };
-  }, [isAdmin, isCombatTurnPhase, isCombatActive, combatState, noncombatTurnState, selectedEpisode, crawlers, getCrawlerInventory, currentPlayerId]);
+    return { speed: turnSpeed, used, remaining: Math.max(0, turnSpeed - used), canMove: isOwner, isTheirTurn: true, label: 'per noncombat turn' };
+  }, [isCombatTurnPhase, isCombatActive, combatState, noncombatTurnState, selectedEpisode, crawlers, getCrawlerInventory, currentPlayerId]);
+
+  // Movement budget that limits a drag. The DM can always reposition freely.
+  const getCrawlerMoveBudget = useCallback((crawlerId: string) => (
+    isAdmin ? null : getCrawlerMoveStatus(crawlerId)
+  ), [isAdmin, getCrawlerMoveStatus]);
 
   // Where the current crawler drag started (to measure and limit the move)
   const crawlerDragStartRef = useRef<{ index: number; x: number; y: number } | null>(null);
@@ -1966,9 +1970,10 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     if (!currentPlayerId || currentPlayerId !== placement.crawlerId) return;
     const feet = mapDistanceFeet(start, placement);
     if (feet > 0) {
-      onRecordCrawlerMove?.(placement.crawlerId, feet, !!getCrawlerMoveBudget(placement.crawlerId));
+      const from = selectedEpisode ? { episodeId: selectedEpisode.id, mapId: placement.mapId, x: start.x, y: start.y } : undefined;
+      onRecordCrawlerMove?.(placement.crawlerId, feet, !!getCrawlerMoveBudget(placement.crawlerId), from);
     }
-  }, [crawlerPlacements, broadcastCrawlerPlacements, isAdmin, currentPlayerId, mapDistanceFeet, onRecordCrawlerMove, getCrawlerMoveBudget]);
+  }, [crawlerPlacements, broadcastCrawlerPlacements, isAdmin, currentPlayerId, mapDistanceFeet, onRecordCrawlerMove, getCrawlerMoveBudget, selectedEpisode]);
 
   // Handle dragging runtime mobs (all users can drag)
   const handleRuntimeMobDrag = useCallback((index: number, x: number, y: number) => {
@@ -3263,11 +3268,14 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             const placementIndex = crawlerPlacements.indexOf(placement);
             const isDragging = draggingRuntimeId === `crawler-${placementIndex}`;
             const canInteract = isPointVisible(placement.x, placement.y);
-            const moveBudget = getCrawlerMoveBudget(placement.crawlerId);
+            const moveBudget = getCrawlerMoveStatus(placement.crawlerId);
             const dragStart = crawlerDragStartRef.current;
             const feetLeft = moveBudget
-              ? Math.max(0, Math.round(moveBudget.remaining - (isDragging && dragStart ? mapDistanceFeet(dragStart, placement) : 0)))
+              ? Math.max(0, Math.round(moveBudget.remaining - (isDragging && dragStart && !isAdmin ? mapDistanceFeet(dragStart, placement) : 0)))
               : null;
+            // The player moving sees their own; the DM sees every tracked crawler; in combat
+            // everyone sees the crawler whose turn it is.
+            const showFeetLeft = !!moveBudget && moveBudget.isTheirTurn && (moveBudget.canMove || isAdmin || isCombatTurnPhase);
 
             return (
               <motion.div
@@ -3332,14 +3340,21 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                     );
                   })()}
                   {/* Movement left this turn (combat or noncombat turn) */}
-                  {moveBudget?.canMove && feetLeft !== null && (
+                  {showFeetLeft && moveBudget && feetLeft !== null && (
                     <div
-                      className={`absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full px-1.5 py-0.5 rounded text-[10px] font-bold whitespace-nowrap shadow-lg pointer-events-none ${
+                      className={`absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full px-1.5 pt-0.5 pb-1 rounded text-[10px] font-bold whitespace-nowrap shadow-lg pointer-events-none ${
                         feetLeft === 0 ? 'bg-destructive text-destructive-foreground' : 'bg-background/90 border border-primary/60 text-primary'
                       }`}
                       title={`Movement: ${moveBudget.speed} ft ${moveBudget.label}`}
                     >
-                      {feetLeft} ft left
+                      {feetLeft}/{moveBudget.speed} ft left
+                      {/* Bar showing the share of this turn's movement still left */}
+                      <div className="mt-0.5 h-1 w-full rounded-full bg-muted/60 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${feetLeft === 0 ? 'bg-destructive-foreground/70' : 'bg-primary'}`}
+                          style={{ width: `${moveBudget.speed > 0 ? Math.min(100, (feetLeft / moveBudget.speed) * 100) : 0}%` }}
+                        />
+                      </div>
                     </div>
                   )}
                   {/* Letter badge - only show if there are duplicates */}

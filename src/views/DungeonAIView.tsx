@@ -5,7 +5,7 @@ import { DungeonButton } from "@/components/ui/DungeonButton";
 import MapMobPlacementEditor from "@/components/ui/MapMobPlacementEditor";
 import MapDesignerPopout from "@/components/ui/MapDesignerPopout";
 import { Mob, Episode, EpisodeMobPlacement, Crawler, CrawlerPlacement, InventoryItem, LootBoxTemplate, LootBoxTier, getLootBoxTierColor, type EquipmentSlot, type EquippedItems, Quest, QuestReward, QuestActionItem, QuestRewardTier, type CampaignMapDoc, type PublicMap, type PublicMob, type PublicEpisode } from "@/lib/gameData";
-import { Brain, Upload, Plus, Trash2, Map, Skull, Image as ImageIcon, Save, Edit2, X, Layers, ChevronLeft, ChevronRight, User, Package, Search, Maximize2, Shield, ChevronDown as ChevronDownIcon, ScrollText, Eye, EyeOff, CheckSquare, GripVertical, Users, Globe, Download } from "lucide-react";
+import { Brain, Upload, Plus, Trash2, Map, Skull, Image as ImageIcon, Save, Edit2, X, Layers, ChevronLeft, ChevronRight, User, Package, Search, Maximize2, Shield, ChevronDown as ChevronDownIcon, ScrollText, Eye, EyeOff, CheckSquare, GripVertical, Users, Globe } from "lucide-react";
 import { storage } from "@/lib/firebase";
 import { ShareToggle, ImportButton } from "@/components/ui/ShareToggle";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -45,7 +45,6 @@ interface DungeonAIViewProps {
   onToggleMobPublic?: (mob: Mob, isPublic: boolean) => Promise<void>;
   onToggleEpisodePublic?: (episode: Episode, isPublic: boolean) => Promise<void>;
   onShareAllMyContent?: () => Promise<void>;
-  onImportOldContent?: () => Promise<void>;
   onImportPublicMap?: (map: PublicMap) => Promise<void>;
   onImportPublicMob?: (mob: PublicMob) => Promise<void>;
   onImportPublicEpisode?: (episode: PublicEpisode) => Promise<void>;
@@ -93,7 +92,6 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   onToggleMobPublic,
   onToggleEpisodePublic,
   onShareAllMyContent,
-  onImportOldContent,
   onImportPublicMap,
   onImportPublicMob,
   onImportPublicEpisode,
@@ -107,7 +105,6 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
 
   const [activeTab, setActiveTab] = useState<"mobs" | "maps" | "episodes" | "lootboxes" | "quests">("mobs");
   const [sharingAll, setSharingAll] = useState(false);
-  const [importingOld, setImportingOld] = useState(false);
   const [newMob, setNewMob] = useState<Partial<Mob>>({
     name: "",
     level: 1,
@@ -695,24 +692,6 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
             DUNGEON AI - DM CONSOLE
           </h2>
           <div className="ml-auto flex flex-wrap gap-2">
-          {onImportOldContent && (
-            <DungeonButton
-              variant="default"
-              size="sm"
-              disabled={importingOld}
-              onClick={async () => {
-                setImportingOld(true);
-                try {
-                  await onImportOldContent();
-                } finally {
-                  setImportingOld(false);
-                }
-              }}
-              title="Copy items, crawlers, mobs, maps and episodes saved before campaigns existed into this campaign"
-            >
-              <Download className="w-4 h-4 mr-2" /> {importingOld ? 'Importing...' : 'Import old content'}
-            </DungeonButton>
-          )}
           {onShareAllMyContent && (
             <DungeonButton
               variant="default"

@@ -4,6 +4,11 @@
     "changes": [
       "🗺️ Fixed maps looking squished in the DM's Map Designer — the map scale was stretching only the width. Maps now keep their shape at every scale",
       "🗺️ Fixed tall maps in Show Time growing far past their episode scale (150% now really means 1.5x)",
+      "🎲 DMs can now force an initiative roll from the Show Time panel, rolling d20 + DEX for every crawler still waiting so combat can start",
+      "🧹 Removed the one-time \"Import old content\" button from the DM Console now that the old content has been brought into the campaign",
+      "👣 Feet left to move is now visible to everyone: in combat the current crawler's token shows a feet-left badge with a bar for the DM and all players, the DM sees every crawler's badge during noncombat turns, and the Game Clock panel lists feet left next to each crawler",
+      "↩️ New Undo Turn button: in combat, if you move your token by accident or click the wrong action, undo your turn to put your token, movement, actions, HP and mana back to how they were when it started. Each undo shows in the dice log",
+      "🐢 New automatic trophy, This Is For You, Bud, No Child Left Behind: when one crawler is the slowest in the campaign, their speed is raised to match the second slowest crawler (ties for slowest do nothing)",
       "🗺️ Fixed wide maps getting squished in Show Time when an episode starts; maps now keep their shape and fit the screen",
       "🎯 The gold selection ring on map tokens now hugs the round portrait and grows with it, instead of wrapping the health bar too",
       "🐛 Fixed selecting or deleting a crawler token sometimes picking the wrong crawler",
