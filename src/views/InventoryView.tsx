@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import PixelIcon from '@/components/ui/PixelIcon';
 import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
@@ -58,6 +59,7 @@ interface InventoryViewProps {
   onSaveItemToMyContent?: (item: InventoryItem) => void;
   onToggleItemPublic?: (item: InventoryItem, isPublic: boolean) => void;
   showPublicContent?: boolean;
+  iconImages?: Record<string, string>; // iconLibrary id -> pixel icon image
 }
 
 // Helper to create item signature for grouping
@@ -109,6 +111,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   onSaveItemToMyContent,
   onToggleItemPublic,
   showPublicContent = false,
+  iconImages = {},
 }) => {
   const [editMode, setEditMode] = useState(false);
   // Expanded item details state
@@ -338,6 +341,12 @@ const InventoryView: React.FC<InventoryViewProps> = ({
 
   const libraryItems = getSharedInventory();
 
+  // Crawler copies made before the library item got its icon fall back to the library item's icon
+  const getItemIconSrc = (item: InventoryItem): string | undefined => {
+    const iconId = item.iconId ?? libraryItems.find(li => li.name === item.name)?.iconId;
+    return iconId ? iconImages[iconId] : undefined;
+  };
+
   // Shared renderer for expanded item details (used by both library and crawler items)
   const renderExpandedItemDetails = (item: InventoryItem) => (
     <div className="mt-2 space-y-1.5 text-xs border-l-2 border-primary/30 pl-3">
@@ -556,7 +565,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                       isSearchHighlight ? 'border-primary/50' : 'border-border/50'
                     }`}>
                       <div className="flex items-start gap-2">
-                        {getEquipmentIcon(item.equipSlot, "w-4 h-4 shrink-0 mt-0.5")}
+                        <PixelIcon src={getItemIconSrc(item)} alt={item.name} className="w-8 h-8" fallback={getEquipmentIcon(item.equipSlot, "w-4 h-4 shrink-0 mt-0.5")} />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1 flex-wrap">
                             <button
@@ -1299,9 +1308,14 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                               className="flex items-center gap-3 text-sm py-2 border-b border-border/50 last:border-0"
                             >
                               {/* Item type icon */}
-                              {item.isSpellTome
-                                ? <Wand2 className="w-4 h-4 shrink-0 text-primary" />
-                                : getEquipmentIcon(item.equipSlot)}
+                              <PixelIcon
+                                src={getItemIconSrc(item)}
+                                alt={item.name}
+                                className="w-8 h-8"
+                                fallback={item.isSpellTome
+                                  ? <Wand2 className="w-4 h-4 shrink-0 text-primary" />
+                                  : getEquipmentIcon(item.equipSlot)}
+                              />
                               {editingItemId === `${crawler.id}:${item.id}` ? (
                                 <div className="flex flex-col flex-1 gap-1">
                                   <input

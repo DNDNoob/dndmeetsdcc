@@ -203,9 +203,22 @@ export interface Spell {
   description: string;
   tags?: string[];
   spellData: SpellData;
+  iconId?: string;           // References an entry in the global iconLibrary collection
   createdBy?: string;        // Firebase uid of creator
   createdByUsername?: string; // Denormalized for display
   isPublic?: boolean;        // Whether visible to players outside the campaign
+}
+
+/** A pixel-art icon in the global `iconLibrary` collection, shared by every campaign. */
+export interface IconLibraryEntry {
+  id: string;
+  image: string;       // small PNG data URL (48x48 pixel art)
+  tags: string[];      // normalized descriptor tags used to match icons to new items/spells
+  kind: 'item' | 'spell';
+  sourceName: string;  // name of the item or spell the icon was generated for
+  prompt?: string;
+  createdAt: string;
+  createdBy?: string;
 }
 
 export const SPELL_LEARNED_FROM = ['tome', 'quest', 'level', 'race', 'class', 'granted'] as const;
@@ -254,6 +267,7 @@ export interface InventoryItem {
   weaponData?: WeaponData; // Weapon-specific data (only for items with "weapon" tag or weapon equipSlot)
   isUpgraded?: boolean; // Whether this item has been upgraded by a crawler
   isSpellTome?: boolean; // Consumable that teaches a spell when used
+  iconId?: string; // References an entry in the global iconLibrary collection
   spellTomeData?: {
     entries: Array<{
       spellId?: string; // References a spell in the library
