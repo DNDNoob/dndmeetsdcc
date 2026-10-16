@@ -9,7 +9,8 @@
       "🎲 Attacks, bonus actions and reactions now roll one d20 instead of two",
       "🐢 No Child Left Behind now only runs during a game, so DMs can set up slower crawlers, and the trophy is awarded once per crawler",
       "🗺️ Deleting a map no longer moves an episode's mobs onto the wrong map; episodes using it are updated and keep their other maps, settings and fog",
-      "📝 Saving an episode in the DM Console during a game no longer moves mobs back or restores their HP"
+      "📝 Saving an episode in the DM Console during a game no longer moves mobs back or restores their HP",
+      "⚔️ Combat no longer saves a copy of every crawler and mob picture, so big fights stay well under Firebase's 1 MB save limit"
     ]
   },
   {

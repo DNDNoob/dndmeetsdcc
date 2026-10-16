@@ -453,7 +453,7 @@ export interface CombatantEntry {
   hasRolledInitiative: boolean;
   hasUsedAction: boolean;
   hasUsedBonusAction: boolean;
-  avatar?: string; // cached avatar/image for display
+  avatar?: string; // Deprecated: no longer saved (images made combat docs too big); look up the crawler/mob instead
   currentHP?: number; // per-combatant HP tracking (used for mob instances)
   feetMovedThisTurn?: number; // crawler movement used this turn (reset when the turn ends)
 }
