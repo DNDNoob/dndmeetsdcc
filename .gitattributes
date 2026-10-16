@@ -1,0 +1,3 @@
+scripts/npc-voices/*.cmd text eol=crlf
+scripts/npc-voices/*.vbs text eol=crlf
+scripts/npc-voices/*.ps1 text eol=crlf

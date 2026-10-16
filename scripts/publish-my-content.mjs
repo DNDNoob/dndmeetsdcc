@@ -53,9 +53,15 @@ const publicDocId = (campaignId, sourceId) => `${campaignId}__${sourceId}`;
 const mapImage = (m) => m.image || m.imageUrl || m.url || m.value || '';
 
 // Must match buildEpisodeBundle in src/lib/publicContent.ts
+// Shared copies keep an NPC's personality but never its secret (mirrors stripNpcSecret in gameData.ts)
+function stripNpcSecret(mob) {
+  if (!mob.personality) return mob;
+  const { secret, revealWhen, ...personality } = mob.personality;
+  return { ...mob, personality };
+}
 function toMobType(mob) {
   const { createdBy, createdByUsername, isPublic, sourceId, sourceCampaignId, publishedAt, roomId, ...rest } = mob;
-  return { ...rest, encountered: false };
+  return stripNpcSecret({ ...rest, encountered: false });
 }
 function toQuestTemplate(q) {
   return {
@@ -253,10 +259,10 @@ async function main() {
       if (!isMine(mob.createdBy)) continue;
       const by = mob.createdBy ? { createdBy: mob.createdBy, ...(mob.createdByUsername ? { createdByUsername: mob.createdByUsername } : {}) } : creator;
       const { roomId: _r, ...mobData } = mob;
-      const pub = {
+      const pub = stripNpcSecret({
         ...mobData, ...by, id: publicDocId(roomId, mob.id), sourceId: mob.id, sourceCampaignId: roomId,
         encountered: false, isPublic: true, publishedAt: Date.now(),
-      };
+      });
       totals.mobs++;
       await write(`mob "${mob.name}"`, async () => {
         await setDoc(doc(db, 'publicMobs', pub.id), pub);
