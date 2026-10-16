@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { db, auth, getCollectionRef, setDoc, doc, deleteDoc, updateDoc, onSnapshot, initAuth, writeBatch, runTransaction, getDocs, collection as fsCollection } from '../lib/firebase';
+import { db, auth, getCollectionRef, setDoc, doc, deleteDoc, updateDoc, onSnapshot, initAuth, writeBatch, runTransaction } from '../lib/firebase';
 import { diffById, applyDiff, isEmptyDiff } from '../lib/arrayMerge';
 import { isAuthenticatedUser } from '../lib/firebase';
 import { toast } from 'sonner';
@@ -39,7 +39,6 @@ interface UseFirebaseStoreReturn {
     next: Record<string, unknown>[],
     extra?: Record<string, unknown>,
   ) => Promise<void>;
-  readRootCollection: (collection: string) => Promise<Record<string, unknown>[]>;
 }
 
 interface Creator {
@@ -531,14 +530,6 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
     }
   }, [roomId, requireAuth]);
 
-  // One-off read of a top-level collection (outside any campaign), e.g. content saved
-  // before campaigns existed
-  const readRootCollection = useCallback(async (collectionName: string) => {
-    if (!db) return [];
-    const snap = await getDocs(fsCollection(db, collectionName));
-    return snap.docs.map(d => ({ ...d.data(), id: d.id }) as Record<string, unknown>);
-  }, []);
-
   const getCollection = useCallback(<T = Record<string, unknown>>(collection: CollectionName): T[] => {
     return (data[collection] || []) as T[];
   }, [data]);
@@ -565,7 +556,6 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
     roomId,
     setCreator,
     mergeArrayById,
-    readRootCollection,
   };
 }
 
