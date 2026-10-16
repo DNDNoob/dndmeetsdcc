@@ -3,6 +3,8 @@
     "date": "2026-10-15",
     "changes": [
       "🧹 Removed the one-time \"Import old content\" button from the DM Console now that the old content has been brought into the campaign",
+      "👣 Feet left to move is now visible to everyone: in combat the current crawler's token shows a feet-left badge with a bar for the DM and all players, the DM sees every crawler's badge during noncombat turns, and the Game Clock panel lists feet left next to each crawler",
+      "↩️ New Undo Turn button: in combat, if you move your token by accident or click the wrong action, undo your turn to put your token, movement, actions, HP and mana back to how they were when it started. Each undo shows in the dice log",
       "🐢 New automatic trophy, This Is For You, Bud, No Child Left Behind: when one crawler is the slowest in the campaign, their speed is raised to match the second slowest crawler (ties for slowest do nothing)",
       "🗺️ Fixed wide maps getting squished in Show Time when an episode starts; maps now keep their shape and fit the screen",
       "🎯 The gold selection ring on map tokens now hugs the round portrait and grows with it, instead of wrapping the health bar too",

@@ -340,13 +340,27 @@ Combat proceeds in turn order (highest initiative first). On your turn:
 
 The DM advances turns with the "Next Turn" button.
 
+## Undo Turn
+
+Moved your token by accident or clicked the wrong action? Press **Undo Turn** during your own turn. It shows at the top of your crawler profile and in the combat section of the game clock panel. Tap it, then tap **Tap again to undo** to confirm.
+
+Undoing puts everything back to how it was when your turn started:
+
+- Your token goes back to where it stood
+- Your movement, action and bonus action are refilled
+- HP changes from damage or healing this turn are reversed, for crawlers and mobs
+- Mana spent and spell casts this turn are given back
+
+Every undo adds a "reset their turn" line to the dice log so the table can see it. Rolls you already made stay in the log. Only the player whose turn it is (or the DM) can undo, and only until the turn passes. Things outside the fight, like items traded or quests updated, are not undone.
+
 ## Movement
 
 Each crawler has a **movement speed**: how many feet they can move per combat turn. It starts at **60 ft**. Equipment with a Speed modifier (for example, fast boots) raises or lowers it, and the DM can change a crawler's base speed in edit mode on their profile.
 
 - During combat you can only move **your own crawler**, and only on **its turn**.
 - Distance uses the same scale as the Ruler: **5 ft per grid square**, where a square is the size of one token.
-- While dragging, a badge above your token shows how many feet you have left. If you drag farther than you're allowed, the token stops at the edge of your range.
+- A **feet-left badge** above the token of the crawler whose turn it is shows how many feet they have left out of their speed (for example **35/60 ft left**), with a bar that empties as they move. Everyone at the table sees it, and it counts down live while you drag. If you drag farther than you're allowed, the token stops at the edge of your range.
+- The turn order in the Game Clock panel also shows the current crawler's feet left next to their name.
 - You can move several times in one turn until your feet run out. Your movement refills when the turn passes.
 - The DM can move any token at any time without using up anyone's movement.
 
@@ -706,7 +720,7 @@ During exploration (outside of combat), the DM can track noncombat turns. Each t
 - The turn counter increments
 - The game clock advances 1 hour
 - Each crawler gets a limited number of rolls per turn (default: 3)
-- Each crawler can move up to **twice their movement speed** (120 ft at the default 60 ft speed). A badge above your token shows the feet you have left, and only you can move your crawler. The DM can still move any token freely.
+- Each crawler can move up to **twice their movement speed** (120 ft at the default 60 ft speed). A badge above your token shows the feet you have left (the DM sees every crawler's badge, and the Game Clock panel lists each crawler's feet left), and only you can move your crawler. The DM can still move any token freely.
 
 The DM starts a new noncombat turn from the game clock panel.
 
