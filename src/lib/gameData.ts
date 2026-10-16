@@ -48,6 +48,49 @@ export interface CrawlerTrophy {
 // Default movement speed (feet per combat turn) when a crawler has none set
 export const DEFAULT_MOVE_SPEED = 60;
 
+// The crawler a crawler picker should open on: the viewer's own crawler, else the first one
+export const getInitialCrawlerId = (crawlers: Crawler[], currentPlayerId?: string): string =>
+  currentPlayerId && crawlers.some(c => c.id === currentPlayerId) ? currentPlayerId : (crawlers[0]?.id || "");
+
+// Episodes point at maps by their position in the campaign's map list ("0", "1", ...).
+// When maps are deleted, positions after them shift down, so rewrite an episode's references
+// with `remap` (old position -> new position, or null if that map is gone).
+// Returns only the changed fields, or null when nothing changes.
+export const remapEpisodeMapRefs = (
+  episode: Episode,
+  remap: (oldId: string) => string | null,
+): Pick<Episode, 'mapIds' | 'mobPlacements' | 'crawlerPlacements' | 'mapSettings'> | null => {
+  const firstMapId = episode.mapIds[0];
+  // Placements saved without a mapId belong to the episode's first map
+  const placementMap = (mapId?: string) => remap(mapId || firstMapId || '0');
+  const mapIds = episode.mapIds.map(remap).filter((id): id is string => id !== null);
+  const mobPlacements = (episode.mobPlacements || [])
+    .map(p => ({ ...p, mapId: placementMap(p.mapId) }))
+    .filter((p): p is EpisodeMobPlacement => p.mapId !== null);
+  const crawlerPlacements = episode.crawlerPlacements
+    ?.map(p => ({ ...p, mapId: placementMap(p.mapId) }))
+    .filter((p): p is CrawlerPlacement => p.mapId !== null);
+  const mapSettings = episode.mapSettings
+    ? Object.fromEntries(
+        Object.entries(episode.mapSettings)
+          .map(([k, v]) => [remap(k), v] as const)
+          .filter((e): e is readonly [string, MapSettings] => e[0] !== null),
+      )
+    : undefined;
+  const changed =
+    JSON.stringify(mapIds) !== JSON.stringify(episode.mapIds) ||
+    JSON.stringify(mobPlacements) !== JSON.stringify(episode.mobPlacements || []) ||
+    JSON.stringify(crawlerPlacements) !== JSON.stringify(episode.crawlerPlacements) ||
+    JSON.stringify(mapSettings) !== JSON.stringify(episode.mapSettings);
+  if (!changed) return null;
+  return {
+    mapIds,
+    mobPlacements,
+    ...(crawlerPlacements ? { crawlerPlacements } : {}),
+    ...(mapSettings ? { mapSettings } : {}),
+  };
+};
+
 // Noncombat turns allow this multiple of a crawler's combat movement speed
 export const NONCOMBAT_MOVE_MULTIPLIER = 2;
 

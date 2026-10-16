@@ -151,7 +151,8 @@ Nobody gets left behind. If exactly one crawler in the campaign is slower than e
 
 - Speed here means the crawler's speed after equipment bonuses.
 - If two or more crawlers are tied for slowest, nothing happens.
-- It happens again any time a single crawler becomes the slowest, and the trophy counts up each time.
+- It only runs while a game is being played (after the DM clicks **Play the Game** in Show Time), so the DM can set up crawlers with any speed beforehand.
+- It happens again any time a single crawler becomes the slowest during a game. The trophy is awarded once per crawler.
 - It runs while the DM has the campaign open.`,
   },
   {
@@ -323,6 +324,8 @@ The combat system handles turn-based encounters with initiative, action tracking
 
 The DM starts combat from the game clock panel during Show Time. They select which crawlers and mobs participate. You can also add combatants mid-combat using the "Add to Combat" button.
 
+Every mob placed in the episode can join combat, including mobs the party hasn't encountered yet. Unencountered mobs are tagged *unencountered* in the setup list and have a **Reveal** button. Players see every combatant in the turn order either way.
+
 ## Initiative Phase
 
 1. Each participant rolls for initiative (d20 + modifiers)
@@ -437,6 +440,14 @@ Each map in an episode has independent settings:
 - **Mob Placements**: Mobs are placed on specific maps, not the episode as a whole
 - **Crawler Placements**: Player character positions are per-map
 
+## Editing an Episode During a Game
+
+You can open an episode in the DM Console editor while it's running in Show Time. Saving it keeps the live positions and HP of mobs you didn't touch in the editor, so moves made in Show Time aren't undone.
+
+## Deleting Maps
+
+If you delete a map, every episode that uses it is updated: the map is removed from the episode along with the mobs and crawlers placed on it, and the episode's other maps keep their mobs, settings and fog.
+
 ## Ending an Episode
 
 The DM can click "Game Over" to end the episode for all players, or "Back to Episodes" to return to the episode selection screen.`,
@@ -537,10 +548,19 @@ Each mob has:
 - **Default Gold**
 - **Equipped Items** (items the mob has equipped, shown with a shield icon)
 
+## Encountered Mobs
+
+New mobs start as **unencountered**: they don't appear in players' Mob Profiles until the party meets them. They still show on the map and can join combat.
+
+The DM can mark a mob encountered (or unencountered) from:
+- The DM Console Mobs tab
+- Show Time: right-click a mob token and choose **Mark Encountered**
+- The combat panel: the **Reveal** / **Hide** button next to the mob
+
 ## Mob Visibility
 
 The DM can choose to hide or show various mob details:
-- **Hidden**: The mob doesn't appear to players at all
+- **Unencountered**: The mob is left out of players' Mob Profiles
 - **Hide HP**: Health bar is hidden from players
 - **Hide Strengths/Weaknesses**: Stat details hidden until the DM reveals them
 
@@ -756,6 +776,8 @@ Show Time is the main gameplay view where the DM presents maps, mobs, and encoun
 4. Navigate between maps using the map selector
 5. Manage combat, loot, and turns from the game clock panel
 6. Click "Game Over" to end the session
+
+If you refresh the page or visit another page (like the DM Console) during a game, Show Time picks up where you left off when you come back, and players stay in the game.
 
 ## For Players
 

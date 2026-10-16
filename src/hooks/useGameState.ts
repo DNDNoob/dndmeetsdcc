@@ -25,6 +25,7 @@ import {
   getEquippedModifiers,
   addActivityStats,
   getHPLossStats,
+  remapEpisodeMapRefs,
   type CrawlerActivityStats,
   type CrawlerTrophy,
   defaultCrawlers,
@@ -38,7 +39,7 @@ import {
 import { useGame } from "@/contexts/GameContext";
 import type { BatchOperation } from "@/hooks/useFirebaseStore";
 import { db, storage } from "@/lib/firebase";
-import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, deleteDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { ref as storageRef, deleteObject } from "firebase/storage";
 import { logger } from "@/lib/logger";
 import { toast } from "sonner";
@@ -291,6 +292,77 @@ export const useGameState = () => {
     }
   };
 
+  // Show Time keeps per-map state in docs keyed `${episodeId}-${mapPosition}`
+  const PER_MAP_SHOWTIME_COLLECTIONS = [
+    'fog-of-war', 'pings', 'map-boxes', 'ruler-state',
+    'crawler-placements', 'runtime-mob-placements', 'name-overrides',
+  ];
+
+  // Adds episode updates to `operations` and moves per-map Show Time docs so that every
+  // episode keeps pointing at the same maps once `deletedIds` are gone
+  const remapEpisodesAfterMapDelete = async (
+    mapDocs: Record<string, unknown>[],
+    deletedIds: Set<string>,
+    operations: BatchOperation[],
+  ) => {
+    // Same ordering and filtering as the `maps` array the positions index into
+    const withImage = mapDocs.filter(d => !!((d?.image as string) || (d?.imageUrl as string) || (d?.url as string) || (d?.value as string)));
+    const newPosition = new Map<string, string | null>();
+    let next = 0;
+    withImage.forEach((d, oldIdx) => {
+      newPosition.set(String(oldIdx), deletedIds.has(d.id as string) ? null : String(next++));
+    });
+    // References we can't place (already broken) are left alone
+    const remap = (oldId: string) => (newPosition.has(oldId) ? newPosition.get(oldId)! : oldId);
+
+    for (const episode of getCollection('episodes') as Episode[]) {
+      const updates = remapEpisodeMapRefs(episode, remap);
+      if (!updates) continue;
+      operations.push({
+        type: 'update',
+        collection: 'episodes',
+        id: episode.id,
+        data: { ...updates, updatedAt: new Date().toISOString() } as Record<string, unknown>,
+      });
+      logger.log('[GameState] 🗺️ Re-indexing episode maps', { episode: episode.id, from: episode.mapIds, to: updates.mapIds });
+
+      if (!db) continue;
+      const oldIds = episode.mapIds.filter(id => remap(id) !== id);
+      if (oldIds.length === 0) continue;
+      const pathFor = (col: string, mapId: string) =>
+        roomId ? `rooms/${roomId}/${col}/${episode.id}-${mapId}` : `${col}/${episode.id}-${mapId}`;
+      for (const col of PER_MAP_SHOWTIME_COLLECTIONS) {
+        try {
+          // Read everything first: a map's new position can be another map's old one
+          const touched = new Set<string>();
+          const moved = new Map<string, Record<string, unknown>>();
+          for (const oldId of oldIds) {
+            touched.add(oldId);
+            const snap = await getDoc(doc(db, pathFor(col, oldId)));
+            const target = remap(oldId);
+            if (target !== null) touched.add(target);
+            if (snap.exists() && target !== null) {
+              // Some docs (placements) also record the map position inside them
+              const data = { ...snap.data() } as Record<string, unknown>;
+              if ('mapId' in data) data.mapId = target;
+              if (Array.isArray(data.placements)) {
+                data.placements = (data.placements as Record<string, unknown>[]).map(pl => ({ ...pl, mapId: target }));
+              }
+              moved.set(target, data);
+            }
+          }
+          for (const key of touched) {
+            const data = moved.get(key);
+            if (data) await setDoc(doc(db, pathFor(col, key)), data);
+            else await deleteDoc(doc(db, pathFor(col, key)));
+          }
+        } catch (err) {
+          console.warn('[GameState] ⚠️ Failed to move Show Time state after map delete:', col, episode.id, err);
+        }
+      }
+    }
+  };
+
   // Persist maps by diffing Firestore docs against provided array of base64 strings
   const setMaps = async (newMaps: string[]) => {
     const existingDocs = getCollection('maps') as Record<string, unknown>[];
@@ -411,6 +483,12 @@ export const useGameState = () => {
         collection: 'maps',
         id,
       });
+    }
+
+    // Episodes reference maps by position; deleting a map shifts every later map down one,
+    // so move episodes (and their Show Time state) to the new positions in the same save
+    if (mapsToDeleteIds.length > 0) {
+      await remapEpisodesAfterMapDelete(existingDocs || [], new Set(mapsToDeleteIds), operations);
     }
 
     if (operations.length > 0) {
@@ -1401,7 +1479,11 @@ export const useGameState = () => {
     if (!crawler) return;
     logger.log('[GameState] 🐢 No Child Left Behind:', bump);
     await writeCrawler(bump.crawlerId, { moveSpeed: bump.moveSpeed });
-    await awardTrophy(bump.crawlerId, NO_CHILD_LEFT_BEHIND_TROPHY, NO_CHILD_LEFT_BEHIND_DESCRIPTION);
+    // The trophy is earned once; later speed bumps for the same crawler don't stack it
+    const alreadyAwarded = (crawler.trophies ?? []).some(t => t.name === NO_CHILD_LEFT_BEHIND_TROPHY);
+    if (!alreadyAwarded) {
+      await awardTrophy(bump.crawlerId, NO_CHILD_LEFT_BEHIND_TROPHY, NO_CHILD_LEFT_BEHIND_DESCRIPTION);
+    }
     toast.info(`${crawler.name}'s speed went from ${bump.fromSpeed} ft to ${bump.toSpeed} ft.`);
   };
 
@@ -1413,6 +1495,12 @@ export const useGameState = () => {
       .map(t => (t.id === trophyId ? { ...t, count: t.count - 1 } : t))
       .filter(t => t.count > 0);
     await writeCrawler(crawlerId, { trophies });
+  };
+
+  // Encountered mobs show in players' Mob Profiles; unencountered ones stay hidden there.
+  // Same pairing the DM Console uses (encountered ⇔ not hidden).
+  const setMobEncountered = async (mobId: string, encountered: boolean) => {
+    await updateItem('mobs', mobId, { encountered, hidden: !encountered } as Record<string, unknown>);
   };
 
   const overrideMobHealth = async (combatantId: string, newHP: number) => {
@@ -1799,6 +1887,7 @@ export const useGameState = () => {
     applyNoChildLeftBehind,
     revokeTrophy,
     overrideMobHealth,
+    setMobEncountered,
     endCombat,
     cancelCombat,
     removeCombatant,

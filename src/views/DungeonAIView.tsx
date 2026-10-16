@@ -131,6 +131,9 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   const [selectedMobsForEpisode, setSelectedMobsForEpisode] = useState<EpisodeMobPlacement[]>([]);
   const [selectedCrawlersForEpisode, setSelectedCrawlersForEpisode] = useState<CrawlerPlacement[]>([]);
   const [editingEpisodeId, setEditingEpisodeId] = useState<string | null>(null);
+  // Placements as they were when Edit was opened; Show Time keeps changing the live episode
+  // (mob moves, HP) while the editor is open, so only touched placements are saved back
+  const editLoadedPlacements = useRef<{ mobs: EpisodeMobPlacement[]; crawlers: CrawlerPlacement[] } | null>(null);
   const [currentMapIndexForEditor, setCurrentMapIndexForEditor] = useState(0);
   // Per-map settings: { [mapId]: { fogOfWar: boolean, scale: number } }
   const [mapSettingsForEpisode, setMapSettingsForEpisode] = useState<{ [mapId: string]: { fogOfWar: boolean; scale: number } }>({});
@@ -499,18 +502,33 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
 
     if (editingEpisodeId) {
       // Update existing episode
+      const loaded = editLoadedPlacements.current;
+      const live = episodes.find(e => e.id === editingEpisodeId);
+      const samePlacement = (a: EpisodeMobPlacement, b: EpisodeMobPlacement) =>
+        a.mobId === b.mobId && a.mapId === b.mapId && a.x === b.x && a.y === b.y;
+      const mobsChanged = !loaded || JSON.stringify(selectedMobsForEpisode) !== JSON.stringify(loaded.mobs);
+      const crawlersChanged = !loaded || JSON.stringify(selectedCrawlersForEpisode) !== JSON.stringify(loaded.crawlers);
+      // Mobs the DM didn't move in the editor keep their live position and HP from Show Time
+      const mobPlacementsToSave = selectedMobsForEpisode.map(p => {
+        const loadedIdx = loaded?.mobs.findIndex(l => samePlacement(l, p)) ?? -1;
+        const livePlacement = loadedIdx >= 0 ? live?.mobPlacements[loadedIdx] : undefined;
+        return livePlacement && livePlacement.mobId === p.mobId
+          ? { ...livePlacement, mapId: livePlacement.mapId || p.mapId, scale: p.scale }
+          : p;
+      });
       onUpdateEpisode(editingEpisodeId, {
         name: newEpisodeName,
         description: newEpisodeDescription,
         mapIds: selectedMapsForEpisode,
-        mobPlacements: selectedMobsForEpisode,
-        crawlerPlacements: selectedCrawlersForEpisode,
+        ...(mobsChanged ? { mobPlacements: mobPlacementsToSave } : {}),
+        ...(crawlersChanged ? { crawlerPlacements: selectedCrawlersForEpisode } : {}),
         mapSettings: mapSettings,
         lootBoxIds: selectedLootBoxIdsForEpisode.length > 0 ? selectedLootBoxIdsForEpisode : undefined,
         questIds: selectedQuestIdsForEpisode.length > 0 ? selectedQuestIdsForEpisode : undefined,
         startingGameTime: parsedStartingTime,
       });
       setEditingEpisodeId(null);
+      editLoadedPlacements.current = null;
     } else {
       // Create new episode
       const episode: Episode = {
@@ -615,7 +633,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
     setSelectedMapsForEpisode(episode.mapIds);
 
     // Load mob placements - add mapId if missing (backwards compatibility)
-    setSelectedMobsForEpisode(episode.mobPlacements.map(p => ({
+    const loadedMobs = episode.mobPlacements.map(p => ({
       mobId: p.mobId,
       mapId: p.mapId || episode.mapIds[0] || '0', // Default to first map if no mapId
       x: p.x,
@@ -624,15 +642,19 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
       currentHP: p.currentHP,
       inventoryOverride: p.inventoryOverride,
       goldOverride: p.goldOverride,
-    })));
+      letterIndex: p.letterIndex,
+    }));
+    setSelectedMobsForEpisode(loadedMobs);
 
     // Load crawler placements
-    setSelectedCrawlersForEpisode(episode.crawlerPlacements?.map(p => ({
+    const loadedCrawlers = episode.crawlerPlacements?.map(p => ({
       crawlerId: p.crawlerId,
       mapId: p.mapId || episode.mapIds[0] || '0',
       x: p.x,
       y: p.y,
-    })) || []);
+    })) || [];
+    setSelectedCrawlersForEpisode(loadedCrawlers);
+    editLoadedPlacements.current = { mobs: loadedMobs, crawlers: loadedCrawlers };
 
     // Load per-map settings
     const loadedMapSettings: { [mapId: string]: { fogOfWar: boolean; scale: number } } = {};
@@ -1908,6 +1930,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                       variant="default"
                       onClick={() => {
                         setEditingEpisodeId(null);
+                        editLoadedPlacements.current = null;
                         setNewEpisodeName("");
                         setNewEpisodeDescription("");
                         setSelectedMapsForEpisode([]);

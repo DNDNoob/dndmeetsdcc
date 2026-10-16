@@ -14,7 +14,7 @@ import { MapBox, MapBoxData, ShapeType } from "@/components/ui/MapBox";
 import { MapToolsMenu } from "@/components/ui/MapToolsMenu";
 import { CrawlerIcon } from "@/components/ui/CrawlerIcon";
 import { db } from "@/lib/firebase";
-import { doc, setDoc, onSnapshot, serverTimestamp, Timestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, onSnapshot, serverTimestamp, Timestamp } from "firebase/firestore";
 import { useThrottledCallback } from "@/hooks/useDebounce";
 import CombatTurnTimer from "@/components/CombatTurnTimer";
 
@@ -56,6 +56,7 @@ interface ShowTimeViewProps {
   onDeleteAssignedQuest?: (id: string) => void;
   currentPlayerId?: string; // crawler id of the player at this screen (DMs may have none)
   onRecordCrawlerMove?: (crawlerId: string, feet: number, spendTurnMovement: boolean, from?: { episodeId: string; mapId: string; x: number; y: number }) => Promise<void>;
+  onSetMobEncountered?: (mobId: string, encountered: boolean) => Promise<void>;
 }
 
 const SHOWTIME_STORAGE_KEY = 'dcc_showtime_state';
@@ -728,7 +729,7 @@ const InventoryPanel: React.FC<{
   );
 };
 
-const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock, noncombatTurnState, resetNoncombatTurns, combatState, onRemoveCombatant, onRuntimePlacementsChange, onGameActiveChange, onRegisterGameToggle, roomId, quests = [], assignedQuests = [], onAssignQuest, onUpdateQuest, onUpdateAssignedQuest, onDeleteAssignedQuest, currentPlayerId, onRecordCrawlerMove }) => {
+const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock, noncombatTurnState, resetNoncombatTurns, combatState, onRemoveCombatant, onRuntimePlacementsChange, onGameActiveChange, onRegisterGameToggle, roomId, quests = [], assignedQuests = [], onAssignQuest, onUpdateQuest, onUpdateAssignedQuest, onDeleteAssignedQuest, currentPlayerId, onRecordCrawlerMove, onSetMobEncountered }) => {
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
   const selectedEpisodeIdRef = useRef<string | null>(null);
   const [currentMapIndex, setCurrentMapIndex] = useState(0);
@@ -907,6 +908,36 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       console.error('[ShowTime] Failed to broadcast showtime state:', error);
     }
   }, [isAdmin, roomId, gameStarted]);
+
+  // DM: when Show Time mounts again (refresh, or back from another page), pick up the running
+  // episode from the shared showtime state instead of starting over, so players stay in the game
+  const hasRestoredShowtime = useRef(false);
+  useEffect(() => {
+    if (!isAdmin || !db || hasRestoredShowtime.current || episodes.length === 0) return;
+    hasRestoredShowtime.current = true;
+    const showtimeDocPath = roomId
+      ? `rooms/${roomId}/showtime-state/current`
+      : `showtime-state/current`;
+    getDoc(doc(db, showtimeDocPath)).then(snapshot => {
+      if (!snapshot.exists() || selectedEpisodeIdRef.current) return;
+      const data = snapshot.data();
+      const episode = data.episodeId ? episodes.find(e => e.id === data.episodeId) : undefined;
+      if (!episode || !data.isActive) return;
+      const mapIdx = typeof data.currentMapIndex === 'number' && data.currentMapIndex < episode.mapIds.length ? data.currentMapIndex : 0;
+      const mapUrl = maps[parseInt(episode.mapIds[mapIdx], 10)] || data.selectedMapUrl || null;
+      console.log('[ShowTime] Restoring running episode', { episodeId: episode.id, mapIdx, gameStarted: data.gameStarted });
+      setSelectedEpisode(episode);
+      setCurrentMapIndex(mapIdx);
+      setSelectedMap(mapUrl);
+      needsCentering.current = true;
+      if (data.gameStarted === true) {
+        setGameStarted(true);
+        onGameActiveChange?.(true);
+      }
+    }).catch(error => {
+      console.error('[ShowTime] Failed to restore showtime state:', error);
+    });
+  }, [isAdmin, roomId, episodes, maps, onGameActiveChange]);
 
   // Listen for showtime state updates (for players)
   useEffect(() => {
@@ -3595,10 +3626,12 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       {contextMenu && isAdmin && (() => {
         // Resolve mob HP info for display/editing
         let mobHPInfo: { currentHP: number; maxHP: number; name: string } | null = null;
+        let contextMob: Mob | undefined;
         if (contextMenu.type === 'episode-mob') {
           const placement = selectedEpisode?.mobPlacements[contextMenu.index];
           if (placement) {
             const mob = mobs.find(m => m.id === placement.mobId);
+            contextMob = mob;
             if (mob && mob.hitPoints) {
               const hp = placement.currentHP ?? mob.hitPoints;
               mobHPInfo = { currentHP: hp, maxHP: mob.hitPoints, name: mob.name };
@@ -3609,6 +3642,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
           const placement = filtered[contextMenu.index];
           if (placement) {
             const mob = mobs.find(m => m.id === placement.mobId);
+            contextMob = mob;
             if (mob && mob.hitPoints) {
               const hp = placement.currentHP ?? mob.hitPoints;
               mobHPInfo = { currentHP: hp, maxHP: mob.hitPoints, name: mob.name };
@@ -3677,6 +3711,19 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
               </div>
             </div>
           )}
+          {contextMob && onSetMobEncountered && (() => {
+            const encountered = !!contextMob.encountered && !contextMob.hidden;
+            const mobId = contextMob.id;
+            return (
+              <button
+                onClick={() => { onSetMobEncountered(mobId, !encountered); setContextMenu(null); }}
+                className="w-full text-left px-4 py-2 text-sm text-accent hover:bg-accent/10 font-display flex items-center gap-2"
+              >
+                {encountered ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                {encountered ? 'Mark Unencountered' : 'Mark Encountered'}
+              </button>
+            );
+          })()}
           <button
             onClick={() => handleDeleteSelectedEntity()}
             className="w-full text-left px-4 py-2 text-sm text-destructive hover:bg-destructive/10 font-display flex items-center gap-2"
