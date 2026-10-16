@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Clock, ChevronUp, ChevronDown, RotateCcw, Sun, Moon, Swords, Zap, SkipForward, XCircle, Heart, Plus, Play, Square, Timer, Pause, Footprints } from "lucide-react";
 import { type Crawler, type Mob, type NoncombatTurnState, type GameClockState, type Episode, type CombatState, type CrawlerPlacement, type EpisodeMobPlacement, type CombatantEntry, type InventoryItem, getEffectiveMoveSpeed, NONCOMBAT_MOVE_MULTIPLIER } from "@/lib/gameData";
+import UndoTurnButton from "@/components/UndoTurnButton";
 
 interface PingPanelProps {
   isAdmin?: boolean;
@@ -28,6 +29,8 @@ interface PingPanelProps {
   onToggleGameActive?: (active: boolean) => Promise<void>;
   onUpdateCombatTimer?: (settings: { turnTimerMode?: 'countdown' | 'stopwatch'; turnTimerDuration?: number; turnTimerPaused?: boolean }) => Promise<void>;
   getCrawlerInventory?: (crawlerId: string) => InventoryItem[];
+  currentPlayerId?: string;
+  onUndoCombatTurn?: () => Promise<boolean>;
 }
 
 const PingPanel: React.FC<PingPanelProps> = ({
@@ -55,6 +58,8 @@ const PingPanel: React.FC<PingPanelProps> = ({
   onToggleGameActive,
   onUpdateCombatTimer,
   getCrawlerInventory,
+  currentPlayerId,
+  onUndoCombatTurn,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showRestDropdown, setShowRestDropdown] = useState<'short' | 'long' | null>(null);
@@ -884,6 +889,20 @@ const PingPanel: React.FC<PingPanelProps> = ({
                     )}
                   </div>
                 )}
+
+                {/* Undo the current turn: the player whose turn it is, or the DM */}
+                {(() => {
+                  const activeId = combatState.combatants[combatState.currentTurnIndex]?.id;
+                  if (!isAdmin && activeId !== currentPlayerId) return null;
+                  return (
+                    <UndoTurnButton
+                      combatState={combatState}
+                      crawlerId={activeId}
+                      onUndo={onUndoCombatTurn}
+                      className="w-full"
+                    />
+                  );
+                })()}
 
                 {/* DM: Advance turn and end combat */}
                 {isAdmin && (

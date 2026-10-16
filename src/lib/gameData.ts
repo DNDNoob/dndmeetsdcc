@@ -429,6 +429,26 @@ export interface CombatState {
   turnTimerDuration?: number; // countdown seconds, default: 60
   turnTimerPaused?: boolean; // DM can pause the timer
   turnStartedAt?: number; // epoch ms when current turn started
+  turnSnapshot?: CombatTurnSnapshot | null; // checkpoint of the current turn, used to undo it
+}
+
+// What the game looked like when a combat turn started, so the player can undo the turn.
+// Only small, mutable fields are kept (combatant avatars are not copied) to stay well
+// under the Firestore document size limit.
+export interface CombatTurnSnapshot {
+  combatantId: string; // whose turn this checkpoint belongs to
+  takenAt: number; // epoch ms
+  combatants: {
+    id: string;
+    currentHP?: number;
+    hasUsedAction: boolean;
+    hasUsedBonusAction: boolean;
+    feetMovedThisTurn?: number;
+  }[];
+  // HP, mana and activity stats of every crawler in the fight (damage and healing can hit anyone)
+  crawlers: Record<string, { hp: number; mana: number; activityStats?: CrawlerActivityStats }>;
+  knownSpells?: KnownSpell[]; // the active crawler's spells (cast counts change when casting)
+  startPosition?: { episodeId: string; mapId: string; x: number; y: number } | null; // token spot before the first move
 }
 
 export interface Episode {

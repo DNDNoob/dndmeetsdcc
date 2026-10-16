@@ -55,7 +55,7 @@ interface ShowTimeViewProps {
   onUpdateAssignedQuest?: (id: string, updates: Partial<AssignedQuest>) => void;
   onDeleteAssignedQuest?: (id: string) => void;
   currentPlayerId?: string; // crawler id of the player at this screen (DMs may have none)
-  onRecordCrawlerMove?: (crawlerId: string, feet: number, spendTurnMovement: boolean) => Promise<void>;
+  onRecordCrawlerMove?: (crawlerId: string, feet: number, spendTurnMovement: boolean, from?: { episodeId: string; mapId: string; x: number; y: number }) => Promise<void>;
 }
 
 const SHOWTIME_STORAGE_KEY = 'dcc_showtime_state';
@@ -1970,9 +1970,10 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     if (!currentPlayerId || currentPlayerId !== placement.crawlerId) return;
     const feet = mapDistanceFeet(start, placement);
     if (feet > 0) {
-      onRecordCrawlerMove?.(placement.crawlerId, feet, !!getCrawlerMoveBudget(placement.crawlerId));
+      const from = selectedEpisode ? { episodeId: selectedEpisode.id, mapId: placement.mapId, x: start.x, y: start.y } : undefined;
+      onRecordCrawlerMove?.(placement.crawlerId, feet, !!getCrawlerMoveBudget(placement.crawlerId), from);
     }
-  }, [crawlerPlacements, broadcastCrawlerPlacements, isAdmin, currentPlayerId, mapDistanceFeet, onRecordCrawlerMove, getCrawlerMoveBudget]);
+  }, [crawlerPlacements, broadcastCrawlerPlacements, isAdmin, currentPlayerId, mapDistanceFeet, onRecordCrawlerMove, getCrawlerMoveBudget, selectedEpisode]);
 
   // Handle dragging runtime mobs (all users can drag)
   const handleRuntimeMobDrag = useCallback((index: number, x: number, y: number) => {

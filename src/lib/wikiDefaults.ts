@@ -340,6 +340,19 @@ Combat proceeds in turn order (highest initiative first). On your turn:
 
 The DM advances turns with the "Next Turn" button.
 
+## Undo Turn
+
+Moved your token by accident or clicked the wrong action? Press **Undo Turn** during your own turn. It shows at the top of your crawler profile and in the combat section of the game clock panel. Tap it, then tap **Tap again to undo** to confirm.
+
+Undoing puts everything back to how it was when your turn started:
+
+- Your token goes back to where it stood
+- Your movement, action and bonus action are refilled
+- HP changes from damage or healing this turn are reversed, for crawlers and mobs
+- Mana spent and spell casts this turn are given back
+
+Every undo adds a "reset their turn" line to the dice log so the table can see it. Rolls you already made stay in the log. Only the player whose turn it is (or the DM) can undo, and only until the turn passes. Things outside the fight, like items traded or quests updated, are not undone.
+
 ## Movement
 
 Each crawler has a **movement speed**: how many feet they can move per combat turn. It starts at **60 ft**. Equipment with a Speed modifier (for example, fast boots) raises or lowers it, and the DM can change a crawler's base speed in edit mode on their profile.

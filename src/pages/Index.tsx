@@ -192,6 +192,7 @@ const Index = () => {
     applyCombatDamage,
     applyCombatDamageBatch,
     recordCrawlerMove,
+    undoCombatTurn,
     awardTrophy,
     applyNoChildLeftBehind,
     revokeTrophy,
@@ -973,6 +974,7 @@ const Index = () => {
                 combatState={activeCombatState}
                 onRecordCombatInitiative={recordCombatInitiative}
                 onRecordCombatAction={recordCombatAction}
+                onUndoCombatTurn={undoCombatTurn}
                 onApplyCombatDamage={applyCombatDamage}
                 onApplyCombatDamageBatch={applyCombatDamageBatch}
                 isAdmin={isAdmin}
@@ -1197,6 +1199,8 @@ const Index = () => {
               onAddCombatant={addCombatant}
               onUpdateCombatTimer={updateCombatTimer}
               getCrawlerInventory={getCrawlerInventory}
+              currentPlayerId={currentPlayer?.id}
+              onUndoCombatTurn={undoCombatTurn}
             />
           )}
 
