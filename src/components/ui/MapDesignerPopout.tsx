@@ -288,7 +288,7 @@ const MapDesignerPopout: React.FC<MapDesignerPopoutProps> = ({
             className="relative"
             style={{
               width: mapImageDimensions ? `${mapImageDimensions.width * mapScale / 100}px` : `calc(128vh * ${mapScale / 100})`,
-              height: `calc(80vh * ${mapScale / 100})`,
+              height: mapImageDimensions ? `${mapImageDimensions.height * mapScale / 100}px` : `calc(80vh * ${mapScale / 100})`,
             }}
           >
             {/* Inner transform for episode base scale */}
@@ -307,6 +307,10 @@ const MapDesignerPopout: React.FC<MapDesignerPopoutProps> = ({
                 style={{
                   height: '80vh',
                   width: 'auto',
+                  // Tailwind's base styles cap images at max-width: 100% of their parent, which
+                  // squished the map to the spacer's width (and so changed with the episode scale)
+                  maxWidth: 'none',
+                  maxHeight: 'none',
                   display: 'block',
                 }}
                 draggable={false}
