@@ -25,9 +25,9 @@ import { useFriends } from "@/hooks/useFriends";
 import { usePublicContent } from "@/hooks/usePublicContent";
 import { useMyContent } from "@/hooks/useMyContent";
 import { toast } from "sonner";
+import { getNoChildLeftBehindBump } from "@/lib/gameData";
 import type { Episode, Campaign, CrawlerPlacement, EpisodeMobPlacement, Mob, PublicMap, PublicMob, PublicEpisode, InventoryItem, Spell } from "@/lib/gameData";
 import { publicDocId, buildEpisodeBundle } from "@/lib/publicContent";
-import { legacyPlanCounts } from "@/lib/legacyImport";
 
 type AppScreen = "splash" | "menu" | "game";
 type GameView = "profiles" | "maps" | "inventory" | "mobs" | "dungeonai" | "showtime" | "sounds" | "wiki" | "spells";
@@ -152,8 +152,6 @@ const Index = () => {
     importMaps,
     importMob,
     importEpisode,
-    planOldContentImport,
-    applyOldContentImport,
     setCreator,
     cleanupEmptyMaps,
     episodes,
@@ -192,7 +190,9 @@ const Index = () => {
     applyCombatDamage,
     applyCombatDamageBatch,
     recordCrawlerMove,
+    undoCombatTurn,
     awardTrophy,
+    applyNoChildLeftBehind,
     revokeTrophy,
     overrideMobHealth,
     endCombat,
@@ -500,28 +500,19 @@ const Index = () => {
     setCreator(isAuthenticated && user ? { uid: user.uid, ...(userProfile?.username ? { username: userProfile.username } : {}) } : null);
   }, [isAuthenticated, user, userProfile?.username, setCreator]);
 
-  // Copy content saved before campaigns existed into this campaign (owner only). Originals are kept.
-  const handleImportOldContent = async () => {
-    if (!roomId || !user || !isAdmin) return;
-    try {
-      const plan = await planOldContentImport(creatorFields());
-      const counts = legacyPlanCounts(plan);
-      const summary = ([
-        [counts.items, 'library item'], [counts.crawlers, 'crawler'], [counts.mobs, 'mob'],
-        [counts.maps, 'map'], [counts.episodes, 'episode'], [counts.quests, 'quest'], [counts.lootBoxes, 'loot box'],
-      ] as [number, string][]).filter(([n]) => n).map(([n, label]) => `${n} ${label}${n === 1 ? '' : 's'}`).join(', ');
-      if (!summary) {
-        toast.info('No old content left to import');
-        return;
-      }
-      if (!confirm(`Copy ${summary} from before campaigns into this campaign? The originals are not changed.`)) return;
-      await applyOldContentImport(plan);
-      toast.success(`Imported ${summary}`);
-    } catch (err) {
-      console.error('[Index] Import old content failed:', err);
-      toast.error('Import failed. Check the console for details.');
-    }
-  };
+  // "No Child Left Behind": the DM's client lifts a sole slowest crawler to the second slowest speed.
+  // Only the DM runs it so the trophy isn't awarded once per connected player.
+  const noChildLeftBehindKey = (() => {
+    const bump = getNoChildLeftBehindBump(crawlers, getCrawlerInventory);
+    return bump ? `${bump.crawlerId}:${bump.moveSpeed}` : '';
+  })();
+  const lastNoChildLeftBehindKey = useRef('');
+  useEffect(() => {
+    if (!isAdmin || !isLoaded || !noChildLeftBehindKey) return;
+    if (lastNoChildLeftBehindKey.current === noChildLeftBehindKey) return;
+    lastNoChildLeftBehindKey.current = noChildLeftBehindKey;
+    applyNoChildLeftBehind().catch(err => console.error('[Index] No Child Left Behind failed:', err));
+  }, [isAdmin, isLoaded, noChildLeftBehindKey, applyNoChildLeftBehind]);
 
   // Restore campaign from URL query param on cold load (deep linking)
   const campaignRestoredRef = useRef(false);
@@ -958,6 +949,7 @@ const Index = () => {
                 combatState={activeCombatState}
                 onRecordCombatInitiative={recordCombatInitiative}
                 onRecordCombatAction={recordCombatAction}
+                onUndoCombatTurn={undoCombatTurn}
                 onApplyCombatDamage={applyCombatDamage}
                 onApplyCombatDamageBatch={applyCombatDamageBatch}
                 isAdmin={isAdmin}
@@ -1063,7 +1055,6 @@ const Index = () => {
                 onToggleMobPublic={handleToggleMobPublic}
                 onToggleEpisodePublic={handleToggleEpisodePublic}
                 onShareAllMyContent={handleShareAllMyContent}
-                onImportOldContent={isAdmin ? handleImportOldContent : undefined}
                 onImportPublicMap={handleImportPublicMap}
                 onImportPublicMob={handleImportPublicMob}
                 onImportPublicEpisode={handleImportPublicEpisode}
@@ -1182,6 +1173,9 @@ const Index = () => {
               runtimeMobPlacements={runtimeMobPlacements}
               onAddCombatant={addCombatant}
               onUpdateCombatTimer={updateCombatTimer}
+              getCrawlerInventory={getCrawlerInventory}
+              currentPlayerId={currentPlayer?.id}
+              onUndoCombatTurn={undoCombatTurn}
             />
           )}
 

@@ -10,6 +10,7 @@ import {
   GameClockState,
   CombatState,
   CombatantEntry,
+  CombatTurnSnapshot,
   WikiPage,
   Quest,
   AssignedQuest,
@@ -17,6 +18,9 @@ import {
   KnownSpell,
   SpellLearnedFrom,
   getSpellMasteryLevel,
+  getNoChildLeftBehindBump,
+  NO_CHILD_LEFT_BEHIND_TROPHY,
+  NO_CHILD_LEFT_BEHIND_DESCRIPTION,
   getEffectiveManaCost,
   getEquippedModifiers,
   addActivityStats,
@@ -33,12 +37,12 @@ import {
 } from "@/lib/gameData";
 import { useGame } from "@/contexts/GameContext";
 import type { BatchOperation } from "@/hooks/useFirebaseStore";
-import { storage } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase";
+import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { ref as storageRef, deleteObject } from "firebase/storage";
 import { logger } from "@/lib/logger";
 import { toast } from "sonner";
 import { sortableMapIds, planEpisodeImport } from "@/lib/publicContent";
-import { planLegacyImport, type LegacyImportPlan } from "@/lib/legacyImport";
 
 export interface DiceRollEntry {
   id: string;
@@ -61,6 +65,10 @@ export interface DiceRollEntry {
     recipientNames: string[];
     detail?: string; // action item text or reward name
   };
+  // For a player undoing their combat turn
+  turnResetNotification?: {
+    round: number;
+  };
 }
 
 interface InventoryEntry {
@@ -81,7 +89,6 @@ export const useGameState = () => {
     setRoomId,
     setCreator,
     mergeArrayById,
-    readRootCollection,
   } = useGame();
 
   // Cache for memoization - store previous collection values and their serialized forms
@@ -555,54 +562,6 @@ export const useGameState = () => {
       items as unknown as Record<string, unknown>[],
       { crawlerId },
     );
-  };
-
-  // ── Import old content (saved before campaigns existed, at the top level of Firestore) ──
-  const planOldContentImport = async (creator: { createdBy: string; createdByUsername?: string }) => {
-    const [inv, oldCrawlers, oldMobs, oldMaps, oldEpisodes, oldQuests, oldTemplates] = await Promise.all(
-      ['inventory', 'crawlers', 'mobs', 'maps', 'episodes', 'quests', 'lootBoxTemplates'].map(readRootCollection),
-    );
-    const raw = (name: string) => getCollection(name) as Record<string, unknown>[];
-    const existingMapIds = raw('maps').map((d) => d.id as string).filter(Boolean);
-    return planLegacyImport(
-      { inventory: inv, crawlers: oldCrawlers, mobs: oldMobs, maps: oldMaps, episodes: oldEpisodes, quests: oldQuests, lootBoxTemplates: oldTemplates },
-      {
-        crawlers: raw('crawlers'),
-        mobs: raw('mobs'),
-        maps: raw('maps'),
-        episodes: raw('episodes'),
-        quests: raw('quests'),
-        lootBoxTemplates: raw('lootBoxTemplates'),
-        inventory: raw('inventory'),
-        libraryItems: getSharedInventory() as unknown as Record<string, unknown>[],
-      },
-      { creator, newId: () => crypto.randomUUID(), mapDocIds: (n) => sortableMapIds(existingMapIds, n) },
-    );
-  };
-
-  const applyOldContentImport = async (plan: LegacyImportPlan) => {
-    // Maps one at a time (each image can be close to Firestore's 1 MB limit), in order so they append
-    for (const m of plan.maps) {
-      await addItem('maps', m);
-    }
-    const ops: BatchOperation[] = [
-      ...plan.mobs.map((d) => ({ type: 'add' as const, collection: 'mobs' as const, id: d.id as string, data: d })),
-      ...plan.quests.map((d) => ({ type: 'add' as const, collection: 'quests' as const, id: d.id as string, data: d })),
-      ...plan.lootBoxTemplates.map((d) => ({ type: 'add' as const, collection: 'lootBoxTemplates' as const, id: d.id as string, data: d })),
-      ...plan.crawlers.map((d) => ({ type: 'add' as const, collection: 'crawlers' as const, id: d.id as string, data: d })),
-    ];
-    if (ops.length > 0) await batchWrite(ops);
-    for (const inv of plan.crawlerInventories) {
-      await mergeArrayById('inventory', inv.crawlerId, 'items', [], inv.items, { crawlerId: inv.crawlerId });
-    }
-    if (plan.libraryItems.length > 0) {
-      const current = getSharedInventory();
-      await updateSharedInventory([...current, ...(plan.libraryItems as unknown as InventoryItem[])]);
-    }
-    // Episodes last, once everything they point at exists
-    for (const e of plan.episodes) {
-      await addItem('episodes', e);
-    }
   };
 
   // Episode management
@@ -1116,6 +1075,33 @@ export const useGameState = () => {
     await updateItem('combatState', 'current', { combatants: updatedCombatants } as Record<string, unknown>);
   };
 
+  // Checkpoint of the game at the start of a combat turn, so the player can undo that turn
+  const buildTurnSnapshot = (combatants: CombatantEntry[], turnIndex: number): CombatTurnSnapshot | undefined => {
+    const active = combatants[turnIndex];
+    if (!active) return undefined;
+    const snapCrawlers: CombatTurnSnapshot['crawlers'] = {};
+    for (const c of combatants) {
+      if (c.type !== 'crawler') continue;
+      const crawler = crawlers.find(cr => cr.id === c.id);
+      if (!crawler) continue;
+      snapCrawlers[c.id] = { hp: crawler.hp ?? 0, mana: crawler.mana ?? 0, activityStats: crawler.activityStats };
+    }
+    const activeCrawler = active.type === 'crawler' ? crawlers.find(cr => cr.id === active.id) : undefined;
+    return {
+      combatantId: active.id,
+      takenAt: Date.now(),
+      combatants: combatants.map(c => ({
+        id: c.id,
+        currentHP: c.currentHP,
+        hasUsedAction: c.hasUsedAction,
+        hasUsedBonusAction: c.hasUsedBonusAction,
+        feetMovedThisTurn: c.feetMovedThisTurn,
+      })),
+      crawlers: snapCrawlers,
+      knownSpells: activeCrawler?.knownSpells,
+    };
+  };
+
   const confirmInitiative = async () => {
     if (!combatState) return;
     // Sort combatants by initiative (highest first)
@@ -1127,6 +1113,7 @@ export const useGameState = () => {
       combatRound: 1,
       turnStartedAt: Date.now(),
       turnTimerPaused: false,
+      turnSnapshot: buildTurnSnapshot(sorted, 0) ?? null,
     } as Record<string, unknown>);
     logger.log('[GameState] ⚔️ Combat order confirmed, starting combat phase');
   };
@@ -1142,13 +1129,103 @@ export const useGameState = () => {
       }
       return c;
     });
+    const newIndex = isNewRound ? 0 : nextIndex;
     await updateItem('combatState', 'current', {
       combatants: resetCombatants,
-      currentTurnIndex: isNewRound ? 0 : nextIndex,
+      currentTurnIndex: newIndex,
       combatRound: isNewRound ? combatState.combatRound + 1 : combatState.combatRound,
       turnStartedAt: Date.now(),
       turnTimerPaused: false,
+      turnSnapshot: buildTurnSnapshot(resetCombatants, newIndex) ?? null,
     } as Record<string, unknown>);
+  };
+
+  // Undo the current combat turn: put the game back to the checkpoint taken when the turn
+  // started (token position, movement, actions, HP, mana, spell casts) and note it in the dice log.
+  // Dice rolls already made stay in the log.
+  const undoCombatTurn = async (): Promise<boolean> => {
+    if (!combatState?.active || combatState.phase !== 'combat') return false;
+    const active = combatState.combatants[combatState.currentTurnIndex];
+    const snap = combatState.turnSnapshot;
+    if (!active || !snap || snap.combatantId !== active.id) {
+      toast.error("This turn can't be undone");
+      return false;
+    }
+
+    const snapById = new Map(snap.combatants.map(s => [s.id, s]));
+    const restoredCombatants = combatState.combatants.map(c => {
+      const s = snapById.get(c.id);
+      if (!s) return c;
+      return {
+        ...c,
+        currentHP: s.currentHP,
+        hasUsedAction: s.hasUsedAction,
+        hasUsedBonusAction: s.hasUsedBonusAction,
+        feetMovedThisTurn: s.feetMovedThisTurn ?? 0,
+      };
+    });
+
+    // Restore the token first, while the start position is still in the snapshot
+    if (snap.startPosition && db) {
+      const { episodeId, mapId, x, y } = snap.startPosition;
+      const path = roomId
+        ? `rooms/${roomId}/crawler-placements/${episodeId}-${mapId}`
+        : `crawler-placements/${episodeId}-${mapId}`;
+      try {
+        const ref = doc(db, path);
+        const docSnap = await getDoc(ref);
+        if (docSnap.exists()) {
+          const placements = (docSnap.data().placements ?? []) as { crawlerId: string; mapId: string; x: number; y: number }[];
+          let moved = false;
+          const updated = placements.map(p => {
+            if (moved || p.crawlerId !== active.id || p.mapId !== mapId) return p;
+            moved = true;
+            return { ...p, x, y };
+          });
+          if (moved) await updateDoc(ref, { placements: updated, updatedAt: serverTimestamp() });
+        }
+      } catch (error) {
+        console.error('[GameState] Failed to restore token position on undo:', error);
+      }
+    }
+
+    // Crawler HP, mana and stats (damage and healing this turn could have hit anyone in the fight)
+    const crawlerOps: BatchOperation[] = [];
+    for (const [crawlerId, s] of Object.entries(snap.crawlers)) {
+      const current = crawlers.find(c => c.id === crawlerId);
+      if (!current || !getCollection<Crawler>('crawlers').some(c => c.id === crawlerId)) continue;
+      const data: Record<string, unknown> = {};
+      if ((current.hp ?? 0) !== s.hp) data.hp = s.hp;
+      if ((current.mana ?? 0) !== s.mana) data.mana = s.mana;
+      if (JSON.stringify(current.activityStats ?? {}) !== JSON.stringify(s.activityStats ?? {})) {
+        data.activityStats = s.activityStats ?? {};
+      }
+      if (crawlerId === active.id && snap.knownSpells &&
+          JSON.stringify(current.knownSpells ?? []) !== JSON.stringify(snap.knownSpells)) {
+        data.knownSpells = snap.knownSpells;
+      }
+      if (Object.keys(data).length > 0) {
+        crawlerOps.push({ type: 'update', collection: 'crawlers', id: crawlerId, data });
+      }
+    }
+    if (crawlerOps.length > 0) await batchWrite(crawlerOps);
+
+    await updateItem('combatState', 'current', {
+      combatants: restoredCombatants,
+      turnSnapshot: { ...snap, startPosition: null },
+    } as Record<string, unknown>);
+
+    await addDiceRoll({
+      id: crypto.randomUUID(),
+      crawlerName: active.name,
+      crawlerId: active.id,
+      timestamp: Date.now(),
+      results: [],
+      total: 0,
+      turnResetNotification: { round: combatState.combatRound },
+    });
+    logger.log('[GameState] ↩️ Turn undone for', active.name);
+    return true;
   };
 
   const updateCombatTimer = async (settings: { turnTimerMode?: 'countdown' | 'stopwatch'; turnTimerDuration?: number; turnTimerPaused?: boolean }) => {
@@ -1258,14 +1335,26 @@ export const useGameState = () => {
 
   // Record feet a crawler moved. When movement is limited this also spends the crawler's
   // movement for the current combat turn, or for the current noncombat turn outside combat.
-  const recordCrawlerMove = async (crawlerId: string, feet: number, spendTurnMovement: boolean) => {
+  // `from` is where the token was before this move; the first move of a combat turn
+  // remembers it so the turn can be undone.
+  const recordCrawlerMove = async (
+    crawlerId: string,
+    feet: number,
+    spendTurnMovement: boolean,
+    from?: { episodeId: string; mapId: string; x: number; y: number },
+  ) => {
     if (feet <= 0) return;
     const addFeet = (used: number | undefined) => Math.round(((used ?? 0) + feet) * 10) / 10;
     if (spendTurnMovement && combatState?.active && combatState.phase === 'combat') {
       const combatants = combatState.combatants.map(c =>
         c.id === crawlerId && c.type === 'crawler' ? { ...c, feetMovedThisTurn: addFeet(c.feetMovedThisTurn) } : c
       );
-      await updateItem('combatState', 'current', { combatants } as Record<string, unknown>);
+      const updates: Record<string, unknown> = { combatants };
+      const snap = combatState.turnSnapshot;
+      if (from && snap && snap.combatantId === crawlerId && !snap.startPosition) {
+        updates.turnSnapshot = { ...snap, startPosition: from };
+      }
+      await updateItem('combatState', 'current', updates);
     } else if (spendTurnMovement && noncombatTurnState) {
       const feetMoved = { ...(noncombatTurnState.feetMoved ?? {}), [crawlerId]: addFeet(noncombatTurnState.feetMoved?.[crawlerId]) };
       await updateItem('noncombatTurns', 'current', { feetMoved } as Record<string, unknown>);
@@ -1300,6 +1389,20 @@ export const useGameState = () => {
     }
     await writeCrawler(crawlerId, { trophies });
     toast.success(`🏆 ${crawler.name} earned "${trimmed}"!`);
+  };
+
+  // "No Child Left Behind": if exactly one saved crawler is slower than everyone else, raise
+  // their base speed so their effective speed matches the second slowest, and award the trophy.
+  const applyNoChildLeftBehind = async () => {
+    const stored = getCollection<Crawler>('crawlers');
+    const bump = getNoChildLeftBehindBump(stored, getCrawlerInventory);
+    if (!bump) return;
+    const crawler = stored.find(c => c.id === bump.crawlerId);
+    if (!crawler) return;
+    logger.log('[GameState] 🐢 No Child Left Behind:', bump);
+    await writeCrawler(bump.crawlerId, { moveSpeed: bump.moveSpeed });
+    await awardTrophy(bump.crawlerId, NO_CHILD_LEFT_BEHIND_TROPHY, NO_CHILD_LEFT_BEHIND_DESCRIPTION);
+    toast.info(`${crawler.name}'s speed went from ${bump.fromSpeed} ft to ${bump.toSpeed} ft.`);
   };
 
   // Take back one award of a trophy; removes it when the count reaches 0
@@ -1642,8 +1745,6 @@ export const useGameState = () => {
     importMaps,
     importMob,
     importEpisode,
-    planOldContentImport,
-    applyOldContentImport,
     setCreator,
     cleanupEmptyMaps,
     episodes,
@@ -1693,7 +1794,9 @@ export const useGameState = () => {
     applyCombatDamage,
     applyCombatDamageBatch,
     recordCrawlerMove,
+    undoCombatTurn,
     awardTrophy,
+    applyNoChildLeftBehind,
     revokeTrophy,
     overrideMobHealth,
     endCombat,
