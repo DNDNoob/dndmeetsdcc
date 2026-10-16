@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Clock, ChevronUp, ChevronDown, RotateCcw, Sun, Moon, Swords, Zap, SkipForward, XCircle, Heart, Plus, Play, Square, Timer, Pause } from "lucide-react";
+import { Clock, ChevronUp, ChevronDown, RotateCcw, Sun, Moon, Swords, Zap, SkipForward, XCircle, Heart, Plus, Play, Square, Timer, Pause, Footprints } from "lucide-react";
+import { type Crawler, type Mob, type NoncombatTurnState, type GameClockState, type Episode, type CombatState, type CrawlerPlacement, type EpisodeMobPlacement, type CombatantEntry, type InventoryItem, getEffectiveMoveSpeed, NONCOMBAT_MOVE_MULTIPLIER } from "@/lib/gameData";
 import UndoTurnButton from "@/components/UndoTurnButton";
-import { type Crawler, type Mob, type NoncombatTurnState, type GameClockState, type Episode, type CombatState, type CrawlerPlacement, type EpisodeMobPlacement, type CombatantEntry } from "@/lib/gameData";
 
 interface PingPanelProps {
   isAdmin?: boolean;
@@ -28,6 +28,7 @@ interface PingPanelProps {
   isGameActive?: boolean;
   onToggleGameActive?: (active: boolean) => Promise<void>;
   onUpdateCombatTimer?: (settings: { turnTimerMode?: 'countdown' | 'stopwatch'; turnTimerDuration?: number; turnTimerPaused?: boolean }) => Promise<void>;
+  getCrawlerInventory?: (crawlerId: string) => InventoryItem[];
   currentPlayerId?: string;
   onUndoCombatTurn?: () => Promise<boolean>;
 }
@@ -56,6 +57,7 @@ const PingPanel: React.FC<PingPanelProps> = ({
   isGameActive,
   onToggleGameActive,
   onUpdateCombatTimer,
+  getCrawlerInventory,
   currentPlayerId,
   onUndoCombatTurn,
 }) => {
@@ -159,6 +161,14 @@ const PingPanel: React.FC<PingPanelProps> = ({
     return used >= noncombatTurnState.maxRolls;
   });
   const turnNumber = noncombatTurnState?.turnNumber ?? 0;
+
+  // A crawler's movement speed per combat turn, including equipment
+  const getMoveSpeed = (crawlerId: string) => {
+    const crawler = (crawlers ?? []).find(c => c.id === crawlerId);
+    return crawler ? getEffectiveMoveSpeed(crawler, getCrawlerInventory?.(crawlerId) ?? []) : 0;
+  };
+  // Noncombat movement only counts for the episode the turn was started in
+  const noncombatMoveTracked = !!noncombatTurnState && (!noncombatTurnState.episodeId || !activeEpisode || noncombatTurnState.episodeId === activeEpisode.id);
 
   const isCombatActive = combatState?.active && combatState.phase !== 'ended';
   const isInitiativePhase = combatState?.active && combatState.phase === 'initiative';
@@ -405,11 +415,21 @@ const PingPanel: React.FC<PingPanelProps> = ({
                   {playerCrawlers.map(c => {
                     const used = noncombatTurnState.rollsUsed[c.id] ?? 0;
                     const remaining = Math.max(0, noncombatTurnState.maxRolls - used);
+                    const turnSpeed = getMoveSpeed(c.id) * NONCOMBAT_MOVE_MULTIPLIER;
+                    const feetLeft = Math.max(0, Math.round(turnSpeed - (noncombatTurnState.feetMoved?.[c.id] ?? 0)));
                     return (
-                      <div key={c.id} className="flex justify-between">
-                        <span>{c.name}</span>
-                        <span className={remaining === 0 ? 'text-destructive' : 'text-primary'}>
-                          {used}/{noncombatTurnState.maxRolls} used
+                      <div key={c.id} className="flex justify-between gap-2">
+                        <span className="truncate">{c.name}</span>
+                        <span className="flex items-center gap-2 shrink-0">
+                          {noncombatMoveTracked && (
+                            <span className={`flex items-center gap-0.5 ${feetLeft === 0 ? 'text-destructive' : 'text-primary'}`} title="Movement left this noncombat turn">
+                              <Footprints className="w-3 h-3" />
+                              {feetLeft} ft
+                            </span>
+                          )}
+                          <span className={remaining === 0 ? 'text-destructive' : 'text-primary'}>
+                            {used}/{noncombatTurnState.maxRolls} used
+                          </span>
                         </span>
                       </div>
                     );
@@ -726,6 +746,17 @@ const PingPanel: React.FC<PingPanelProps> = ({
                           <span className="text-muted-foreground">({c.initiative})</span>
                         </div>
                         <div className="flex items-center gap-1">
+                          {/* Movement left this turn for the crawler whose turn it is */}
+                          {isCurrent && isCombatPhase && c.type === 'crawler' && (() => {
+                            const speed = getMoveSpeed(c.id);
+                            const feetLeft = Math.max(0, Math.round(speed - (c.feetMovedThisTurn ?? 0)));
+                            return (
+                              <span className={`flex items-center gap-0.5 text-[10px] ${feetLeft === 0 ? 'text-destructive' : 'text-primary'}`} title="Movement left this turn">
+                                <Footprints className="w-3 h-3" />
+                                {feetLeft}/{speed} ft
+                              </span>
+                            );
+                          })()}
                           {/* Mob HP display with override */}
                           {c.type === 'mob' && mob && (
                             <>

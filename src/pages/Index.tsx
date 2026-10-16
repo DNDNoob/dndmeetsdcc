@@ -1198,6 +1198,7 @@ const Index = () => {
               runtimeMobPlacements={runtimeMobPlacements}
               onAddCombatant={addCombatant}
               onUpdateCombatTimer={updateCombatTimer}
+              getCrawlerInventory={getCrawlerInventory}
               currentPlayerId={currentPlayer?.id}
               onUndoCombatTurn={undoCombatTurn}
             />
