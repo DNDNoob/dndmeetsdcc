@@ -2,6 +2,7 @@
   {
     "date": "2026-10-17",
     "changes": [
+      "💬 After you @ a mob, the chat remembers who you're talking to, so you don't need to @ them every message. The \"No one by that name\" popup no longer appears once a name is picked",
       "🐛 NPCs now listen as soon as the DM opens an episode in Show Time, instead of waiting for the game to be started",
       "🗣️ Every mob can now talk in Game Chat, not just ones with a personality card. Hidden mobs stay quiet",
       "🎲 Mobs without a personality get one written by the AI from their name, description, abilities and items, plus random traits so no two are alike. It includes a secret and a Persuasion DC",

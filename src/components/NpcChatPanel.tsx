@@ -79,8 +79,17 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
   const [mention, setMention] = useState<{ start: number; query: string } | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
   const [pickedMobIds, setPickedMobIds] = useState<string[]>([]);
+  // The mob this person is talking with: later messages go to it without another @
+  const [talkingToId, setTalkingToId] = useState<string | null>(null);
 
-  const speech = useSpeechToText((text) => { void onSend(text, true); });
+  const talkingTo = talkingToId ? mentionables.find(m => m.kind === "npc" && m.id === talkingToId) ?? null : null;
+  const talkingToRef = useRef(talkingTo);
+  talkingToRef.current = talkingTo;
+
+  const speech = useSpeechToText((text) => {
+    const target = talkingToRef.current;
+    void onSend(text, true, target ? [target.id] : []);
+  });
 
   // Re-evaluate the online indicator as heartbeats age
   useEffect(() => {
@@ -139,6 +148,8 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
       .filter(m => m.name.toLowerCase().startsWith(q) || m.name.toLowerCase().split(/\s+/).some(w => w.startsWith(q)))
       .slice(0, 8);
   }, [mention, mentionables]);
+  // Once a name is picked and the person keeps typing, the "@Name words…" no longer looks like a search
+  const showMention = !!mention && (mentionOptions.length > 0 || !/\s/.test(mention.query));
 
   const updateDraft = (value: string, caret: number | null) => {
     setDraft(value);
@@ -162,13 +173,16 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
     if (option.kind === "npc") setPickedMobIds(ids => (ids.includes(option.id) ? ids : [...ids, option.id]));
     const caret = mention.start + insert.length;
     requestAnimationFrame(() => {
-      inputRef.current?.focus();
-      inputRef.current?.setSelectionRange(caret, caret);
+      const input = inputRef.current;
+      if (!input) return;
+      input.focus();
+      // Only move the caret if nothing was typed since the pick
+      if (input.value === next) input.setSelectionRange(caret, caret);
     });
   };
 
   const onInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (!mention) return;
+    if (!showMention) return;
     if (e.key === "Escape") { e.preventDefault(); setMention(null); return; }
     if (!mentionOptions.length) return;
     if (e.key === "ArrowDown") { e.preventDefault(); setMentionIndex(i => (i + 1) % mentionOptions.length); }
@@ -180,10 +194,18 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
     const text = draft.trim();
     if (!text || !author) return;
     // Only mobs still tagged in the text count as picked
-    const toMobIds = pickedMobIds.filter(id => {
+    let toMobIds = pickedMobIds.filter(id => {
       const mob = mentionables.find(m => m.id === id);
       return mob && text.includes(`@${mob.name}`);
     });
+    const taggedCrawler = mentionables.some(m => m.kind === "crawler" && text.includes(`@${m.name}`));
+    if (toMobIds.length) {
+      setTalkingToId(toMobIds[toMobIds.length - 1]);
+    } else if (taggedCrawler) {
+      setTalkingToId(null); // talking to another player now
+    } else if (talkingTo) {
+      toMobIds = [talkingTo.id];
+    }
     setDraft("");
     setMention(null);
     setPickedMobIds([]);
@@ -427,7 +449,7 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
 
             {/* Input */}
             <div className="relative shrink-0 border-t border-border p-2">
-              {author && mention && !speech.listening && (
+              {author && showMention && !speech.listening && (
                 <div className="absolute left-2 right-2 bottom-full mb-1 bg-background border-2 border-primary shadow-xl z-10 text-sm" data-testid="mention-list" role="listbox">
                   {mentionOptions.length === 0 ? (
                     <p className="px-2 py-1.5 text-xs text-muted-foreground italic">
@@ -452,6 +474,21 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
                       </button>
                     ))
                   )}
+                </div>
+              )}
+              {author && talkingTo && (
+                <div className="flex items-center gap-1.5 mb-1.5 text-[11px] text-muted-foreground" data-testid="talking-to">
+                  <Wand2 className="w-3 h-3 text-accent shrink-0" />
+                  <span className="truncate">Talking to <span className="text-accent font-bold">{talkingTo.name}</span></span>
+                  <button
+                    type="button"
+                    onClick={() => setTalkingToId(null)}
+                    className="ml-auto p-0.5 hover:text-primary"
+                    aria-label={`Stop talking to ${talkingTo.name}`}
+                    title="Stop talking to them"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
                 </div>
               )}
               {author ? (

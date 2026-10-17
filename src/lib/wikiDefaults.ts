@@ -851,7 +851,7 @@ Hidden mobs never talk.
 ## When NPCs Speak
 
 NPCs listen as soon as the DM opens an episode in Show Time (you do not need to start the game clock), and talk on their own, no button needed:
-- **Spoken to by name**: "Grimble, where's the key?" gets an answer. You can also type **@** in the chat box to pick who you're talking to from a list
+- **Spoken to by name**: "Grimble, where's the key?" gets an answer. You can also type **@** in the chat box to pick who you're talking to from a list. After that, your messages keep going to that mob (the chat shows **Talking to …** above the box) until you pick someone else or tap the ✕
 - **Within 20 feet**: players can only talk to mobs within 20 ft of their crawler (measured like the Ruler). The @ list only shows mobs in range, with how far away they are, and mobs farther away don't answer. The DM can talk to any mob
 - **Someone talks nearby**: the closest NPC may chime in
 - **A crawler walks up** to them
