@@ -35,7 +35,7 @@ npm run npc-voices
 
 ## How it behaves
 
-- Only runs model calls while a Show Time game is live; otherwise it sleeps. It keeps the computer awake during a game.
+- Only runs model calls while the DM has an episode open in Show Time; otherwise it sleeps. It keeps the computer awake during a game.
 - **Best quality** uses `qwen3:14b`, **Fast** uses `qwen3:8b` (DM picks in the chat settings). If there isn't enough free memory for Best quality it uses Fast and says so in the chat.
 - Unloads the model after 15 minutes without activity.
 - Secrets are only added to the prompt after the DM unlocks them.

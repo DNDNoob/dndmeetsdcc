@@ -130,7 +130,8 @@ export class NpcRoom {
 
   onShowtime(data) {
     this.showtime = data;
-    this.gameLive = !!data && data.gameStarted === true && data.isActive === true && !!data.episodeId;
+    // Listen whenever the DM has an episode open in Show Time (the game clock does not need to be started)
+    this.gameLive = !!data && data.isActive === true && !!data.episodeId;
     this.evaluate();
     if (this.live) this.syncEpisode(); // map or episode may have changed
   }
