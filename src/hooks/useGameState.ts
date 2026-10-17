@@ -14,6 +14,12 @@ import {
   WikiPage,
   Quest,
   AssignedQuest,
+  ChatMessage,
+  NpcAiSettings,
+  NpcAiStatus,
+  NpcSecretEntry,
+  NpcGeneratedPersonality,
+  NpcSecretState,
   Spell,
   KnownSpell,
   SpellLearnedFrom,
@@ -1809,6 +1815,79 @@ export const useGameState = () => {
     await updateItem('wiki', id, updates as unknown as Record<string, unknown>);
   };
 
+  // ======== In-game chat & talking NPCs ========
+  // Only the most recent lines are kept in memory for the chat panel and NPC context
+  const CHAT_DISPLAY_LIMIT = 150;
+  const chatMessages = useMemo(() => {
+    const stored = getStableCollection<ChatMessage>('chatMessages');
+    return [...stored].sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0)).slice(-CHAT_DISPLAY_LIMIT);
+  }, [getCollection, isLoaded]);
+
+  const npcAiDocs = useMemo(() => getStableCollection<Record<string, unknown>>('npcAi'), [getCollection, isLoaded]);
+  const npcAiSettings = useMemo(
+    () => (npcAiDocs.find(d => d.id === 'settings') as unknown as NpcAiSettings | undefined) ?? null,
+    [npcAiDocs]
+  );
+  const npcAiStatus = useMemo(
+    () => (npcAiDocs.find(d => d.id === 'status') as unknown as NpcAiStatus | undefined) ?? null,
+    [npcAiDocs]
+  );
+  const npcSecrets = useMemo((): Record<string, NpcSecretEntry> => {
+    const docData = npcAiDocs.find(d => d.id === 'secrets');
+    if (!docData) return {};
+    const { id: _id, ...entries } = docData;
+    return entries as Record<string, NpcSecretEntry>;
+  }, [npcAiDocs]);
+  const npcPersonalities = useMemo((): Record<string, NpcGeneratedPersonality> => {
+    const docData = npcAiDocs.find(d => d.id === 'personalities');
+    if (!docData) return {};
+    const { id: _id, ...entries } = docData;
+    return entries as Record<string, NpcGeneratedPersonality>;
+  }, [npcAiDocs]);
+
+  const sendChatMessage = async (message: Omit<ChatMessage, 'id' | 'createdAt'>) => {
+    const text = message.text.trim();
+    if (!text) return;
+    const entry: ChatMessage = {
+      ...message,
+      text: text.slice(0, 500),
+      id: `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      createdAt: Date.now(),
+    };
+    await addItem('chatMessages', entry as unknown as Record<string, unknown>);
+  };
+
+  // Deletes chat lines (all of them, or one episode's). Batches are capped well under Firestore's 500.
+  const clearChat = async (episodeId?: string) => {
+    const all = getCollection('chatMessages') as unknown as ChatMessage[];
+    const toDelete = episodeId ? all.filter(m => m.episodeId === episodeId) : all;
+    for (let i = 0; i < toDelete.length; i += 400) {
+      await batchWrite(toDelete.slice(i, i + 400).map(m => ({
+        type: 'delete' as const,
+        collection: 'chatMessages' as const,
+        id: m.id,
+      })));
+    }
+  };
+
+  // Singleton docs in npcAi: create on first write, merge afterwards
+  const writeNpcAiDoc = async (docId: 'settings' | 'secrets', data: Record<string, unknown>) => {
+    if (npcAiDocs.some(d => d.id === docId)) {
+      await updateItem('npcAi', docId, data);
+    } else {
+      await addItem('npcAi', { id: docId, ...data });
+    }
+  };
+
+  const updateNpcAiSettings = async (updates: Partial<Omit<NpcAiSettings, 'id'>>) => {
+    await writeNpcAiDoc('settings', updates as Record<string, unknown>);
+  };
+
+  const setNpcSecretState = async (mobId: string, state: NpcSecretState) => {
+    const entry: NpcSecretEntry = { state, at: Date.now() };
+    await writeNpcAiDoc('secrets', { [mobId]: entry });
+  };
+
   return {
     crawlers,
     updateCrawler,
@@ -1894,6 +1973,15 @@ export const useGameState = () => {
     wikiPages,
     addWikiPage,
     updateWikiPage,
+    chatMessages,
+    npcAiSettings,
+    npcAiStatus,
+    npcSecrets,
+    npcPersonalities,
+    sendChatMessage,
+    clearChat,
+    updateNpcAiSettings,
+    setNpcSecretState,
     spells,
     addSpell,
     updateSpell,

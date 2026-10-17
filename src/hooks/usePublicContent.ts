@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db, collection, doc, setDoc, deleteDoc, getDocs, onSnapshot } from '@/lib/firebase';
 import type { InventoryItem, Spell, PublicMap, PublicMob, PublicEpisode, PublicEpisodeAssets, Mob } from '@/lib/gameData';
+import { stripNpcSecret } from '@/lib/gameData';
 
 /**
  * Manages reading and writing to the global root-level public content collections.
@@ -122,7 +123,7 @@ export function usePublicContent(enabled: boolean) {
 
   const publishMob = async (mob: PublicMob) => {
     if (!db) return;
-    await setDoc(doc(db, 'publicMobs', mob.id), { ...mob, isPublic: true });
+    await setDoc(doc(db, 'publicMobs', mob.id), stripNpcSecret({ ...mob, isPublic: true }));
   };
 
   const unpublishMob = async (publicId: string) => {

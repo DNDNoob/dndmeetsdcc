@@ -343,7 +343,104 @@ export interface Mob {
   createdBy?: string;        // Firebase uid of creator (absent = made in this campaign by its DM)
   createdByUsername?: string; // Denormalized for display
   isPublic?: boolean;        // Shared to the community (publicMobs)
+  personality?: NpcPersonality; // DM-only: drives AI dialogue for talking NPCs
 }
+
+// ======== Talking NPCs (local AI) ========
+
+/** DM-only personality card. The secret is never sent to the AI until the DM unlocks it. */
+export interface NpcPersonality {
+  voice?: string;      // Voice and manner
+  wants?: string;
+  knows?: string;
+  secret?: string;
+  revealWhen?: string; // Plain-words reveal condition, e.g. "the party pays or bribes him"
+  attitude?: string;   // Attitude toward the party
+  persuasionDC?: number; // A Persuasion roll this high (d20 + CHA mod) asks the DM to unlock the secret
+}
+
+export const hasNpcPersonality = (mob: Pick<Mob, 'personality'>): boolean =>
+  !!mob.personality && Object.values(mob.personality).some(v => typeof v === 'string' && v.trim() !== '');
+
+/** Shared copies of a mob keep its personality but never its secret. */
+export const stripNpcSecret = <T extends { personality?: NpcPersonality }>(mob: T): T => {
+  if (!mob.personality) return mob;
+  const { secret: _s, revealWhen: _r, ...rest } = mob.personality;
+  return { ...mob, personality: rest };
+};
+
+/** One line in the in-game chat: rooms/{roomId}/chatMessages/{id} */
+export interface ChatMessage {
+  id: string;
+  authorType: 'crawler' | 'dm' | 'npc';
+  authorId: string;     // crawler id, 'dm', or mob id
+  authorName: string;
+  text: string;
+  createdAt: number;    // epoch ms
+  episodeId?: string;
+  // NPC lines: where the speaking token stood, for the speech bubble
+  mapId?: string;
+  x?: number;
+  y?: number;
+  viaVoice?: boolean;   // Sent with the hold-to-talk mic
+  toMobIds?: string[];  // Mobs picked with @ in the chat box
+  nearMobIds?: string[]; // Player messages: mobs within talking range of the crawler when sent
+}
+
+/** Players can only talk to mobs this close to their crawler. */
+export const NPC_TALK_RANGE_FEET = 20;
+
+/** A personality the AI wrote for a mob that had none: rooms/{roomId}/npcAi/personalities → { [mobId]: ... } */
+export interface NpcGeneratedPersonality extends NpcPersonality {
+  generatedAt?: number;
+  traits?: Record<string, string | number>; // the random ingredients it was built from
+}
+
+/** The personality a mob talks with: the DM's card if filled in, else the generated one. */
+export const withNpcPersonality = (mob: Mob, generated: Record<string, NpcGeneratedPersonality>): Mob & { personalityGenerated?: boolean } => {
+  if (hasNpcPersonality(mob) || !generated[mob.id]) return mob;
+  return { ...mob, personality: generated[mob.id], personalityGenerated: true };
+};
+
+export type NpcModelChoice = 'quality' | 'fast';
+
+/** DM settings: rooms/{roomId}/npcAi/settings */
+export interface NpcAiSettings {
+  id: 'settings';
+  enabled?: boolean;        // NPC voices on (default) / off
+  model?: NpcModelChoice;   // default 'quality'
+  mutedAll?: boolean;
+  mutedMobIds?: string[];
+  brain?: NpcBrain;         // where NPC lines are written; default 'online'
+}
+
+/** 'online': the DM's browser using free Groq/Gemini keys. 'laptop': the NPC script with Ollama. */
+export type NpcBrain = 'online' | 'laptop';
+
+/** Written by the NPC script on the DM's computer: rooms/{roomId}/npcAi/status */
+export interface NpcAiStatus {
+  id: 'status';
+  heartbeatAt?: number;     // epoch ms; online if recent
+  activeModel?: string;     // e.g. 'qwen3:14b'
+  note?: string;            // e.g. 'Close other apps for Best quality'
+  busy?: boolean;           // laptop can't run any model right now
+  runner?: NpcBrain;        // which brain wrote this status
+  onlineOutUntil?: number;  // free online limits used up until then; the laptop covers if running
+  thinking?: { mobId: string; mapId?: string; x?: number; y?: number; since: number } | null;
+}
+
+export type NpcSecretState = 'locked' | 'pending' | 'unlocked';
+
+/** Per-NPC secret state: rooms/{roomId}/npcAi/secrets → { [mobId]: NpcSecretEntry } */
+export interface NpcSecretEntry {
+  state: NpcSecretState;
+  reason?: string;          // what the player said that looked like the reveal condition
+  at?: number;
+}
+
+export const NPC_STATUS_STALE_MS = 90_000;
+export const isNpcAiOnline = (status: NpcAiStatus | null | undefined, now = Date.now()): boolean =>
+  !!status?.heartbeatAt && now - status.heartbeatAt < NPC_STATUS_STALE_MS;
 
 export interface EpisodeMobPlacement {
   mobId: string;

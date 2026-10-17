@@ -1,7 +1,28 @@
 [
   {
+    "date": "2026-10-17",
+    "changes": [
+      "💬 After you @ a mob, the chat remembers who you're talking to, so you don't need to @ them every message. The \"No one by that name\" popup no longer appears once a name is picked",
+      "🐛 NPCs now listen as soon as the DM opens an episode in Show Time, instead of waiting for the game to be started",
+      "🗣️ Every mob can now talk in Game Chat, not just ones with a personality card. Hidden mobs stay quiet",
+      "🎲 Mobs without a personality get one written by the AI from their name, description, abilities and items, plus random traits so no two are alike. It includes a secret and a Persuasion DC",
+      "💬 Type @ in Game Chat to pick who you're talking to from a list",
+      "📏 Players can only talk to mobs within 20 ft of their crawler; the @ list shows only mobs in range, with their distance",
+      "🧠 New NPC brain setting in the Game Chat: NPCs can now talk using free online AI (Groq, with Gemini as backup) straight from the DM's browser, no install needed. Laptop mode still runs on the DM's computer",
+      "🔄 When Groq's free requests run out, NPCs switch to Gemini automatically, and the laptop covers if both are used up",
+      "🔑 DMs paste their free Groq and Gemini keys in the chat settings; keys stay in the DM's browser and are never shared",
+      "🖱️ Laptop NPC voices now has one-click NPC Voices ON / OFF desktop shortcuts instead of always running at sign-in; OFF frees the model's memory",
+      "💬 The Game Chat header now says which brain is answering, and the settings panel scrolls on phones"
+    ]
+  },
+  {
     "date": "2026-10-16",
     "changes": [
+      "💬 New Game Chat in Show Time: players chat as their crawler and the DM as the DM, with a hold-to-talk microphone that turns speech into text",
+      "🗣️ Talking NPCs: give a mob a personality in the DM Console and it speaks for itself in Show Time, with lines in speech bubbles over its head and in the chat",
+      "🤫 NPC secrets stay hidden from the AI until the DM unlocks them; the DM gets an Unlock / Not yet prompt when a player meets the reveal condition",
+      "🎲 NPCs can have a Persuasion DC: a crawler who rolls Persuasion high enough next to them gets the DM an Unlock / Not yet prompt for the secret",
+      "⚙️ DM chat settings: turn NPC voices on or off, pick Best quality or Fast, mute NPCs, lock secrets and clear the chat",
       "👾 Unencountered mobs can now join combat, and players see them in the turn order. The DM can reveal a mob from the combat panel or by right-clicking its token in Show Time (Mark Encountered)",
       "🎬 Show Time no longer resets when the DM refreshes or visits another page during a game; it picks up the running episode and players stay in the game",
       "🐛 Refreshing the DM Console no longer sends the DM back to the main menu",

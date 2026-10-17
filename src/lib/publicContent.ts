@@ -9,6 +9,7 @@ import type {
   PublicEpisodeAssets,
   Quest,
 } from './gameData';
+import { stripNpcSecret } from './gameData';
 
 /**
  * Pure helpers for publishing campaign content to the community collections and
@@ -39,7 +40,7 @@ const toMobType = (mob: Mob): Mob => {
   delete (rest as Record<string, unknown>).sourceCampaignId;
   delete (rest as Record<string, unknown>).publishedAt;
   delete (rest as Record<string, unknown>).roomId;
-  return { ...(rest as Mob), encountered: false };
+  return stripNpcSecret({ ...(rest as Mob), encountered: false });
 };
 
 /** Fresh fog of war for a new playthrough, keeping whether fog is enabled and the map scale. */
