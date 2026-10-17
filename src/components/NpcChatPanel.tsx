@@ -11,8 +11,10 @@ import {
   type NpcSecretEntry,
   type NpcSecretState,
   type NpcModelChoice,
+  type NpcBrain,
   isNpcAiOnline,
 } from "@/lib/gameData";
+import type { NpcOnlineKeys } from "@/lib/npc/onlineLlm.mjs";
 
 const OPEN_STORAGE_KEY = "dcc_chat_open";
 
@@ -35,6 +37,8 @@ interface NpcChatPanelProps {
   onUpdateSettings?: (updates: Partial<Omit<NpcAiSettings, "id">>) => void | Promise<void>;
   onSetSecretState?: (mobId: string, state: NpcSecretState) => void | Promise<void>;
   onClearChat?: () => void | Promise<void>;
+  npcKeys?: NpcOnlineKeys;                        // DM only: free online model keys, saved in this browser
+  onChangeNpcKeys?: (keys: NpcOnlineKeys) => void;
 }
 
 const readOpen = (): boolean => {
@@ -50,7 +54,7 @@ const formatTime = (ms: number) =>
 /** Shared in-game chat for Show Time, with NPC voices status and DM controls. */
 export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
   messages, author, isAdmin, mobs, npcsOnMap, aiSettings, aiStatus, secrets,
-  onSend, onUpdateSettings, onSetSecretState, onClearChat,
+  onSend, onUpdateSettings, onSetSecretState, onClearChat, npcKeys, onChangeNpcKeys,
 }) => {
   const [open, setOpen] = useState(readOpen);
   const [showSettings, setShowSettings] = useState(false);
@@ -91,13 +95,21 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
   const model: NpcModelChoice = aiSettings?.model ?? "quality";
   const mutedIds = aiSettings?.mutedMobIds ?? [];
 
+  const brain: NpcBrain = aiSettings?.brain ?? "online";
+  const hasKey = !!(npcKeys?.groq?.trim() || npcKeys?.gemini?.trim());
+  const laptopCovering = online && brain === "online" && aiStatus?.runner === "laptop";
+
   const statusLabel = !enabled
     ? "NPC voices off"
-    : !online
-      ? "NPC voices offline"
-      : aiStatus?.busy
-        ? "NPC voices offline: laptop busy"
-        : "NPC voices online";
+    : isAdmin && brain === "online" && npcKeys && !hasKey && !online
+      ? "Add a key in settings"
+      : !online
+        ? "NPC voices offline"
+        : aiStatus?.busy
+          ? "NPC voices offline: laptop busy"
+          : laptopCovering
+            ? "Laptop covering"
+            : "NPC voices online";
   const statusColor = !enabled || !online || aiStatus?.busy ? "bg-muted-foreground" : "bg-green-500";
 
   const pendingSecrets = useMemo(
@@ -129,10 +141,10 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
             {/* Header */}
             <div className="shrink-0 flex items-center gap-2 px-3 py-2 border-b border-border">
               <MessageSquare className="w-4 h-4 text-primary" />
-              <span className="font-display text-sm text-primary uppercase tracking-wide">Game Chat</span>
-              <span className="ml-auto flex items-center gap-1.5 text-[11px] text-muted-foreground" title={aiStatus?.note || statusLabel}>
-                <span className={`w-2 h-2 rounded-full ${statusColor}`} />
-                {statusLabel}
+              <span className="font-display text-sm text-primary uppercase tracking-wide whitespace-nowrap shrink-0">Game Chat</span>
+              <span className="ml-auto min-w-0 flex items-center gap-1.5 text-[11px] text-muted-foreground" title={aiStatus?.note || statusLabel}>
+                <span className={`w-2 h-2 shrink-0 rounded-full ${statusColor}`} />
+                <span className="truncate">{statusLabel}</span>
               </span>
               {isAdmin && (
                 <button
@@ -189,11 +201,54 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
 
             {/* DM: settings */}
             {isAdmin && showSettings && (
-              <div className="shrink-0 px-3 py-2 border-b border-border space-y-2 text-xs overflow-y-auto max-h-[32vh]" data-testid="npc-settings">
+              <div className="flex-1 min-h-0 px-3 py-2 space-y-2 text-xs overflow-y-auto" data-testid="npc-settings">
                 <label className="flex items-center justify-between gap-2">
                   <span>NPC voices</span>
                   <Switch checked={enabled} onCheckedChange={(v) => onUpdateSettings?.({ enabled: v })} />
                 </label>
+                <div className="flex items-center justify-between gap-2">
+                  <span>NPC brain</span>
+                  <div className="flex border border-border">
+                    {([["online", "Online"], ["laptop", "Laptop"]] as const).map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => onUpdateSettings?.({ brain: value })}
+                        className={`px-2 py-0.5 ${brain === value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-primary"}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {brain === "online" && npcKeys && onChangeNpcKeys && (
+                  <div className="space-y-1" data-testid="npc-keys">
+                    <p className="text-muted-foreground">
+                      Free keys, saved only in this browser. Groq is used first, then Gemini when Groq's free limit runs out.
+                      Keep this page open during the game.
+                    </p>
+                    {([["groq", "Groq key", "gsk_…"], ["gemini", "Gemini key", "AIza…"]] as const).map(([id, label, placeholder]) => (
+                      <label key={id} className="flex items-center gap-2">
+                        <span className="w-20 shrink-0">{label}</span>
+                        <input
+                          type="password"
+                          autoComplete="off"
+                          spellCheck={false}
+                          value={npcKeys[id] ?? ""}
+                          onChange={(e) => onChangeNpcKeys({ ...npcKeys, [id]: e.target.value.trim() })}
+                          placeholder={placeholder}
+                          className="flex-1 min-w-0 bg-muted border border-border px-2 py-0.5 text-xs"
+                        />
+                      </label>
+                    ))}
+                  </div>
+                )}
+                {brain === "laptop" && (
+                  <p className="text-muted-foreground">Uses the NPC voices program on the DM computer.</p>
+                )}
+                {laptopCovering && (
+                  <p className="text-accent">Free online limits used up for now: the laptop is covering.</p>
+                )}
                 <div className="flex items-center justify-between gap-2">
                   <span>Model</span>
                   <div className="flex border border-border">
@@ -267,8 +322,8 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
               </div>
             )}
 
-            {/* Messages */}
-            <div ref={listRef} className="flex-1 min-h-[96px] overflow-y-auto px-3 py-2 space-y-1.5 text-sm">
+            {/* Messages (hidden while the DM has settings open, so both fit on a phone) */}
+            <div ref={listRef} hidden={isAdmin && showSettings} className="flex-1 min-h-[64px] overflow-y-auto px-3 py-2 space-y-1.5 text-sm">
               {messages.length === 0 && (
                 <p className="text-xs text-muted-foreground italic text-center py-6">
                   No messages yet. Say something, or talk to an NPC by name.
@@ -296,7 +351,7 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
             </div>
 
             {/* Input */}
-            <div className="border-t border-border p-2">
+            <div className="shrink-0 border-t border-border p-2">
               {author ? (
                 <form
                   className="flex items-center gap-1.5"

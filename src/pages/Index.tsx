@@ -24,6 +24,7 @@ import { useCampaigns } from "@/hooks/useCampaigns";
 import { useFriends } from "@/hooks/useFriends";
 import { usePublicContent } from "@/hooks/usePublicContent";
 import { useMyContent } from "@/hooks/useMyContent";
+import { useNpcBrain } from "@/hooks/useNpcBrain";
 import { toast } from "sonner";
 import { getNoChildLeftBehindBump } from "@/lib/gameData";
 import type { Episode, Campaign, CrawlerPlacement, EpisodeMobPlacement, Mob, PublicMap, PublicMob, PublicEpisode, InventoryItem, Spell } from "@/lib/gameData";
@@ -244,6 +245,9 @@ const Index = () => {
     if (!activeCampaign || !user) return false;
     return activeCampaign.ownerId === user.uid;
   }, [activeCampaign, user]);
+
+  // Online NPC brain: runs in the DM's browser during a live game (keys stay in this browser)
+  const { npcKeys, setNpcKeys } = useNpcBrain(roomId, isAdmin);
 
   // Public content (cross-campaign sharing)
   const showPublicContent = userProfile?.showPublicContent ?? false;
@@ -1120,6 +1124,8 @@ const Index = () => {
                 onClearChat={isAdmin ? clearChat : undefined}
                 onUpdateNpcAiSettings={isAdmin ? updateNpcAiSettings : undefined}
                 onSetNpcSecretState={isAdmin ? setNpcSecretState : undefined}
+                npcKeys={isAdmin ? npcKeys : undefined}
+                onChangeNpcKeys={isAdmin ? setNpcKeys : undefined}
               />
             )}
             {currentView === "sounds" && <SoundEffectsView />}

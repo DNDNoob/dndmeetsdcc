@@ -394,7 +394,11 @@ export interface NpcAiSettings {
   model?: NpcModelChoice;   // default 'quality'
   mutedAll?: boolean;
   mutedMobIds?: string[];
+  brain?: NpcBrain;         // where NPC lines are written; default 'online'
 }
+
+/** 'online': the DM's browser using free Groq/Gemini keys. 'laptop': the NPC script with Ollama. */
+export type NpcBrain = 'online' | 'laptop';
 
 /** Written by the NPC script on the DM's computer: rooms/{roomId}/npcAi/status */
 export interface NpcAiStatus {
@@ -403,6 +407,8 @@ export interface NpcAiStatus {
   activeModel?: string;     // e.g. 'qwen3:14b'
   note?: string;            // e.g. 'Close other apps for Best quality'
   busy?: boolean;           // laptop can't run any model right now
+  runner?: NpcBrain;        // which brain wrote this status
+  onlineOutUntil?: number;  // free online limits used up until then; the laptop covers if running
   thinking?: { mobId: string; mapId?: string; x?: number; y?: number; since: number } | null;
 }
 

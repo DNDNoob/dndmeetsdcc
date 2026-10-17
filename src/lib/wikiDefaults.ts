@@ -822,7 +822,7 @@ The chat button in the bottom right opens the **Game Chat** for the running epis
     order: 32,
     content: `# Talking NPCs
 
-Mobs with a personality speak for themselves during Show Time. An AI model running on the DM's computer writes one line of in-character dialogue at a time, based on the personality you wrote and what is happening in the game.
+Mobs with a personality speak for themselves during Show Time. An AI model writes one line of in-character dialogue at a time, based on the personality you wrote and what is happening in the game. The model runs either online through free AI services or on the DM's own computer (see NPC Brain below).
 
 ## Giving a Mob a Personality
 
@@ -869,22 +869,38 @@ Each crawler gets one try per NPC each noncombat turn (or every 10 minutes when 
 
 Open the Game Chat and tap the gear icon:
 - **NPC voices**: turn the feature on or off for this campaign
+- **NPC brain**: **Online** or **Laptop** (see below)
 - **Model**: **Best quality** (bigger, slower) or **Fast** (smaller, quicker)
 - **Mute all NPCs**, or mute one NPC
 - **Secret** lock/unlock per NPC
 - **Clear chat** for the current episode
 
-The dot next to the chat button is green when the DM computer is online and listening.
+The dot next to the chat button is green when an NPC brain is listening. The chat header says which one is answering, for example "NPC voices online" or "Laptop covering".
 
 ## Voice Input
 
 Hold the microphone button next to the chat box, talk, and let go. Your words appear in the chat as a message. This works in Chrome, Edge and Safari; it isn't available in Firefox.
 
-## Setting Up the DM Computer
+## NPC Brain
 
-The AI runs on the DM's own computer using [Ollama](https://ollama.com), so nothing is sent to an outside AI service. A one-time installer sets it to start automatically when the computer signs in, so on game night there is nothing to run. Setup steps are in \`scripts/npc-voices/README.md\` in the project repository.
+Choose where the AI runs in the chat settings (gear icon) under **NPC brain**.
 
-If the DM computer is off, asleep, or out of memory, the chat still works and NPCs just stay quiet. The chat header says why.`,
+### Online (default)
+
+The AI runs in the DM's own browser using free online models. Nothing to install: keep Show Time open on the DM's device during the game.
+
+1. Get a free key from [Groq](https://console.groq.com/keys) and, as a backup, one from [Google AI Studio](https://aistudio.google.com/apikey) (Gemini).
+2. In the chat settings, paste them into **Groq key** and **Gemini key**.
+
+NPCs use Groq first. If Groq's free requests run out, they switch to Gemini automatically, and the chat header says so. If both run out, the laptop covers when it is running; otherwise NPCs stay quiet until the free limit resets.
+
+The keys are saved only in that browser on that device. They are never stored in the game or shared with players, so add them again if you DM from another device or browser. Only one tab runs the NPCs at a time.
+
+### Laptop
+
+The AI runs on the DM's computer with [Ollama](https://ollama.com), so nothing is sent to an outside service. A one-time installer sets it up; setup steps are in \`scripts/npc-voices/README.md\` in the project repository. If the computer's \`.env.npc\` file has \`GROQ_API_KEY\` or \`GEMINI_API_KEY\`, the laptop also tries Groq, then Gemini, before its own model.
+
+If no brain is available (no keys, laptop off or asleep, or out of memory), the chat still works and NPCs just stay quiet. The chat header says why.`,
   },
   {
     id: 'sound-effects',

@@ -1,5 +1,15 @@
 [
   {
+    "date": "2026-10-17",
+    "changes": [
+      "🧠 New NPC brain setting in the Game Chat: NPCs can now talk using free online AI (Groq, with Gemini as backup) straight from the DM's browser, no install needed. Laptop mode still runs on the DM's computer",
+      "🔄 When Groq's free requests run out, NPCs switch to Gemini automatically, and the laptop covers if both are used up",
+      "🔑 DMs paste their free Groq and Gemini keys in the chat settings; keys stay in the DM's browser and are never shared",
+      "🖱️ Laptop NPC voices now has one-click NPC Voices ON / OFF desktop shortcuts instead of always running at sign-in; OFF frees the model's memory",
+      "💬 The Game Chat header now says which brain is answering, and the settings panel scrolls on phones"
+    ]
+  },
+  {
     "date": "2026-10-16",
     "changes": [
       "💬 New Game Chat in Show Time: players chat as their crawler and the DM as the DM, with a hold-to-talk microphone that turns speech into text",

@@ -2,7 +2,9 @@
 
 Runs on the DM's computer and makes mobs with an **NPC Personality** talk in Show Time. It watches the DM's live campaigns in Firestore, asks a local [Ollama](https://ollama.com) model for one line of dialogue when something happens, and writes the line to the game chat. The app shows it in a speech bubble over the NPC.
 
-Nothing is sent to an outside AI service. If this computer is off, the chat still works and NPCs stay quiet.
+This is the **Laptop** NPC brain. The game also has an **Online** brain that runs in the DM's browser with free Groq/Gemini keys and needs no install; the DM picks one in the Game Chat settings. When the online brain runs out of free requests, this script covers if it is running. If no brain is available, the chat still works and NPCs stay quiet.
+
+Both brains share the same engine in `src/lib/npc/` (`engine.mjs` for when and who speaks, `brain.mjs` for prompts, `onlineLlm.mjs` for Groq and Gemini). This script adds the Ollama model, the Windows task and keep-awake.
 
 ## One-time setup (Windows)
 
@@ -17,7 +19,7 @@ Nothing is sent to an outside AI service. If this computer is off, the chat stil
    ```
    powershell -ExecutionPolicy Bypass -File scripts\npc-voices\install-windows.ps1 -DmUsername <your in-game username>
    ```
-   This installs packages, creates a dedicated NPC account (saved to `.env.npc`, which is git-ignored and stays on this computer), and registers a **DnD NPC Voices** startup task that runs hidden whenever you sign in to Windows.
+   This installs packages, creates a dedicated NPC account (saved to `.env.npc`, which is git-ignored and stays on this computer), starts NPC voices, and puts **NPC Voices ON** and **NPC Voices OFF** shortcuts on the desktop. OFF also unloads the model to free memory. Add `-StartAtSignIn` if you want it to start by itself whenever you sign in to Windows.
 5. The setup step prints the NPC account's uid. The Firestore rules must let that uid write `rooms/{roomId}/chatMessages` and `rooms/{roomId}/npcAi`.
 
 To update after pulling new code, run the installer again (no `-DmUsername` needed). To remove it, run `scripts\npc-voices\uninstall-windows.ps1`.
@@ -41,8 +43,11 @@ npm run npc-voices
 
 ## Settings (optional, in `.env.npc` or the environment)
 
+`.env.npc` is git-ignored. Keep keys there, never in `.env` or the code.
+
 | Variable | Default | Meaning |
 |----------|---------|---------|
+| `GROQ_API_KEY` / `GEMINI_API_KEY` | (none) | Free online keys. When set, the script tries Groq, then Gemini, then Ollama |
 | `OLLAMA_URL` | `http://127.0.0.1:11434` | Ollama address |
 | `NPC_MODEL_QUALITY` / `NPC_MODEL_FAST` | `qwen3:14b` / `qwen3:8b` | Models to use |
 | `NPC_COOLDOWN_SECONDS` | `20` | Gap between lines from the same NPC |

@@ -1,9 +1,11 @@
-# Installs NPC voices on a Windows PC so it starts automatically at sign-in.
+# Installs NPC voices on a Windows PC with "NPC Voices ON" / "NPC Voices OFF" desktop shortcuts.
 # Usage (from the repo folder):
 #   powershell -ExecutionPolicy Bypass -File scripts\npc-voices\install-windows.ps1 -DmUsername <your in-game username>
-# Re-running is safe: it keeps the existing NPC account and refreshes the startup task.
+# Add -StartAtSignIn to also start it automatically whenever you sign in to Windows.
+# Re-running is safe: it keeps the existing NPC account and refreshes the shortcuts.
 param(
-  [string]$DmUsername
+  [string]$DmUsername,
+  [switch]$StartAtSignIn
 )
 $ErrorActionPreference = 'Stop'
 $repo = Resolve-Path (Join-Path $PSScriptRoot '..\..')
@@ -24,14 +26,30 @@ if (-not (Test-Path (Join-Path $repo '.env.npc'))) {
 }
 
 $taskName = 'DnD NPC Voices'
-$vbs = Join-Path $repo 'scripts\npc-voices\run-hidden.vbs'
-$action = New-ScheduledTaskAction -Execute 'wscript.exe' -Argument "`"$vbs`"" -WorkingDirectory $repo
-$trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
-$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero) -MultipleInstances IgnoreNew
-Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Description 'Makes NPCs talk in DnD meets DCC games using the local Ollama model.' -Force | Out-Null
+if ($StartAtSignIn) {
+  $vbs = Join-Path $repo 'scripts\npc-voices\run-hidden.vbs'
+  $action = New-ScheduledTaskAction -Execute 'wscript.exe' -Argument "`"$vbs`"" -WorkingDirectory $repo
+  $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
+  $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero) -MultipleInstances IgnoreNew
+  Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Description 'Makes NPCs talk in DnD meets DCC games using the local Ollama model.' -Force | Out-Null
+} else {
+  Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
+}
+
+# Desktop shortcuts to turn it on and off
+$desktop = [Environment]::GetFolderPath('Desktop')
+$shell = New-Object -ComObject WScript.Shell
+foreach ($s in @(@{ Name = 'NPC Voices ON'; Script = 'start-windows.ps1'; Icon = 'imageres.dll,101' },
+                 @{ Name = 'NPC Voices OFF'; Script = 'stop-windows.ps1'; Icon = 'imageres.dll,100' })) {
+  $lnk = $shell.CreateShortcut((Join-Path $desktop "$($s.Name).lnk"))
+  $lnk.TargetPath = 'powershell.exe'
+  $lnk.Arguments = "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$(Join-Path $repo "scripts\npc-voices\$($s.Script)")`""
+  $lnk.WorkingDirectory = "$repo"
+  $lnk.IconLocation = $s.Icon
+  $lnk.Save()
+}
 
 # Restart it now so the latest code is running
-Get-CimInstance Win32_Process -Filter "Name = 'node.exe'" | Where-Object { $_.CommandLine -like '*npc-voices*index.mjs*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
-Get-CimInstance Win32_Process -Filter "Name = 'cmd.exe'" | Where-Object { $_.CommandLine -like '*npc-voices*run.cmd*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
-Start-ScheduledTask -TaskName $taskName
-Write-Host "Installed. NPC voices now starts when you sign in to Windows. Log: $repo\npc-voices.log"
+& (Join-Path $repo 'scripts\npc-voices\start-windows.ps1')
+$when = if ($StartAtSignIn) { 'It also starts when you sign in to Windows.' } else { 'Use the NPC Voices ON / OFF shortcuts on your desktop.' }
+Write-Host "Installed and running. $when Log: $repo\npc-voices.log"
