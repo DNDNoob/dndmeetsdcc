@@ -18,6 +18,7 @@ import {
   NpcAiSettings,
   NpcAiStatus,
   NpcSecretEntry,
+  NpcGeneratedPersonality,
   NpcSecretState,
   Spell,
   KnownSpell,
@@ -1839,6 +1840,12 @@ export const useGameState = () => {
     const { id: _id, ...entries } = docData;
     return entries as Record<string, NpcSecretEntry>;
   }, [npcAiDocs]);
+  const npcPersonalities = useMemo((): Record<string, NpcGeneratedPersonality> => {
+    const docData = npcAiDocs.find(d => d.id === 'personalities');
+    if (!docData) return {};
+    const { id: _id, ...entries } = docData;
+    return entries as Record<string, NpcGeneratedPersonality>;
+  }, [npcAiDocs]);
 
   const sendChatMessage = async (message: Omit<ChatMessage, 'id' | 'createdAt'>) => {
     const text = message.text.trim();
@@ -1972,6 +1979,7 @@ export const useGameState = () => {
     npcAiSettings,
     npcAiStatus,
     npcSecrets,
+    npcPersonalities,
     sendChatMessage,
     clearChat,
     updateNpcAiSettings,

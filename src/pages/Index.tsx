@@ -209,6 +209,7 @@ const Index = () => {
     npcAiSettings,
     npcAiStatus,
     npcSecrets,
+    npcPersonalities,
     sendChatMessage,
     clearChat,
     updateNpcAiSettings,
@@ -1120,6 +1121,7 @@ const Index = () => {
                 npcAiSettings={npcAiSettings}
                 npcAiStatus={npcAiStatus}
                 npcSecrets={npcSecrets}
+                npcPersonalities={npcPersonalities}
                 onSendChatMessage={sendChatMessage}
                 onClearChat={isAdmin ? clearChat : undefined}
                 onUpdateNpcAiSettings={isAdmin ? updateNpcAiSettings : undefined}

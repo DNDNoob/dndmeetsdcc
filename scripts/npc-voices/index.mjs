@@ -140,10 +140,11 @@ async function loadedModels() {
   try { return ((await ollama('/api/ps')).models || []).map((m) => m.name || m.model); } catch { return null; }
 }
 
-async function chat(model, system, user, { maxTokens = 80, temperature = 0.8 } = {}) {
+async function chat(model, system, user, { maxTokens = 80, temperature = 0.8, json = false } = {}) {
   const res = await ollama('/api/chat', {
     model,
     stream: false,
+    ...(json ? { format: 'json' } : {}),
     think: false,
     keep_alive: '30m',
     options: { num_ctx: 4096, temperature, num_predict: maxTokens },
@@ -192,9 +193,9 @@ const ollamaLlm = {
     this.chosen = model;
     return { label: model, note, busy };
   },
-  async generate({ system, user, maxTokens, temperature }) {
+  async generate({ system, user, maxTokens, temperature, json }) {
     const model = this.chosen || CONFIG.models.fast;
-    return { text: await chat(model, system, user, { maxTokens, temperature }), label: model };
+    return { text: await chat(model, system, user, { maxTokens, temperature, json }), label: model };
   },
   idle: () => unloadAll(),
 };

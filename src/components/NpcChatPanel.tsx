@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { MessageSquare, Mic, Send, Settings, X, Volume2, VolumeX, Lock, Unlock, Trash2, Sparkles } from "lucide-react";
+import { MessageSquare, Mic, Send, Settings, X, Volume2, VolumeX, Lock, Unlock, Trash2, Sparkles, User, Wand2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
 import {
@@ -13,6 +13,7 @@ import {
   type NpcModelChoice,
   type NpcBrain,
   isNpcAiOnline,
+  NPC_TALK_RANGE_FEET,
 } from "@/lib/gameData";
 import type { NpcOnlineKeys } from "@/lib/npc/onlineLlm.mjs";
 
@@ -24,16 +25,25 @@ export interface NpcChatAuthor {
   name: string;
 }
 
+/** Someone who can be picked with @ in the chat box. */
+export interface NpcChatMentionable {
+  id: string;
+  name: string;
+  kind: "npc" | "crawler";
+  feet?: number; // players: how far the mob is from their crawler
+}
+
 interface NpcChatPanelProps {
   messages: ChatMessage[];
   author: NpcChatAuthor | null; // null = can't post (e.g. a player who hasn't picked a crawler)
   isAdmin: boolean;
   mobs: Mob[];
-  npcsOnMap: Mob[]; // NPCs with a personality on the current map (DM controls)
+  npcsOnMap: Mob[]; // Mobs on the current map that can talk (DM controls)
+  mentionables?: NpcChatMentionable[]; // who @ can pick (players: only mobs within talking range)
   aiSettings: NpcAiSettings | null;
   aiStatus: NpcAiStatus | null;
   secrets: Record<string, NpcSecretEntry>;
-  onSend: (text: string, viaVoice: boolean) => void | Promise<void>;
+  onSend: (text: string, viaVoice: boolean, toMobIds?: string[]) => void | Promise<void>;
   onUpdateSettings?: (updates: Partial<Omit<NpcAiSettings, "id">>) => void | Promise<void>;
   onSetSecretState?: (mobId: string, state: NpcSecretState) => void | Promise<void>;
   onClearChat?: () => void | Promise<void>;
@@ -53,7 +63,7 @@ const formatTime = (ms: number) =>
 
 /** Shared in-game chat for Show Time, with NPC voices status and DM controls. */
 export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
-  messages, author, isAdmin, mobs, npcsOnMap, aiSettings, aiStatus, secrets,
+  messages, author, isAdmin, mobs, npcsOnMap, mentionables = [], aiSettings, aiStatus, secrets,
   onSend, onUpdateSettings, onSetSecretState, onClearChat, npcKeys, onChangeNpcKeys,
 }) => {
   const [open, setOpen] = useState(readOpen);
@@ -64,6 +74,11 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
   const listRef = useRef<HTMLDivElement>(null);
   const seenCountRef = useRef(messages.length);
   const [unread, setUnread] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  // @ picker: the "@query" being typed (start = index of the @), and who has been picked
+  const [mention, setMention] = useState<{ start: number; query: string } | null>(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const [pickedMobIds, setPickedMobIds] = useState<string[]>([]);
 
   const speech = useSpeechToText((text) => { void onSend(text, true); });
 
@@ -117,11 +132,62 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
     [isAdmin, secrets, mobs]
   );
 
+  const mentionOptions = useMemo(() => {
+    if (!mention) return [];
+    const q = mention.query.toLowerCase();
+    return mentionables
+      .filter(m => m.name.toLowerCase().startsWith(q) || m.name.toLowerCase().split(/\s+/).some(w => w.startsWith(q)))
+      .slice(0, 8);
+  }, [mention, mentionables]);
+
+  const updateDraft = (value: string, caret: number | null) => {
+    setDraft(value);
+    const before = value.slice(0, caret ?? value.length);
+    const match = /(^|\s)@([^@\n]{0,24})$/.exec(before);
+    if (match && !/\s{2}/.test(match[2])) {
+      setMention({ start: before.length - match[2].length - 1, query: match[2] });
+      setMentionIndex(0);
+    } else {
+      setMention(null);
+    }
+  };
+
+  const pickMention = (option: NpcChatMentionable) => {
+    if (!mention) return;
+    const end = mention.start + 1 + mention.query.length;
+    const insert = `@${option.name} `;
+    const next = draft.slice(0, mention.start) + insert + draft.slice(end);
+    setDraft(next);
+    setMention(null);
+    if (option.kind === "npc") setPickedMobIds(ids => (ids.includes(option.id) ? ids : [...ids, option.id]));
+    const caret = mention.start + insert.length;
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      inputRef.current?.setSelectionRange(caret, caret);
+    });
+  };
+
+  const onInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!mention) return;
+    if (e.key === "Escape") { e.preventDefault(); setMention(null); return; }
+    if (!mentionOptions.length) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); setMentionIndex(i => (i + 1) % mentionOptions.length); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setMentionIndex(i => (i - 1 + mentionOptions.length) % mentionOptions.length); }
+    else if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); pickMention(mentionOptions[mentionIndex] ?? mentionOptions[0]); }
+  };
+
   const submit = () => {
     const text = draft.trim();
     if (!text || !author) return;
+    // Only mobs still tagged in the text count as picked
+    const toMobIds = pickedMobIds.filter(id => {
+      const mob = mentionables.find(m => m.id === id);
+      return mob && text.includes(`@${mob.name}`);
+    });
     setDraft("");
-    void onSend(text, false);
+    setMention(null);
+    setPickedMobIds([]);
+    void onSend(text, false, toMobIds);
   };
 
   const mobById = (id: string) => mobs.find(m => m.id === id);
@@ -274,15 +340,24 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
                 <div>
                   <p className="text-muted-foreground mb-1">NPCs on this map</p>
                   {npcsOnMap.length === 0 && (
-                    <p className="text-muted-foreground italic">No mobs with a personality here. Add one in the DM Console.</p>
+                    <p className="text-muted-foreground italic">No mobs on this map yet.</p>
                   )}
                   {npcsOnMap.map(mob => {
                     const muted = mutedIds.includes(mob.id);
                     const secretState = secrets[mob.id]?.state ?? "locked";
                     const hasSecret = !!mob.personality?.secret?.trim();
+                    const generated = !!(mob as Mob & { personalityGenerated?: boolean }).personalityGenerated;
+                    const hasAny = !!mob.personality && Object.values(mob.personality).some(v => typeof v === "string" && v.trim());
+                    const card = mob.personality
+                      ? [mob.personality.voice, mob.personality.attitude && `Attitude: ${mob.personality.attitude}`, mob.personality.secret && `Secret: ${mob.personality.secret}`].filter(Boolean).join("\n")
+                      : "";
                     return (
                       <div key={mob.id} className="flex items-center gap-2 py-0.5">
-                        <span className="flex-1 truncate">{mob.name}</span>
+                        <span className="flex-1 min-w-0 truncate" title={card || undefined}>
+                          {mob.name}
+                          {generated && <span className="ml-1 text-[10px] text-accent" title={card}>(AI personality)</span>}
+                          {!hasAny && <span className="ml-1 text-[10px] text-muted-foreground">(personality on first line)</span>}
+                        </span>
                         {hasSecret && (
                           <button
                             type="button"
@@ -326,7 +401,7 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
             <div ref={listRef} hidden={isAdmin && showSettings} className="flex-1 min-h-[64px] overflow-y-auto px-3 py-2 space-y-1.5 text-sm">
               {messages.length === 0 && (
                 <p className="text-xs text-muted-foreground italic text-center py-6">
-                  No messages yet. Say something, or talk to an NPC by name.
+                  No messages yet. Say something, or type @ to talk to someone.
                 </p>
               )}
               {messages.map(m => {
@@ -351,7 +426,34 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
             </div>
 
             {/* Input */}
-            <div className="shrink-0 border-t border-border p-2">
+            <div className="relative shrink-0 border-t border-border p-2">
+              {author && mention && !speech.listening && (
+                <div className="absolute left-2 right-2 bottom-full mb-1 bg-background border-2 border-primary shadow-xl z-10 text-sm" data-testid="mention-list" role="listbox">
+                  {mentionOptions.length === 0 ? (
+                    <p className="px-2 py-1.5 text-xs text-muted-foreground italic">
+                      {isAdmin
+                        ? "No one here by that name."
+                        : `No one by that name within ${NPC_TALK_RANGE_FEET} ft. Walk closer to talk to a mob.`}
+                    </p>
+                  ) : (
+                    mentionOptions.map((option, i) => (
+                      <button
+                        key={`${option.kind}-${option.id}`}
+                        type="button"
+                        role="option"
+                        aria-selected={i === mentionIndex}
+                        onMouseDown={(e) => { e.preventDefault(); pickMention(option); }}
+                        onMouseEnter={() => setMentionIndex(i)}
+                        className={`w-full flex items-center gap-2 px-2 py-1.5 text-left ${i === mentionIndex ? "bg-primary/20" : ""}`}
+                      >
+                        {option.kind === "npc" ? <Wand2 className="w-3.5 h-3.5 text-accent shrink-0" /> : <User className="w-3.5 h-3.5 text-primary shrink-0" />}
+                        <span className={`flex-1 truncate ${option.kind === "npc" ? "text-accent" : "text-primary"}`}>{option.name}</span>
+                        {option.feet !== undefined && <span className="text-[10px] text-muted-foreground">{option.feet} ft</span>}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
               {author ? (
                 <form
                   className="flex items-center gap-1.5"
@@ -372,9 +474,12 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
                     </button>
                   )}
                   <input
+                    ref={inputRef}
                     value={speech.listening ? speech.interim : draft}
-                    onChange={(e) => setDraft(e.target.value)}
-                    placeholder={speech.listening ? "Listening…" : `Message as ${author.name}`}
+                    onChange={(e) => updateDraft(e.target.value, e.target.selectionStart)}
+                    onKeyDown={onInputKeyDown}
+                    onBlur={() => setMention(null)}
+                    placeholder={speech.listening ? "Listening…" : `Message as ${author.name} (@ to pick)`}
                     readOnly={speech.listening}
                     maxLength={500}
                     className="flex-1 min-w-0 bg-muted border border-border px-2 py-1.5 text-sm focus:outline-none focus:border-primary"

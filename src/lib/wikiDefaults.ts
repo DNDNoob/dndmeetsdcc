@@ -574,7 +574,7 @@ When placed on a map during episode setup or Show Time, mobs appear as circular 
 
 ## NPC Personality
 
-Every mob has an optional **NPC Personality** card (DM only) in the DM Console. Fill it in and the mob talks for itself in Show Time when NPC voices are running. See [Talking NPCs](/wiki/talking-npcs).`,
+Every mob can talk for itself in Show Time when NPC voices are running. Each mob has an optional **NPC Personality** card (DM only) in the DM Console; leave it blank and the AI makes one up from the mob's details. See [Talking NPCs](/wiki/talking-npcs).`,
   },
   {
     id: 'dice-roller',
@@ -838,12 +838,21 @@ In the DM Console, open a mob (new or existing) and expand **NPC Personality**. 
 | Attitude toward the party | Friendly, grumpy, scared, hostile... |
 | Persuasion DC | How hard they are to talk into giving up the secret (optional) |
 
-Players never see this card. Only mobs with at least one field filled in will talk.
+Players never see this card.
+
+### Auto-generated personalities
+
+Every mob can talk, even ones you never wrote a card for. The first time a mob without a card is needed (or while things are quiet), the AI writes one from everything the game knows about it: name, kind, level, description, strengths and abilities, weaknesses, hit points, the items it carries and its gold. It also rolls random ingredients (a temperament, a speech quirk, what drives it, how it sees the crawlers and something tied to its past) so no two mobs come out the same, even two of the same kind.
+
+The generated personality includes a secret and a Persuasion DC based on the mob's level (bosses are harder). It stays the same for the rest of the campaign. In the chat settings it shows as **(AI personality)** next to the mob's name; hover to read it. Fill in the mob's card in the DM Console at any time to replace it with your own.
+
+Hidden mobs never talk.
 
 ## When NPCs Speak
 
 NPCs talk on their own, no button needed:
-- **Spoken to by name**: "Grimble, where's the key?" gets an answer
+- **Spoken to by name**: "Grimble, where's the key?" gets an answer. You can also type **@** in the chat box to pick who you're talking to from a list
+- **Within 20 feet**: players can only talk to mobs within 20 ft of their crawler (measured like the Ruler). The @ list only shows mobs in range, with how far away they are, and mobs farther away don't answer. The DM can talk to any mob
 - **Someone talks nearby**: the closest NPC may chime in
 - **A crawler walks up** to them
 - **A crawler gets badly hurt**, a **fight breaks out**, a **mob dies**, or a **loot box is opened** nearby

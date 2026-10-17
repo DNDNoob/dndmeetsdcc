@@ -38,6 +38,7 @@ const clockTime = (ms) => new Date(ms).toLocaleTimeString([], { hour: 'numeric',
  */
 export function createOnlineLlm(getKeys, opts = {}) {
   const restUntil = {};
+  const restKey = {}; // the key that was resting: a new key gets tried straight away
   const why = {};
   const noExtras = new Set();
   const covering = opts.laptopFallback ? 'using the laptop model' : "the laptop covers if it's running";
@@ -46,7 +47,7 @@ export function createOnlineLlm(getKeys, opts = {}) {
     const keys = getKeys() || {};
     return NPC_ONLINE_PROVIDERS.filter((p) => keys[p.id]?.trim());
   };
-  const ready = (p) => (restUntil[p.id] ?? 0) <= Date.now();
+  const ready = (p) => (restUntil[p.id] ?? 0) <= Date.now() || restKey[p.id] !== (getKeys() || {})[p.id]?.trim();
 
   const outOfOptions = () => {
     const withKeys = usable();
@@ -60,6 +61,7 @@ export function createOnlineLlm(getKeys, opts = {}) {
 
   const rest = (p, ms, reason) => {
     restUntil[p.id] = Date.now() + ms;
+    restKey[p.id] = (getKeys() || {})[p.id]?.trim();
     why[p.id] = reason;
   };
 

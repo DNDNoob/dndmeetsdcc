@@ -22,9 +22,13 @@ export function useNpcBrain(roomId: string | null | undefined, isDm: boolean) {
   const [keys, setKeysState] = useState<NpcOnlineKeys>(loadKeys);
   const keysRef = useRef(keys);
   keysRef.current = keys;
+  const roomRef = useRef<NpcRoom | null>(null);
 
   const setKeys = useCallback((next: NpcOnlineKeys) => {
     setKeysState(next);
+    keysRef.current = next;
+    // New keys: don't keep waiting out "no key" or a bad-key error
+    void roomRef.current?.retryOnline();
     try {
       localStorage.setItem(KEYS_STORAGE, JSON.stringify(next));
     } catch {
@@ -48,6 +52,7 @@ export function useNpcBrain(roomId: string | null | undefined, isDm: boolean) {
         log: (...a) => console.log('[NpcBrain]', ...a),
         warn: (...a) => console.warn('[NpcBrain]', ...a),
       });
+      roomRef.current = room;
     };
 
     // Only one tab per browser runs the brain, so NPCs never answer twice
@@ -64,6 +69,7 @@ export function useNpcBrain(roomId: string | null | undefined, isDm: boolean) {
     return () => {
       cancelled = true;
       room?.dispose();
+      roomRef.current = null;
       release();
     };
   }, [roomId, isDm]);

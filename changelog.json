@@ -2,6 +2,10 @@
   {
     "date": "2026-10-17",
     "changes": [
+      "🗣️ Every mob can now talk in Game Chat, not just ones with a personality card. Hidden mobs stay quiet",
+      "🎲 Mobs without a personality get one written by the AI from their name, description, abilities and items, plus random traits so no two are alike. It includes a secret and a Persuasion DC",
+      "💬 Type @ in Game Chat to pick who you're talking to from a list",
+      "📏 Players can only talk to mobs within 20 ft of their crawler; the @ list shows only mobs in range, with their distance",
       "🧠 New NPC brain setting in the Game Chat: NPCs can now talk using free online AI (Groq, with Gemini as backup) straight from the DM's browser, no install needed. Laptop mode still runs on the DM's computer",
       "🔄 When Groq's free requests run out, NPCs switch to Gemini automatically, and the laptop covers if both are used up",
       "🔑 DMs paste their free Groq and Gemini keys in the chat settings; keys stay in the DM's browser and are never shared",

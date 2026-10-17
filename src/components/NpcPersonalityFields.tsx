@@ -39,8 +39,9 @@ export const NpcPersonalityFields: React.FC<NpcPersonalityFieldsProps> = ({ valu
       {open && (
         <div className="mt-2 space-y-2">
           <p className="text-[11px] text-muted-foreground">
-            Fill any of these and this mob talks in Show Time when NPC voices are running. Players never see this card.
-            The AI isn't told the secret until you unlock it.
+            Every mob talks in Show Time when NPC voices are running. Leave this blank and the AI makes up a personality
+            from the mob's details the first time it's needed. Players never see this card. The AI isn't told the secret
+            until you unlock it.
           </p>
           {FIELDS.map(field => (
             <div key={field.key}>

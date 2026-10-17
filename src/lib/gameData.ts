@@ -383,7 +383,24 @@ export interface ChatMessage {
   x?: number;
   y?: number;
   viaVoice?: boolean;   // Sent with the hold-to-talk mic
+  toMobIds?: string[];  // Mobs picked with @ in the chat box
+  nearMobIds?: string[]; // Player messages: mobs within talking range of the crawler when sent
 }
+
+/** Players can only talk to mobs this close to their crawler. */
+export const NPC_TALK_RANGE_FEET = 20;
+
+/** A personality the AI wrote for a mob that had none: rooms/{roomId}/npcAi/personalities → { [mobId]: ... } */
+export interface NpcGeneratedPersonality extends NpcPersonality {
+  generatedAt?: number;
+  traits?: Record<string, string | number>; // the random ingredients it was built from
+}
+
+/** The personality a mob talks with: the DM's card if filled in, else the generated one. */
+export const withNpcPersonality = (mob: Mob, generated: Record<string, NpcGeneratedPersonality>): Mob & { personalityGenerated?: boolean } => {
+  if (hasNpcPersonality(mob) || !generated[mob.id]) return mob;
+  return { ...mob, personality: generated[mob.id], personalityGenerated: true };
+};
 
 export type NpcModelChoice = 'quality' | 'fast';
 

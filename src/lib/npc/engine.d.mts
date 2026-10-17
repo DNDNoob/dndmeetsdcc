@@ -4,7 +4,7 @@ import type { NpcAiSettings, NpcAiStatus, NpcBrain } from '../gameData';
 export type NpcTier = 'quality' | 'fast';
 
 export interface NpcLlmAdapter {
-  generate(req: { tier: NpcTier; system: string | null; user: string; maxTokens?: number; temperature?: number }): Promise<{ text: string; label?: string }>;
+  generate(req: { tier: NpcTier; system: string | null; user: string; maxTokens?: number; temperature?: number; json?: boolean }): Promise<{ text: string; label?: string }>;
   prepare?(tier: NpcTier): Promise<{ label?: string | null; note?: string; busy?: boolean }>;
   idle?(): unknown;
 }
@@ -45,4 +45,6 @@ export class NpcRoom {
   });
   live: boolean;
   dispose(): void;
+  /** Online brain: clear a "come back later" wait (e.g. after new keys) and try again now. */
+  retryOnline(): Promise<void>;
 }
