@@ -2,6 +2,8 @@
   {
     "date": "2026-10-18",
     "changes": [
+      "🔒 Campaigns are now private: only the DM and players who joined can see or change a campaign's data. Before, anyone signed in with Google could edit any campaign",
+      "🔒 Wiki links now only work for web, email and wiki addresses, which closes a hole that let a wiki page run code in other players' browsers",
       "🛒 Each copy of a creature merchant now runs its own shop: Goblin A and Goblin B have separate stock, gold and haggling. Character merchants like Grimble still have one shop",
       "🛒 Merchants: tick Is a merchant on any mob in the DM Console and give it stock, starting gold and a Scrooge Factor",
       "🤝 In Show Time, tap a merchant within 20 ft and choose Trade with Merchant to buy their items or sell your own",

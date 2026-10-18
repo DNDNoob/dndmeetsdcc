@@ -878,6 +878,7 @@ export interface Campaign {
   memberIds: string[];    // Firebase uids of players who have joined (max 10)
   maxMembers: number;     // Max player count (default 10)
   inviteCode: string;     // Short unique code for invite links
+  lastJoinCode?: string;  // Invite code the latest joiner used (security rules check it matches inviteCode)
   createdAt: number;
   updatedAt: number;
 }
