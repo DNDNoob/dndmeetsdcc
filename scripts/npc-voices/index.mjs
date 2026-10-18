@@ -24,8 +24,7 @@ import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, co
 import {
   initializeFirestore, collection, onSnapshot, query, where, getDocs, connectFirestoreEmulator,
 } from 'firebase/firestore';
-import { NpcRoom, DEFAULT_NPC_CONFIG, NpcLlmUnavailable } from '../../src/lib/npc/engine.mjs';
-import { createOnlineLlm } from '../../src/lib/npc/onlineLlm.mjs';
+import { NpcRoom, DEFAULT_NPC_CONFIG } from '../../src/lib/npc/engine.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..', '..');
@@ -200,43 +199,8 @@ const ollamaLlm = {
   idle: () => unloadAll(),
 };
 
-/**
- * With GROQ_API_KEY / GEMINI_API_KEY in .env.npc: Groq first, then Gemini, then Ollama here.
- * Without keys: Ollama only.
- */
-function laptopLlm() {
-  const keys = { groq: env.GROQ_API_KEY, gemini: env.GEMINI_API_KEY };
-  if (!keys.groq && !keys.gemini) return ollamaLlm;
-  const online = createOnlineLlm(() => keys, { laptopFallback: true, testUrl: env.NPC_TEST_LLM_URL });
-  let useOnline = true;
-  let onlineNote = '';
-  return {
-    async prepare(tier) {
-      try {
-        const info = await online.prepare(tier);
-        useOnline = true;
-        return info;
-      } catch (err) {
-        if (!(err instanceof NpcLlmUnavailable)) throw err;
-        useOnline = false;
-        onlineNote = err.note;
-        const local = await ollamaLlm.prepare(tier);
-        return { ...local, note: local.note || onlineNote };
-      }
-    },
-    async generate(req) {
-      if (useOnline) {
-        try { return await online.generate(req); } catch (err) {
-          if (!(err instanceof NpcLlmUnavailable)) throw err;
-          useOnline = false;
-          if (!ollamaLlm.chosen) await ollamaLlm.prepare(req.tier);
-        }
-      }
-      return ollamaLlm.generate(req);
-    },
-    idle: () => unloadAll(),
-  };
-}
+/** The laptop brain is the local model only: online models run in the DM's browser. */
+const laptopLlm = () => ollamaLlm;
 
 // ── keep the computer awake while a game runs (Windows) ──────────────────────
 
@@ -284,9 +248,6 @@ async function main() {
   const dmUid = profiles.docs[0].id;
   log(`Serving campaigns run by ${dmUsername}`);
 
-  if (env.GROQ_API_KEY || env.GEMINI_API_KEY) {
-    log(`Online models first: ${[env.GROQ_API_KEY && 'Groq', env.GEMINI_API_KEY && 'Gemini'].filter(Boolean).join(', then ')}, then Ollama`);
-  }
   const ollamaUp = await loadedModels();
   log(ollamaUp === null ? `Warning: Ollama isn't answering at ${CONFIG.ollamaUrl}` : `Ollama is running at ${CONFIG.ollamaUrl}`);
 

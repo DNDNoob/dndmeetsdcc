@@ -2,7 +2,7 @@
 
 Runs on the DM's computer and makes mobs with an **NPC Personality** talk in Show Time. It watches the DM's live campaigns in Firestore, asks a local [Ollama](https://ollama.com) model for one line of dialogue when something happens, and writes the line to the game chat. The app shows it in a speech bubble over the NPC.
 
-This is the **Laptop** NPC brain. The game also has an **Online** brain that runs in the DM's browser with free Groq/Gemini keys and needs no install; the DM picks one in the Game Chat settings. When the online brain runs out of free requests, this script covers if it is running. If no brain is available, the chat still works and NPCs stay quiet.
+This is the **Laptop** NPC brain: it answers with the local Ollama model only. The game also has an **Online** brain that runs in the DM's browser with free Groq/Gemini keys and needs no install; the DM picks one in the Game Chat settings. When the online brain runs out of free requests, this script covers if it is running. If no brain is available, the chat still works and NPCs stay quiet.
 
 Both brains share the same engine in `src/lib/npc/` (`engine.mjs` for when and who speaks, `brain.mjs` for prompts, `onlineLlm.mjs` for Groq and Gemini). This script adds the Ollama model, the Windows task and keep-awake.
 
@@ -43,11 +43,10 @@ npm run npc-voices
 
 ## Settings (optional, in `.env.npc` or the environment)
 
-`.env.npc` is git-ignored. Keep keys there, never in `.env` or the code.
+`.env.npc` is git-ignored. Keep secrets there, never in `.env` or the code.
 
 | Variable | Default | Meaning |
 |----------|---------|---------|
-| `GROQ_API_KEY` / `GEMINI_API_KEY` | (none) | Free online keys. When set, the script tries Groq, then Gemini, then Ollama |
 | `OLLAMA_URL` | `http://127.0.0.1:11434` | Ollama address |
 | `NPC_MODEL_QUALITY` / `NPC_MODEL_FAST` | `qwen3:14b` / `qwen3:8b` | Models to use |
 | `NPC_COOLDOWN_SECONDS` | `20` | Gap between lines from the same NPC |

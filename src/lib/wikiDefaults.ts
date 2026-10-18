@@ -907,7 +907,7 @@ The keys are saved only in that browser on that device. They are never stored in
 
 ### Laptop
 
-The AI runs on the DM's computer with [Ollama](https://ollama.com), so nothing is sent to an outside service. A one-time installer sets it up; setup steps are in \`scripts/npc-voices/README.md\` in the project repository. If the computer's \`.env.npc\` file has \`GROQ_API_KEY\` or \`GEMINI_API_KEY\`, the laptop also tries Groq, then Gemini, before its own model.
+The AI runs on the DM's computer with [Ollama](https://ollama.com), so nothing is sent to an outside service. A one-time installer sets it up; setup steps are in \`scripts/npc-voices/README.md\` in the project repository. Laptop mode only uses this local model, never Groq or Gemini. Pick it when you want the local AI; the Online brain is enough whenever the DM tab is open.
 
 If no brain is available (no keys, laptop off or asleep, or out of memory), the chat still works and NPCs just stay quiet. The chat header says why.`,
   },

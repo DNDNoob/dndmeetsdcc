@@ -332,7 +332,7 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
                   </div>
                 )}
                 {brain === "laptop" && (
-                  <p className="text-muted-foreground">Uses the NPC voices program on the DM computer.</p>
+                  <p className="text-muted-foreground">Uses only the local AI model in the NPC voices program on the DM computer. No Groq or Gemini.</p>
                 )}
                 {laptopCovering && (
                   <p className="text-accent">Free online limits used up for now: the laptop is covering.</p>
