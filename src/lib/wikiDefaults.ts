@@ -61,6 +61,8 @@ The navigation bar at the top of the screen gives you quick access to all sectio
 
 On mobile devices, the navigation collapses into a **hamburger menu** (☰) — tap it to access all sections from a dropdown.
 
+In **Show Time**, the navigation bar hides to give the map more room. Rest your mouse at the top-left edge of the screen for a moment to bring it back, or pin it open. Moving across the top of the screen on your way to the map tools won't pop it open.
+
 Use the **Campaigns** button to return to the campaign list at any time.`,
   },
   {
