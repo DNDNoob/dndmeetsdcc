@@ -218,6 +218,12 @@ const Index = () => {
     deleteLanguage,
     updateNpcAiSettings,
     setNpcSecretState,
+    merchants,
+    buyFromMerchant,
+    sellToMerchant,
+    restockMerchant,
+    haggleWithMerchant,
+    resolveMerchantHaggle,
     spells,
     addSpell,
     updateSpell,
@@ -1146,6 +1152,12 @@ const Index = () => {
                 npcKeys={isAdmin ? npcKeys : undefined}
                 onChangeNpcKeys={isAdmin ? setNpcKeys : undefined}
                 onSetTranslateMode={async (crawlerId, mode) => { await updateCrawler(crawlerId, { translateMode: mode }); }}
+                merchants={merchants}
+                onBuyFromMerchant={buyFromMerchant}
+                onSellToMerchant={sellToMerchant}
+                onHaggleWithMerchant={haggleWithMerchant}
+                onRestockMerchant={isAdmin ? restockMerchant : undefined}
+                onResolveMerchantHaggle={isAdmin ? resolveMerchantHaggle : undefined}
               />
             )}
             {currentView === "sounds" && <SoundEffectsView />}

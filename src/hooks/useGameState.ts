@@ -42,6 +42,16 @@ import {
   type PublicEpisode,
   type PublicEpisodeAssets,
   type CustomLanguage,
+  type MerchantState,
+  type MerchantStockEntry,
+  type MerchantHaggle,
+  createMerchantState,
+  getEffectiveScrooge,
+  getMerchantBuyPrice,
+  getMerchantSellPrice,
+  merchantItemKey,
+  DEFAULT_HAGGLE_DC,
+  getHaggleBlocker,
 } from "@/lib/gameData";
 import { useGame } from "@/contexts/GameContext";
 import { DEFAULT_LANGUAGE_ID } from "@/lib/languages";
@@ -98,6 +108,7 @@ export const useGameState = () => {
     setRoomId,
     setCreator,
     mergeArrayById,
+    transact,
   } = useGame();
 
   // Cache for memoization - store previous collection values and their serialized forms
@@ -1505,7 +1516,17 @@ export const useGameState = () => {
 
   // Encountered mobs show in players' Mob Profiles; unencountered ones stay hidden there.
   // Same pairing the DM Console uses (encountered ⇔ not hidden).
+  // Meeting a character also reveals the creature they are (Grimble → Goblin).
   const setMobEncountered = async (mobId: string, encountered: boolean) => {
+    const speciesId = encountered ? mobs.find(m => m.id === mobId)?.speciesId : undefined;
+    const species = speciesId ? mobs.find(m => m.id === speciesId) : undefined;
+    if (species && !(species.encountered && !species.hidden)) {
+      await batchWrite([
+        { type: 'update', collection: 'mobs', id: mobId, data: { encountered, hidden: !encountered } },
+        { type: 'update', collection: 'mobs', id: species.id, data: { encountered: true, hidden: false } },
+      ]);
+      return;
+    }
     await updateItem('mobs', mobId, { encountered, hidden: !encountered } as Record<string, unknown>);
   };
 
@@ -1874,6 +1895,164 @@ export const useGameState = () => {
     return entries as Record<string, NpcGeneratedPersonality>;
   }, [npcAiDocs]);
 
+  // --- Merchants ---
+  // Live stock and gold live in merchants/{mobId}. Every trade reads that doc, the crawler and
+  // their inventory on the server and writes all three at once, so two crawlers can't buy the
+  // same last item and gold never goes missing.
+  const merchants = useMemo(() => getStableCollection<MerchantState>('merchants'), [getCollection, isLoaded]);
+
+  const merchantDocOps = (mob: Mob, existing: boolean, next: MerchantState): BatchOperation => existing
+    ? { type: 'update', collection: 'merchants', id: mob.id, data: { stock: next.stock, gold: next.gold, discounts: next.discounts ?? {}, haggles: next.haggles ?? {} } }
+    : { type: 'add', collection: 'merchants', id: mob.id, data: next as unknown as Record<string, unknown> };
+
+  const inventoryOp = (crawlerId: string, invDocId: string, existing: boolean, items: InventoryItem[]): BatchOperation => existing
+    ? { type: 'update', collection: 'inventory', id: invDocId, data: { items } }
+    : { type: 'add', collection: 'inventory', id: invDocId, data: { crawlerId, items } };
+
+  const tradeReads = (mob: Mob, crawlerId: string) => {
+    const invDocId = (inventory.find(i => i.crawlerId === crawlerId) as { id?: string } | undefined)?.id || crawlerId;
+    return {
+      invDocId,
+      reads: [
+        { collection: 'merchants' as const, id: mob.id },
+        { collection: 'crawlers' as const, id: crawlerId },
+        { collection: 'inventory' as const, id: invDocId },
+      ],
+    };
+  };
+
+  /** Buys one of the stock line matching `item`. Returns true when the trade went through. */
+  const buyFromMerchant = async (mob: Mob, crawlerId: string, item: InventoryItem) => {
+    if (!mob.merchant) return false;
+    const config = mob.merchant;
+    const key = merchantItemKey(item);
+    const { invDocId, reads } = tradeReads(mob, crawlerId);
+    return transact(reads, ([merchantDoc, crawlerDoc, invDoc]) => {
+      if (!crawlerDoc) throw new Error('Crawler not found.');
+      const state = (merchantDoc as unknown as MerchantState | null) ?? createMerchantState(mob.id, config);
+      const idx = state.stock.findIndex(e => merchantItemKey(e.item) === key);
+      if (idx < 0 || state.stock[idx].quantity <= 0) throw new Error(`${mob.name} is sold out of ${item.name}.`);
+      const price = getMerchantBuyPrice(state.stock[idx].item.goldValue, getEffectiveScrooge(config, state, crawlerId));
+      const gold = Number(crawlerDoc.gold) || 0;
+      if (gold < price) throw new Error(`Not enough gold: ${item.name} costs ${price}.`);
+      const stock: MerchantStockEntry[] = state.stock
+        .map((e, i) => (i === idx ? { ...e, quantity: e.quantity - 1 } : e))
+        .filter(e => e.quantity > 0);
+      const bought: InventoryItem = { ...state.stock[idx].item, id: `item-${crypto.randomUUID()}` };
+      const items = [...(((invDoc?.items as InventoryItem[]) ?? [])), bought];
+      return [
+        merchantDocOps(mob, !!merchantDoc, { ...state, stock, gold: state.gold + price }),
+        { type: 'update', collection: 'crawlers', id: crawlerId, data: { gold: gold - price } },
+        inventoryOp(crawlerId, invDocId, !!invDoc, items),
+      ];
+    });
+  };
+
+  /**
+   * Sells one inventory item. `minGold` is what the player agreed to take: the full price, or the
+   * merchant's remaining gold when they chose to sell for less. If the merchant can no longer pay
+   * that much the sale is cancelled.
+   */
+  const sellToMerchant = async (mob: Mob, crawlerId: string, itemId: string, minGold: number) => {
+    if (!mob.merchant) return false;
+    const config = mob.merchant;
+    const { invDocId, reads } = tradeReads(mob, crawlerId);
+    return transact(reads, ([merchantDoc, crawlerDoc, invDoc]) => {
+      if (!crawlerDoc) throw new Error('Crawler not found.');
+      const state = (merchantDoc as unknown as MerchantState | null) ?? createMerchantState(mob.id, config);
+      const owned = ((invDoc?.items as InventoryItem[]) ?? []);
+      const item = owned.find(i => i.id === itemId);
+      if (!item) throw new Error('That item is no longer in your inventory.');
+      const price = getMerchantSellPrice(item.goldValue, getEffectiveScrooge(config, state, crawlerId));
+      const paid = Math.min(price, state.gold);
+      if (paid < minGold) throw new Error(`${mob.name} only has ${state.gold} gold left now. Try again.`);
+      const key = merchantItemKey(item);
+      const idx = state.stock.findIndex(e => merchantItemKey(e.item) === key);
+      const { equipped: _eq, ...cleanItem } = item;
+      const stock: MerchantStockEntry[] = idx >= 0
+        ? state.stock.map((e, i) => (i === idx ? { ...e, quantity: e.quantity + 1 } : e))
+        : [...state.stock, { item: { ...cleanItem, id: `merch-${crypto.randomUUID()}` }, quantity: 1 }];
+      // Selling an equipped item takes it off
+      const equipped = { ...((crawlerDoc.equippedItems as Record<string, string>) ?? {}) };
+      for (const [slot, id] of Object.entries(equipped)) if (id === itemId) delete equipped[slot];
+      return [
+        merchantDocOps(mob, !!merchantDoc, { ...state, stock, gold: state.gold - paid }),
+        { type: 'update', collection: 'crawlers', id: crawlerId, data: { gold: (Number(crawlerDoc.gold) || 0) + paid, equippedItems: equipped } },
+        inventoryOp(crawlerId, invDocId, !!invDoc, owned.filter(i => i.id !== itemId)),
+      ];
+    });
+  };
+
+  /** DM: reset stock, gold and haggling from the merchant's settings. */
+  const restockMerchant = async (mob: Mob) => {
+    if (!mob.merchant) return false;
+    const config = mob.merchant;
+    return transact([{ collection: 'merchants', id: mob.id }], () => [
+      // A restock intentionally replaces the whole live state
+      { type: 'add', collection: 'merchants', id: mob.id, data: createMerchantState(mob.id, config) as unknown as Record<string, unknown> },
+    ]);
+  };
+
+  /**
+   * Rolls Persuasion (d20 + CHA mod, with equipment) to haggle. A roll that meets the DC asks the
+   * DM to approve one Scrooge level off for this crawler. One try per crawler until the next restock.
+   * Uses the crawler's action in combat, or one of their rolls this noncombat turn.
+   */
+  const haggleWithMerchant = async (mob: Mob, crawler: Crawler) => {
+    if (!mob.merchant) return null;
+    const config = mob.merchant;
+    const existing = merchants.find(m => m.id === mob.id);
+    if (existing?.haggles?.[crawler.id]) {
+      toast.error(`You already haggled with ${mob.name}. Try again after they restock.`);
+      return null;
+    }
+    const blocker = getHaggleBlocker(crawler.id, combatState, noncombatTurnState);
+    if (blocker) {
+      toast.error(blocker);
+      return null;
+    }
+    const cha = crawler.cha + (getEquippedModifiers(crawler, getCrawlerInventory(crawler.id)).cha ?? 0);
+    const modifier = Math.floor((cha - 10) / 2);
+    const rawRoll = Math.floor(Math.random() * 20) + 1;
+    const total = rawRoll + modifier;
+    const dc = config.haggleDC ?? DEFAULT_HAGGLE_DC;
+    const entry: MerchantHaggle = { state: total >= dc ? 'pending' : 'failed', crawlerName: crawler.name, total, dc, at: Date.now() };
+    const ok = await transact([{ collection: 'merchants', id: mob.id }], ([merchantDoc]) => {
+      const state = (merchantDoc as unknown as MerchantState | null) ?? createMerchantState(mob.id, config);
+      if (state.haggles?.[crawler.id]) throw new Error(`You already haggled with ${mob.name}. Try again after they restock.`);
+      return [merchantDocOps(mob, !!merchantDoc, { ...state, haggles: { ...(state.haggles ?? {}), [crawler.id]: entry } })];
+    });
+    if (!ok) return null;
+    // Haggling costs the action (combat) or one of this turn's rolls (noncombat)
+    if (combatState?.active && combatState.phase !== 'ended') await recordCombatAction(crawler.id, 'action');
+    else await recordNoncombatRoll(crawler.id);
+    await addDiceRoll({
+      id: crypto.randomUUID(),
+      crawlerName: crawler.name,
+      crawlerId: crawler.id,
+      timestamp: Date.now(),
+      results: [{ dice: 'D20', result: rawRoll }],
+      total,
+      statRoll: { stat: `Haggle with ${mob.name} (Persuasion)`, modifier, rawRoll },
+    });
+    return entry;
+  };
+
+  /** DM: approve (one Scrooge level off for that crawler) or deny a haggle that met the DC. */
+  const resolveMerchantHaggle = async (mob: Mob, crawlerId: string, approve: boolean) => {
+    return transact([{ collection: 'merchants', id: mob.id }], ([merchantDoc]) => {
+      const state = merchantDoc as unknown as MerchantState | null;
+      const haggle = state?.haggles?.[crawlerId];
+      if (!state || !haggle || haggle.state !== 'pending') return [];
+      const discounts = { ...(state.discounts ?? {}) };
+      if (approve) discounts[crawlerId] = (discounts[crawlerId] ?? 0) + 1;
+      return [{
+        type: 'update', collection: 'merchants', id: mob.id,
+        data: { discounts, haggles: { ...state.haggles, [crawlerId]: { ...haggle, state: approve ? 'approved' : 'denied' } } },
+      }];
+    });
+  };
+
   const sendChatMessage = async (message: Omit<ChatMessage, 'id' | 'createdAt'>) => {
     const text = message.text.trim();
     if (!text) return;
@@ -2014,6 +2193,12 @@ export const useGameState = () => {
     deleteLanguage,
     updateNpcAiSettings,
     setNpcSecretState,
+    merchants,
+    buyFromMerchant,
+    sellToMerchant,
+    restockMerchant,
+    haggleWithMerchant,
+    resolveMerchantHaggle,
     spells,
     addSpell,
     updateSpell,

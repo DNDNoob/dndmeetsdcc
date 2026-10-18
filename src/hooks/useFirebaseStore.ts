@@ -39,6 +39,10 @@ interface UseFirebaseStoreReturn {
     next: Record<string, unknown>[],
     extra?: Record<string, unknown>,
   ) => Promise<void>;
+  transact: (
+    reads: { collection: CollectionName; id: string }[],
+    compute: (docs: (Record<string, unknown> | null)[]) => BatchOperation[],
+  ) => Promise<boolean>;
 }
 
 interface Creator {
@@ -86,7 +90,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
   };
 
   // Collections to sync
-  const collections: CollectionName[] = ['crawlers', 'mobs', 'maps', 'inventory', 'episodes', 'soundEffects', 'diceRolls', 'lootBoxes', 'lootBoxTemplates', 'noncombatTurns', 'gameClock', 'combatState', 'wiki', 'quests', 'assignedQuests', 'spells', 'chatMessages', 'npcAi', 'languages'];
+  const collections: CollectionName[] = ['crawlers', 'mobs', 'maps', 'inventory', 'episodes', 'soundEffects', 'diceRolls', 'lootBoxes', 'lootBoxTemplates', 'noncombatTurns', 'gameClock', 'combatState', 'wiki', 'quests', 'assignedQuests', 'spells', 'chatMessages', 'npcAi', 'merchants', 'languages'];
 
   // Load and subscribe to real-time updates
   useEffect(() => {
@@ -530,6 +534,35 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
     }
   }, [roomId, requireAuth]);
 
+  // Reads the given docs from the server and writes the operations `compute` returns, all or
+  // nothing; Firestore retries `compute` if another player changed one of the docs meanwhile.
+  // `compute` throws an Error with a player-facing message to cancel. Returns false if cancelled.
+  const transact = useCallback(async (
+    reads: { collection: CollectionName; id: string }[],
+    compute: (docs: (Record<string, unknown> | null)[]) => BatchOperation[],
+  ): Promise<boolean> => {
+    if (!requireAuth()) return false;
+    const refOf = (collection: CollectionName, id: string) => doc(getCollectionRef(collection, roomId || undefined), id);
+    try {
+      await runTransaction(db, async (tx) => {
+        const snaps = await Promise.all(reads.map(r => tx.get(refOf(r.collection, r.id))));
+        const ops = compute(snaps.map(snap => (snap.exists() ? { id: snap.id, ...snap.data() } : null)));
+        for (const op of ops) {
+          const ref = refOf(op.collection, op.id);
+          if (op.type === 'delete') tx.delete(ref);
+          else if (op.type === 'update') tx.update(ref, cleanObject(op.data ?? {}) as Record<string, unknown>);
+          else tx.set(ref, cleanObject({ ...(op.data ?? {}), ...(roomId ? { roomId } : {}) }) as Record<string, unknown>);
+        }
+      });
+      logger.log('[FirebaseStore] ✅ Transaction committed:', reads.map(r => `${r.collection}/${r.id}`).join(', '));
+      return true;
+    } catch (err) {
+      console.error('[FirebaseStore] ❌ Transaction error:', err);
+      toast.error(err instanceof Error && err.message ? err.message : 'Failed to save changes. Please try again.', { id: 'save-error' });
+      return false;
+    }
+  }, [roomId, requireAuth]);
+
   const getCollection = useCallback(<T = Record<string, unknown>>(collection: CollectionName): T[] => {
     return (data[collection] || []) as T[];
   }, [data]);
@@ -556,6 +589,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
     roomId,
     setCreator,
     mergeArrayById,
+    transact,
   };
 }
 

@@ -1,3 +1,7 @@
+import type { NpcSpeaker } from './npc/speakers.mjs';
+export { getMobKind, isBossMob, isPlacementHostile, baseMobId, mapSpeakers } from './npc/speakers.mjs';
+export type { NpcSpeaker } from './npc/speakers.mjs';
+
 export type EquipmentSlot = 'head' | 'chest' | 'legs' | 'feet' | 'leftHand' | 'rightHand' | 'ringFinger' | 'weapon';
 
 export interface EquippedItems {
@@ -341,11 +345,17 @@ export function getEquippedModifiers(crawler: Crawler, inventory: InventoryItem[
   return totals;
 }
 
+/** Creatures are templates you can place many times (Goblin); characters are unique and part of the story (Grimble). */
+export type MobKind = 'creature' | 'character';
+
 export interface Mob {
   id: string;
   name: string;
   level: number;
-  type: "normal" | "boss" | "npc";
+  type: "normal" | "boss" | "npc"; // Legacy; kept in step with kind/boss so older copies still read right
+  kind?: MobKind;      // Absent on old mobs: read with getMobKind()
+  boss?: boolean;      // Absent on old mobs: read with isBossMob()
+  speciesId?: string;  // Characters: the creature they are ("Grimble is a Goblin")
   description: string;
   encountered: boolean;
   hidden: boolean;
@@ -364,7 +374,108 @@ export interface Mob {
   isPublic?: boolean;        // Shared to the community (publicMobs)
   personality?: NpcPersonality; // DM-only: drives AI dialogue for talking NPCs
   languages?: string[];      // Language ids it speaks, native first; none set = Worldspeech
+  merchant?: MerchantConfig;  // NPCs that buy and sell items with crawlers
 }
+
+// ======== Merchants ========
+
+export interface MerchantStockEntry {
+  item: InventoryItem;
+  quantity: number;
+}
+
+/** DM settings on the mob. Restocking copies these into the live MerchantState. */
+export interface MerchantConfig {
+  enabled: boolean;
+  stock: MerchantStockEntry[];
+  startingGold: number;
+  scroogeFactor: number; // Each level: buy prices +10%, sell prices -10%
+  haggleDC?: number;     // Persuasion (d20 + CHA mod) needed to ask the DM for a lower Scrooge level
+}
+
+export type MerchantHaggleState = 'pending' | 'approved' | 'denied' | 'failed';
+
+export interface MerchantHaggle {
+  state: MerchantHaggleState;
+  crawlerName: string;
+  total: number;
+  dc: number;
+  at: number;
+}
+
+/** Live stock and gold, shared by everyone in the room: rooms/{roomId}/merchants/{mobId} */
+export interface MerchantState {
+  id: string; // = mobId
+  stock: MerchantStockEntry[];
+  gold: number;
+  discounts?: Record<string, number>;      // crawlerId -> Scrooge levels taken off by haggling
+  haggles?: Record<string, MerchantHaggle>; // crawlerId -> their haggle attempt since the last restock
+  restockedAt?: number;
+}
+
+export const MERCHANT_TRADE_RANGE_FEET = 20;
+export const DEFAULT_HAGGLE_DC = 15;
+export const DEFAULT_MERCHANT_CONFIG: MerchantConfig = { enabled: true, stock: [], startingGold: 100, scroogeFactor: 0 };
+
+/** Any mob can be a merchant; this doesn't depend on its type. */
+export const isMerchant = (mob: Pick<Mob, 'merchant'> | undefined): boolean => !!mob?.merchant?.enabled;
+
+/** A fresh live state from the DM's settings. Items get new ids so restocks never collide. */
+export const createMerchantState = (mobId: string, config: MerchantConfig): MerchantState => ({
+  id: mobId,
+  stock: (config.stock || [])
+    .filter(e => e.quantity > 0)
+    .map(e => ({ item: { ...e.item, id: `merch-${crypto.randomUUID()}` }, quantity: Math.floor(e.quantity) })),
+  gold: Math.max(0, Math.floor(config.startingGold || 0)),
+  discounts: {},
+  haggles: {},
+  restockedAt: Date.now(),
+});
+
+/** The Scrooge level a crawler trades at after any haggling discount. */
+export const getEffectiveScrooge = (config: MerchantConfig | undefined, state: MerchantState | undefined, crawlerId?: string): number =>
+  Math.max(0, Math.floor(config?.scroogeFactor ?? 0) - (crawlerId ? state?.discounts?.[crawlerId] ?? 0 : 0));
+
+// Worked in tenths so 100 gold at +10% is exactly 110, not 110.00000000000001 rounded up to 111
+export const getMerchantBuyPrice = (goldValue: number | undefined, scrooge: number): number =>
+  Math.max(0, Math.ceil(Math.round((goldValue ?? 0) * (10 + scrooge)) / 10));
+
+export const getMerchantSellPrice = (goldValue: number | undefined, scrooge: number): number =>
+  Math.max(0, Math.floor(Math.round((goldValue ?? 0) * (10 - scrooge)) / 10));
+
+/**
+ * Haggling uses an action, like the Actions tab: in combat it takes the crawler's action on
+ * their turn; between fights it uses one of their rolls for this noncombat turn.
+ * Returns why the crawler can't act right now, or null if they can.
+ */
+export const getHaggleBlocker = (
+  crawlerId: string,
+  combatState: Pick<CombatState, 'active' | 'phase' | 'combatants' | 'currentTurnIndex'> | null | undefined,
+  noncombatTurnState: Pick<NoncombatTurnState, 'rollsUsed' | 'maxRolls'> | null | undefined,
+): string | null => {
+  if (combatState?.active && combatState.phase !== 'ended') {
+    if (combatState.phase !== 'combat' || combatState.combatants[combatState.currentTurnIndex]?.id !== crawlerId) {
+      return 'Haggling uses your action. Wait for your turn.';
+    }
+    if (combatState.combatants.find(c => c.id === crawlerId)?.hasUsedAction) return 'You already used your action this turn.';
+    return null;
+  }
+  if (noncombatTurnState && (noncombatTurnState.rollsUsed?.[crawlerId] ?? 0) >= noncombatTurnState.maxRolls) {
+    return 'Haggling uses a roll, and you have none left this turn.';
+  }
+  return null;
+};
+
+/** Two items count as the same stock line when everything but the id matches. */
+export const merchantItemKey = (item: InventoryItem): string => {
+  const { id: _id, equipped: _eq, ...rest } = item;
+  const stable = (v: unknown): unknown =>
+    Array.isArray(v) ? v.map(stable)
+      : v && typeof v === 'object'
+        ? Object.fromEntries(Object.keys(v as object).sort().map(k => [k, stable((v as Record<string, unknown>)[k])]))
+        : v;
+  return JSON.stringify(stable(rest));
+};
 
 // ======== Talking NPCs (local AI) ========
 
@@ -424,6 +535,17 @@ export const withNpcPersonality = (mob: Mob, generated: Record<string, NpcGenera
   return { ...mob, personality: generated[mob.id], personalityGenerated: true };
 };
 
+/** The legacy type field that matches a kind and boss flag. */
+export const legacyMobType = (kind: MobKind, boss: boolean): Mob['type'] =>
+  boss ? 'boss' : kind === 'character' ? 'npc' : 'normal';
+
+/**
+ * A speaker as a mob the chat can show: its own id and name ("Goblin B"), and the DM's card if
+ * the mob has one, else the personality the AI wrote for this speaker.
+ */
+export const speakerAsMob = (speaker: NpcSpeaker, generated: Record<string, NpcGeneratedPersonality>): Mob & { personalityGenerated?: boolean } =>
+  withNpcPersonality({ ...speaker.mob, id: speaker.id, name: speaker.name }, generated);
+
 export type NpcModelChoice = 'quality' | 'fast';
 
 /** DM settings: rooms/{roomId}/npcAi/settings */
@@ -474,6 +596,7 @@ export interface EpisodeMobPlacement {
   inventoryOverride?: InventoryItem[]; // Per-placement inventory override (episode-specific)
   goldOverride?: number; // Per-placement gold override (episode-specific)
   letterIndex?: number; // Stable letter assignment (0=A, 1=B, etc.) — survives deletion of other placements
+  hostile?: boolean; // DM's call for this token; absent = creatures hostile, characters friendly (isPlacementHostile)
 }
 
 export interface CrawlerPlacement {

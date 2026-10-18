@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Clock, ChevronUp, ChevronDown, RotateCcw, Sun, Moon, Swords, Zap, SkipForward, XCircle, Heart, Plus, Play, Square, Timer, Pause, Footprints, Dices, Eye, EyeOff } from "lucide-react";
-import { type Crawler, type Mob, type NoncombatTurnState, type GameClockState, type Episode, type CombatState, type CrawlerPlacement, type EpisodeMobPlacement, type CombatantEntry, type InventoryItem, getEffectiveMoveSpeed, NONCOMBAT_MOVE_MULTIPLIER } from "@/lib/gameData";
+import { type Crawler, type Mob, type NoncombatTurnState, type GameClockState, type Episode, type CombatState, type CrawlerPlacement, type EpisodeMobPlacement, type CombatantEntry, type InventoryItem, getEffectiveMoveSpeed, isPlacementHostile, NONCOMBAT_MOVE_MULTIPLIER } from "@/lib/gameData";
 import UndoTurnButton from "@/components/UndoTurnButton";
 
 interface PingPanelProps {
@@ -178,6 +178,7 @@ const PingPanel: React.FC<PingPanelProps> = ({
         name: `${mob.name}${suffix}`,
         hitPoints: p.currentHP ?? mob.hitPoints,
         encountered: isMobEncountered(mob),
+        hostile: isPlacementHostile(p, mob),
       };
     }).filter((e): e is NonNullable<typeof e> => e !== null);
   }, [activeEpisode?.mobPlacements, runtimeMobPlacements, mobs]);
@@ -289,14 +290,14 @@ const PingPanel: React.FC<PingPanelProps> = ({
     setSelectedNewCombatants({});
   };
 
-  // Open combat setup with all mobs/crawlers pre-selected
+  // Open combat setup with every crawler and hostile token pre-selected (friendly ones can still be ticked)
   const openCombatSetup = () => {
     const crawlerSel: Record<string, boolean> = {};
     playerCrawlers.forEach(c => { crawlerSel[c.id] = true; });
     setSelectedCombatCrawlers(crawlerSel);
 
     const mobSel: Record<string, boolean> = {};
-    mobCombatEntries.forEach(e => { mobSel[e.combatId] = true; });
+    mobCombatEntries.forEach(e => { mobSel[e.combatId] = e.hostile; });
     setSelectedCombatMobs(mobSel);
 
     setShowCombatSetup(true);
@@ -541,6 +542,9 @@ const PingPanel: React.FC<PingPanelProps> = ({
                           <span>{entry.name}</span>
                           {entry.hitPoints != null && (
                             <span className="text-muted-foreground">({entry.hitPoints} HP)</span>
+                          )}
+                          {!entry.hostile && (
+                            <span className="text-[10px] text-green-500 italic">friendly</span>
                           )}
                           {!entry.encountered && (
                             <span className="text-[10px] text-muted-foreground italic">unencountered</span>

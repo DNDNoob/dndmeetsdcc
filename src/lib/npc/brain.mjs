@@ -1,5 +1,6 @@
 // Pure helpers for the NPC voices script: prompts, distances, name matching, output cleanup.
 // No Firebase or network calls here, so they're easy to test.
+import { getMobKind, isBossMob } from './speakers.mjs';
 
 export const hasPersonality = (mob) =>
   !!mob?.personality && Object.values(mob.personality).some((v) => typeof v === 'string' && v.trim() !== '');
@@ -186,7 +187,10 @@ export const rollPersonalityTraits = (rand = Math.random) => ({
   seed: Math.floor(rand() * 1_000_000),
 });
 
-const MOB_KINDS = { npc: 'a non-player character', boss: 'a boss monster', normal: 'a monster' };
+const mobKindWords = (mob) => {
+  const kind = getMobKind(mob) === 'character' ? 'a named character in the story' : 'a common creature, one of many like it';
+  return isBossMob(mob) ? `${kind} (a boss)` : kind;
+};
 
 const describeItem = (item) => {
   const mods = item.statModifiers
@@ -200,8 +204,9 @@ const describeItem = (item) => {
 export const describeMobFacts = ({ mob, items = [], gold }) => {
   const lines = [
     `Name: ${mob.name}`,
-    `Kind: ${MOB_KINDS[mob.type] ?? 'a monster'}, level ${mob.level ?? 1}`,
+    `Kind: ${mobKindWords(mob)}, level ${mob.level ?? 1}`,
   ];
+  if (mob.speciesName) lines.push(`Species: ${mob.speciesName}`);
   if (mob.description) lines.push(`Description: ${mob.description.slice(0, 600)}`);
   if (mob.hitPoints) lines.push(`Hit points: ${mob.hitPoints}`);
   if (mob.strengths) lines.push(`Strengths and abilities: ${mob.strengths.slice(0, 300)}`);

@@ -14,6 +14,7 @@ import {
   type NpcBrain,
   type TranslateMode,
   isNpcAiOnline,
+  baseMobId,
   NPC_TALK_RANGE_FEET,
 } from "@/lib/gameData";
 import type { NpcOnlineKeys } from "@/lib/npc/onlineLlm.mjs";
@@ -153,7 +154,7 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
   const statusColor = !enabled || !online || aiStatus?.busy ? "bg-muted-foreground" : "bg-green-500";
 
   const pendingSecrets = useMemo(
-    () => (isAdmin ? Object.entries(secrets).filter(([mobId, s]) => s?.state === "pending" && mobs.some(m => m.id === mobId)) : []),
+    () => (isAdmin ? Object.entries(secrets).filter(([mobId, s]) => s?.state === "pending" && mobs.some(m => m.id === mobId || m.id === baseMobId(mobId))) : []),
     [isAdmin, secrets, mobs]
   );
 
@@ -228,7 +229,8 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
     void onSend(text, false, toMobIds, speakLanguage?.id);
   };
 
-  const mobById = (id: string) => mobs.find(m => m.id === id);
+  // Speakers that left the map ("Goblin B") still show with their creature's picture
+  const mobById = (id: string) => mobs.find(m => m.id === id) ?? mobs.find(m => m.id === baseMobId(id));
 
   return (
     <div className="fixed bottom-24 right-2 sm:right-4 z-[98] flex flex-col items-end gap-2 pointer-events-none">

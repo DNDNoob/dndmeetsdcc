@@ -32,6 +32,7 @@ export type CollectionName =
   | 'chatMessages'
   | 'npcAi'
   | 'languages'
+  | 'merchants'
   | string; // Allow any string for flexibility
 
 /**

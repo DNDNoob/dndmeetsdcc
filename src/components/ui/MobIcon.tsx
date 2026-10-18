@@ -14,14 +14,17 @@ interface MobIconProps {
   maxHP?: number;
   /** Draw the gold selection ring around the avatar circle */
   selected?: boolean;
+  /** DM only: red border for hostile tokens, green for friendly ones (undefined = default border) */
+  hostile?: boolean;
 }
 
-export const MobIcon: React.FC<MobIconProps> = ({ mob, size = 40, isDragging = false, onClick, inCombat = false, combatHP, maxHP, selected = false }) => {
+export const MobIcon: React.FC<MobIconProps> = ({ mob, size = 40, isDragging = false, onClick, inCombat = false, combatHP, maxHP, selected = false, hostile }) => {
   const displayMaxHP = maxHP ?? mob.hitPoints ?? 0;
   const displayCurrentHP = inCombat ? (combatHP ?? mob.hitPoints ?? 0) : displayMaxHP;
   const hpPercentage = displayMaxHP > 0 ? Math.min(100, Math.max(0, (displayCurrentHP / displayMaxHP) * 100)) : 0;
   // Only show health bar during active combat
   const showBar = inCombat && displayMaxHP > 0;
+  const borderColor = hostile === undefined ? "border-primary" : hostile ? "border-destructive" : "border-green-500";
 
   return (
     <div
@@ -34,7 +37,7 @@ export const MobIcon: React.FC<MobIconProps> = ({ mob, size = 40, isDragging = f
     >
       {/* Circular container */}
       <div
-        className={`absolute inset-x-0 top-0 rounded-full border-2 ${selected ? "ring-2 ring-accent ring-offset-2 ring-offset-background " : ""}border-primary shadow-lg overflow-hidden bg-muted`}
+        className={`absolute inset-x-0 top-0 rounded-full border-2 ${selected ? "ring-2 ring-accent ring-offset-2 ring-offset-background " : ""}${borderColor} shadow-lg overflow-hidden bg-muted`}
         style={{
           width: size,
           height: size,
