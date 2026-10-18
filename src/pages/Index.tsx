@@ -29,6 +29,7 @@ import { toast } from "sonner";
 import { getNoChildLeftBehindBump } from "@/lib/gameData";
 import type { Episode, Campaign, CrawlerPlacement, EpisodeMobPlacement, Mob, PublicMap, PublicMob, PublicEpisode, InventoryItem, Spell } from "@/lib/gameData";
 import { publicDocId, buildEpisodeBundle } from "@/lib/publicContent";
+import { LanguagesProvider } from "@/contexts/LanguagesContext";
 
 type AppScreen = "splash" | "menu" | "game";
 type GameView = "profiles" | "maps" | "inventory" | "mobs" | "dungeonai" | "showtime" | "sounds" | "wiki" | "spells";
@@ -212,6 +213,9 @@ const Index = () => {
     npcPersonalities,
     sendChatMessage,
     clearChat,
+    customLanguages,
+    createLanguage,
+    deleteLanguage,
     updateNpcAiSettings,
     setNpcSecretState,
     merchants,
@@ -841,6 +845,12 @@ const Index = () => {
     setGameActiveRef.current = fn;
   }, []);
 
+  // Whose languages decide what's readable: the DM reads everything
+  const languageReader = useMemo(
+    () => (isAdmin ? null : crawlers.find(c => c.id === currentPlayer?.id) ?? null),
+    [isAdmin, crawlers, currentPlayer?.id]
+  );
+
   // While auth is still loading, show a loading indicator to avoid flashing
   // the splash screen before we know if the user should be redirected to landing
   if (authLoading) {
@@ -899,6 +909,13 @@ const Index = () => {
   }
 
   return (
+    <LanguagesProvider
+      customLanguages={customLanguages}
+      isAdmin={isAdmin}
+      readerCrawler={languageReader}
+      createLanguage={createLanguage}
+      deleteLanguage={deleteLanguage}
+    >
     <div className="min-h-screen">
       <a href="#main-content" className="skip-nav">Skip to main content</a>
       <AnimatePresence mode="wait">
@@ -1134,6 +1151,7 @@ const Index = () => {
                 onSetNpcSecretState={isAdmin ? setNpcSecretState : undefined}
                 npcKeys={isAdmin ? npcKeys : undefined}
                 onChangeNpcKeys={isAdmin ? setNpcKeys : undefined}
+                onSetTranslateMode={async (crawlerId, mode) => { await updateCrawler(crawlerId, { translateMode: mode }); }}
                 merchants={merchants}
                 onBuyFromMerchant={buyFromMerchant}
                 onSellToMerchant={sellToMerchant}
@@ -1232,6 +1250,7 @@ const Index = () => {
         </>
       )}
     </div>
+    </LanguagesProvider>
   );
 };
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { MessageSquare, Mic, Send, Settings, X, Volume2, VolumeX, Lock, Unlock, Trash2, Sparkles, User, Wand2 } from "lucide-react";
+import { MessageSquare, Mic, Send, Settings, X, Volume2, VolumeX, Lock, Unlock, Trash2, Sparkles, User, Wand2, Languages, Check, Pencil } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
 import {
@@ -12,11 +12,13 @@ import {
   type NpcSecretState,
   type NpcModelChoice,
   type NpcBrain,
+  type TranslateMode,
   isNpcAiOnline,
   baseMobId,
   NPC_TALK_RANGE_FEET,
 } from "@/lib/gameData";
 import type { NpcOnlineKeys } from "@/lib/npc/onlineLlm.mjs";
+import type { ChatLineView, Language } from "@/lib/languages";
 
 const OPEN_STORAGE_KEY = "dcc_chat_open";
 
@@ -44,7 +46,13 @@ interface NpcChatPanelProps {
   aiSettings: NpcAiSettings | null;
   aiStatus: NpcAiStatus | null;
   secrets: Record<string, NpcSecretEntry>;
-  onSend: (text: string, viaVoice: boolean, toMobIds?: string[]) => void | Promise<void>;
+  onSend: (text: string, viaVoice: boolean, toMobIds?: string[], language?: string) => void | Promise<void>;
+  /** How each line reads for this viewer (languages and translators). Without it every line shows as written. */
+  readLine?: (m: ChatMessage) => ChatLineView;
+  speakLanguages?: Language[];          // languages the author can speak in (players)
+  translateMode?: TranslateMode;        // the author's translator setting (players)
+  onSetTranslateMode?: (mode: TranslateMode) => void | Promise<void>;
+  onTranslate?: (m: ChatMessage, text: string) => void | Promise<void>; // pass a line on to the party (maybe twisted)
   onUpdateSettings?: (updates: Partial<Omit<NpcAiSettings, "id">>) => void | Promise<void>;
   onSetSecretState?: (mobId: string, state: NpcSecretState) => void | Promise<void>;
   onClearChat?: () => void | Promise<void>;
@@ -66,6 +74,7 @@ const formatTime = (ms: number) =>
 export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
   messages, author, isAdmin, mobs, npcsOnMap, mentionables = [], aiSettings, aiStatus, secrets,
   onSend, onUpdateSettings, onSetSecretState, onClearChat, npcKeys, onChangeNpcKeys,
+  readLine, speakLanguages = [], translateMode = "off", onSetTranslateMode, onTranslate,
 }) => {
   const [open, setOpen] = useState(readOpen);
   const [showSettings, setShowSettings] = useState(false);
@@ -82,6 +91,13 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
   const [pickedMobIds, setPickedMobIds] = useState<string[]>([]);
   // The mob this person is talking with: later messages go to it without another @
   const [talkingToId, setTalkingToId] = useState<string | null>(null);
+  // Language this person speaks in (players who know more than one)
+  const [speakId, setSpeakId] = useState<string | null>(null);
+  const speakLanguage = speakLanguages.find(l => l.id === speakId) ?? speakLanguages[0];
+  const speakRef = useRef(speakLanguage?.id);
+  speakRef.current = speakLanguage?.id;
+  // Translator rewriting a line before passing it on: message id → draft
+  const [twisting, setTwisting] = useState<{ id: string; text: string } | null>(null);
 
   const talkingTo = talkingToId ? mentionables.find(m => m.kind === "npc" && m.id === talkingToId) ?? null : null;
   const talkingToRef = useRef(talkingTo);
@@ -89,7 +105,7 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
 
   const speech = useSpeechToText((text) => {
     const target = talkingToRef.current;
-    void onSend(text, true, target ? [target.id] : []);
+    void onSend(text, true, target ? [target.id] : [], speakRef.current);
   });
 
   // Re-evaluate the online indicator as heartbeats age
@@ -210,7 +226,7 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
     setDraft("");
     setMention(null);
     setPickedMobIds([]);
-    void onSend(text, false, toMobIds);
+    void onSend(text, false, toMobIds, speakLanguage?.id);
   };
 
   // Speakers that left the map ("Goblin B") still show with their creature's picture
@@ -432,6 +448,7 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
                 const mob = m.authorType === "npc" ? mobById(m.authorId) : undefined;
                 const mine = author && m.authorType === author.type && m.authorId === author.id;
                 const nameClass = m.authorType === "npc" ? "text-accent" : m.authorType === "dm" ? "text-destructive" : "text-primary";
+                const line: ChatLineView = readLine ? readLine(m) : { text: m.text, scrambled: false };
                 return (
                   <div key={m.id} className={`flex gap-2 ${mine ? "opacity-90" : ""}`}>
                     {m.authorType === "npc" && (
@@ -442,7 +459,77 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
                     <div className="min-w-0">
                       <span className={`font-bold text-xs ${nameClass}`}>{m.authorName}</span>
                       <span className="text-[10px] text-muted-foreground ml-1.5">{formatTime(m.createdAt)}{m.viaVoice ? " 🎙" : ""}</span>
-                      <p className={`break-words leading-snug ${m.authorType === "npc" ? "italic" : ""}`}>{m.text}</p>
+                      {line.languageName && (
+                        <span
+                          className="ml-1.5 inline-flex items-center gap-0.5 text-[10px] text-accent"
+                          title={line.scrambled ? `You don't know ${line.languageName}` : `Spoken in ${line.languageName}`}
+                        >
+                          <Languages className="w-2.5 h-2.5" />{line.languageName}
+                        </span>
+                      )}
+                      <p
+                        className={`leading-snug ${line.scrambled ? "break-all text-muted-foreground" : "break-words"} ${m.authorType === "npc" ? "italic" : ""}`}
+                        data-testid={line.scrambled ? "chat-line-scrambled" : undefined}
+                      >
+                        {line.text}
+                      </p>
+                      {line.via && <p className="text-[10px] text-primary">translated by {line.via}</p>}
+                      {line.translating && <p className="text-[10px] text-muted-foreground italic">{line.translating} is translating…</p>}
+                      {line.toldParty?.map((t, i) => (
+                        <p key={i} className="text-[10px] text-muted-foreground" data-testid="told-party">
+                          {t.twisted ? (
+                            <>
+                              {t.mine ? "You told the party" : `${t.by} told the party`}: <span className="italic">{t.text}</span>
+                              <span className="ml-1 px-1 border border-destructive text-destructive not-italic">twisted</span>
+                            </>
+                          ) : (
+                            <>{t.mine ? "You passed it on" : `${t.by} passed it on`}</>
+                          )}
+                        </p>
+                      ))}
+                      {line.canTranslate && onTranslate && (
+                        twisting?.id === m.id ? (
+                          <form
+                            className="flex items-center gap-1 mt-1"
+                            onSubmit={(e) => {
+                              e.preventDefault();
+                              if (!twisting.text.trim()) return;
+                              void onTranslate(m, twisting.text.trim());
+                              setTwisting(null);
+                            }}
+                          >
+                            <input
+                              autoFocus
+                              value={twisting.text}
+                              onChange={(e) => setTwisting({ id: m.id, text: e.target.value })}
+                              maxLength={500}
+                              className="flex-1 min-w-0 bg-muted border border-border px-1.5 py-0.5 text-xs"
+                              aria-label="What you tell the party"
+                            />
+                            <button type="submit" className="p-1 text-primary hover:bg-primary/20" aria-label="Tell the party"><Check className="w-3.5 h-3.5" /></button>
+                            <button type="button" onClick={() => setTwisting(null)} className="p-1 text-muted-foreground hover:text-primary" aria-label="Cancel"><X className="w-3.5 h-3.5" /></button>
+                          </form>
+                        ) : (
+                          <div className="flex gap-1.5 mt-1" data-testid="translate-actions">
+                            <button
+                              type="button"
+                              onClick={() => void onTranslate(m, m.text)}
+                              className="px-1.5 py-0.5 border border-primary text-primary hover:bg-primary/20 text-[10px] font-display uppercase"
+                              title="Tell the party exactly what was said"
+                            >
+                              Pass on
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setTwisting({ id: m.id, text: m.text })}
+                              className="flex items-center gap-0.5 px-1.5 py-0.5 border border-destructive text-destructive hover:bg-destructive/20 text-[10px] font-display uppercase"
+                              title="Tell the party something else. They won't know."
+                            >
+                              <Pencil className="w-2.5 h-2.5" /> Twist
+                            </button>
+                          </div>
+                        )
+                      )}
                     </div>
                   </div>
                 );
@@ -491,6 +578,35 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
                   >
                     <X className="w-3 h-3" />
                   </button>
+                </div>
+              )}
+              {author && speakLanguages.length > 1 && (
+                <div className="flex items-center gap-1.5 mb-1.5 text-[11px] text-muted-foreground" data-testid="chat-language-row">
+                  <Languages className="w-3 h-3 shrink-0" />
+                  {speakLanguages.length > 1 && (
+                    <select
+                      value={speakLanguage?.id ?? ""}
+                      onChange={(e) => setSpeakId(e.target.value)}
+                      className="min-w-0 bg-muted border border-border px-1 py-0.5"
+                      aria-label="Speak in"
+                      title="The language you speak in"
+                    >
+                      {speakLanguages.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                    </select>
+                  )}
+                  {onSetTranslateMode && (
+                    <select
+                      value={translateMode}
+                      onChange={(e) => void onSetTranslateMode(e.target.value as TranslateMode)}
+                      className="ml-auto min-w-0 bg-muted border border-border px-1 py-0.5"
+                      aria-label="Translate for party"
+                      title="Pass lines in your languages on to party members who don't know them"
+                    >
+                      <option value="off">Not translating</option>
+                      <option value="auto">Translating</option>
+                      <option value="review">Translating (check lines)</option>
+                    </select>
+                  )}
                 </div>
               )}
               {author ? (

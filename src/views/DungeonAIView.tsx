@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import NpcPersonalityFields from "@/components/NpcPersonalityFields";
+import { LanguagePicker } from "@/components/LanguagePicker";
 import MerchantFields from "@/components/MerchantFields";
 import MobKindFields from "@/components/MobKindFields";
 import { motion } from "framer-motion";
@@ -224,6 +225,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
       defaultInventory: newMob.defaultInventory,
       defaultGold: newMob.defaultGold,
       ...(newMob.personality ? { personality: newMob.personality } : {}),
+      ...(newMob.languages?.length ? { languages: newMob.languages } : {}),
       ...(newMob.merchant ? { merchant: newMob.merchant } : {}),
     };
     console.log('[DungeonAI] ➕ Add Mob clicked', mob);
@@ -233,7 +235,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
     } catch (err) {
       console.error('[DungeonAI] ❌ Failed to persist mob', err);
     }
-    setNewMob({ name: "", level: 1, type: "normal", kind: "creature", boss: false, speciesId: "", description: "", weaknesses: "", strengths: "", hitPoints: 50, personality: undefined, merchant: undefined });
+    setNewMob({ name: "", level: 1, type: "normal", kind: "creature", boss: false, speciesId: "", description: "", weaknesses: "", strengths: "", hitPoints: 50, personality: undefined, merchant: undefined, languages: undefined });
   };
 
   const handleDeleteMob = async (id: string) => {
@@ -858,6 +860,14 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                       className="w-full bg-muted border border-border px-3 py-2"
                     />
                   </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Languages</label>
+                    <LanguagePicker
+                      value={newMob.languages}
+                      onChange={(languages) => setNewMob({ ...newMob, languages })}
+                      hint="Tap the languages it speaks. The first one is its native tongue. Players who don't know the language it uses see gibberish."
+                    />
+                  </div>
                   <NpcPersonalityFields
                     value={newMob.personality}
                     onChange={(personality) => setNewMob({ ...newMob, personality })}
@@ -1013,6 +1023,15 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                               className="w-full bg-muted border border-border px-2 py-1 text-sm"
                             />
                           </div>
+                        </div>
+
+                        <div className="mt-3">
+                          <label className="text-xs text-muted-foreground mb-1 block">Languages</label>
+                          <LanguagePicker
+                            value={editedMob.languages}
+                            onChange={(languages) => setEditedMobData(prev => prev ? { ...prev, languages } : prev)}
+                            hint="Tap the languages it speaks. The first one is its native tongue. Players who don't know the language it uses see gibberish."
+                          />
                         </div>
 
                         <div className="mt-3">
