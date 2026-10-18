@@ -955,6 +955,7 @@ NPCs remember the party. When a conversation with an NPC has been quiet for abou
 - **Characters** (like Grimble) keep their memory for the whole campaign, across maps and episodes.
 - **Creature copies** (like Goblin B) each remember their own conversations, but only for the episode they were made in.
 - Locked secrets never go into memory, since the AI doesn't know them.
+- NPCs only know what they could have heard: messages players sent while the NPC was within 20 ft, your narration (unless you @ someone else), and other NPCs talking close by on the same map. Each reply uses the last 25 messages the NPC heard, and nothing from other maps or out of earshot goes into its replies or its memory.
 
 DMs can see and change what an NPC remembers: open the Game Chat settings and tap the brain icon next to the NPC. The number on it is how many notes it has. Edit the notes (one per line) and tap **Save**, or tap **Forget everything** to wipe its memory and feelings.
 

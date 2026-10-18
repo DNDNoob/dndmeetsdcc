@@ -38,7 +38,7 @@ export const DEFAULT_NPC_CONFIG = {
   greetCooldownMs: 120_000,
   unloadAfterMs: 15 * 60_000,
   jobMaxAgeMs: 60_000,
-  transcriptLines: 10,
+  transcriptLines: 25,       // chat messages the speaker heard, sent with each prompt
   heartbeatMs: 15_000,
   memoryQuietMs: 120_000,    // a conversation this quiet is over and gets saved to memory
 };
@@ -368,10 +368,30 @@ export class NpcRoom {
     };
   }
 
-  transcript() {
+  /**
+   * Could this speaker have heard a chat message? Its own lines, players' messages sent while it was in
+   * talking range (the app records who was), the DM's narration unless aimed at someone else, and other
+   * NPCs' lines spoken on this map close by. Nothing from other maps or out of earshot.
+   */
+  heardBy(m, speakerId, placement) {
+    if (m.authorType === 'npc') {
+      if (m.authorId === speakerId) return true;
+      return !!placement && m.mapId === this.currentMapId && typeof m.x === 'number' && typeof m.y === 'number'
+        && distance(m, placement) <= this.config.nearDistance;
+    }
+    const to = m.toMobIds || [];
+    if (m.authorType === 'dm') return !to.length || to.includes(speakerId);
+    if (to.includes(speakerId)) return true;
+    return Array.isArray(m.nearMobIds) ? m.nearMobIds.includes(speakerId) : true;
+  }
+
+  /** The recent chat this speaker heard in the current episode. */
+  transcript(speakerId, placement) {
     const epId = this.showtime?.episodeId;
     return formatTranscript(
-      this.state.chat.filter((m) => !m.episodeId || m.episodeId === epId).slice(-this.config.transcriptLines)
+      this.state.chat
+        .filter((m) => (!m.episodeId || m.episodeId === epId) && this.heardBy(m, speakerId, placement))
+        .slice(-this.config.transcriptLines)
     );
   }
 
@@ -379,7 +399,7 @@ export class NpcRoom {
 
   onChat(snapshot) {
     const all = snapshot.docs.map((d) => ({ ...d.data(), id: d.id })).sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
-    this.state.chat = all.slice(-50);
+    this.state.chat = all.slice(-150);
     // On the first snapshot, skip old history but pick up anything said in the last few seconds,
     // so a message that arrived while the other brain was handing over still gets an answer.
     const priming = !this.chatPrimed;
@@ -722,9 +742,10 @@ export class NpcRoom {
   async runMemory(job) {
     const convo = this.convos.get(job.mobId);
     if (!convo || Date.now() - convo.lastAt < this.config.memoryQuietMs) return;
+    const placement = this.placementFor(job.mobId);
     const lines = this.state.chat.filter((m) => (m.createdAt ?? 0) >= convo.since - 5_000
       && (!m.episodeId || m.episodeId === convo.episodeId)
-      && ((m.authorType === 'npc' && m.authorId === job.mobId) || (m.authorType === 'crawler' && convo.crawlerIds.has(m.authorId)) || m.authorType === 'dm'));
+      && this.heardBy(m, job.mobId, placement));
     if (!lines.some((m) => m.authorType === 'npc' && m.authorId === job.mobId)) { this.convos.delete(job.mobId); return; }
     const tier = await this.prepare();
     if (!tier) return; // try again on a later tick
@@ -758,7 +779,7 @@ export class NpcRoom {
     const tier = await this.prepare();
     if (!tier) return;
     const reply = await this.ask(tier, null, buildSecretCheckPrompt({
-      condition: p.revealWhen, speaker: job.message.authorName, text: job.message.text, transcript: this.transcript(),
+      condition: p.revealWhen, speaker: job.message.authorName, text: job.message.text, transcript: this.transcript(mob.id, this.placementFor(mob.id)),
     }), { maxTokens: 4, temperature: 0 });
     if (!isYes(reply)) return;
     this.log(`[${this.name}] Reveal condition met for ${mob.name}; asking the DM`);
@@ -781,7 +802,7 @@ export class NpcRoom {
     const mob = await this.ensurePersonality(placement, tier);
     if (!mob) return;
 
-    const transcript = this.transcript();
+    const transcript = this.transcript(mob.id, placement);
     if (job.gated) {
       const answer = await this.ask(tier, null, buildShouldSpeakPrompt({ mob, transcript, trigger: job.trigger }), { maxTokens: 4, temperature: 0 });
       if (!isYes(answer)) return;
