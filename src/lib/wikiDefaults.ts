@@ -340,11 +340,35 @@ Loot is shared by every crawler in the combat's initiative list, including anyon
 - **Items the mob carries more than one copy of**, like potions, are dealt out evenly. Copies that can't be split evenly go to the party inventory. (4 potions between 3 crawlers is 1 each, plus 1 for the party.)
 - **Single items**, like a mob's one dagger, go to the party inventory.
 
+## Smashed Loot
+
+Looting is rough work, and some loot gets smashed. Each coin and each copy of a stackable item (anything the mob carries more than one of) rolls a chance to be destroyed instead of looted. Single items, like a mob's one dagger, are never smashed.
+
+- The chance is **25%** by default. The DM can change it for each mob with **Smash chance** in the DM Console, next to the mob's gold.
+- Each crawler's share rolls against their own Looting level. Leftovers headed for the party inventory roll against the best looter in the fight.
+- The **Looted** line in the dice history lists what was smashed.
+
+## Looting Level
+
+Every mob a crawler helps loot counts toward their **Looting level**, shown on their profile under Activity with how many more mobs they need for the next level.
+
+| Level | Mobs looted | Loot smashed |
+|-------|-------------|--------------|
+| 0 | 0 | normal rate |
+| 1 | 10 | 10% less often |
+| 2 | 30 | 20% less often |
+| 3 | 60 | 30% less often |
+| 4 | 100 | 40% less often |
+| 5 | 150 | half as often |
+| 10 | 550 | never |
+
+Each level cuts the chance by a tenth, so with a 25% smash chance a level 5 looter only loses about 12%. A toast celebrates each level-up.
+
 ## When It Happens
 
 Loot drops the moment the mob's HP reaches 0, whether from an attack or from the DM setting its HP. A mob is only looted once: healing it and bringing it down again doesn't drop anything more, and its body stays empty in later fights in that episode.
 
-Every kill posts a **Looted** line to the dice history showing what each crawler got and what went to the party.
+Every kill posts a **Looted** line to the dice history showing what each crawler got, what was smashed and what went to the party.
 
 ## Party Inventory
 

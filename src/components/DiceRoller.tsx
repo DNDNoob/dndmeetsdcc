@@ -224,6 +224,12 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
                             {entry.mobLootNotification.shares.map(line => (
                               <span key={line} className="block text-foreground">{line}</span>
                             ))}
+                            {(entry.mobLootNotification.destroyed?.length ?? 0) > 0 && (
+                              <span className="block">
+                                <span className="text-muted-foreground">Smashed: </span>
+                                <span className="text-destructive">{entry.mobLootNotification.destroyed!.join(', ')}</span>
+                              </span>
+                            )}
                             {entry.mobLootNotification.partyItems.length > 0 && (
                               <span className="block">
                                 <span className="text-muted-foreground">Party inventory: </span>

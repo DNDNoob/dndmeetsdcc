@@ -124,6 +124,7 @@ export interface CrawlerActivityStats {
   lowHealthCount?: number; // times HP dropped below 10% of max HP
   killingBlows?: number; // mobs brought to 0 HP
   combatEndingBlows?: number; // killing blows that took down the last mob standing
+  mobsLooted?: number; // mobs whose loot this crawler shared in (raises their Looting level)
 }
 
 export type ActivityStatKey = keyof CrawlerActivityStats;
@@ -368,6 +369,7 @@ export interface Mob {
   hideHitPoints?: boolean;
   defaultInventory?: InventoryItem[]; // Default items this mob type carries
   defaultGold?: number; // Default gold this mob type carries
+  lootDestructionChance?: number; // % chance each stackable item copy or coin is smashed when looted (default DEFAULT_LOOT_DESTRUCTION_CHANCE)
   equippedItems?: EquippedItems; // Equipment mapping (slot → item ID)
   createdBy?: string;        // Firebase uid of creator (absent = made in this campaign by its DM)
   createdByUsername?: string; // Denormalized for display
@@ -507,39 +509,87 @@ export interface MobLootSplit {
   gold: Record<string, number>; // crawlerId → gold received
   items: Record<string, InventoryItem[]>; // crawlerId → items received
   party: InventoryItem[]; // items for the party inventory
+  destroyedGold: number;
+  destroyed: InventoryItem[]; // stackable copies smashed while looting
 }
+
+// ---- Looting skill ----
+// Like spell mastery: Looting level N is reached after 5·N·(N+1) mobs looted (10, 30, 60, 100…),
+// and each level cuts the crawler's chance of loot being smashed by a tenth, up to level 10.
+export const DEFAULT_LOOT_DESTRUCTION_CHANCE = 25;
+export const MAX_LOOTING_LEVEL = 10;
+
+export const getLootingLevel = (mobsLooted = 0): number => {
+  let level = 0;
+  while (level < MAX_LOOTING_LEVEL && mobsLooted >= 5 * (level + 1) * (level + 2)) level++;
+  return level;
+};
+
+/** Mobs left to loot before the next Looting level, or null at the max level. */
+export const getLootsUntilNextLevel = (mobsLooted = 0): number | null => {
+  const level = getLootingLevel(mobsLooted);
+  return level >= MAX_LOOTING_LEVEL ? null : 5 * (level + 1) * (level + 2) - mobsLooted;
+};
+
+/** % chance a crawler's loot is smashed, given the mob's base chance and their Looting level. */
+export const getLootDestructionChance = (baseChance: number, lootingLevel: number): number =>
+  Math.max(0, baseChance * (1 - Math.min(lootingLevel, MAX_LOOTING_LEVEL) / MAX_LOOTING_LEVEL));
 
 /**
  * Splits a defeated mob's loot between the crawlers who fought it. Gold is split evenly, with
  * leftover coins going one each in `crawlerIds` order. Items the mob carries several copies of
  * are dealt out evenly and leftovers go to the party; single items go to the party.
- * Every item gets a fresh id so copies never collide inside one inventory.
+ * Each coin and each copy of a stackable item then rolls against `chanceFor(crawlerId)` (in %)
+ * to be smashed instead; party leftovers roll against the best (lowest) chance in the fight.
+ * Single items are never smashed. Every item gets a fresh id so copies never collide.
  */
-export const splitMobLoot = (items: InventoryItem[], gold: number, crawlerIds: string[]): MobLootSplit => {
-  const split: MobLootSplit = { gold: {}, items: {}, party: [] };
+export const splitMobLoot = (
+  items: InventoryItem[],
+  gold: number,
+  crawlerIds: string[],
+  chanceFor: (crawlerId: string) => number = () => 0,
+  random: () => number = Math.random,
+): MobLootSplit => {
+  const split: MobLootSplit = { gold: {}, items: {}, party: [], destroyedGold: 0, destroyed: [] };
   const fresh = (item: InventoryItem): InventoryItem => {
     const { equipped: _eq, ...rest } = item;
     return { ...rest, id: `item-${crypto.randomUUID()}` };
   };
+  const smashed = (chance: number) => chance > 0 && random() * 100 < chance;
   const n = crawlerIds.length;
   if (n === 0) {
     split.party = items.map(fresh);
     return split;
   }
+  const partyChance = Math.min(...crawlerIds.map(chanceFor));
   const coins = Math.max(0, Math.floor(gold || 0));
   crawlerIds.forEach((id, i) => {
-    const share = Math.floor(coins / n) + (i < coins % n ? 1 : 0);
+    const dealt = Math.floor(coins / n) + (i < coins % n ? 1 : 0);
+    const chance = chanceFor(id);
+    let share = dealt;
+    for (let c = 0; c < dealt; c++) {
+      if (smashed(chance)) { share--; split.destroyedGold++; }
+    }
     if (share > 0) split.gold[id] = share;
   });
   for (const stack of stackItems(items)) {
     const copies = items.filter(i => getItemStackKey(i) === stack.key);
-    const each = stack.count > 1 ? Math.floor(stack.count / n) : 0;
+    if (stack.count === 1) {
+      split.party.push(fresh(copies[0]));
+      continue;
+    }
+    const each = Math.floor(stack.count / n);
     crawlerIds.forEach((id, i) => {
-      if (each === 0) return;
-      const mine = copies.slice(i * each, (i + 1) * each).map(fresh);
-      split.items[id] = [...(split.items[id] ?? []), ...mine];
+      const chance = chanceFor(id);
+      for (const copy of copies.slice(i * each, (i + 1) * each)) {
+        if (smashed(chance)) split.destroyed.push(copy);
+        else split.items[id] = [...(split.items[id] ?? []), fresh(copy)];
+      }
     });
-    split.party.push(...copies.slice(each * n).map(fresh));
+    for (const copy of copies.slice(each * n)) {
+      if (smashed(partyChance)) split.destroyed.push(copy);
+      else split.party.push(fresh(copy));
+    }
   }
   return split;
 };

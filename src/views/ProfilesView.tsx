@@ -8,7 +8,7 @@ import { CrawlerLanguagesCard } from "@/components/CrawlerLanguagesCard";
 import { usableLanguageIds } from "@/lib/languages";
 import { HealthBar } from "@/components/ui/HealthBar";
 import { EquipmentSlot } from "@/components/ui/EquipmentSlot";
-import { Crawler, Mob, InventoryItem, getItemStackKey, stackItems, PARTY_INVENTORY_ID, createEmptyCrawler, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery, getInitialCrawlerId } from "@/lib/gameData";
+import { Crawler, Mob, InventoryItem, getItemStackKey, stackItems, getLootingLevel, getLootsUntilNextLevel, createEmptyCrawler, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery, getInitialCrawlerId } from "@/lib/gameData";
 import type { DiceRollEntry } from "@/hooks/useGameState";
 import UndoTurnButton, { canUndoCombatTurn } from "@/components/UndoTurnButton";
 import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Backpack, HardHat, Package, Lock, Unlock, ChevronDown, ChevronUp, Check, Search, Send, BookOpen, Filter, X, Gem, Footprints, Shirt, Hand, Target, Swords, RefreshCw, Timer, ScrollText, Eye, EyeOff, CheckSquare, Trophy, Skull, HeartCrack, Crown, Minus, Wand2, Star } from "lucide-react";
@@ -1450,7 +1450,10 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             { label: 'Fight Finishers', value: stats.combatEndingBlows ?? 0, icon: Crown },
             { label: 'HP Lost', value: stats.damageTaken ?? 0, icon: Heart },
             { label: 'Near Death', value: stats.lowHealthCount ?? 0, icon: HeartCrack },
+            { label: 'Mobs Looted', value: stats.mobsLooted ?? 0, icon: Coins },
           ];
+          const lootingLevel = getLootingLevel(stats.mobsLooted);
+          const lootsToNext = getLootsUntilNextLevel(stats.mobsLooted);
           const trophies = selected.trophies ?? [];
           const handleAward = async () => {
             if (!trophyName.trim()) return;
@@ -1494,6 +1497,13 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                       <div className="text-foreground font-bold text-lg">{value.toLocaleString()}</div>
                     </div>
                   ))}
+                </div>
+                <div className="mt-3 bg-accent/10 border border-accent/30 rounded px-3 py-2 text-sm" title="Each Looting level makes loot a tenth less likely to be smashed">
+                  <span className="font-display text-accent">Looting Lv {lootingLevel}</span>
+                  <span className="text-muted-foreground">
+                    {lootingLevel > 0 ? ` · loot smashed ${lootingLevel * 10}% less often` : ' · loot is smashed at the normal rate'}
+                    {lootsToNext !== null ? ` · ${lootsToNext} more mob${lootsToNext === 1 ? '' : 's'} to Lv ${lootingLevel + 1}` : ' · max level, loot is never smashed'}
+                  </span>
                 </div>
               </div>
 

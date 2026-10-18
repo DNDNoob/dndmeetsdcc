@@ -12,6 +12,10 @@ import {
   CombatantEntry,
   isPlacementHostile,
   splitMobLoot,
+  getLootingLevel,
+  getLootDestructionChance,
+  DEFAULT_LOOT_DESTRUCTION_CHANCE,
+  type MobLootSplit,
   stackItems,
   PARTY_INVENTORY_ID,
   CombatTurnSnapshot,
@@ -95,6 +99,7 @@ export interface DiceRollEntry {
     gold: number; // total gold handed out
     shares: string[]; // one line per crawler, e.g. "Vex: 5 gold, Health Potion ×2"
     partyItems: string[]; // what went to the party inventory
+    destroyed?: string[]; // what got smashed while looting
   };
   // For a player undoing their combat turn
   turnResetNotification?: {
@@ -1421,7 +1426,8 @@ export const useGameState = () => {
       const items = placement?.inventoryOverride ?? mob.defaultInventory ?? [];
       const gold = placement?.goldOverride ?? mob.defaultGold ?? 0;
       if (items.length === 0 && gold <= 0) return [];
-      return [{ combatId, name: combatant.name, items, gold, placementIdx }];
+      const destructionChance = mob.lootDestructionChance ?? DEFAULT_LOOT_DESTRUCTION_CHANCE;
+      return [{ combatId, name: combatant.name, items, gold, placementIdx, destructionChance }];
     });
     if (drops.length === 0) return;
 
@@ -1436,7 +1442,9 @@ export const useGameState = () => {
     ];
 
     let looted: typeof drops = [];
-    let summary: { gold: Record<string, number>; items: Record<string, InventoryItem[]>; party: InventoryItem[] } = { gold: {}, items: {}, party: [] };
+    type LootSummary = Omit<MobLootSplit, 'gold'> & { gold: Record<string, number>; levelUps: { id: string; level: number }[] };
+    const emptySummary = (): LootSummary => ({ gold: {}, items: {}, party: [], destroyedGold: 0, destroyed: [], levelUps: [] });
+    let summary = emptySummary();
     const ok = await transact(reads, (docs) => {
       const [combatDoc, ...rest] = docs;
       const crawlerDocs = rest.slice(0, recipientIds.length);
@@ -1446,13 +1454,20 @@ export const useGameState = () => {
         const c = combatants.find(x => x.id === d.combatId);
         return c && !c.looted && (c.currentHP ?? 1) <= 0;
       });
-      summary = { gold: {}, items: {}, party: [] };
+      summary = emptySummary();
       if (looted.length === 0) return [];
+      // Each crawler's Looting level lowers the chance their share gets smashed
+      const lootedBefore = recipientIds.map((_, i) =>
+        Number((crawlerDocs[i]?.activityStats as CrawlerActivityStats | undefined)?.mobsLooted) || 0);
+      const levelOf = new Map(recipientIds.map((id, i) => [id, getLootingLevel(lootedBefore[i])]));
       for (const drop of looted) {
-        const split = splitMobLoot(drop.items, drop.gold, recipientIds);
+        const split = splitMobLoot(drop.items, drop.gold, recipientIds,
+          id => getLootDestructionChance(drop.destructionChance, levelOf.get(id) ?? 0));
         for (const [id, g] of Object.entries(split.gold)) summary.gold[id] = (summary.gold[id] ?? 0) + g;
         for (const [id, list] of Object.entries(split.items)) summary.items[id] = [...(summary.items[id] ?? []), ...list];
         summary.party.push(...split.party);
+        summary.destroyed.push(...split.destroyed);
+        summary.destroyedGold += split.destroyedGold;
       }
       const lootedIds = new Set(looted.map(d => d.combatId));
       const ops: BatchOperation[] = [{
@@ -1463,9 +1478,13 @@ export const useGameState = () => {
       }];
       recipientIds.forEach((id, i) => {
         const crawlerDoc = crawlerDocs[i];
-        if (crawlerDoc && summary.gold[id]) {
-          ops.push({ type: 'update', collection: 'crawlers', id, data: { gold: (Number(crawlerDoc.gold) || 0) + summary.gold[id] } });
-        }
+        if (!crawlerDoc) return;
+        const activityStats = addActivityStats(crawlerDoc.activityStats as CrawlerActivityStats | undefined, { mobsLooted: looted.length });
+        const data: Record<string, unknown> = { activityStats };
+        if (summary.gold[id]) data.gold = (Number(crawlerDoc.gold) || 0) + summary.gold[id];
+        const newLevel = getLootingLevel(activityStats.mobsLooted);
+        if (newLevel > getLootingLevel(lootedBefore[i])) summary.levelUps.push({ id, level: newLevel });
+        ops.push({ type: 'update', collection: 'crawlers', id, data });
       });
       owners.forEach((ownerId, i) => {
         const added = ownerId === PARTY_INVENTORY_ID ? summary.party : summary.items[ownerId];
@@ -1508,9 +1527,11 @@ export const useGameState = () => {
         gold: totalGold,
         shares,
         partyItems: describe(summary.party),
+        destroyed: [summary.destroyedGold ? `${summary.destroyedGold} gold` : '', ...describe(summary.destroyed)].filter(Boolean),
       },
     });
     toast.success(`Looted ${looted.map(d => d.name).join(', ')}`);
+    for (const { id, level } of summary.levelUps) toast.success(`${nameOf(id)} reached Looting level ${level}!`, { icon: '💰' });
   };
 
   // Apply damage to one or more combat targets in a single pass, so splash hits don't
