@@ -2,6 +2,8 @@
   {
     "date": "2026-10-18",
     "changes": [
+      "🐉 Creature sounds for NPC voices: Goblin, Tiny, Giant, Dragon and Ghost effects, picked from the NPC's notes or chosen in the chat settings",
+      "🎭 NPCs can get an ElevenLabs character voice from your ElevenLabs account, and are then read by ElevenLabs first",
       "🔊 Gemini voices now get only a mood tag, like [annoyance], in front of the line, so they stop reading their directions aloud",
       "🩺 The Spoken voices settings now say why a line wasn't voiced for players, or if another game tab is making the voices",
       "🔊 Spoken voices no longer read their directions out loud, only the NPC's line",

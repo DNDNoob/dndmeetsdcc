@@ -25,6 +25,7 @@ import type { NpcOnlineKeys } from "@/lib/npc/onlineLlm.mjs";
 import type { ChatLineView, Language } from "@/lib/languages";
 import {
   GEMINI_VOICES, GROQ_VOICES, KOKORO_VOICES, engineName, fitVoice, kokoroVoice, voiceLabel, voiceTraits,
+  CREATURE_SOUNDS, creatureSoundName,
   type CatalogVoice, type VoiceEngine,
 } from "@/lib/npcSpeech/voices";
 import { useSpeechEngineState } from "@/lib/npcSpeech/engine";
@@ -562,6 +563,7 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
                         const pick = voicePicks[baseId] ?? {};
                         const traits = voiceTraits(mob.id, mob, pick);
                         const autoTraits = voiceTraits(mob.id, mob, pick.speed === undefined ? undefined : { speed: pick.speed });
+                        const autoSound = voiceTraits(mob.id, mob).sound;
                         const autoVoice = voiceEngine === "kokoro"
                           ? KOKORO_VOICES.find(v => v.id === kokoroVoice(autoTraits))
                           : fitVoice(catalog, autoTraits);
@@ -572,6 +574,7 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
                           void onUpdateSettings?.({ voices: Object.keys(merged).length ? { ...rest, [baseId]: merged } : rest });
                         };
                         return (
+                          <>
                           <div className="ml-2 mb-1 flex items-center gap-1" data-testid={`npc-voice-${mob.id}`}>
                             <select
                               value={pick[pickField] ?? ""}
@@ -603,6 +606,33 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
                               <Play className="w-3.5 h-3.5" />
                             </button>
                           </div>
+                          <div className="ml-2 mb-1 flex items-center gap-1">
+                            <select
+                              value={pick.sound ?? ""}
+                              onChange={(e) => setPick({ sound: e.target.value || undefined })}
+                              className="flex-1 min-w-0 bg-muted border border-border px-1 py-0.5 text-[11px]"
+                              aria-label={`${mob.name}'s creature sound`}
+                              title="A sound effect put on the voice"
+                              data-testid={`npc-sound-${mob.id}`}
+                            >
+                              <option value="">Sound: Auto ({creatureSoundName(autoSound)})</option>
+                              <option value="none">Sound: None</option>
+                              {CREATURE_SOUNDS.map(c => <option key={c.id} value={c.id}>Sound: {c.name}</option>)}
+                            </select>
+                            {voiceEngine !== "elevenlabs" && elevenList.length > 0 && (
+                              <select
+                                value={pick.elevenlabs ?? ""}
+                                onChange={(e) => setPick({ elevenlabs: e.target.value || undefined })}
+                                className="flex-1 min-w-0 bg-muted border border-border px-1 py-0.5 text-[11px]"
+                                aria-label={`${mob.name}'s ElevenLabs character voice`}
+                                title="An ElevenLabs voice for this NPC. It's read by ElevenLabs first while your ElevenLabs credits last."
+                              >
+                                <option value="">ElevenLabs: none</option>
+                                {elevenList.map(v => <option key={v.id} value={v.id}>ElevenLabs: {voiceLabel(v)}</option>)}
+                              </select>
+                            )}
+                          </div>
+                          </>
                         );
                       })()}
                       {memoryOpen && onSetMemory && (

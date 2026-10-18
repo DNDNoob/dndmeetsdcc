@@ -1073,6 +1073,22 @@ NPCs can also say their lines out loud. Turn on **Spoken voices** in the Game Ch
 - Lines in a language a player doesn't know are read to them as the scrambled words, so it sounds foreign. Players who know the language, and the DM, hear the real words. Lines in Mindspeech or Ward sign aren't read aloud, and players who don't know Beast hear nothing from a beast (they still see what it does).
 - Actions written between asterisks (the NPC grinning, wiping its hands) are skipped; only the words are spoken.
 
+### Creature sounds
+
+Each NPC can also have a creature sound, an effect put on whatever voice reads its lines:
+
+- **Goblin**: higher, quicker and a little nasal
+- **Tiny**: very high and fast, like a pixie or a cartoon mouse
+- **Giant**: deeper and slower, with a bit of boom
+- **Dragon**: much deeper, with a growl and an echo
+- **Ghost**: hollow, wavering and echoing
+
+It's picked from the NPC's name, description and Voice and manner notes (a "goblin" gets Goblin, a "red dragon" gets Dragon). You can choose another one, or None, under the NPC's voice in the chat settings. The sound works with every voice service and costs nothing.
+
+### ElevenLabs character voices
+
+ElevenLabs has a voice library with goblins, trolls, dragons and cartoon characters. Add the ones you like to your ElevenLabs account, then pick one for an NPC with the **ElevenLabs** menu under its voice. NPCs with an ElevenLabs voice are read by ElevenLabs first, even when other services still have free use, so they keep their character voice until your ElevenLabs credits run out. Everyone else keeps the usual order.
+
 ### Picking a voice
 
 Every NPC gets a voice picked from its **Voice and manner** notes, name and description. Words like "gruff", "old" or "orc" give a deep, slower voice; "squeaky", "nervous" or "goblin" a quicker one; "posh", "noble" or "elf" a British accent; "she" or "lady" a woman's voice. Copies of a creature (Goblin A, Goblin B) share a voice but talk at slightly different speeds.

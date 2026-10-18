@@ -99,6 +99,17 @@ export const GROQ_VOICES: CatalogVoice[] = [
 export const voiceLabel = (v: CatalogVoice) =>
   `${v.name} (${[v.accent, v.note, v.gender].filter(Boolean).join(' ')})`;
 
+/** Creature sounds: an effect put on any voice so a goblin squeaks and a dragon rumbles. */
+export interface CreatureSound { id: string; name: string; words: string[] }
+export const CREATURE_SOUNDS: CreatureSound[] = [
+  { id: 'goblin', name: 'Goblin', words: ['goblin', 'goblins', 'kobold', 'imp', 'gremlin', 'gnome', 'hobgoblin'] },
+  { id: 'tiny', name: 'Tiny', words: ['pixie', 'fairy', 'faerie', 'sprite', 'mouse', 'squirrel', 'chipmunk', 'hamster', 'cartoon', 'cartoonish'] },
+  { id: 'giant', name: 'Giant', words: ['giant', 'ogre', 'troll', 'golem', 'titan', 'colossal', 'cyclops'] },
+  { id: 'dragon', name: 'Dragon', words: ['dragon', 'dragons', 'wyrm', 'drake', 'wyvern', 'demon', 'devil', 'hydra'] },
+  { id: 'ghost', name: 'Ghost', words: ['ghost', 'ghostly', 'spirit', 'wraith', 'specter', 'spectre', 'phantom', 'banshee', 'spectral', 'lich'] },
+];
+export const creatureSoundName = (id?: string) => CREATURE_SOUNDS.find(c => c.id === id)?.name ?? 'None';
+
 export const NPC_SPEED_MIN = 0.7;
 export const NPC_SPEED_MAX = 1.4;
 
@@ -128,6 +139,8 @@ export interface VoiceTraits {
   speed: number;
   /** How to say it, for services that take directions (Gemini, Groq) */
   manner: string;
+  /** Creature sound effect put on the clip, if any */
+  sound?: string;
 }
 
 export function voiceTraits(speakerId: string, mob: VoiceMob | undefined, pick?: NpcSpeechVoice): VoiceTraits {
@@ -157,7 +170,11 @@ export function voiceTraits(speakerId: string, mob: VoiceMob | undefined, pick?:
     `${m.name}${notes ? `, ${notes}` : ''}`,
     m.personality?.attitude ? `Attitude: ${m.personality.attitude.slice(0, 80)}` : '',
   ].filter(Boolean).join('. ');
-  return { gender, british, deep, quick, seed, speed: nudged, manner };
+  // The DM's pick, else the first creature named in the notes ('none' means plain)
+  const sound = pick?.sound
+    ? (pick.sound === 'none' ? undefined : pick.sound)
+    : CREATURE_SOUNDS.find(c => has(text, c.words))?.id;
+  return { gender, british, deep, quick, seed, speed: nudged, manner, sound };
 }
 
 /** The catalog voice that best fits the traits. */
