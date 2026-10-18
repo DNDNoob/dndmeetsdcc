@@ -50,6 +50,19 @@ const Navigation: React.FC<NavigationProps> = ({
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const playerDropdownRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
+  const revealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Reveal the collapsed nav only after the cursor rests in the trigger zone,
+  // so passing through the top edge (e.g. to reach the map tools) doesn't open it
+  const startReveal = () => {
+    if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
+    revealTimerRef.current = setTimeout(() => setIsHovered(true), 400);
+  };
+  const cancelReveal = () => {
+    if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
+    revealTimerRef.current = null;
+  };
+  useEffect(() => cancelReveal, []);
 
   const getPlayerColor = () => {
     if (playerType === "ai") return "text-accent text-glow-gold";
@@ -104,8 +117,9 @@ const Navigation: React.FC<NavigationProps> = ({
       {autoCollapse && !isPinned && !isHovered && (
         <div
           className="fixed top-0 left-0 h-8 z-[60]"
-          style={{ width: '60%' }}
-          onMouseEnter={() => setIsHovered(true)}
+          style={{ width: '40%' }}
+          onMouseEnter={startReveal}
+          onMouseLeave={cancelReveal}
         />
       )}
       <motion.nav
