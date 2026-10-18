@@ -24,9 +24,10 @@ import { useLanguages } from "@/contexts/LanguagesContext";
 import { readChatLine, usableLanguageIds, DEFAULT_LANGUAGE_ID } from "@/lib/languages";
 import MerchantPanel, { MerchantHagglePrompts } from "@/components/MerchantPanel";
 import { isMerchant, getHaggleBlocker, MERCHANT_TRADE_RANGE_FEET, type MerchantState } from "@/lib/gameData";
-import { withNpcPersonality, speakerAsMob, mapSpeakers, baseMobId, isPlacementHostile, NPC_TALK_RANGE_FEET, type TranslateMode, type ChatMessage, type NpcAiSettings, type NpcAiStatus, type NpcSecretEntry, type NpcSecretState, type NpcGeneratedPersonality } from "@/lib/gameData";
+import { withNpcPersonality, speakerAsMob, mapSpeakers, baseMobId, isPlacementHostile, NPC_TALK_RANGE_FEET, type TranslateMode, type ChatMessage, type NpcAiSettings, type NpcAiStatus, type NpcSecretEntry, type NpcSecretState, type NpcGeneratedPersonality, type NpcMemory } from "@/lib/gameData";
 
 const NO_GENERATED_PERSONALITIES: Record<string, NpcGeneratedPersonality> = {};
+const NO_NPC_MEMORIES: Record<string, NpcMemory> = {};
 
 interface ShowTimeViewProps {
   maps: string[];
@@ -73,6 +74,8 @@ interface ShowTimeViewProps {
   npcAiStatus?: NpcAiStatus | null;
   npcSecrets?: Record<string, NpcSecretEntry>;
   npcPersonalities?: Record<string, NpcGeneratedPersonality>; // personalities the AI wrote for mobs without one
+  npcMemories?: Record<string, NpcMemory>; // what each speaker remembers from earlier conversations
+  onSetNpcMemory?: (speakerId: string, memory: NpcMemory) => Promise<void>;
   onSendChatMessage?: (message: Omit<ChatMessage, 'id' | 'createdAt'>) => Promise<void>;
   onClearChat?: (episodeId?: string) => Promise<void>;
   onUpdateNpcAiSettings?: (updates: Partial<Omit<NpcAiSettings, 'id'>>) => Promise<void>;
@@ -761,7 +764,7 @@ const InventoryPanel: React.FC<{
   );
 };
 
-const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock, noncombatTurnState, resetNoncombatTurns, combatState, onRemoveCombatant, onRuntimePlacementsChange, onGameActiveChange, onRegisterGameToggle, roomId, quests = [], assignedQuests = [], onAssignQuest, onUpdateQuest, onUpdateAssignedQuest, onDeleteAssignedQuest, currentPlayerId, onRecordCrawlerMove, onSetMobEncountered, chatMessages = [], npcAiSettings = null, npcAiStatus = null, npcSecrets = {}, npcPersonalities = NO_GENERATED_PERSONALITIES, onSendChatMessage, onClearChat, onUpdateNpcAiSettings, onSetNpcSecretState, npcKeys, onChangeNpcKeys, merchants = NO_MERCHANTS, onBuyFromMerchant, onSellToMerchant, onHaggleWithMerchant, onRestockMerchant, onResolveMerchantHaggle, onSetTranslateMode }) => {
+const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock, noncombatTurnState, resetNoncombatTurns, combatState, onRemoveCombatant, onRuntimePlacementsChange, onGameActiveChange, onRegisterGameToggle, roomId, quests = [], assignedQuests = [], onAssignQuest, onUpdateQuest, onUpdateAssignedQuest, onDeleteAssignedQuest, currentPlayerId, onRecordCrawlerMove, onSetMobEncountered, chatMessages = [], npcAiSettings = null, npcAiStatus = null, npcSecrets = {}, npcPersonalities = NO_GENERATED_PERSONALITIES, npcMemories = NO_NPC_MEMORIES, onSetNpcMemory, onSendChatMessage, onClearChat, onUpdateNpcAiSettings, onSetNpcSecretState, npcKeys, onChangeNpcKeys, merchants = NO_MERCHANTS, onBuyFromMerchant, onSellToMerchant, onHaggleWithMerchant, onRestockMerchant, onResolveMerchantHaggle, onSetTranslateMode }) => {
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
   const selectedEpisodeIdRef = useRef<string | null>(null);
   const [currentMapIndex, setCurrentMapIndex] = useState(0);
@@ -2293,6 +2296,15 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     for (const s of npcSpeakers) if (!byId.has(s.id)) byId.set(s.id, speakerAsMob(s, npcPersonalities));
     return [...byId.values()];
   }, [npcSpeakers, npcPersonalities]);
+
+  // What speakers remember; a creature copy's memory only counts in the episode it was made in
+  const episodeNpcMemories = useMemo(() => {
+    const out: Record<string, NpcMemory> = {};
+    for (const [id, m] of Object.entries(npcMemories)) {
+      if (!m.episodeId || m.episodeId === selectedEpisode?.id) out[id] = m;
+    }
+    return out;
+  }, [npcMemories, selectedEpisode?.id]);
 
   // Everything the chat may need to show by id: campaign mobs plus the speakers on this map
   const talkingMobs = useMemo(() => {
@@ -4061,6 +4073,8 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
           onSend={handleSendChat}
           onUpdateSettings={onUpdateNpcAiSettings}
           onSetSecretState={onSetNpcSecretState}
+          memories={episodeNpcMemories}
+          onSetMemory={onSetNpcMemory}
           npcKeys={npcKeys}
           onChangeNpcKeys={onChangeNpcKeys}
           readLine={readChat}

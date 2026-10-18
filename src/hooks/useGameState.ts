@@ -19,6 +19,7 @@ import {
   NpcAiStatus,
   NpcSecretEntry,
   NpcGeneratedPersonality,
+  NpcMemory,
   NpcSecretState,
   Spell,
   KnownSpell,
@@ -1894,6 +1895,12 @@ export const useGameState = () => {
     const { id: _id, ...entries } = docData;
     return entries as Record<string, NpcGeneratedPersonality>;
   }, [npcAiDocs]);
+  const npcMemories = useMemo((): Record<string, NpcMemory> => {
+    const docData = npcAiDocs.find(d => d.id === 'memories');
+    if (!docData) return {};
+    const { id: _id, ...entries } = docData;
+    return entries as Record<string, NpcMemory>;
+  }, [npcAiDocs]);
 
   // --- Merchants ---
   // Live stock and gold live in merchants/{mobId}. Every trade reads that doc, the crawler and
@@ -2079,7 +2086,7 @@ export const useGameState = () => {
   };
 
   // Singleton docs in npcAi: create on first write, merge afterwards
-  const writeNpcAiDoc = async (docId: 'settings' | 'secrets', data: Record<string, unknown>) => {
+  const writeNpcAiDoc = async (docId: 'settings' | 'secrets' | 'memories', data: Record<string, unknown>) => {
     if (npcAiDocs.some(d => d.id === docId)) {
       await updateItem('npcAi', docId, data);
     } else {
@@ -2089,6 +2096,11 @@ export const useGameState = () => {
 
   const updateNpcAiSettings = async (updates: Partial<Omit<NpcAiSettings, 'id'>>) => {
     await writeNpcAiDoc('settings', updates as Record<string, unknown>);
+  };
+
+  // DM edits to what a speaker remembers (an empty note list with no feelings clears it)
+  const setNpcMemory = async (speakerId: string, memory: NpcMemory) => {
+    await writeNpcAiDoc('memories', { [speakerId]: { ...memory, updatedAt: Date.now() } });
   };
 
   const setNpcSecretState = async (mobId: string, state: NpcSecretState) => {
@@ -2186,6 +2198,8 @@ export const useGameState = () => {
     npcAiStatus,
     npcSecrets,
     npcPersonalities,
+    npcMemories,
+    setNpcMemory,
     sendChatMessage,
     clearChat,
     customLanguages,

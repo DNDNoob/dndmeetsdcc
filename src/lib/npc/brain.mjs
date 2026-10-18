@@ -48,11 +48,98 @@ const describeCrawler = (c) => {
   return `${c.name}${bits ? ` (${bits}${c.level ? `, level ${c.level}` : ''}${hurt ? `, ${hurt}` : ''})` : hurt ? ` (${hurt})` : ''}`;
 };
 
+// ── Memory: what an NPC remembers from earlier conversations ──
+
+export const MEMORY_MAX_NOTES = 8;
+
+/** -3 (hates them) … +3 (fond of them) in words for the prompt and the DM. */
+export const feelingWord = (score) =>
+  score <= -3 ? 'hostile' : score === -2 ? 'dislikes them' : score === -1 ? 'wary'
+    : score === 0 ? 'neutral' : score === 1 ? 'warming to them' : score === 2 ? 'friendly' : 'fond of them';
+
+const clampScore = (n) => Math.max(-3, Math.min(3, Math.round(Number(n) || 0)));
+
+/** Prompt lines for what the NPC remembers and how it feels about each crawler. */
+export const describeMemory = (memory) => {
+  const lines = [];
+  const notes = (memory?.notes || []).filter(Boolean);
+  if (notes.length) {
+    lines.push('What you remember from earlier conversations:');
+    for (const n of notes) lines.push(`- ${n}`);
+  }
+  const feelings = Object.values(memory?.feelings || {}).filter((f) => f?.name);
+  if (feelings.length) {
+    lines.push(`How you feel about the crawlers: ${feelings.map((f) => `${f.name}: ${feelingWord(f.score)}`).join('; ')}. Let this show in how you treat them.`);
+  }
+  return lines;
+};
+
+export const MEMORY_SYSTEM_PROMPT = [
+  'You keep the memory notes for a character in a tabletop game.',
+  'Reply with only a JSON object, no other text.',
+].join('\n');
+
+/**
+ * Prompt to fold a finished conversation into an NPC's memory.
+ * @param {{ mob: object, memory?: object, transcript: string, crawlerNames: string[] }} opts
+ */
+export const buildMemoryPrompt = ({ mob, memory, transcript, crawlerNames }) => {
+  const notes = (memory?.notes || []).filter(Boolean);
+  const feelings = memory?.feelings || {};
+  const current = crawlerNames.map((name) => {
+    const f = Object.values(feelings).find((x) => x?.name === name);
+    return `${name}: ${f ? clampScore(f.score) : 0}`;
+  });
+  return [
+    `Character: ${mob.name}${mob.description ? ` (${mob.description.slice(0, 200)})` : ''}`,
+    mob.personality?.attitude ? `Their usual attitude: ${mob.personality.attitude}` : null,
+    '',
+    notes.length ? `What ${mob.name} already remembers:\n${notes.map((n) => `- ${n}`).join('\n')}` : `${mob.name} has no memories of the party yet.`,
+    '',
+    `The conversation that just ended:\n${transcript}`,
+    '',
+    `Update ${mob.name}'s memory. Keep what still matters, add what is new, merge repeats, drop trivia.`,
+    `- At most ${MEMORY_MAX_NOTES} notes, each under 20 words, written from ${mob.name}'s point of view, naming who did what.`,
+    '- Keep promises, deals, threats, insults, favours, lies they were told, names and plans they learned, and what they told the party.',
+    '- Only record what was actually said or done. Do not invent anything, and never record anything that was not said aloud.',
+    `- Feelings: a score from -3 (hostile) to 3 (fond) for each crawler, moved at most 1 or 2 points by this conversation. Current scores: ${current.join(', ') || 'none'}.`,
+    '',
+    'JSON shape: {"notes": ["..."], "feelings": {"<crawler name>": <score>}}',
+  ].filter((l) => l !== null).join('\n');
+};
+
+/**
+ * Read the model's memory update. Feelings are keyed by crawler id (names mapped through `crawlers`);
+ * crawlers it didn't mention keep their old score. Null if the reply isn't usable.
+ * @param {string} raw
+ * @param {{ id: string, name: string }[]} crawlers
+ * @param {object} [prev] the memory before this conversation
+ */
+export const parseMemory = (raw, crawlers, prev) => {
+  const text = stripThinking(raw);
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start < 0 || end <= start) return null;
+  let data;
+  try { data = JSON.parse(text.slice(start, end + 1)); } catch { return null; }
+  if (!Array.isArray(data?.notes)) return null;
+  const notes = data.notes
+    .filter((n) => typeof n === 'string' && n.trim())
+    .map((n) => n.trim().slice(0, 200))
+    .slice(0, MEMORY_MAX_NOTES);
+  const feelings = { ...(prev?.feelings || {}) };
+  for (const [name, score] of Object.entries(data.feelings || {})) {
+    const crawler = crawlers.find((c) => c.name?.toLowerCase() === name.trim().toLowerCase());
+    if (crawler && Number.isFinite(Number(score))) feelings[crawler.id] = { name: crawler.name, score: clampScore(score) };
+  }
+  return { notes, feelings };
+};
+
 /**
  * System prompt for one NPC line. The secret is only included when the DM has unlocked it,
  * so the model can't leak what it hasn't been told.
  */
-export const buildSystemPrompt = ({ mob, secretUnlocked, scene, speaking, knownLanguages }) => {
+export const buildSystemPrompt = ({ mob, secretUnlocked, scene, memory, speaking, knownLanguages }) => {
   const p = mob.personality || {};
   const lines = [
     `You are ${mob.name}, a character in a gritty, darkly funny dungeon-crawl tabletop game.`,
@@ -70,6 +157,7 @@ export const buildSystemPrompt = ({ mob, secretUnlocked, scene, speaking, knownL
       if (p.revealWhen) lines.push(`You would only open up if: ${p.revealWhen}.`);
     }
   }
+  lines.push(...describeMemory(memory));
   if (speaking) {
     lines.push(`You are speaking ${speaking}${knownLanguages?.length > 1 ? ` (you know ${knownLanguages.join(', ')})` : ''}. Write your words in plain English; the game shows them in ${speaking}.`);
   }
