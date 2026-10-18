@@ -34,6 +34,24 @@ export interface Crawler {
   moveSpeed?: number; // feet per combat turn; defaults to DEFAULT_MOVE_SPEED
   activityStats?: CrawlerActivityStats;
   trophies?: CrawlerTrophy[]; // DM-awarded recognition for things that can't be measured automatically
+  languages?: string[];   // Language ids this crawler knows; none set = Worldspeech only
+  telepathic?: boolean;   // Needed to use Mindspeech (DM sets it)
+  translateMode?: TranslateMode; // Translating chat lines for party members who don't know the language
+}
+
+// ======== Languages ========
+
+/** off: not translating. auto: lines pass on to the party as said. review: the translator passes each line on (or twists it) first. */
+export type TranslateMode = 'off' | 'auto' | 'review';
+
+/** A language someone made up: rooms/{roomId}/languages/{id}. Built-in languages live in src/lib/languageList.mjs. */
+export interface CustomLanguage {
+  id: string;
+  name: string;
+  description?: string;
+  createdBy?: string;          // Firebase uid
+  createdByCrawlerId?: string; // the crawler who made it (they know it from the start)
+  createdAt?: number;
 }
 
 // A trophy the DM awards by hand. Awarding the same name again increments count.
@@ -306,6 +324,7 @@ export interface InventoryItem {
   createdBy?: string;        // Firebase uid of creator
   createdByUsername?: string; // Denormalized for display
   isPublic?: boolean;        // Whether visible to players outside the campaign
+  language?: string;         // Written in this language: the description is scrambled for crawlers who don't know it
 }
 
 // Compute total stat modifiers from all equipped items on a crawler
@@ -344,6 +363,7 @@ export interface Mob {
   createdByUsername?: string; // Denormalized for display
   isPublic?: boolean;        // Shared to the community (publicMobs)
   personality?: NpcPersonality; // DM-only: drives AI dialogue for talking NPCs
+  languages?: string[];      // Language ids it speaks, native first; none set = Worldspeech
 }
 
 // ======== Talking NPCs (local AI) ========
@@ -385,6 +405,8 @@ export interface ChatMessage {
   viaVoice?: boolean;   // Sent with the hold-to-talk mic
   toMobIds?: string[];  // Mobs picked with @ in the chat box
   nearMobIds?: string[]; // Player messages: mobs within talking range of the crawler when sent
+  language?: string;     // Spoken in this language (none = everyone understands, e.g. the DM narrating)
+  translationOf?: string; // A translator's version of another line, shown to party members who can't read it
 }
 
 /** Players can only talk to mobs this close to their crawler. */
@@ -699,6 +721,7 @@ export interface QuestNote {
   crawlerName: string;
   text: string;
   createdAt: string;
+  language?: string; // Written in this language: scrambled for crawlers who don't know it
 }
 
 export interface Quest {

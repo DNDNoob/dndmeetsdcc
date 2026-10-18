@@ -20,6 +20,7 @@ import {
   formatTranscript, isYes, cleanLine,
   rollPersonalityTraits, buildPersonalityPrompt, parsePersonality, defaultPersuasionDC, PERSONALITY_SYSTEM_PROMPT,
 } from './brain.mjs';
+import { mobLanguageIds, languageName } from '../languageList.mjs';
 
 export const DEFAULT_NPC_CONFIG = {
   nearDistance: 12,          // map-% units
@@ -83,7 +84,7 @@ export class NpcRoom {
     this.secrets = {};
     this.state = {
       mobs: [], crawlers: [], episode: null, combat: null, clock: null,
-      crawlerPlacements: [], runtimeMobPlacements: [], chat: [], lootBoxes: [],
+      crawlerPlacements: [], runtimeMobPlacements: [], chat: [], lootBoxes: [], languages: [],
     };
     this.liveUnsubs = [];
     this.placementUnsubs = [];
@@ -97,6 +98,7 @@ export class NpcRoom {
     this.prevNear = new Set();         // `${crawlerId}:${mobId}` pairs near each other
     this.lastNpcByCrawler = new Map(); // crawlerId → mobId of the NPC they last talked with
     this.persuadeTries = new Map();    // `${crawlerId}:${mobId}` → { turn, at } of the last Persuasion try
+    this.lastLanguageByMob = new Map(); // mobId → language it was last spoken to in (one it knows)
     this.activeModel = null;
     this.note = '';
     this.busy = false;
@@ -168,6 +170,7 @@ export class NpcRoom {
       sub(collection(db, `${this.path}/chatMessages`), (s) => this.onChat(s)),
       sub(collection(db, `${this.path}/diceRolls`), (s) => this.onDiceRolls(s)),
       sub(doc(db, `${this.path}/noncombatTurns/current`), (s) => { this.state.noncombatTurn = s.exists() ? s.data() : null; }),
+      sub(collection(db, `${this.path}/languages`), (s) => { this.state.languages = s.docs.map((d) => ({ ...d.data(), id: d.id })); }),
     ];
     this.watchPlacements();
     this.heartbeat = setInterval(() => this.publishStatus(), this.config.heartbeatMs);
@@ -329,11 +332,32 @@ export class NpcRoom {
     };
   }
 
-  transcript() {
+  /** Recent chat for the model. Given a mob, lines in languages it doesn't know stay unreadable to it. */
+  transcript(mob) {
     const epId = this.showtime?.episodeId;
-    return formatTranscript(
-      this.state.chat.filter((m) => !m.episodeId || m.episodeId === epId).slice(-this.config.transcriptLines)
-    );
+    const lines = this.state.chat
+      .filter((m) => !m.translationOf && (!m.episodeId || m.episodeId === epId))
+      .slice(-this.config.transcriptLines);
+    return mob
+      ? formatTranscript(lines, (lang) => this.mobKnows(mob, lang), (lang) => this.languageName(lang))
+      : formatTranscript(lines);
+  }
+
+  languageName(id) {
+    return languageName(id, this.state.languages);
+  }
+
+  mobKnows(mob, languageId) {
+    return !languageId || mobLanguageIds(mob).includes(languageId);
+  }
+
+  /**
+   * What a mob hears when someone talks: the words if it knows the language, else just that it
+   * couldn't follow. `heard` is the language to answer in (only when it understood).
+   */
+  hearing(mob, m, words) {
+    if (this.mobKnows(mob, m.language)) return { trigger: `${words}: "${m.text}"`, heard: m.language };
+    return { trigger: `${words} in ${this.languageName(m.language)}, a language you don't understand.`, heard: undefined };
   }
 
   // ── events ──
@@ -349,7 +373,7 @@ export class NpcRoom {
       if (change.type !== 'added') continue;
       const m = { ...change.doc.data(), id: change.doc.id };
       if (priming && (m.createdAt ?? 0) < Date.now() - 15_000) continue;
-      if (m.authorType === 'npc') continue;
+      if (m.authorType === 'npc' || m.translationOf) continue;
       if (m.episodeId && m.episodeId !== this.showtime?.episodeId) continue;
       if ((m.createdAt ?? 0) < Date.now() - 120_000) continue;
       this.lastActivityAt = Date.now();
@@ -377,7 +401,7 @@ export class NpcRoom {
     for (const mob of involved.values()) {
       const p = mob.personality || {};
       const state = this.secrets[mob.id]?.state ?? 'locked';
-      if (p.secret && p.revealWhen && state === 'locked') this.enqueue({ kind: 'secret-check', mobId: mob.id, message: m });
+      if (p.secret && p.revealWhen && state === 'locked' && this.mobKnows(mob, m.language)) this.enqueue({ kind: 'secret-check', mobId: mob.id, message: m });
     }
 
     if (m.authorType === 'crawler') {
@@ -387,11 +411,11 @@ export class NpcRoom {
 
     if (named.length) {
       for (const mob of named.slice(0, 2)) {
-        this.enqueue({ kind: 'line', mobId: mob.id, direct: true, near: speakerSpot, trigger: `${m.authorName} spoke to you: "${m.text}"` });
+        this.enqueue({ kind: 'line', mobId: mob.id, direct: true, near: speakerSpot, ...this.hearing(mob, m, `${m.authorName} spoke to you`) });
       }
     } else if (nearSpeaker.length) {
       const n = nearSpeaker[0];
-      this.enqueue({ kind: 'line', mobId: n.mobId, gated: true, near: speakerSpot, trigger: `${m.authorName} said this right next to you: "${m.text}"` });
+      this.enqueue({ kind: 'line', mobId: n.mobId, gated: true, near: speakerSpot, ...this.hearing(n.mob, m, `${m.authorName} said this right next to you`) });
     }
   }
 
@@ -669,7 +693,7 @@ export class NpcRoom {
     const tier = await this.prepare();
     if (!tier) return;
     const reply = await this.ask(tier, null, buildSecretCheckPrompt({
-      condition: p.revealWhen, speaker: job.message.authorName, text: job.message.text, transcript: this.transcript(),
+      condition: p.revealWhen, speaker: job.message.authorName, text: job.message.text, transcript: this.transcript(mob),
     }), { maxTokens: 4, temperature: 0 });
     if (!isYes(reply)) return;
     this.log(`[${this.name}] Reveal condition met for ${mob.name}; asking the DM`);
@@ -692,7 +716,7 @@ export class NpcRoom {
     const mob = await this.ensurePersonality(placement, tier);
     if (!mob) return;
 
-    const transcript = this.transcript();
+    const transcript = this.transcript(mob);
     if (job.gated) {
       const answer = await this.ask(tier, null, buildShouldSpeakPrompt({ mob, transcript, trigger: job.trigger }), { maxTokens: 4, temperature: 0 });
       if (!isYes(answer)) return;
@@ -700,10 +724,19 @@ export class NpcRoom {
 
     const mapId = this.currentMapId;
     await this.writeStatus({ thinking: { mobId: mob.id, mapId, x: placement.x, y: placement.y, since: Date.now() } });
+    // Answer in the language it was spoken to in (if it knows it); otherwise keep to the last one
+    // it was addressed in, else its native tongue
+    const known = mobLanguageIds(mob);
+    if (job.heard && known.includes(job.heard)) this.lastLanguageByMob.set(mob.id, job.heard);
+    const lastHeard = this.lastLanguageByMob.get(mob.id);
+    const language = lastHeard && known.includes(lastHeard) ? lastHeard : known[0];
     let line = '';
     try {
       const secretUnlocked = this.secrets[mob.id]?.state === 'unlocked';
-      const system = buildSystemPrompt({ mob, secretUnlocked, scene: this.scene(placement) });
+      const system = buildSystemPrompt({
+        mob, secretUnlocked, scene: this.scene(placement),
+        speaking: this.languageName(language), knownLanguages: known.map((id) => this.languageName(id)),
+      });
       line = cleanLine(await this.ask(tier, system, buildLinePrompt({ mob, transcript, trigger: job.trigger }), { maxTokens: 80, temperature: 0.8 }), mob.name);
     } finally {
       await this.writeStatus({ thinking: null });
@@ -717,6 +750,7 @@ export class NpcRoom {
       authorId: mob.id,
       authorName: mob.name,
       text: line,
+      language,
       createdAt: Date.now(),
       episodeId: this.showtime?.episodeId,
       mapId,

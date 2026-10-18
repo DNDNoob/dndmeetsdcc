@@ -51,7 +51,7 @@ const describeCrawler = (c) => {
  * System prompt for one NPC line. The secret is only included when the DM has unlocked it,
  * so the model can't leak what it hasn't been told.
  */
-export const buildSystemPrompt = ({ mob, secretUnlocked, scene }) => {
+export const buildSystemPrompt = ({ mob, secretUnlocked, scene, speaking, knownLanguages }) => {
   const p = mob.personality || {};
   const lines = [
     `You are ${mob.name}, a character in a gritty, darkly funny dungeon-crawl tabletop game.`,
@@ -69,6 +69,9 @@ export const buildSystemPrompt = ({ mob, secretUnlocked, scene }) => {
       if (p.revealWhen) lines.push(`You would only open up if: ${p.revealWhen}.`);
     }
   }
+  if (speaking) {
+    lines.push(`You are speaking ${speaking}${knownLanguages?.length > 1 ? ` (you know ${knownLanguages.join(', ')})` : ''}. Write your words in plain English; the game shows them in ${speaking}.`);
+  }
   lines.push('');
   lines.push('The scene:');
   if (scene.episodeName) lines.push(`- Location: ${scene.episodeName}${scene.episodeDescription ? ` (${scene.episodeDescription})` : ''}`);
@@ -83,8 +86,18 @@ export const buildSystemPrompt = ({ mob, secretUnlocked, scene }) => {
   return lines.join('\n');
 };
 
-export const formatTranscript = (messages) =>
-  messages.map((m) => `${m.authorName}${m.authorType === 'dm' ? ' (narrator)' : ''}: ${m.text}`).join('\n');
+/**
+ * Chat lines as the model reads them. With `understands`, lines in a language the NPC doesn't
+ * know come through as just the language, not the words.
+ */
+export const formatTranscript = (messages, understands, nameOf) =>
+  messages.map((m) => {
+    const who = `${m.authorName}${m.authorType === 'dm' ? ' (narrator)' : ''}`;
+    if (understands && m.language && !understands(m.language)) {
+      return `${who}: (says something in ${nameOf ? nameOf(m.language) : 'a language'} you don't understand)`;
+    }
+    return `${who}: ${m.text}`;
+  }).join('\n');
 
 export const buildLinePrompt = ({ mob, transcript, trigger }) =>
   [

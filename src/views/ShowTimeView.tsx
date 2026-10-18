@@ -20,7 +20,9 @@ import CombatTurnTimer from "@/components/CombatTurnTimer";
 import NpcChatPanel, { type NpcChatAuthor, type NpcChatMentionable } from "@/components/NpcChatPanel";
 import NpcSpeechBubbles from "@/components/ui/NpcSpeechBubbles";
 import type { NpcOnlineKeys } from "@/lib/npc/onlineLlm.mjs";
-import { withNpcPersonality, NPC_TALK_RANGE_FEET, type ChatMessage, type NpcAiSettings, type NpcAiStatus, type NpcSecretEntry, type NpcSecretState, type NpcGeneratedPersonality } from "@/lib/gameData";
+import { useLanguages } from "@/contexts/LanguagesContext";
+import { readChatLine, usableLanguageIds, DEFAULT_LANGUAGE_ID } from "@/lib/languages";
+import { withNpcPersonality, NPC_TALK_RANGE_FEET, type TranslateMode, type ChatMessage, type NpcAiSettings, type NpcAiStatus, type NpcSecretEntry, type NpcSecretState, type NpcGeneratedPersonality } from "@/lib/gameData";
 
 const NO_GENERATED_PERSONALITIES: Record<string, NpcGeneratedPersonality> = {};
 
@@ -75,6 +77,7 @@ interface ShowTimeViewProps {
   onSetNpcSecretState?: (mobId: string, state: NpcSecretState) => Promise<void>;
   npcKeys?: NpcOnlineKeys;
   onChangeNpcKeys?: (keys: NpcOnlineKeys) => void;
+  onSetTranslateMode?: (crawlerId: string, mode: TranslateMode) => Promise<void>;
 }
 
 const SHOWTIME_STORAGE_KEY = 'dcc_showtime_state';
@@ -747,7 +750,7 @@ const InventoryPanel: React.FC<{
   );
 };
 
-const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock, noncombatTurnState, resetNoncombatTurns, combatState, onRemoveCombatant, onRuntimePlacementsChange, onGameActiveChange, onRegisterGameToggle, roomId, quests = [], assignedQuests = [], onAssignQuest, onUpdateQuest, onUpdateAssignedQuest, onDeleteAssignedQuest, currentPlayerId, onRecordCrawlerMove, onSetMobEncountered, chatMessages = [], npcAiSettings = null, npcAiStatus = null, npcSecrets = {}, npcPersonalities = NO_GENERATED_PERSONALITIES, onSendChatMessage, onClearChat, onUpdateNpcAiSettings, onSetNpcSecretState, npcKeys, onChangeNpcKeys }) => {
+const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock, noncombatTurnState, resetNoncombatTurns, combatState, onRemoveCombatant, onRuntimePlacementsChange, onGameActiveChange, onRegisterGameToggle, roomId, quests = [], assignedQuests = [], onAssignQuest, onUpdateQuest, onUpdateAssignedQuest, onDeleteAssignedQuest, currentPlayerId, onRecordCrawlerMove, onSetMobEncountered, chatMessages = [], npcAiSettings = null, npcAiStatus = null, npcSecrets = {}, npcPersonalities = NO_GENERATED_PERSONALITIES, onSendChatMessage, onClearChat, onUpdateNpcAiSettings, onSetNpcSecretState, npcKeys, onChangeNpcKeys, onSetTranslateMode }) => {
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
   const selectedEpisodeIdRef = useRef<string | null>(null);
   const [currentMapIndex, setCurrentMapIndex] = useState(0);
@@ -2216,10 +2219,43 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   }, [selectedEpisode, currentMapId]);
 
   // ======== In-game chat & talking NPCs ========
-  const episodeChatMessages = useMemo(
+  const episodeChatLines = useMemo(
     () => selectedEpisode ? chatMessages.filter(m => !m.episodeId || m.episodeId === selectedEpisode.id) : [],
     [chatMessages, selectedEpisode]
   );
+  // Translators' versions of lines are kept apart and shown in place of the line they translate
+  const episodeChatMessages = useMemo(() => episodeChatLines.filter(m => !m.translationOf), [episodeChatLines]);
+  const chatTranslations = useMemo(() => {
+    const byLine = new Map<string, ChatMessage[]>();
+    for (const m of episodeChatLines) {
+      if (!m.translationOf) continue;
+      byLine.set(m.translationOf, [...(byLine.get(m.translationOf) ?? []), m]);
+    }
+    return byLine;
+  }, [episodeChatLines]);
+
+  // Languages: what each line looks like to this viewer
+  const { languages: allLanguageList, customLanguages } = useLanguages();
+  const myChatCrawler = useMemo(
+    () => (!isAdmin && currentPlayerId ? crawlers.find(c => c.id === currentPlayerId) ?? null : null),
+    [isAdmin, currentPlayerId, crawlers]
+  );
+  const readChat = useCallback(
+    (m: ChatMessage) => readChatLine(m, chatTranslations.get(m.id) ?? [], { isAdmin, crawler: myChatCrawler, party: crawlers }, customLanguages),
+    [chatTranslations, isAdmin, myChatCrawler, crawlers, customLanguages]
+  );
+  // Speech bubbles show what this viewer can make out
+  const bubbleMessages = useMemo(
+    () => episodeChatMessages.map(m => (m.language ? { ...m, text: readChat(m).text } : m)),
+    [episodeChatMessages, readChat]
+  );
+  const mySpeakLanguages = useMemo(() => {
+    if (!myChatCrawler) return [];
+    const ids = usableLanguageIds(myChatCrawler);
+    // Worldspeech first when they know it, so it's the default
+    const ordered = ids.includes(DEFAULT_LANGUAGE_ID) ? [DEFAULT_LANGUAGE_ID, ...ids.filter(id => id !== DEFAULT_LANGUAGE_ID)] : ids;
+    return ordered.map(id => allLanguageList.find(l => l.id === id)).filter((l): l is NonNullable<typeof l> => !!l);
+  }, [myChatCrawler, allLanguageList]);
 
   // Every mob can talk: mobs without a DM-written personality use the one the AI generated
   const talkingMobs = useMemo(() => mobs.map(m => withNpcPersonality(m, npcPersonalities)), [mobs, npcPersonalities]);
@@ -2265,7 +2301,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     return crawler ? { type: 'crawler', id: crawler.id, name: crawler.name } : null;
   }, [isAdmin, currentPlayerId, crawlers]);
 
-  const handleSendChat = useCallback(async (text: string, viaVoice: boolean, toMobIds: string[] = []) => {
+  const handleSendChat = useCallback(async (text: string, viaVoice: boolean, toMobIds: string[] = [], language?: string) => {
     if (!chatAuthor || !onSendChatMessage) return;
     // Players: note which mobs are in talking range, so only those answer
     const nearMobIds = chatAuthor.type === 'crawler'
@@ -2280,8 +2316,22 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       ...(viaVoice ? { viaVoice: true } : {}),
       ...(toMobIds.length ? { toMobIds } : {}),
       ...(nearMobIds ? { nearMobIds } : {}),
+      ...(chatAuthor.type === 'crawler' && language ? { language } : {}),
     });
   }, [chatAuthor, onSendChatMessage, selectedEpisode, chatMentionables]);
+
+  // A translator passes a line on to the party, as said or twisted
+  const handleTranslate = useCallback(async (m: ChatMessage, text: string) => {
+    if (!myChatCrawler || !onSendChatMessage) return;
+    await onSendChatMessage({
+      authorType: 'crawler',
+      authorId: myChatCrawler.id,
+      authorName: myChatCrawler.name,
+      text,
+      translationOf: m.id,
+      ...(m.episodeId ? { episodeId: m.episodeId } : {}),
+    });
+  }, [myChatCrawler, onSendChatMessage]);
 
   // Get the current map URL
   const currentMapUrl = useMemo(() => {
@@ -3678,7 +3728,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
           {/* NPC speech bubbles over their tokens */}
           <NpcSpeechBubbles
-            messages={episodeChatMessages}
+            messages={bubbleMessages}
             thinking={npcAiStatus?.thinking ?? null}
             mapId={currentMapId}
             counterScale={iconCounterScale}
@@ -3846,6 +3896,11 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
           onSetSecretState={onSetNpcSecretState}
           npcKeys={npcKeys}
           onChangeNpcKeys={onChangeNpcKeys}
+          readLine={readChat}
+          speakLanguages={mySpeakLanguages}
+          translateMode={myChatCrawler?.translateMode ?? 'off'}
+          onSetTranslateMode={myChatCrawler && onSetTranslateMode ? (mode) => onSetTranslateMode(myChatCrawler.id, mode) : undefined}
+          onTranslate={myChatCrawler ? handleTranslate : undefined}
           onClearChat={onClearChat ? () => onClearChat(selectedEpisode.id) : undefined}
         />
       )}

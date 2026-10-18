@@ -41,8 +41,10 @@ import {
   type PublicMob,
   type PublicEpisode,
   type PublicEpisodeAssets,
+  type CustomLanguage,
 } from "@/lib/gameData";
 import { useGame } from "@/contexts/GameContext";
+import { DEFAULT_LANGUAGE_ID } from "@/lib/languages";
 import type { BatchOperation } from "@/hooks/useFirebaseStore";
 import { db, storage } from "@/lib/firebase";
 import { doc, getDoc, setDoc, deleteDoc, updateDoc, serverTimestamp } from "firebase/firestore";
@@ -1638,6 +1640,33 @@ export const useGameState = () => {
     logger.log('[GameState] ➕ Added', toAdd.length, 'combatant(s) to active combat');
   };
 
+  // ======== Languages ========
+  // Built-in languages live in code; this collection holds the ones people make up
+  const customLanguages = useMemo(() => getStableCollection<CustomLanguage>('languages'), [getCollection, isLoaded]);
+
+  /** Make up a language. When a crawler makes it, they know it straight away. */
+  const createLanguage = async (name: string, description: string, crawlerId?: string) => {
+    const trimmed = name.trim().slice(0, 40);
+    if (!trimmed) return;
+    const language: CustomLanguage = {
+      id: `lang-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      name: trimmed,
+      ...(description.trim() ? { description: description.trim().slice(0, 300) } : {}),
+      ...(crawlerId ? { createdByCrawlerId: crawlerId } : {}),
+      createdAt: Date.now(),
+    };
+    await addItem('languages', language as unknown as Record<string, unknown>);
+    const crawler = crawlerId ? crawlers.find(c => c.id === crawlerId) : undefined;
+    if (crawler) {
+      const known = crawler.languages ?? [DEFAULT_LANGUAGE_ID];
+      await updateCrawler(crawler.id, { languages: [...known, language.id] });
+    }
+  };
+
+  const deleteLanguage = async (id: string) => {
+    await deleteItem('languages', id);
+  };
+
   // ======== Spells ========
   const spells = useMemo(() => {
     return getStableCollection<Spell>('spells');
@@ -1980,6 +2009,9 @@ export const useGameState = () => {
     npcPersonalities,
     sendChatMessage,
     clearChat,
+    customLanguages,
+    createLanguage,
+    deleteLanguage,
     updateNpcAiSettings,
     setNpcSecretState,
     spells,
