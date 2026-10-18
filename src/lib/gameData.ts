@@ -717,8 +717,9 @@ export interface NpcSpeechVoice {
   voice?: string;      // Kokoro voice
   gemini?: string;     // Gemini voice name
   groq?: string;       // Groq (Orpheus) voice
-  elevenlabs?: string; // ElevenLabs voice id
+  elevenlabs?: string; // ElevenLabs voice id (an NPC with one is read by ElevenLabs first)
   speed?: number;
+  sound?: string;      // creature sound effect id ('none' turns off the one picked from notes)
 }
 
 /** 'online': the DM's browser using free Groq/Gemini keys. 'laptop': the NPC script with Ollama. */

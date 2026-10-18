@@ -4,6 +4,7 @@ import { useSyncExternalStore } from 'react';
 import type { NpcSpeechVoice } from '@/lib/gameData';
 import type { NpcOnlineKeys } from '@/lib/npc/onlineLlm.mjs';
 import { speechEngine } from './engine';
+import { applyCreatureSound, hasCreatureSound } from './effects';
 import {
   GEMINI_VOICES, GROQ_VOICES, VOICE_ENGINES, fitVoice, kokoroVoice,
   type CatalogVoice, type VoiceEngine, type VoiceTraits,
@@ -270,9 +271,23 @@ async function kokoro(req: SpeakRequest): Promise<SpokenClip> {
   return { blob, ext: 'wav', engine: 'kokoro' };
 }
 
-/** Read a line aloud with the first service that works. Throws only if Kokoro fails too. */
+/** Read a line aloud with the first service that works, with the NPC's creature sound on it. Throws only if Kokoro fails too. */
 export async function speakLine(req: SpeakRequest, keys: NpcOnlineKeys): Promise<SpokenClip> {
-  for (const engine of voiceEnginesInOrder(keys)) {
+  const clip = await speakPlain(req, keys);
+  if (!hasCreatureSound(req.traits.sound)) return clip;
+  try {
+    return { ...clip, blob: await applyCreatureSound(clip.blob, req.traits.sound!), ext: 'wav' };
+  } catch (err) {
+    console.warn('[NpcSpeech] Creature sound failed, using the plain voice', err);
+    return clip;
+  }
+}
+
+async function speakPlain(req: SpeakRequest, keys: NpcOnlineKeys): Promise<SpokenClip> {
+  // An NPC given an ElevenLabs character voice is read by ElevenLabs while it has use left
+  const order = voiceEnginesInOrder(keys);
+  if (req.pick?.elevenlabs && order.includes('elevenlabs')) order.sort((a, b) => Number(b === 'elevenlabs') - Number(a === 'elevenlabs'));
+  for (const engine of order) {
     try {
       const key = keyFor(engine, keys);
       const clip = engine === 'gemini' ? await gemini(req, key, keys)
