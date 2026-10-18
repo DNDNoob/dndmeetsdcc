@@ -31,6 +31,7 @@ export type CollectionName =
   | 'friendRequests'
   | 'chatMessages'
   | 'npcAi'
+  | 'merchants'
   | string; // Allow any string for flexibility
 
 /**

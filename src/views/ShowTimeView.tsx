@@ -8,7 +8,7 @@ import RulerOverlay from "@/components/ui/RulerOverlay";
 import { MobIcon } from "@/components/ui/MobIcon";
 import { FogOfWar } from "@/components/ui/FogOfWar";
 import { Episode, Mob, MapSettings, Crawler, CrawlerPlacement, EpisodeMobPlacement, SentLootBox, LootBoxTemplate, getLootBoxTierColor, InventoryItem, CombatState, getEquippedModifiers, getEffectiveMoveSpeed, getMapDistanceFeet, NONCOMBAT_MOVE_MULTIPLIER, Quest, AssignedQuest, QuestActionItem, LootBoxTier } from "@/lib/gameData";
-import { Map as MapIcon, X, Eye, EyeOff, Layers, ChevronLeft, ChevronRight, PlayCircle, Grid3x3, CloudFog, Eraser, Trash2, Target, ZoomIn, ZoomOut, Package, Lock, Unlock, Search, Plus, Heart, ScrollText, CheckSquare, Check } from "lucide-react";
+import { Map as MapIcon, X, Eye, EyeOff, Layers, ChevronLeft, ChevronRight, PlayCircle, Grid3x3, CloudFog, Eraser, Trash2, Target, ZoomIn, ZoomOut, Package, Lock, Unlock, Search, Plus, Heart, ScrollText, CheckSquare, Check, Store } from "lucide-react";
 import { PingEffect, Ping } from "@/components/ui/PingEffect";
 import { MapBox, MapBoxData, ShapeType } from "@/components/ui/MapBox";
 import { MapToolsMenu } from "@/components/ui/MapToolsMenu";
@@ -20,6 +20,8 @@ import CombatTurnTimer from "@/components/CombatTurnTimer";
 import NpcChatPanel, { type NpcChatAuthor, type NpcChatMentionable } from "@/components/NpcChatPanel";
 import NpcSpeechBubbles from "@/components/ui/NpcSpeechBubbles";
 import type { NpcOnlineKeys } from "@/lib/npc/onlineLlm.mjs";
+import MerchantPanel, { MerchantHagglePrompts } from "@/components/MerchantPanel";
+import { isMerchant, MERCHANT_TRADE_RANGE_FEET, type MerchantState } from "@/lib/gameData";
 import { withNpcPersonality, NPC_TALK_RANGE_FEET, type ChatMessage, type NpcAiSettings, type NpcAiStatus, type NpcSecretEntry, type NpcSecretState, type NpcGeneratedPersonality } from "@/lib/gameData";
 
 const NO_GENERATED_PERSONALITIES: Record<string, NpcGeneratedPersonality> = {};
@@ -75,7 +77,16 @@ interface ShowTimeViewProps {
   onSetNpcSecretState?: (mobId: string, state: NpcSecretState) => Promise<void>;
   npcKeys?: NpcOnlineKeys;
   onChangeNpcKeys?: (keys: NpcOnlineKeys) => void;
+  // Merchants
+  merchants?: MerchantState[];
+  onBuyFromMerchant?: (mob: Mob, crawlerId: string, item: InventoryItem) => Promise<boolean>;
+  onSellToMerchant?: (mob: Mob, crawlerId: string, itemId: string, minGold: number) => Promise<boolean>;
+  onHaggleWithMerchant?: (mob: Mob, crawler: Crawler) => Promise<unknown>;
+  onRestockMerchant?: (mob: Mob) => Promise<boolean>;
+  onResolveMerchantHaggle?: (mob: Mob, crawlerId: string, approve: boolean) => Promise<boolean>;
 }
+
+const NO_MERCHANTS: MerchantState[] = [];
 
 const SHOWTIME_STORAGE_KEY = 'dcc_showtime_state';
 
@@ -747,7 +758,7 @@ const InventoryPanel: React.FC<{
   );
 };
 
-const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock, noncombatTurnState, resetNoncombatTurns, combatState, onRemoveCombatant, onRuntimePlacementsChange, onGameActiveChange, onRegisterGameToggle, roomId, quests = [], assignedQuests = [], onAssignQuest, onUpdateQuest, onUpdateAssignedQuest, onDeleteAssignedQuest, currentPlayerId, onRecordCrawlerMove, onSetMobEncountered, chatMessages = [], npcAiSettings = null, npcAiStatus = null, npcSecrets = {}, npcPersonalities = NO_GENERATED_PERSONALITIES, onSendChatMessage, onClearChat, onUpdateNpcAiSettings, onSetNpcSecretState, npcKeys, onChangeNpcKeys }) => {
+const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock, noncombatTurnState, resetNoncombatTurns, combatState, onRemoveCombatant, onRuntimePlacementsChange, onGameActiveChange, onRegisterGameToggle, roomId, quests = [], assignedQuests = [], onAssignQuest, onUpdateQuest, onUpdateAssignedQuest, onDeleteAssignedQuest, currentPlayerId, onRecordCrawlerMove, onSetMobEncountered, chatMessages = [], npcAiSettings = null, npcAiStatus = null, npcSecrets = {}, npcPersonalities = NO_GENERATED_PERSONALITIES, onSendChatMessage, onClearChat, onUpdateNpcAiSettings, onSetNpcSecretState, npcKeys, onChangeNpcKeys, merchants = NO_MERCHANTS, onBuyFromMerchant, onSellToMerchant, onHaggleWithMerchant, onRestockMerchant, onResolveMerchantHaggle }) => {
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
   const selectedEpisodeIdRef = useRef<string | null>(null);
   const [currentMapIndex, setCurrentMapIndex] = useState(0);
@@ -805,6 +816,11 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   // Selected map entity for keyboard/right-click delete
   const [selectedMapEntity, setSelectedMapEntity] = useState<{ type: 'episode-mob' | 'runtime-mob' | 'crawler'; index: number } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; type: 'episode-mob' | 'runtime-mob' | 'crawler'; index: number } | null>(null);
+  // Merchants: the small "Trade with Merchant" menu a player gets by tapping one, and the open trade window
+  const [merchantMenu, setMerchantMenu] = useState<{ mobId: string; x: number; y: number } | null>(null);
+  const [openMerchantId, setOpenMerchantId] = useState<string | null>(null);
+  // Where a press on a mob started, so a drag isn't mistaken for a tap
+  const mobPressRef = useRef<{ x: number; y: number } | null>(null);
 
   // Crawler and Mob placement state (DM can add during ShowTime)
   const [crawlerPlacements, setCrawlerPlacements] = useState<CrawlerPlacement[]>([]);
@@ -2259,6 +2275,34 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     return list;
   }, [npcsOnMap, isAdmin, myCrawlerSpot, mobPlacementsOnMap, isPointVisible, mapDistanceFeet, crawlerPlacements, currentMapId, crawlers, currentPlayerId]);
 
+  // --- Merchants ---
+  // Distance from the player's crawler to the nearest visible copy of a merchant on this map
+  const merchantDistanceFeet = useCallback((mobId: string): number | null => {
+    if (!myCrawlerSpot) return null;
+    const spots = mobPlacementsOnMap.filter(p => p.mobId === mobId && isPointVisible(p.x, p.y));
+    if (spots.length === 0) return null;
+    return Math.min(...spots.map(p => mapDistanceFeet(myCrawlerSpot, p)));
+  }, [myCrawlerSpot, mobPlacementsOnMap, isPointVisible, mapDistanceFeet]);
+
+  // A player tapping a merchant (not dragging it) gets the "Trade with Merchant" menu
+  const handleMerchantTap = (e: React.MouseEvent, mob: Mob) => {
+    if (isAdmin || !isMerchant(mob)) return;
+    const start = mobPressRef.current;
+    if (start && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 6) return;
+    e.stopPropagation();
+    setMerchantMenu({ mobId: mob.id, x: e.clientX, y: e.clientY });
+  };
+  const recordMobPress = (x: number, y: number) => { mobPressRef.current = { x, y }; };
+
+  const merchantsWithState = useMemo(() => mobs
+    .filter(m => isMerchant(m))
+    .map(mob => ({ mob, state: merchants.find(st => st.id === mob.id) }))
+    .filter((m): m is { mob: Mob; state: MerchantState } => !!m.state),
+  [mobs, merchants]);
+
+  const myCrawler = currentPlayerId ? crawlers.find(c => c.id === currentPlayerId) : undefined;
+  const openMerchantMob = openMerchantId ? mobs.find(m => m.id === openMerchantId && isMerchant(m)) : undefined;
+
   const chatAuthor = useMemo((): NpcChatAuthor | null => {
     if (isAdmin) return { type: 'dm', id: 'dm', name: 'DM' };
     const crawler = currentPlayerId ? crawlers.find(c => c.id === currentPlayerId) : undefined;
@@ -3273,9 +3317,11 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                 onMouseDown={(e) => {
                   if (!canInteract) return;
                   e.stopPropagation();
+                  recordMobPress(e.clientX, e.clientY);
                   handleMobMouseDown(`${placement.mobId}-${globalIndex}`);
                 }}
                 onClick={(e) => {
+                  handleMerchantTap(e, mob);
                   if (!isDragging && isAdmin) {
                     e.stopPropagation();
                     setSelectedMapEntity({ type: 'episode-mob', index: globalIndex });
@@ -3293,6 +3339,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                   if (!canInteract) return;
                   e.stopPropagation();
                   const touch = e.touches[0];
+                  recordMobPress(touch.clientX, touch.clientY);
                   handleMobMouseDown(`${placement.mobId}-${globalIndex}`);
                   // Store touch start for drag
                   (e.currentTarget as HTMLElement).dataset.touchStartX = String(touch.clientX);
@@ -3561,9 +3608,11 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                 onMouseDown={(e) => {
                   if (!canInteract) return;
                   e.stopPropagation();
+                  recordMobPress(e.clientX, e.clientY);
                   setDraggingRuntimeId(`mob-${index}`);
                 }}
                 onClick={(e) => {
+                  handleMerchantTap(e, mob);
                   if (!isDragging && isAdmin) {
                     e.stopPropagation();
                     setSelectedMapEntity({ type: 'runtime-mob', index });
@@ -3580,6 +3629,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                 onTouchStart={(e) => {
                   if (!canInteract) return;
                   e.stopPropagation();
+                  recordMobPress(e.touches[0].clientX, e.touches[0].clientY);
                   setDraggingRuntimeId(`mob-${index}`);
                 }}
               >
@@ -3818,6 +3868,18 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
               </button>
             );
           })()}
+          {contextMob && isMerchant(contextMob) && (() => {
+            const mobId = contextMob.id;
+            return (
+              <button
+                onClick={() => { setOpenMerchantId(mobId); setContextMenu(null); }}
+                className="w-full text-left px-4 py-2 text-sm text-accent hover:bg-accent/10 font-display flex items-center gap-2"
+              >
+                <Store className="w-4 h-4" />
+                Open Merchant
+              </button>
+            );
+          })()}
           <button
             onClick={() => handleDeleteSelectedEntity()}
             className="w-full text-left px-4 py-2 text-sm text-destructive hover:bg-destructive/10 font-display flex items-center gap-2"
@@ -3828,6 +3890,62 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
         </div>
         );
       })()}
+
+      {/* Player tapped a merchant: offer to trade */}
+      {merchantMenu && !isAdmin && (() => {
+        const mob = mobs.find(m => m.id === merchantMenu.mobId);
+        if (!mob) return null;
+        const feet = merchantDistanceFeet(mob.id);
+        const inRange = feet !== null && feet <= MERCHANT_TRADE_RANGE_FEET;
+        return (
+          <>
+            <div className="fixed inset-0 z-[199]" onClick={() => setMerchantMenu(null)} />
+            <div
+              className="fixed z-[200] bg-background border-2 border-accent rounded shadow-lg py-1 min-w-[180px]"
+              style={{ left: Math.min(merchantMenu.x, window.innerWidth - 200), top: Math.min(merchantMenu.y, window.innerHeight - 90) }}
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <button
+                disabled={!inRange}
+                onClick={() => { setOpenMerchantId(mob.id); setMerchantMenu(null); }}
+                className="w-full text-left px-4 py-2 text-sm text-accent hover:bg-accent/10 font-display flex items-center gap-2 disabled:opacity-50 disabled:hover:bg-transparent"
+              >
+                <Store className="w-4 h-4" />
+                Trade with Merchant
+              </button>
+              {!inRange && (
+                <p className="px-4 pb-1 text-[11px] text-muted-foreground">
+                  {feet === null ? "Your crawler isn't on this map." : `${Math.round(feet)} ft away. Walk within ${MERCHANT_TRADE_RANGE_FEET} ft to trade.`}
+                </p>
+              )}
+            </div>
+          </>
+        );
+      })()}
+
+      {/* Merchant trade window */}
+      {openMerchantMob && (
+        <MerchantPanel
+          mob={openMerchantMob}
+          state={merchants.find(m => m.id === openMerchantMob.id)}
+          isAdmin={isAdmin}
+          crawler={myCrawler}
+          crawlerInventory={myCrawler ? getCrawlerInventory?.(myCrawler.id) ?? [] : []}
+          distanceFeet={merchantDistanceFeet(openMerchantMob.id)}
+          onBuy={async (item) => { if (myCrawler) await onBuyFromMerchant?.(openMerchantMob, myCrawler.id, item); }}
+          onSell={async (itemId, minGold) => { if (myCrawler) await onSellToMerchant?.(openMerchantMob, myCrawler.id, itemId, minGold); }}
+          onHaggle={async () => { if (myCrawler) await onHaggleWithMerchant?.(openMerchantMob, myCrawler); }}
+          onRestock={async () => { await onRestockMerchant?.(openMerchantMob); }}
+          onResolveHaggle={async (crawlerId, approve) => { await onResolveMerchantHaggle?.(openMerchantMob, crawlerId, approve); }}
+          onClose={() => setOpenMerchantId(null)}
+        />
+      )}
+
+      {/* DM: haggles waiting for a yes or no */}
+      {isAdmin && onResolveMerchantHaggle && !openMerchantMob && (
+        <MerchantHagglePrompts merchants={merchantsWithState} onResolve={onResolveMerchantHaggle} />
+      )}
 
       {/* In-game chat with talking NPCs */}
       {selectedEpisode && onSendChatMessage && (

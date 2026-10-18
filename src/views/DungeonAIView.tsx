@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from "react";
 import NpcPersonalityFields from "@/components/NpcPersonalityFields";
+import MerchantFields from "@/components/MerchantFields";
 import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import MapMobPlacementEditor from "@/components/ui/MapMobPlacementEditor";
 import MapDesignerPopout from "@/components/ui/MapDesignerPopout";
-import { Mob, Episode, EpisodeMobPlacement, Crawler, CrawlerPlacement, InventoryItem, LootBoxTemplate, LootBoxTier, getLootBoxTierColor, type EquipmentSlot, type EquippedItems, Quest, QuestReward, QuestActionItem, QuestRewardTier, type CampaignMapDoc, type PublicMap, type PublicMob, type PublicEpisode } from "@/lib/gameData";
+import { Mob, Episode, EpisodeMobPlacement, Crawler, CrawlerPlacement, InventoryItem, LootBoxTemplate, LootBoxTier, getLootBoxTierColor, type EquipmentSlot, type EquippedItems, Quest, QuestReward, QuestActionItem, QuestRewardTier, type CampaignMapDoc, type PublicMap, type PublicMob, type PublicEpisode, isMerchant } from "@/lib/gameData";
 import { Brain, Upload, Plus, Trash2, Map, Skull, Image as ImageIcon, Save, Edit2, X, Layers, ChevronLeft, ChevronRight, User, Package, Search, Maximize2, Shield, ChevronDown as ChevronDownIcon, ScrollText, Eye, EyeOff, CheckSquare, GripVertical, Users, Globe } from "lucide-react";
 import { storage } from "@/lib/firebase";
 import { ShareToggle, ImportButton } from "@/components/ui/ShareToggle";
@@ -219,6 +220,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
       defaultInventory: newMob.defaultInventory,
       defaultGold: newMob.defaultGold,
       ...(newMob.personality ? { personality: newMob.personality } : {}),
+      ...(newMob.merchant ? { merchant: newMob.merchant } : {}),
     };
     console.log('[DungeonAI] ➕ Add Mob clicked', mob);
     try {
@@ -227,7 +229,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
     } catch (err) {
       console.error('[DungeonAI] ❌ Failed to persist mob', err);
     }
-    setNewMob({ name: "", level: 1, type: "normal", description: "", weaknesses: "", strengths: "", hitPoints: 50, personality: undefined });
+    setNewMob({ name: "", level: 1, type: "normal", description: "", weaknesses: "", strengths: "", hitPoints: 50, personality: undefined, merchant: undefined });
   };
 
   const handleDeleteMob = async (id: string) => {
@@ -860,6 +862,11 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                     value={newMob.personality}
                     onChange={(personality) => setNewMob({ ...newMob, personality })}
                   />
+                  <MerchantFields
+                    value={newMob.merchant}
+                    onChange={(merchant) => setNewMob({ ...newMob, merchant })}
+                    items={getSharedInventory?.() ?? []}
+                  />
                 </div>
                 <div className="flex flex-col items-center justify-center border border-dashed border-border p-4">
                   <label className="text-xs text-muted-foreground mb-2">Mob Image</label>
@@ -1018,6 +1025,14 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                           <NpcPersonalityFields
                             value={editedMob.personality}
                             onChange={(personality) => setEditedMobData(prev => prev ? { ...prev, personality } : prev)}
+                          />
+                        </div>
+
+                        <div className="mt-3">
+                          <MerchantFields
+                            value={editedMob.merchant}
+                            onChange={(merchant) => setEditedMobData(prev => prev ? { ...prev, merchant } : prev)}
+                            items={getSharedInventory?.() ?? []}
                           />
                         </div>
 
@@ -1337,6 +1352,12 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                               }).join(', ')}
                               {mob.defaultGold ? ` · ${mob.defaultGold} gold` : ''}
                             </div>
+                          )}
+                          {isMerchant(mob) && mob.merchant && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              <span className="text-accent">Merchant:</span>{' '}
+                              {mob.merchant.stock.reduce((n, e) => n + e.quantity, 0)} items · {mob.merchant.startingGold} gold · Scrooge {mob.merchant.scroogeFactor}
+                            </p>
                           )}
                         </div>
                         <div className="flex flex-wrap gap-2 mt-2 md:mt-0">

@@ -344,7 +344,85 @@ export interface Mob {
   createdByUsername?: string; // Denormalized for display
   isPublic?: boolean;        // Shared to the community (publicMobs)
   personality?: NpcPersonality; // DM-only: drives AI dialogue for talking NPCs
+  merchant?: MerchantConfig;  // NPCs that buy and sell items with crawlers
 }
+
+// ======== Merchants ========
+
+export interface MerchantStockEntry {
+  item: InventoryItem;
+  quantity: number;
+}
+
+/** DM settings on the mob. Restocking copies these into the live MerchantState. */
+export interface MerchantConfig {
+  enabled: boolean;
+  stock: MerchantStockEntry[];
+  startingGold: number;
+  scroogeFactor: number; // Each level: buy prices +10%, sell prices -10%
+  haggleDC?: number;     // Persuasion (d20 + CHA mod) needed to ask the DM for a lower Scrooge level
+}
+
+export type MerchantHaggleState = 'pending' | 'approved' | 'denied' | 'failed';
+
+export interface MerchantHaggle {
+  state: MerchantHaggleState;
+  crawlerName: string;
+  total: number;
+  dc: number;
+  at: number;
+}
+
+/** Live stock and gold, shared by everyone in the room: rooms/{roomId}/merchants/{mobId} */
+export interface MerchantState {
+  id: string; // = mobId
+  stock: MerchantStockEntry[];
+  gold: number;
+  discounts?: Record<string, number>;      // crawlerId -> Scrooge levels taken off by haggling
+  haggles?: Record<string, MerchantHaggle>; // crawlerId -> their haggle attempt since the last restock
+  restockedAt?: number;
+}
+
+export const MERCHANT_TRADE_RANGE_FEET = 20;
+export const DEFAULT_HAGGLE_DC = 15;
+export const DEFAULT_MERCHANT_CONFIG: MerchantConfig = { enabled: true, stock: [], startingGold: 100, scroogeFactor: 0 };
+
+/** Any mob can be a merchant; this doesn't depend on its type. */
+export const isMerchant = (mob: Pick<Mob, 'merchant'> | undefined): boolean => !!mob?.merchant?.enabled;
+
+/** A fresh live state from the DM's settings. Items get new ids so restocks never collide. */
+export const createMerchantState = (mobId: string, config: MerchantConfig): MerchantState => ({
+  id: mobId,
+  stock: (config.stock || [])
+    .filter(e => e.quantity > 0)
+    .map(e => ({ item: { ...e.item, id: `merch-${crypto.randomUUID()}` }, quantity: Math.floor(e.quantity) })),
+  gold: Math.max(0, Math.floor(config.startingGold || 0)),
+  discounts: {},
+  haggles: {},
+  restockedAt: Date.now(),
+});
+
+/** The Scrooge level a crawler trades at after any haggling discount. */
+export const getEffectiveScrooge = (config: MerchantConfig | undefined, state: MerchantState | undefined, crawlerId?: string): number =>
+  Math.max(0, Math.floor(config?.scroogeFactor ?? 0) - (crawlerId ? state?.discounts?.[crawlerId] ?? 0 : 0));
+
+// Worked in tenths so 100 gold at +10% is exactly 110, not 110.00000000000001 rounded up to 111
+export const getMerchantBuyPrice = (goldValue: number | undefined, scrooge: number): number =>
+  Math.max(0, Math.ceil(Math.round((goldValue ?? 0) * (10 + scrooge)) / 10));
+
+export const getMerchantSellPrice = (goldValue: number | undefined, scrooge: number): number =>
+  Math.max(0, Math.floor(Math.round((goldValue ?? 0) * (10 - scrooge)) / 10));
+
+/** Two items count as the same stock line when everything but the id matches. */
+export const merchantItemKey = (item: InventoryItem): string => {
+  const { id: _id, equipped: _eq, ...rest } = item;
+  const stable = (v: unknown): unknown =>
+    Array.isArray(v) ? v.map(stable)
+      : v && typeof v === 'object'
+        ? Object.fromEntries(Object.keys(v as object).sort().map(k => [k, stable((v as Record<string, unknown>)[k])]))
+        : v;
+  return JSON.stringify(stable(rest));
+};
 
 // ======== Talking NPCs (local AI) ========
 

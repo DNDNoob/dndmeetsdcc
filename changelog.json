@@ -1,5 +1,17 @@
 [
   {
+    "date": "2026-10-18",
+    "changes": [
+      "🛒 Merchants: tick Is a merchant on any mob in the DM Console and give it stock, starting gold and a Scrooge Factor",
+      "🤝 In Show Time, tap a merchant within 20 ft and choose Trade with Merchant to buy their items or sell your own",
+      "📦 Merchant stock and gold are shared live by the whole party, so when one crawler buys the last knife no one else can",
+      "💰 Merchants only pay with the gold they have; if they're short, you can sell for whatever they have left",
+      "🧾 Scrooge Factor: each level makes buying 10% dearer and selling 10% cheaper",
+      "🎲 Haggle: roll Persuasion against the merchant's Haggle DC, and if you make it the DM can lower your prices one level",
+      "🔄 DMs can right-click a merchant in Show Time to see its stock, answer haggles and restock it"
+    ]
+  },
+  {
     "date": "2026-10-17",
     "changes": [
       "💬 After you @ a mob, the chat remembers who you're talking to, so you don't need to @ them every message. The \"No one by that name\" popup no longer appears once a name is picked",
