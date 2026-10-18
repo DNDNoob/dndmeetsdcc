@@ -1,5 +1,12 @@
 [
   {
+    "date": "2026-10-18",
+    "changes": [
+      "👤 The Set Up Profile box now shows which account you're signed in with and has a Sign out button, so you're no longer stuck in it",
+      "🐛 If a profile can't be saved because you're not signed in with Google, the message now says so instead of just \"Failed to save profile\""
+    ]
+  },
+  {
     "date": "2026-10-17",
     "changes": [
       "💬 After you @ a mob, the chat remembers who you're talking to, so you don't need to @ them every message. The \"No one by that name\" popup no longer appears once a name is picked",

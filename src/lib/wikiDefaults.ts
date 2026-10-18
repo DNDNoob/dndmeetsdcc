@@ -1069,6 +1069,7 @@ The app requires user accounts for all game interactions. Your account is how th
 2. Click **CREATE ACCOUNT** and fill in your email and password (at least 6 characters).
 3. Alternatively, click **Continue with Google** for one-click account creation.
 4. On first sign-in, you'll be prompted to choose a **username** (unique, 3-24 characters, letters/numbers/underscores) and **display name**.
+5. The Set Up Profile box shows which account you're signed in with. If it's the wrong one, click **Not you? Sign out** to go back and sign in again.
 
 ## Signing In
 

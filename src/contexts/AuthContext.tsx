@@ -222,7 +222,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return true;
     } catch (error) {
       console.error('[Auth] Error saving user profile:', error);
-      toast.error('Failed to save profile');
+      // Firestore rules only accept writes from Google sign-ins
+      const isGoogle = user.providerData.some(p => p.providerId === 'google.com');
+      if ((error as { code?: string }).code === 'permission-denied' && !isGoogle) {
+        toast.error('This account can\'t save a profile. Sign out and use Continue with Google.');
+      } else {
+        toast.error('Failed to save profile');
+      }
       return false;
     }
   }, [user]);
