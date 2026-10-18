@@ -994,6 +994,17 @@ NPCs listen as soon as the DM opens an episode in Show Time (you do not need to 
 
 Each line appears in a speech bubble over the NPC's head on the map, fades after a few seconds, and is saved in the Game Chat. A "…" bubble shows while the NPC is thinking. An NPC waits about 20 seconds between lines so it doesn't hog the conversation.
 
+## Memory
+
+NPCs remember the party. When a conversation with an NPC has been quiet for about 2 minutes, the AI writes down what mattered in a few short notes, such as "Biff promised to bring back my lantern". It also notes how the NPC now feels about each crawler who talked to it, from hostile to fond. From then on the NPC talks with that memory, so insult Greg and he stays cold with you next time.
+
+- **Characters** (like Grimble) keep their memory for the whole campaign, across maps and episodes.
+- **Creature copies** (like Goblin B) each remember their own conversations, but only for the episode they were made in.
+- Locked secrets never go into memory, since the AI doesn't know them.
+- NPCs only know what they could have heard: messages players sent while the NPC was within 20 ft, your narration (unless you @ someone else), and other NPCs talking close by on the same map. Each reply uses the last 25 messages the NPC heard, and nothing from other maps or out of earshot goes into its replies or its memory.
+
+DMs can see and change what an NPC remembers: open the Game Chat settings and tap the brain icon next to the NPC. The number on it is how many notes it has. Edit the notes (one per line) and tap **Save**, or tap **Forget everything** to wipe its memory and feelings.
+
 ## Secrets
 
 The AI is **never told the secret** until you unlock it, so it can't let it slip. When a message in the chat looks like it meets the reveal condition, you get a prompt in the Game Chat:
@@ -1016,6 +1027,7 @@ Open the Game Chat and tap the gear icon:
 - **Model**: **Best quality** (bigger, slower) or **Fast** (smaller, quicker)
 - **Mute all NPCs**, or mute one NPC
 - **Secret** lock/unlock per NPC
+- **Memory** per NPC (brain icon): see and edit what it remembers
 - **Clear chat** for the current episode
 
 The dot next to the chat button is green when an NPC brain is listening. The chat header says which one is answering, for example "NPC voices online" or "Laptop covering".
@@ -1041,7 +1053,7 @@ The keys are saved only in that browser on that device. They are never stored in
 
 ### Laptop
 
-The AI runs on the DM's computer with [Ollama](https://ollama.com), so nothing is sent to an outside service. A one-time installer sets it up; setup steps are in \`scripts/npc-voices/README.md\` in the project repository. If the computer's \`.env.npc\` file has \`GROQ_API_KEY\` or \`GEMINI_API_KEY\`, the laptop also tries Groq, then Gemini, before its own model.
+The AI runs on the DM's computer with [Ollama](https://ollama.com), so nothing is sent to an outside service. A one-time installer sets it up; setup steps are in \`scripts/npc-voices/README.md\` in the project repository. Laptop mode only uses this local model, never Groq or Gemini. Pick it when you want the local AI; the Online brain is enough whenever the DM tab is open.
 
 If no brain is available (no keys, laptop off or asleep, or out of memory), the chat still works and NPCs just stay quiet. The chat header says why.`,
   },
