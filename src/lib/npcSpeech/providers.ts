@@ -145,9 +145,13 @@ let geminiModel = 0; // index of the first model name that works
 async function gemini(req: SpeakRequest, key: string, keys: NpcOnlineKeys): Promise<SpokenClip> {
   const voice = req.pick?.gemini && GEMINI_VOICES.some(v => v.id === req.pick!.gemini)
     ? req.pick.gemini : fitVoice(GEMINI_VOICES, req.traits)!.id;
-  const accent = req.traits.british ? ' with a British accent' : '';
-  const prompt = `Read this line aloud as a character in a fantasy game: ${req.traits.manner}. `
-    + `Stay in character${accent}${pace(req.traits.speed)}. Say only the line:\n${req.text}`;
+  // A short "Say <how>:" lead-in, the form Gemini treats as directions. Longer notes get read out.
+  const mood = moodOf(req.traits.manner).replace('whisper', 'hushed');
+  const how = [
+    mood || req.traits.deep ? `in a ${[mood, req.traits.deep ? 'deep' : ''].filter(Boolean).join(', ')} voice` : '',
+    req.traits.british ? 'with a British accent' : '',
+  ].filter(Boolean).join(' ') + pace(req.traits.speed);
+  const prompt = how ? `Say ${how.replace(/^, /, '')}: ${req.text}` : req.text;
   while (geminiModel < GEMINI_MODELS.length) {
     const model = GEMINI_MODELS[geminiModel];
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
@@ -181,10 +185,11 @@ const GROQ_DIRECTIONS: [RegExp, string][] = [
   [/gruff|growl|grumpy/, 'gruff'], [/sly|sneaky|cunning/, 'sly'],
 ];
 
+const moodOf = (manner: string) => GROQ_DIRECTIONS.find(([re]) => re.test(manner.toLowerCase()))?.[1] ?? '';
+
 async function groq(req: SpeakRequest, key: string, keys: NpcOnlineKeys): Promise<SpokenClip> {
   const voice = req.pick?.groq && GROQ_VOICES.some(v => v.id === req.pick!.groq) ? req.pick.groq : fitVoice(GROQ_VOICES, req.traits)!.id;
-  const manner = req.traits.manner.toLowerCase();
-  const direction = GROQ_DIRECTIONS.find(([re]) => re.test(manner))?.[1];
+  const direction = moodOf(req.traits.manner);
   const prefix = direction ? `[${direction}] ` : '';
   const parts: Uint8Array[] = [];
   let rate = 24000;

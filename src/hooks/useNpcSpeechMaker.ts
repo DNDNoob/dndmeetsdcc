@@ -138,8 +138,10 @@ export function useNpcSpeechMaker(opts: NpcSpeechMakerOptions) {
       };
       void (async () => {
         try {
-          const audioUrl = await clip(words, '');
-          const audioScrambledUrl = hasWords(scrambled) ? await clip(scrambled, '-scrambled') : undefined;
+          const [audioUrl, audioScrambledUrl] = await Promise.all([
+            clip(words, ''),
+            hasWords(scrambled) ? clip(scrambled, '-scrambled') : undefined,
+          ]);
           await onAttachAudio(m.id, { audioUrl, audioScrambledUrl });
         } catch (err) {
           console.warn('[NpcSpeech] Could not read a line aloud', err);

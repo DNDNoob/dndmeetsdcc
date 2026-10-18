@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ChatMessage } from '@/lib/gameData';
 
 const PREFS_KEY = 'dcc_npc_speech_audio';
-// A clip that shows up later than this after its line isn't played (it would be out of step with the chat)
-const PLAY_WITHIN_MS = 60_000;
+// A clip that shows up later than this after its line appeared isn't played (it would be out of step with the chat)
+const PLAY_WITHIN_MS = 2 * 60_000;
 // A tiny silent WAV, played on the first tap so phones allow audio afterwards
 const SILENCE = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAwF0AAIC7AAACABAAZGF0YQAAAAA=';
 
@@ -36,6 +36,9 @@ export function useNpcSpeechPlayer({ messages, understands, mapId }: NpcSpeechPl
   const queue = useRef<{ url: string; at: number }[]>([]);
   const playing = useRef(false);
   const handled = useRef<Set<string> | null>(null);
+  // When this device first saw each line: its clip arrives a little later
+  const seenAt = useRef(new Map<string, number>());
+  const blocked = useRef(false);
   const [speakingId, setSpeakingId] = useState<string | null>(null);
   const idByUrl = useRef(new Map<string, string>());
 
@@ -44,30 +47,15 @@ export function useNpcSpeechPlayer({ messages, understands, mapId }: NpcSpeechPl
     return audioRef.current;
   };
 
-  // Phones only allow sound after a tap: use the first one to unlock the player
-  useEffect(() => {
-    const unlock = () => {
-      const a = getAudio();
-      if (playing.current) return;
-      a.src = SILENCE;
-      a.play().catch(() => {});
-    };
-    window.addEventListener('pointerdown', unlock, { once: true });
-    window.addEventListener('keydown', unlock, { once: true });
-    return () => {
-      window.removeEventListener('pointerdown', unlock);
-      window.removeEventListener('keydown', unlock);
-    };
-  }, []);
-
   const playNext = useCallback(() => {
-    if (playing.current) return;
+    if (playing.current || blocked.current) return;
     let next = queue.current.shift();
     while (next && next.at < Date.now() - PLAY_WITHIN_MS) next = queue.current.shift();
     if (!next) { setSpeakingId(null); return; }
     const a = getAudio();
     playing.current = true;
     setSpeakingId(idByUrl.current.get(next.url) ?? null);
+    const item = next;
     const done = () => {
       a.onended = null;
       a.onerror = null;
@@ -76,27 +64,58 @@ export function useNpcSpeechPlayer({ messages, understands, mapId }: NpcSpeechPl
     };
     a.onended = done;
     a.onerror = done;
-    a.src = next.url;
+    a.src = item.url;
     a.volume = prefsRef.current.volume;
-    a.play().catch(done);
+    a.play().catch((err: unknown) => {
+      if ((err as { name?: string })?.name !== 'NotAllowedError') { done(); return; }
+      // The browser wants a tap before sound: keep the clip and play it on the next tap
+      a.onended = null;
+      a.onerror = null;
+      playing.current = false;
+      blocked.current = true;
+      queue.current.unshift(item);
+      setSpeakingId(null);
+    });
   }, []);
+
+  // Browsers only allow sound after a tap: use taps to unlock the player and play anything held back
+  useEffect(() => {
+    const unlock = () => {
+      if (blocked.current) { blocked.current = false; playNext(); return; }
+      if (playing.current || audioRef.current) return;
+      const a = getAudio();
+      a.src = SILENCE;
+      a.play().catch(() => {});
+    };
+    window.addEventListener('pointerdown', unlock);
+    window.addEventListener('keydown', unlock);
+    return () => {
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('keydown', unlock);
+    };
+  }, [playNext]);
 
   useEffect(() => {
     // Lines already in the chat when this opened are history: never play them
     if (!handled.current) {
-      handled.current = new Set(messages.filter(m => m.audioUrl).map(m => m.id));
+      handled.current = new Set(messages.map(m => m.id));
       return;
     }
     const now = Date.now();
     for (const m of messages) {
-      if (!m.audioUrl || handled.current.has(m.id)) continue;
+      if (handled.current.has(m.id)) continue;
+      if (m.authorType !== 'npc') { handled.current.add(m.id); continue; }
+      if (!seenAt.current.has(m.id)) seenAt.current.set(m.id, now);
+      if (!m.audioUrl) continue;
       handled.current.add(m.id);
-      if (prefsRef.current.muted || (m.createdAt ?? 0) < now - PLAY_WITHIN_MS) continue;
+      const seen = seenAt.current.get(m.id) ?? now;
+      seenAt.current.delete(m.id);
+      if (prefsRef.current.muted || seen < now - PLAY_WITHIN_MS) continue;
       if (mapId && m.mapId && m.mapId !== mapId) continue;
       const url = understands(m) ? m.audioUrl : m.audioScrambledUrl;
       if (!url) continue;
       idByUrl.current.set(url, m.id);
-      queue.current.push({ url, at: m.createdAt ?? now });
+      queue.current.push({ url, at: now });
     }
     playNext();
   }, [messages, understands, mapId, playNext]);

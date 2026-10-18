@@ -2,6 +2,8 @@
   {
     "date": "2026-10-18",
     "changes": [
+      "🔊 Spoken voices no longer read their directions out loud, only the NPC's line",
+      "▶️ NPC lines now play by themselves when the voice clip is ready, even if it takes a little longer, and a clip the browser holds back plays on your next tap",
       "💰 Mob loot: when a hostile mob goes down in combat, its gold and items are looted automatically and shared by every crawler in the fight",
       "🧪 Gold is split evenly. Items a mob has several copies of, like potions, are dealt out evenly, and anything left over goes to the party inventory",
       "🎒 New party inventory on the Profiles page holds unclaimed loot. Any crawler can Take what they need, and the DM can take for a crawler or discard items",
