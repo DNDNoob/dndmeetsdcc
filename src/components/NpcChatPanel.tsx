@@ -183,6 +183,7 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
   const engineLabel = [
     `Using ${engineName(voiceEngine)}${voiceEngine === "kokoro" && engine.status === "ready" ? " (in this browser)" : ""}.`,
     ...restingNotes.map(n => `${n}.`),
+    services.problem ? `${services.problem}.` : "",
     kokoroLabel,
   ].filter(Boolean).join(" ");
   const preview = async (mob: Mob) => {
