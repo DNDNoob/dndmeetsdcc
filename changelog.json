@@ -2,6 +2,7 @@
   {
     "date": "2026-10-18",
     "changes": [
+      "🛒 Each copy of a creature merchant now runs its own shop: Goblin A and Goblin B have separate stock, gold and haggling. Character merchants like Grimble still have one shop",
       "🛒 Merchants: tick Is a merchant on any mob in the DM Console and give it stock, starting gold and a Scrooge Factor",
       "🤝 In Show Time, tap a merchant within 20 ft and choose Trade with Merchant to buy their items or sell your own",
       "📦 Merchant stock and gold are shared live by the whole party, so when one crawler buys the last knife no one else can",
