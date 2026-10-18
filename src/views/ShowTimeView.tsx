@@ -7,7 +7,7 @@ import { GridOverlay } from "@/components/ui/GridOverlay";
 import RulerOverlay from "@/components/ui/RulerOverlay";
 import { MobIcon } from "@/components/ui/MobIcon";
 import { FogOfWar } from "@/components/ui/FogOfWar";
-import { Episode, Mob, MapSettings, Crawler, CrawlerPlacement, EpisodeMobPlacement, SentLootBox, LootBoxTemplate, getLootBoxTierColor, InventoryItem, CombatState, getEquippedModifiers, getEffectiveMoveSpeed, getMapDistanceFeet, NONCOMBAT_MOVE_MULTIPLIER, Quest, AssignedQuest, QuestActionItem, LootBoxTier } from "@/lib/gameData";
+import { Episode, Mob, stackItems, MapSettings, Crawler, CrawlerPlacement, EpisodeMobPlacement, SentLootBox, LootBoxTemplate, getLootBoxTierColor, InventoryItem, CombatState, getEquippedModifiers, getEffectiveMoveSpeed, getMapDistanceFeet, NONCOMBAT_MOVE_MULTIPLIER, Quest, AssignedQuest, QuestActionItem, LootBoxTier } from "@/lib/gameData";
 import { Map as MapIcon, X, Eye, EyeOff, Layers, ChevronLeft, ChevronRight, PlayCircle, Grid3x3, CloudFog, Eraser, Trash2, Target, ZoomIn, ZoomOut, Package, Lock, Unlock, Search, Plus, Heart, ScrollText, CheckSquare, Check, Swords, Handshake, Store } from "lucide-react";
 import { PingEffect, Ping } from "@/components/ui/PingEffect";
 import { MapBox, MapBoxData, ShapeType } from "@/components/ui/MapBox";
@@ -737,16 +737,19 @@ const InventoryPanel: React.FC<{
             {selectedCrawlerItems.length === 0 ? (
               <p className="text-xs text-muted-foreground italic">No items in inventory</p>
             ) : (
-              selectedCrawlerItems.map(item => (
-                <div key={item.id} className="flex items-center justify-between bg-muted/30 border border-border rounded px-2 py-1.5">
+              stackItems(selectedCrawlerItems).map(({ key, item, count, ids }) => (
+                <div key={key} className="flex items-center justify-between bg-muted/30 border border-border rounded px-2 py-1.5">
                   <div className="min-w-0">
-                    <span className="text-xs font-display text-primary block truncate">{item.name}</span>
+                    <span className="text-xs font-display text-primary block truncate">
+                      {item.name}{count > 1 && <span className="text-accent font-bold"> ×{count}</span>}
+                    </span>
                     {item.description && (
                       <span className="text-[10px] text-muted-foreground block truncate">{item.description}</span>
                     )}
                   </div>
                   <button
-                    onClick={() => handleRemoveItem(item.id)}
+                    onClick={() => handleRemoveItem(ids[ids.length - 1])}
+                    title={count > 1 ? 'Remove one' : 'Remove'}
                     className="p-0.5 hover:bg-destructive/10 rounded flex-shrink-0 ml-2"
                   >
                     <Trash2 className="w-3 h-3 text-destructive" />

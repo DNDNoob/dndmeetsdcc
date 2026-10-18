@@ -8,7 +8,7 @@ import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import MapMobPlacementEditor from "@/components/ui/MapMobPlacementEditor";
 import MapDesignerPopout from "@/components/ui/MapDesignerPopout";
-import { Mob, Episode, getMobKind, isBossMob, legacyMobType, EpisodeMobPlacement, Crawler, CrawlerPlacement, InventoryItem, LootBoxTemplate, LootBoxTier, getLootBoxTierColor, type EquipmentSlot, type EquippedItems, Quest, QuestReward, QuestActionItem, QuestRewardTier, type CampaignMapDoc, type PublicMap, type PublicMob, type PublicEpisode, isMerchant } from "@/lib/gameData";
+import { Mob, Episode, stackItems, getMobKind, isBossMob, legacyMobType, EpisodeMobPlacement, Crawler, CrawlerPlacement, InventoryItem, LootBoxTemplate, LootBoxTier, getLootBoxTierColor, type EquipmentSlot, type EquippedItems, Quest, QuestReward, QuestActionItem, QuestRewardTier, type CampaignMapDoc, type PublicMap, type PublicMob, type PublicEpisode, isMerchant } from "@/lib/gameData";
 import { Brain, Upload, Plus, Trash2, Map, Skull, Image as ImageIcon, Save, Edit2, X, Layers, ChevronLeft, ChevronRight, User, Package, Search, Maximize2, Shield, ChevronDown as ChevronDownIcon, ScrollText, Eye, EyeOff, CheckSquare, GripVertical, Users, Globe } from "lucide-react";
 import { storage } from "@/lib/firebase";
 import { ShareToggle, ImportButton } from "@/components/ui/ShareToggle";
@@ -1362,9 +1362,10 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                           {((mob.defaultInventory && mob.defaultInventory.length > 0) || (mob.defaultGold && mob.defaultGold > 0)) && (
                             <div className="text-xs text-muted-foreground mt-1">
                               <span className="text-accent">Inventory:</span>{' '}
-                              {mob.defaultInventory?.map(i => {
+                              {stackItems(mob.defaultInventory ?? []).map(({ item: i, count }) => {
                                 const equipped = isMobItemEquipped(mob.equippedItems, i.id);
-                                return equipped ? `[E] ${i.name}` : i.name;
+                                const name = count > 1 ? `${i.name} ×${count}` : i.name;
+                                return equipped ? `[E] ${name}` : name;
                               }).join(', ')}
                               {mob.defaultGold ? ` · ${mob.defaultGold} gold` : ''}
                             </div>

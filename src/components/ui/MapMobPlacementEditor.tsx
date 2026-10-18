@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import { Mob, EpisodeMobPlacement, Crawler, CrawlerPlacement, InventoryItem } from "@/lib/gameData";
+import { Mob, EpisodeMobPlacement, Crawler, CrawlerPlacement, InventoryItem, stackItems } from "@/lib/gameData";
 import MobIcon from "@/components/ui/MobIcon";
 import { CrawlerIcon } from "@/components/ui/CrawlerIcon";
 import GridOverlay from "@/components/ui/GridOverlay";
@@ -512,16 +512,18 @@ const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
                       {/* Current items */}
                       {mobItems.length > 0 ? (
                         <div className="space-y-1 max-h-24 overflow-y-auto">
-                          {mobItems.map((item, idx) => (
-                            <div key={`${item.id}-${idx}`} className="flex items-center justify-between bg-muted/30 border border-border rounded px-2 py-0.5">
+                          {stackItems(mobItems).map(({ key, item, count }) => (
+                            <div key={key} className="flex items-center justify-between bg-muted/30 border border-border rounded px-2 py-0.5">
                               <div className="min-w-0">
-                                <span className="text-[10px] text-primary truncate block">{item.name}</span>
+                                <span className="text-[10px] text-primary truncate block">{item.name}{count > 1 && <span className="text-accent font-bold"> ×{count}</span>}</span>
                                 {item.equipSlot && <span className="text-[9px] text-accent">{item.equipSlot}</span>}
                               </div>
                               <button
                                 onClick={() => {
                                   if (fullIndex === -1) return;
-                                  const updatedItems = mobItems.filter((_, i) => i !== idx);
+                                  // Remove one copy from the stack
+                                  const lastIdx = mobItems.map(i => i.id).lastIndexOf(item.id);
+                                  const updatedItems = mobItems.filter((_, i) => i !== lastIdx);
                                   const updated = placements.map((p, i) =>
                                     i === fullIndex ? { ...p, inventoryOverride: updatedItems.length > 0 ? updatedItems : undefined } : p
                                   );

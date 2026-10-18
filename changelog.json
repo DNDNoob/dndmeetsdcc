@@ -2,6 +2,11 @@
   {
     "date": "2026-10-18",
     "changes": [
+      "💰 Mob loot: when a hostile mob goes down in combat, its gold and items are looted automatically and shared by every crawler in the fight",
+      "🧪 Gold is split evenly. Items a mob has several copies of, like potions, are dealt out evenly, and anything left over goes to the party inventory",
+      "🎒 New party inventory on the Profiles page holds unclaimed loot. Any crawler can Take what they need, and the DM can take for a crawler or discard items",
+      "📜 Each kill posts a Looted line to the dice history showing who got what",
+      "📦 Copies of the same item now always stack (Health Potion x3) in the Show Time inventory panel, loot boxes, merchant sell lists and mob item lists, not just on profiles",
       "🗣️ Languages: crawlers and mobs now know languages (Worldspeech, Dervish, Vernonacular, Mindspeech, Ward sign, Mewmew, Base64 and Kra Kow). Lines in a language you don't know show up as gibberish in Game Chat and speech bubbles",
       "🧠 Mindspeech only works for crawlers the DM has marked Telepathic",
       "🐉 Mobs have a Languages picker in the DM Console. NPCs answer in the language they're spoken to in, and can't understand languages they don't know",

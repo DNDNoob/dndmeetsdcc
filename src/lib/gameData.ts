@@ -466,6 +466,84 @@ export const getHaggleBlocker = (
   return null;
 };
 
+// ======== Item stacks & mob loot ========
+
+/** Copies of the same item share this key and are shown as one stack. */
+export const getItemStackKey = (item: InventoryItem): string => {
+  const modifiersStr = item.statModifiers
+    ? JSON.stringify(Object.entries(item.statModifiers).filter(([, v]) => v !== 0).sort())
+    : '';
+  return `${item.name}|${item.description || ''}|${item.equipSlot || ''}|${item.goldValue ?? 0}|${modifiersStr}`;
+};
+
+export interface ItemStack {
+  key: string;
+  item: InventoryItem; // first copy, used for display
+  count: number;
+  ids: string[];
+}
+
+/** Groups copies of the same item, keeping the order each item first appears in. */
+export const stackItems = (items: InventoryItem[]): ItemStack[] => {
+  const stacks = new Map<string, ItemStack>();
+  for (const item of items) {
+    const key = getItemStackKey(item);
+    const stack = stacks.get(key);
+    if (stack) {
+      stack.count++;
+      stack.ids.push(item.id);
+    } else {
+      stacks.set(key, { key, item, count: 1, ids: [item.id] });
+    }
+  }
+  return Array.from(stacks.values());
+};
+
+/** Inventory document holding items looted by the party that nobody has taken yet. */
+// (Firestore reserves ids like __name__, so this one has no underscores)
+export const PARTY_INVENTORY_ID = 'party-loot';
+
+export interface MobLootSplit {
+  gold: Record<string, number>; // crawlerId → gold received
+  items: Record<string, InventoryItem[]>; // crawlerId → items received
+  party: InventoryItem[]; // items for the party inventory
+}
+
+/**
+ * Splits a defeated mob's loot between the crawlers who fought it. Gold is split evenly, with
+ * leftover coins going one each in `crawlerIds` order. Items the mob carries several copies of
+ * are dealt out evenly and leftovers go to the party; single items go to the party.
+ * Every item gets a fresh id so copies never collide inside one inventory.
+ */
+export const splitMobLoot = (items: InventoryItem[], gold: number, crawlerIds: string[]): MobLootSplit => {
+  const split: MobLootSplit = { gold: {}, items: {}, party: [] };
+  const fresh = (item: InventoryItem): InventoryItem => {
+    const { equipped: _eq, ...rest } = item;
+    return { ...rest, id: `item-${crypto.randomUUID()}` };
+  };
+  const n = crawlerIds.length;
+  if (n === 0) {
+    split.party = items.map(fresh);
+    return split;
+  }
+  const coins = Math.max(0, Math.floor(gold || 0));
+  crawlerIds.forEach((id, i) => {
+    const share = Math.floor(coins / n) + (i < coins % n ? 1 : 0);
+    if (share > 0) split.gold[id] = share;
+  });
+  for (const stack of stackItems(items)) {
+    const copies = items.filter(i => getItemStackKey(i) === stack.key);
+    const each = stack.count > 1 ? Math.floor(stack.count / n) : 0;
+    crawlerIds.forEach((id, i) => {
+      if (each === 0) return;
+      const mine = copies.slice(i * each, (i + 1) * each).map(fresh);
+      split.items[id] = [...(split.items[id] ?? []), ...mine];
+    });
+    split.party.push(...copies.slice(each * n).map(fresh));
+  }
+  return split;
+};
+
 /** Two items count as the same stock line when everything but the id matches. */
 export const merchantItemKey = (item: InventoryItem): string => {
   const { id: _id, equipped: _eq, ...rest } = item;
@@ -698,6 +776,7 @@ export interface CombatantEntry {
   avatar?: string; // Deprecated: no longer saved (images made combat docs too big); look up the crawler/mob instead
   currentHP?: number; // per-combatant HP tracking (used for mob instances)
   feetMovedThisTurn?: number; // crawler movement used this turn (reset when the turn ends)
+  looted?: boolean; // mob only: its items and gold were already handed out when it went down
 }
 
 // Combat state - synced via Firebase (singleton doc, id = 'current')

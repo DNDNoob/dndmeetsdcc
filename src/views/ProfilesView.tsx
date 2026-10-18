@@ -8,7 +8,7 @@ import { CrawlerLanguagesCard } from "@/components/CrawlerLanguagesCard";
 import { usableLanguageIds } from "@/lib/languages";
 import { HealthBar } from "@/components/ui/HealthBar";
 import { EquipmentSlot } from "@/components/ui/EquipmentSlot";
-import { Crawler, Mob, InventoryItem, createEmptyCrawler, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery, getInitialCrawlerId } from "@/lib/gameData";
+import { Crawler, Mob, InventoryItem, getItemStackKey, stackItems, PARTY_INVENTORY_ID, createEmptyCrawler, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery, getInitialCrawlerId } from "@/lib/gameData";
 import type { DiceRollEntry } from "@/hooks/useGameState";
 import UndoTurnButton, { canUndoCombatTurn } from "@/components/UndoTurnButton";
 import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Backpack, HardHat, Package, Lock, Unlock, ChevronDown, ChevronUp, Check, Search, Send, BookOpen, Filter, X, Gem, Footprints, Shirt, Hand, Target, Swords, RefreshCw, Timer, ScrollText, Eye, EyeOff, CheckSquare, Trophy, Skull, HeartCrack, Crown, Minus, Wand2, Star } from "lucide-react";
@@ -85,6 +85,9 @@ interface ProfilesViewProps {
   onStatRoll?: (crawlerName: string, crawlerId: string, stat: string, totalStat: number) => void;
   getCrawlerLootBoxes?: (crawlerId: string) => SentLootBox[];
   claimLootBoxItems?: (lootBoxId: string, crawlerId: string, itemIds: string[], claimGold?: boolean) => Promise<void>;
+  getPartyInventory?: () => InventoryItem[];
+  onTakeFromPartyInventory?: (crawlerId: string, itemIds: string[]) => Promise<unknown>;
+  onUpdatePartyInventory?: (items: InventoryItem[]) => void;
   noncombatTurnState?: NoncombatTurnState | null;
   getNoncombatRollsRemaining?: (crawlerId: string) => number;
   recordNoncombatRoll?: (crawlerId: string) => Promise<void>;
@@ -263,6 +266,59 @@ const ProfileSpellCard: React.FC<{
   );
 };
 
+// Party inventory: items looted from mobs that any crawler can take
+const PartyInventorySection: React.FC<{
+  items: InventoryItem[];
+  crawlerName: string;
+  canTake: boolean;
+  isAdmin: boolean;
+  onTake: (itemIds: string[]) => Promise<unknown>;
+  onDiscard?: (itemIds: string[]) => void;
+}> = ({ items, crawlerName, canTake, isAdmin, onTake, onDiscard }) => {
+  const [busy, setBusy] = useState(false);
+  const take = async (ids: string[]) => {
+    setBusy(true);
+    try { await onTake(ids); } finally { setBusy(false); }
+  };
+  return (
+    <DungeonCard>
+      <h3 className="font-display text-primary text-lg mb-1 flex items-center gap-2">
+        <Package className="w-5 h-5" /> Party Inventory
+      </h3>
+      <p className="text-xs text-muted-foreground mb-3">Loot the party hasn't split yet. Take what {crawlerName} needs.</p>
+      <div className="space-y-1">
+        {stackItems(items).map(({ key, item, count, ids }) => (
+          <div key={key} className="flex flex-wrap items-center gap-2 bg-muted/20 border border-border rounded px-2 py-1.5">
+            <div className="min-w-[9rem] flex-1">
+              <p className="text-sm text-primary">
+                {item.name}{count > 1 && <span className="text-accent font-bold text-xs"> x{count}</span>}
+              </p>
+              {item.description && <p className="text-[11px] text-muted-foreground">{item.description}</p>}
+            </div>
+            {canTake && (
+              <>
+                <DungeonButton size="sm" disabled={busy} onClick={() => take(ids.slice(0, 1))}>Take</DungeonButton>
+                {count > 1 && (
+                  <DungeonButton size="sm" variant="ghost" disabled={busy} onClick={() => take(ids)}>All</DungeonButton>
+                )}
+              </>
+            )}
+            {isAdmin && onDiscard && (
+              <button
+                onClick={() => { if (confirm(`Discard ${count > 1 ? `all ${count} copies of ` : ''}"${item.name}" from the party inventory?`)) onDiscard(ids); }}
+                className="p-1 hover:bg-destructive/10 rounded"
+                title="Discard"
+              >
+                <Trash2 className="w-3 h-3 text-destructive" />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    </DungeonCard>
+  );
+};
+
 // Loot Box display section for crawler profiles
 const LootBoxSection: React.FC<{
   boxes: SentLootBox[];
@@ -356,29 +412,32 @@ const LootBoxSection: React.FC<{
                       <span className="text-xs text-muted-foreground">Gold (claimed with items)</span>
                     </div>
                   )}
-                  {box.items.map(item => (
+                  {stackItems(box.items).map(({ key, item, count, ids }) => {
+                    const isSelected = ids.every(id => selectedItemIds.includes(id));
+                    return (
                     <div
-                      key={item.id}
+                      key={key}
                       className={`flex items-center gap-2 p-2 rounded border transition-colors cursor-pointer ${
-                        selectedItemIds.includes(item.id)
+                        isSelected
                           ? 'bg-primary/10 border-primary'
                           : 'bg-muted/20 border-border hover:bg-muted/40'
                       }`}
                       onClick={() => setSelectedItemIds(prev =>
-                        prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id]
+                        isSelected ? prev.filter(id => !ids.includes(id)) : [...prev.filter(id => !ids.includes(id)), ...ids]
                       )}
                     >
                       <div className={`w-4 h-4 rounded border flex items-center justify-center ${
-                        selectedItemIds.includes(item.id) ? 'bg-primary border-primary' : 'border-muted-foreground'
+                        isSelected ? 'bg-primary border-primary' : 'border-muted-foreground'
                       }`}>
-                        {selectedItemIds.includes(item.id) && <Check className="w-3 h-3 text-primary-foreground" />}
+                        {isSelected && <Check className="w-3 h-3 text-primary-foreground" />}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold">{item.name}</p>
+                        <p className="text-sm font-semibold">{item.name}{count > 1 && <span className="text-accent"> ×{count}</span>}</p>
                         {item.description && <ForeignText text={item.description} language={item.language} className="block text-xs text-muted-foreground" />}
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                   {claimLootBoxItems && (selectedItemIds.length > 0 || (box.items.length === 0 && box.gold)) && (
                     <button
                       onClick={async () => {
@@ -417,6 +476,9 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   onStatRoll,
   getCrawlerLootBoxes,
   claimLootBoxItems,
+  getPartyInventory,
+  onTakeFromPartyInventory,
+  onUpdatePartyInventory,
   noncombatTurnState,
   getNoncombatRollsRemaining,
   recordNoncombatRoll,
@@ -724,13 +786,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
     return inventory.find(item => item.id === itemId);
   };
 
-  // Helper to create item signature for consolidation (must match InventoryView's getItemSignature)
-  const getItemSignature = (item: InventoryItem) => {
-    const modifiersStr = item.statModifiers
-      ? JSON.stringify(Object.entries(item.statModifiers).filter(([, v]) => v !== 0).sort())
-      : '';
-    return `${item.name}|${item.description || ''}|${item.equipSlot || ''}|${item.goldValue ?? 0}|${modifiersStr}`;
-  };
+  const getItemSignature = getItemStackKey;
 
   // Consolidated inventory for display (groups identical items)
   const consolidatedInventory = useMemo(() => {
@@ -1552,6 +1608,24 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 boxes={boxes}
                 crawlerId={selected.id}
                 claimLootBoxItems={claimLootBoxItems}
+              />
+            </div>
+          );
+        })()}
+
+        {/* Party inventory (items looted from mobs) */}
+        {getPartyInventory && onTakeFromPartyInventory && selected && (() => {
+          const partyItems = getPartyInventory();
+          if (partyItems.length === 0) return null;
+          return (
+            <div className="mt-6">
+              <PartyInventorySection
+                items={partyItems}
+                crawlerName={selected.name}
+                canTake={isOwnProfile || isAdmin}
+                isAdmin={isAdmin}
+                onTake={(ids) => onTakeFromPartyInventory(selected.id, ids)}
+                onDiscard={onUpdatePartyInventory ? (ids) => onUpdatePartyInventory(partyItems.filter(i => !ids.includes(i.id))) : undefined}
               />
             </div>
           );
