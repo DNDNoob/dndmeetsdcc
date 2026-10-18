@@ -8,7 +8,15 @@
       "💰 Merchants only pay with the gold they have; if they're short, you can sell for whatever they have left",
       "🧾 Scrooge Factor: each level makes buying 10% dearer and selling 10% cheaper",
       "🎲 Haggle: roll Persuasion against the merchant's Haggle DC, and if you make it the DM can lower your prices one level. Haggling uses an action (your combat action, or one of your rolls between fights)",
-      "🔄 DMs can right-click a merchant in Show Time to see its stock, answer haggles and restock it"
+      "🔄 DMs can right-click a merchant in Show Time to see its stock, answer haggles and restock it",
+      "🧌 Mobs now come in two kinds: Creatures (templates like Goblin that you can place many times) and Characters (one named person who's part of the story, like Grimble). Boss is now a checkbox on either kind. Old mobs carry over automatically",
+      "🎲 Each copy of a creature on the map now has its own AI personality and talks as itself in Game Chat (\"Goblin B\"), so no two goblins feel the same",
+      "⚔️ Tokens can be friendly or hostile, and the DM can flip them mid-scene from the right-click menu. Hostile tokens are pre-ticked when combat starts; friendly ones can still be pulled in",
+      "📖 Mob Profiles now show encountered Creatures, Bosses and Characters in separate sections. A character can be linked to its creature (Grimble is a Goblin), and meeting them reveals both",
+      "🔐 Accounts are now Google only: the email and password sign-up and sign-in options are gone, since those accounts couldn't save a profile",
+      "👤 The Set Up Profile box now shows which account you're signed in with and has a Sign out button, so you're no longer stuck in it",
+      "🐛 In Show Time, reaching for the red X or other map tools at the top right no longer pops open the top menu and shoves the tools panel down. The menu now opens only when you rest your mouse at the top-left edge for a moment",
+      "🐛 If a profile can't be saved because you're not signed in with Google, the message now says so instead of just \"Failed to save profile\""
     ]
   },
   {

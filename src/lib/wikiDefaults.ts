@@ -19,7 +19,7 @@ When you first visit the site, you'll see the **Landing Page** — a cinematic o
 
 An account is **required** to access any game features. Anonymous browsing of the app is not available — you must sign in first.
 
-1. **Sign in** using Google or email/password (click "Enter the Dungeon" on the landing page).
+1. **Sign in** with Google (click "Enter the Dungeon" on the landing page).
 2. **Choose a username** and display name when prompted (first time only).
 3. You'll be taken to the **Campaign Selection** screen.
 
@@ -60,6 +60,8 @@ The navigation bar at the top of the screen gives you quick access to all sectio
 - **DM Console** - Admin panel (DM only)
 
 On mobile devices, the navigation collapses into a **hamburger menu** (☰) — tap it to access all sections from a dropdown.
+
+In **Show Time**, the navigation bar hides to give the map more room. Rest your mouse at the top-left edge of the screen for a moment to bring it back, or pin it open. Moving across the top of the screen on your way to the map tools won't pop it open.
 
 Use the **Campaigns** button to return to the campaign list at any time.`,
   },
@@ -521,20 +523,36 @@ Fog of war state (which areas are revealed) persists in Firebase. If you close a
   {
     id: 'mobs',
     slug: 'mobs',
-    title: 'Mobs (Enemies & NPCs)',
+    title: 'Mobs (Creatures, Characters & Bosses)',
     category: 'Basics',
     order: 2,
-    content: `# Mobs (Enemies & NPCs)
+    content: `# Mobs (Creatures, Characters & Bosses)
 
-Mobs are the enemies and non-player characters that populate your game world.
+Mobs are everyone in the game world who isn't a crawler. They are all set up the same way and can all talk, trade and fight. The only difference is whether they're a one-off or part of the story.
 
-## Mob Types
+## Kinds
 
-| Type | Color | Purpose |
-|------|-------|---------|
-| Normal | Default | Standard enemies |
-| Boss | Red accent | Powerful enemies |
-| NPC | Blue accent | Non-hostile characters |
+| Kind | What it is | Example |
+|------|-----------|---------|
+| **Creature** | A template. Place it on the map as many times as you like; each copy is labelled A, B, C… and is transient | Goblin, Gnome |
+| **Character** | One named person who is part of the story and may come back | Grimble the Goblin Merchant |
+
+Tick **Boss** on either kind to mark it as a boss (red styling, its own section in Mob Profiles).
+
+A character can optionally be a creature (**Is a** in the DM Console): Grimble *is a* Goblin. When players meet Grimble, Goblin is revealed in their Mob Profiles too.
+
+Mobs made before kinds existed carry over automatically: Normal became Creature, Boss became a Creature with Boss ticked, and NPC became Character.
+
+## Friendly or Hostile
+
+Hostility belongs to each token on the map, not the mob, so it can change mid-scene. Creatures start out **hostile** and characters start out **friendly**.
+
+- **DM**: right-click a token in Show Time and choose **Make Friendly** / **Make Hostile**. The DM sees a red ring around hostile tokens and a green ring around friendly ones; players don't see the rings
+- **Combat**: when the DM starts a combat turn, hostile tokens are ticked and friendly ones are left unticked (marked *friendly*). The DM can still tick a friendly token to pull it into the fight
+
+## Mob Profiles (players)
+
+The Mobs page shows what the party has encountered in three sections: **Creatures**, **Bosses** and **Characters**. Characters show the creature they are when it's known ("A Goblin").
 
 ## Mob Properties
 
@@ -574,7 +592,7 @@ When placed on a map during episode setup or Show Time, mobs appear as circular 
 
 ## NPC Personality
 
-Every mob can talk for itself in Show Time when NPC voices are running. Each mob has an optional **NPC Personality** card (DM only) in the DM Console; leave it blank and the AI makes one up from the mob's details. See [Talking NPCs](/wiki/talking-npcs).
+Every mob can talk for itself in Show Time when NPC voices are running. Each mob has an optional **NPC Personality** card (DM only) in the DM Console; leave it blank and the AI makes one up from the mob's details. Each copy of a creature gets its own made-up personality, so Goblin A and Goblin B feel like different goblins. See [Talking NPCs](/wiki/talking-npcs).
 
 ## Merchants
 
@@ -912,6 +930,8 @@ Players never see this card.
 
 Every mob can talk, even ones you never wrote a card for. The first time a mob without a card is needed (or while things are quiet), the AI writes one from everything the game knows about it: name, kind, level, description, strengths and abilities, weaknesses, hit points, the items it carries and its gold. It also rolls random ingredients (a temperament, a speech quirk, what drives it, how it sees the crawlers and something tied to its past) so no two mobs come out the same, even two of the same kind.
 
+**Creatures** get one per copy on the map: Goblin A, Goblin B and Goblin C each talk as themselves in the chat, with their own personality and secret. If you write a card on a creature, every copy uses your card. **Characters** are one person, so they always have one personality wherever their token stands.
+
 The generated personality includes a secret and a Persuasion DC based on the mob's level (bosses are harder). It stays the same for the rest of the campaign. In the chat settings it shows as **(AI personality)** next to the mob's name; hover to read it. Fill in the mob's card in the DM Console at any time to replace it with your own.
 
 Hidden mobs never talk.
@@ -1128,19 +1148,19 @@ The app requires user accounts for all game interactions. Your account is how th
 ## How It Works
 
 - **All users must sign in** before accessing the app. The landing page at the site root introduces the app and prompts you to create an account or sign in.
-- **Signed-in users** (via Google or email/password) can create campaigns, join campaigns, and interact with all game features.
+- **Signed-in users** (via Google) can create campaigns, join campaigns, and interact with all game features.
 - If you sign out, you'll be redirected back to the landing page.
 
 ## Creating an Account
 
 1. Click **Enter the Dungeon** on the landing page, or click **Sign In** if you see it.
-2. Click **CREATE ACCOUNT** and fill in your email and password (at least 6 characters).
-3. Alternatively, click **Continue with Google** for one-click account creation.
-4. On first sign-in, you'll be prompted to choose a **username** (unique, 3-24 characters, letters/numbers/underscores) and **display name**.
+2. Click **Continue with Google**. Your account is created the first time you sign in. (Accounts are Google only; email/password sign-up has been removed.)
+3. On first sign-in, you'll be prompted to choose a **username** (unique, 3-24 characters, letters/numbers/underscores) and **display name**.
+4. The Set Up Profile box shows which account you're signed in with. If it's the wrong one, click **Not you? Sign out** to go back and sign in again.
 
 ## Signing In
 
-1. Click **Sign In** and enter your email/password, or use Google.
+1. Click **Sign In**, then **Continue with Google**.
 2. After sign-in, you'll see the Campaign Selection screen.
 
 ## Signing Out
@@ -1152,7 +1172,7 @@ Click **Sign Out** to sign out. You can sign back in at any time.
 Your profile includes:
 - **Username** — unique identifier, used for lookups
 - **Display Name** — shown in campaigns and as the DM name
-- **Avatar** — pulled from your Google account if applicable (optional — email/password accounts simply have no avatar)
+- **Avatar** — pulled from your Google account
 
 ## Account Settings
 

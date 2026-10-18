@@ -8,7 +8,7 @@ import RulerOverlay from "@/components/ui/RulerOverlay";
 import { MobIcon } from "@/components/ui/MobIcon";
 import { FogOfWar } from "@/components/ui/FogOfWar";
 import { Episode, Mob, MapSettings, Crawler, CrawlerPlacement, EpisodeMobPlacement, SentLootBox, LootBoxTemplate, getLootBoxTierColor, InventoryItem, CombatState, getEquippedModifiers, getEffectiveMoveSpeed, getMapDistanceFeet, NONCOMBAT_MOVE_MULTIPLIER, Quest, AssignedQuest, QuestActionItem, LootBoxTier } from "@/lib/gameData";
-import { Map as MapIcon, X, Eye, EyeOff, Layers, ChevronLeft, ChevronRight, PlayCircle, Grid3x3, CloudFog, Eraser, Trash2, Target, ZoomIn, ZoomOut, Package, Lock, Unlock, Search, Plus, Heart, ScrollText, CheckSquare, Check, Store } from "lucide-react";
+import { Map as MapIcon, X, Eye, EyeOff, Layers, ChevronLeft, ChevronRight, PlayCircle, Grid3x3, CloudFog, Eraser, Trash2, Target, ZoomIn, ZoomOut, Package, Lock, Unlock, Search, Plus, Heart, ScrollText, CheckSquare, Check, Swords, Handshake, Store } from "lucide-react";
 import { PingEffect, Ping } from "@/components/ui/PingEffect";
 import { MapBox, MapBoxData, ShapeType } from "@/components/ui/MapBox";
 import { MapToolsMenu } from "@/components/ui/MapToolsMenu";
@@ -22,7 +22,7 @@ import NpcSpeechBubbles from "@/components/ui/NpcSpeechBubbles";
 import type { NpcOnlineKeys } from "@/lib/npc/onlineLlm.mjs";
 import MerchantPanel, { MerchantHagglePrompts } from "@/components/MerchantPanel";
 import { isMerchant, getHaggleBlocker, MERCHANT_TRADE_RANGE_FEET, type MerchantState } from "@/lib/gameData";
-import { withNpcPersonality, NPC_TALK_RANGE_FEET, type ChatMessage, type NpcAiSettings, type NpcAiStatus, type NpcSecretEntry, type NpcSecretState, type NpcGeneratedPersonality } from "@/lib/gameData";
+import { withNpcPersonality, speakerAsMob, mapSpeakers, isPlacementHostile, NPC_TALK_RANGE_FEET, type ChatMessage, type NpcAiSettings, type NpcAiStatus, type NpcSecretEntry, type NpcSecretState, type NpcGeneratedPersonality } from "@/lib/gameData";
 
 const NO_GENERATED_PERSONALITIES: Record<string, NpcGeneratedPersonality> = {};
 
@@ -2237,20 +2237,32 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     [chatMessages, selectedEpisode]
   );
 
-  // Every mob can talk: mobs without a DM-written personality use the one the AI generated
-  const talkingMobs = useMemo(() => mobs.map(m => withNpcPersonality(m, npcPersonalities)), [mobs, npcPersonalities]);
-
   // Mob tokens on the current map (episode + runtime placements)
   const mobPlacementsOnMap = useMemo(
     () => [...currentMapMobPlacements, ...runtimeMobPlacements.filter(p => p.mapId === currentMapId)],
     [currentMapMobPlacements, runtimeMobPlacements, currentMapId]
   );
 
-  // Mobs on the current map that can talk (hidden mobs stay quiet)
+  // Every token that can talk (hidden mobs stay quiet). Characters speak as one; each creature
+  // copy is its own speaker ("Goblin B") with its own personality.
+  const npcSpeakers = useMemo(
+    () => mapSpeakers(mobPlacementsOnMap, mobs, [...(selectedEpisode?.mobPlacements ?? []), ...runtimeMobPlacements])
+      .filter(s => !s.mob.hidden),
+    [mobPlacementsOnMap, mobs, selectedEpisode?.mobPlacements, runtimeMobPlacements]
+  );
+
+  // Speakers on the current map with the personality they talk with (one entry per speaker)
   const npcsOnMap = useMemo(() => {
-    const ids = new Set(mobPlacementsOnMap.map(p => p.mobId));
-    return talkingMobs.filter(m => ids.has(m.id) && !m.hidden);
-  }, [mobPlacementsOnMap, talkingMobs]);
+    const byId = new Map<string, Mob>();
+    for (const s of npcSpeakers) if (!byId.has(s.id)) byId.set(s.id, speakerAsMob(s, npcPersonalities));
+    return [...byId.values()];
+  }, [npcSpeakers, npcPersonalities]);
+
+  // Everything the chat may need to show by id: campaign mobs plus the speakers on this map
+  const talkingMobs = useMemo(() => {
+    const onMap = new Set(npcsOnMap.map(m => m.id));
+    return [...npcsOnMap, ...mobs.filter(m => !onMap.has(m.id)).map(m => withNpcPersonality(m, npcPersonalities))];
+  }, [mobs, npcsOnMap, npcPersonalities]);
 
   // Who can be picked with @ in the chat. Players only get mobs they can see within talking range.
   const myCrawlerSpot = useMemo(
@@ -2262,9 +2274,9 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     for (const mob of npcsOnMap) {
       if (isAdmin) { list.push({ id: mob.id, name: mob.name, kind: 'npc' }); continue; }
       if (!myCrawlerSpot) continue;
-      const feet = Math.min(...mobPlacementsOnMap
-        .filter(p => p.mobId === mob.id && isPointVisible(p.x, p.y))
-        .map(p => mapDistanceFeet(myCrawlerSpot, p)));
+      const feet = Math.min(...npcSpeakers
+        .filter(s => s.id === mob.id && isPointVisible(s.placement.x, s.placement.y))
+        .map(s => mapDistanceFeet(myCrawlerSpot, s.placement)));
       if (feet <= NPC_TALK_RANGE_FEET) list.push({ id: mob.id, name: mob.name, kind: 'npc', feet: Math.round(feet) });
     }
     list.sort((a, b) => (a.feet ?? 0) - (b.feet ?? 0) || a.name.localeCompare(b.name));
@@ -2273,7 +2285,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       if (crawlerIds.has(c.id) && c.id !== currentPlayerId) list.push({ id: c.id, name: c.name, kind: 'crawler' });
     }
     return list;
-  }, [npcsOnMap, isAdmin, myCrawlerSpot, mobPlacementsOnMap, isPointVisible, mapDistanceFeet, crawlerPlacements, currentMapId, crawlers, currentPlayerId]);
+  }, [npcsOnMap, isAdmin, myCrawlerSpot, npcSpeakers, isPointVisible, mapDistanceFeet, crawlerPlacements, currentMapId, crawlers, currentPlayerId]);
 
   // --- Merchants ---
   // Distance from the player's crawler to the nearest visible copy of a merchant on this map
@@ -3354,6 +3366,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                     mob={mob}
                     size={64}
                     selected={selectedMapEntity?.type === 'episode-mob' && selectedMapEntity?.index === globalIndex}
+                    hostile={isAdmin ? isPlacementHostile(placement, mob) : undefined}
                     isDragging={isDragging}
                     inCombat={(() => {
                       if (!combatState?.active || combatState.phase === 'ended') return false;
@@ -3638,6 +3651,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                     mob={mob}
                     size={64}
                     selected={selectedMapEntity?.type === 'runtime-mob' && selectedMapEntity?.index === index}
+                    hostile={isAdmin ? isPlacementHostile(placement, mob) : undefined}
                     isDragging={isDragging}
                     inCombat={(() => {
                       if (!combatState?.active || combatState.phase === 'ended') return false;
@@ -3771,8 +3785,10 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
         // Resolve mob HP info for display/editing
         let mobHPInfo: { currentHP: number; maxHP: number; name: string } | null = null;
         let contextMob: Mob | undefined;
+        let contextPlacement: EpisodeMobPlacement | undefined;
         if (contextMenu.type === 'episode-mob') {
           const placement = selectedEpisode?.mobPlacements[contextMenu.index];
+          contextPlacement = placement;
           if (placement) {
             const mob = mobs.find(m => m.id === placement.mobId);
             contextMob = mob;
@@ -3784,6 +3800,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
         } else if (contextMenu.type === 'runtime-mob') {
           const filtered = runtimeMobPlacements.filter(p => p.mapId === currentMapId);
           const placement = filtered[contextMenu.index];
+          contextPlacement = placement;
           if (placement) {
             const mob = mobs.find(m => m.id === placement.mobId);
             contextMob = mob;
@@ -3795,10 +3812,10 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
         }
         const inCombat = combatState?.active && combatState.phase !== 'ended';
 
-        const handleContextHPChange = (newHP: number) => {
+        const updateContextPlacement = (fields: Partial<EpisodeMobPlacement>) => {
           if (contextMenu.type === 'episode-mob' && selectedEpisode && onUpdateEpisode) {
             const updated = selectedEpisode.mobPlacements.map((p, i) =>
-              i === contextMenu.index ? { ...p, currentHP: newHP } : p
+              i === contextMenu.index ? { ...p, ...fields } : p
             );
             const updatedEpisode = { ...selectedEpisode, mobPlacements: updated };
             setSelectedEpisode(updatedEpisode);
@@ -3809,13 +3826,14 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             const realIndex = filteredIndices[contextMenu.index];
             if (realIndex !== undefined) {
               const updated = runtimeMobPlacements.map((p, i) =>
-                i === realIndex ? { ...p, currentHP: newHP } : p
+                i === realIndex ? { ...p, ...fields } : p
               );
               setRuntimeMobPlacements(updated);
               broadcastRuntimeMobPlacements(updated);
             }
           }
         };
+        const handleContextHPChange = (newHP: number) => updateContextPlacement({ currentHP: newHP });
 
         return (
         <div
@@ -3855,6 +3873,19 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
               </div>
             </div>
           )}
+          {contextMob && contextPlacement && (() => {
+            const hostile = isPlacementHostile(contextPlacement, contextMob);
+            return (
+              <button
+                onClick={() => { updateContextPlacement({ hostile: !hostile }); setContextMenu(null); }}
+                className={`w-full text-left px-4 py-2 text-sm font-display flex items-center gap-2 ${hostile ? 'text-green-500 hover:bg-green-500/10' : 'text-destructive hover:bg-destructive/10'}`}
+                title={hostile ? 'Friendly tokens are left unticked when combat starts' : 'Hostile tokens are ticked when combat starts'}
+              >
+                {hostile ? <Handshake className="w-4 h-4" /> : <Swords className="w-4 h-4" />}
+                {hostile ? 'Make Friendly' : 'Make Hostile'}
+              </button>
+            );
+          })()}
           {contextMob && onSetMobEncountered && (() => {
             const encountered = !!contextMob.encountered && !contextMob.hidden;
             const mobId = contextMob.id;

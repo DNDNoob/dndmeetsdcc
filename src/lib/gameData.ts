@@ -1,3 +1,7 @@
+import type { NpcSpeaker } from './npc/speakers.mjs';
+export { getMobKind, isBossMob, isPlacementHostile, baseMobId, mapSpeakers } from './npc/speakers.mjs';
+export type { NpcSpeaker } from './npc/speakers.mjs';
+
 export type EquipmentSlot = 'head' | 'chest' | 'legs' | 'feet' | 'leftHand' | 'rightHand' | 'ringFinger' | 'weapon';
 
 export interface EquippedItems {
@@ -322,11 +326,17 @@ export function getEquippedModifiers(crawler: Crawler, inventory: InventoryItem[
   return totals;
 }
 
+/** Creatures are templates you can place many times (Goblin); characters are unique and part of the story (Grimble). */
+export type MobKind = 'creature' | 'character';
+
 export interface Mob {
   id: string;
   name: string;
   level: number;
-  type: "normal" | "boss" | "npc";
+  type: "normal" | "boss" | "npc"; // Legacy; kept in step with kind/boss so older copies still read right
+  kind?: MobKind;      // Absent on old mobs: read with getMobKind()
+  boss?: boolean;      // Absent on old mobs: read with isBossMob()
+  speciesId?: string;  // Characters: the creature they are ("Grimble is a Goblin")
   description: string;
   encountered: boolean;
   hidden: boolean;
@@ -503,6 +513,17 @@ export const withNpcPersonality = (mob: Mob, generated: Record<string, NpcGenera
   return { ...mob, personality: generated[mob.id], personalityGenerated: true };
 };
 
+/** The legacy type field that matches a kind and boss flag. */
+export const legacyMobType = (kind: MobKind, boss: boolean): Mob['type'] =>
+  boss ? 'boss' : kind === 'character' ? 'npc' : 'normal';
+
+/**
+ * A speaker as a mob the chat can show: its own id and name ("Goblin B"), and the DM's card if
+ * the mob has one, else the personality the AI wrote for this speaker.
+ */
+export const speakerAsMob = (speaker: NpcSpeaker, generated: Record<string, NpcGeneratedPersonality>): Mob & { personalityGenerated?: boolean } =>
+  withNpcPersonality({ ...speaker.mob, id: speaker.id, name: speaker.name }, generated);
+
 export type NpcModelChoice = 'quality' | 'fast';
 
 /** DM settings: rooms/{roomId}/npcAi/settings */
@@ -553,6 +574,7 @@ export interface EpisodeMobPlacement {
   inventoryOverride?: InventoryItem[]; // Per-placement inventory override (episode-specific)
   goldOverride?: number; // Per-placement gold override (episode-specific)
   letterIndex?: number; // Stable letter assignment (0=A, 1=B, etc.) — survives deletion of other placements
+  hostile?: boolean; // DM's call for this token; absent = creatures hostile, characters friendly (isPlacementHostile)
 }
 
 export interface CrawlerPlacement {
