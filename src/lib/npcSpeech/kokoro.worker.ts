@@ -29,7 +29,7 @@ const onProgress = (p: { status: string; file?: string; loaded?: number; total?:
 
 let tts: Promise<KokoroTTS> | null = null;
 const load = () => {
-  tts ??= KokoroTTS.from_pretrained(MODEL_ID, { dtype: 'q8', device: 'wasm', progress_callback: onProgress });
+  tts ??= KokoroTTS.from_pretrained(MODEL_ID, { dtype: 'fp32', device: 'wasm', progress_callback: onProgress });
   return tts;
 };
 

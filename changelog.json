@@ -41,7 +41,10 @@
       "🔊 Spoken voices: NPCs can now say their lines out loud. Turn on Spoken voices in the Game Chat settings and every NPC line is read aloud on every player's device, in a voice picked from the NPC's Voice and manner notes",
       "🎙️ DMs can pick each NPC's voice (28 American and British voices) and speed in the Game Chat settings, and tap ▶ to hear it",
       "🗣️ If a player doesn't know the language an NPC is speaking, they hear the scrambled words, so it sounds foreign",
-      "🔈 Everyone can mute NPC voices or change their volume from the speaker icon in the Game Chat header"
+      "🔈 Everyone can mute NPC voices or change their volume from the speaker icon in the Game Chat header",
+      "🎭 NPC voices sound much more natural: lines are now read by Gemini voices, told who the NPC is and how they talk, so a gruff dwarf sounds gruff. When Gemini's free use runs out, Groq takes over, then ElevenLabs, then the Kokoro voices in the DM's browser",
+      "🔑 Add an ElevenLabs key next to the Groq and Gemini keys in the Game Chat settings. The settings show which voice service is in use and when the others are back",
+      "🎚️ The Kokoro backup voices now use the full-quality model"
     ]
   },
   {

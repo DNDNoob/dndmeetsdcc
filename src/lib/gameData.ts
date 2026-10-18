@@ -712,9 +712,12 @@ export interface NpcAiSettings {
   voices?: Record<string, NpcSpeechVoice>; // DM's voice picks by mob id (creature copies share one)
 }
 
-/** A Kokoro voice and speaking speed (1 = normal). */
+/** The DM's voice picks for an NPC, one per voice service, and its speaking speed (1 = normal). */
 export interface NpcSpeechVoice {
-  voice?: string;
+  voice?: string;      // Kokoro voice
+  gemini?: string;     // Gemini voice name
+  groq?: string;       // Groq (Orpheus) voice
+  elevenlabs?: string; // ElevenLabs voice id
   speed?: number;
 }
 

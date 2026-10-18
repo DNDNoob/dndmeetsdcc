@@ -13,6 +13,7 @@ import {
   type NpcModelChoice,
   type NpcBrain,
   type NpcMemory,
+  type NpcSpeechVoice,
   type TranslateMode,
   isNpcAiOnline,
   npcFeelingWord,
@@ -22,8 +23,12 @@ import {
 } from "@/lib/gameData";
 import type { NpcOnlineKeys } from "@/lib/npc/onlineLlm.mjs";
 import type { ChatLineView, Language } from "@/lib/languages";
-import { KOKORO_VOICES, speakerVoice, voiceLabel } from "@/lib/npcSpeech/voices";
-import { previewVoice, useSpeechEngineState } from "@/lib/npcSpeech/engine";
+import {
+  GEMINI_VOICES, GROQ_VOICES, KOKORO_VOICES, engineName, fitVoice, kokoroVoice, voiceLabel, voiceTraits,
+  type CatalogVoice, type VoiceEngine,
+} from "@/lib/npcSpeech/voices";
+import { useSpeechEngineState } from "@/lib/npcSpeech/engine";
+import { elevenLabsVoices, speakLine, useVoiceServiceState, voiceEnginesInOrder } from "@/lib/npcSpeech/providers";
 
 const OPEN_STORAGE_KEY = "dcc_chat_open";
 
@@ -155,17 +160,42 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
   const speechOn = !!aiSettings?.speech;
   const voicePicks = aiSettings?.voices ?? {};
   const engine = useSpeechEngineState();
-  const engineLabel = engine.status === "loading"
-    ? `Downloading voices ${Math.round((engine.progress ?? 0) * 100)}%`
-    : engine.status === "ready" ? "Voices ready"
-      : engine.status === "error" ? `Voices failed to load: ${engine.error ?? "unknown error"}`
-        : "Starting voices…";
+  const services = useVoiceServiceState();
+  // The voice service lines go to right now: the DM picks voices from its list
+  const voiceEngine: VoiceEngine = voiceEnginesInOrder(npcKeys ?? {})[0] ?? "kokoro";
+  const [elevenList, setElevenList] = useState<CatalogVoice[]>([]);
+  const elevenKey = npcKeys?.elevenlabs?.trim();
+  useEffect(() => {
+    if (!isAdmin || !speechOn || !elevenKey) { setElevenList([]); return; }
+    let live = true;
+    void elevenLabsVoices(elevenKey).then(list => { if (live) setElevenList(list); });
+    return () => { live = false; };
+  }, [isAdmin, speechOn, elevenKey]);
+  const catalog: CatalogVoice[] = voiceEngine === "gemini" ? GEMINI_VOICES
+    : voiceEngine === "groq" ? GROQ_VOICES
+      : voiceEngine === "elevenlabs" ? elevenList
+        : KOKORO_VOICES;
+  const pickField = voiceEngine === "kokoro" ? "voice" : voiceEngine;
+  const kokoroLabel = engine.status === "loading"
+    ? `Downloading the backup voices ${Math.round((engine.progress ?? 0) * 100)}%`
+    : engine.status === "error" ? `Backup voices failed to load: ${engine.error ?? "unknown error"}` : "";
+  const restingNotes = Object.values(services.rest).filter(r => r && r.restUntil > now).map(r => r!.why);
+  const engineLabel = [
+    `Using ${engineName(voiceEngine)}${voiceEngine === "kokoro" && engine.status === "ready" ? " (in this browser)" : ""}.`,
+    ...restingNotes.map(n => `${n}.`),
+    kokoroLabel,
+  ].filter(Boolean).join(" ");
   const preview = async (mob: Mob) => {
-    const { voice, speed } = speakerVoice(mob.id, mob, voicePicks);
+    const pick = voicePicks[baseMobId(mob.id)];
     const lastLine = [...messages].reverse().find(m => m.authorType === "npc" && m.authorId === mob.id)?.text;
     setPreviewing(mob.id);
     try {
-      await previewVoice(lastLine?.replace(/\*[^*]*\*/g, " ").trim() || PREVIEW_LINE, voice!, speed);
+      const text = lastLine?.replace(/\*[^*]*\*/g, " ").trim() || PREVIEW_LINE;
+      const clip = await speakLine({ text, traits: voiceTraits(mob.id, mob, pick), pick }, npcKeys ?? {});
+      const url = URL.createObjectURL(clip.blob);
+      const audio = new Audio(url);
+      audio.onended = () => URL.revokeObjectURL(url);
+      await audio.play();
     } catch (err) {
       console.warn("[NpcSpeech] Preview failed", err);
     } finally {
@@ -397,13 +427,18 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
                     ))}
                   </div>
                 </div>
-                {brain === "online" && npcKeys && onChangeNpcKeys && (
+                {(brain === "online" || speechOn) && npcKeys && onChangeNpcKeys && (
                   <div className="space-y-1" data-testid="npc-keys">
                     <p className="text-muted-foreground">
-                      Free keys, saved only in this browser. Groq is used first, then Gemini when Groq's free limit runs out.
+                      Free keys, saved only in this browser. {brain === "online" && "NPC lines are written with Groq first, then Gemini when Groq's free limit runs out. "}
+                      {speechOn && "Voices use Gemini first, then Groq, then ElevenLabs. "}
                       Keep this page open during the game.
                     </p>
-                    {([["groq", "Groq key", "gsk_…"], ["gemini", "Gemini key", "AIza…"]] as const).map(([id, label, placeholder]) => (
+                    {([
+                      ["groq", "Groq key", "gsk_…"],
+                      ["gemini", "Gemini key", "AIza…"],
+                      ...(speechOn ? [["elevenlabs", "ElevenLabs", "sk_…"] as const] : []),
+                    ] as const).map(([id, label, placeholder]) => (
                       <label key={id} className="flex items-center gap-2">
                         <span className="w-20 shrink-0">{label}</span>
                         <input
@@ -450,7 +485,8 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
                 </label>
                 {speechOn && (
                   <p className="text-muted-foreground" data-testid="npc-speech-status">
-                    NPC lines are read aloud on every player's device. The voices run in this browser (about 90 MB to download the first time), so keep this tab open.{" "}
+                    NPC lines are read aloud on every player's device, using the keys above. When every service is used up,
+                    voices are made in this browser instead (about 330 MB to download the first time), so keep this tab open.{" "}
                     <span className={engine.status === "error" ? "text-destructive" : "text-accent"}>{engineLabel}</span>
                   </p>
                 )}
@@ -523,26 +559,28 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
                       {speechOn && (() => {
                         const baseId = baseMobId(mob.id);
                         const pick = voicePicks[baseId] ?? {};
-                        const current = speakerVoice(mob.id, mob, voicePicks);
-                        const auto = speakerVoice(mob.id, mob, {});
-                        const autoVoice = KOKORO_VOICES.find(v => v.id === auto.voice);
-                        const setPick = (next: { voice?: string; speed?: number }) => {
-                          const merged = { ...pick, ...next };
-                          if (!merged.voice) delete merged.voice;
-                          if (merged.speed === undefined) delete merged.speed;
+                        const traits = voiceTraits(mob.id, mob, pick);
+                        const autoTraits = voiceTraits(mob.id, mob, pick.speed === undefined ? undefined : { speed: pick.speed });
+                        const autoVoice = voiceEngine === "kokoro"
+                          ? KOKORO_VOICES.find(v => v.id === kokoroVoice(autoTraits))
+                          : fitVoice(catalog, autoTraits);
+                        const setPick = (next: NpcSpeechVoice) => {
+                          const merged: NpcSpeechVoice = { ...pick, ...next };
+                          for (const k of Object.keys(merged) as (keyof NpcSpeechVoice)[]) if (merged[k] === undefined) delete merged[k];
                           const { [baseId]: _old, ...rest } = voicePicks;
                           void onUpdateSettings?.({ voices: Object.keys(merged).length ? { ...rest, [baseId]: merged } : rest });
                         };
                         return (
                           <div className="ml-2 mb-1 flex items-center gap-1" data-testid={`npc-voice-${mob.id}`}>
                             <select
-                              value={pick.voice ?? ""}
-                              onChange={(e) => setPick({ voice: e.target.value || undefined })}
+                              value={pick[pickField] ?? ""}
+                              onChange={(e) => setPick({ [pickField]: e.target.value || undefined })}
                               className="flex-1 min-w-0 bg-muted border border-border px-1 py-0.5 text-[11px]"
                               aria-label={`${mob.name}'s voice`}
+                              title={`${engineName(voiceEngine)} voices`}
                             >
-                              <option value="">Auto: {autoVoice ? voiceLabel(autoVoice) : auto.voice}</option>
-                              {KOKORO_VOICES.map(v => <option key={v.id} value={v.id}>{voiceLabel(v)}</option>)}
+                              <option value="">Auto: {autoVoice ? voiceLabel(autoVoice) : "picked from notes"}</option>
+                              {catalog.map(v => <option key={v.id} value={v.id}>{voiceLabel(v)}</option>)}
                             </select>
                             <select
                               value={pick.speed === undefined ? "" : String(pick.speed)}
@@ -559,7 +597,7 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
                               disabled={previewing !== null}
                               className={`p-1 ${previewing === mob.id ? "text-accent animate-pulse" : "text-muted-foreground hover:text-primary"}`}
                               aria-label={`Hear ${mob.name}'s voice`}
-                              title={`Hear ${mob.name} (${current.voice}, speed ${current.speed})`}
+                              title={`Hear ${mob.name} (speed ${traits.speed})`}
                             >
                               <Play className="w-3.5 h-3.5" />
                             </button>

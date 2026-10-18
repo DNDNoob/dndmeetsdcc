@@ -277,6 +277,7 @@ const Index = () => {
     crawlers,
     personalities: npcPersonalities,
     voicePicks: npcAiSettings?.voices,
+    keys: npcKeys,
     onAttachAudio: attachChatAudio,
   });
 

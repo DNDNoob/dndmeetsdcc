@@ -12,8 +12,10 @@ import {
 } from '@/lib/gameData';
 import { TELEPATHIC_LANGUAGE_ID, crawlerUnderstands, scrambleText } from '@/lib/languages';
 import { BEAST_LANGUAGE_ID } from '@/lib/languageList.mjs';
+import type { NpcOnlineKeys } from '@/lib/npc/onlineLlm.mjs';
 import { speechEngine } from '@/lib/npcSpeech/engine';
-import { speakerVoice } from '@/lib/npcSpeech/voices';
+import { speakLine } from '@/lib/npcSpeech/providers';
+import { voiceTraits } from '@/lib/npcSpeech/voices';
 
 // Lines are only read aloud while they're fresh; the clips are deleted soon after
 const FRESH_MS = 60_000;
@@ -41,12 +43,14 @@ interface NpcSpeechMakerOptions {
   crawlers: Crawler[];
   personalities: Record<string, NpcGeneratedPersonality>;
   voicePicks?: Record<string, NpcSpeechVoice>;
+  keys: NpcOnlineKeys;                   // the DM's Gemini, Groq and ElevenLabs keys (this browser only)
   onAttachAudio: (messageId: string, audio: Pick<ChatMessage, 'audioUrl' | 'audioScrambledUrl'>) => Promise<void> | void;
 }
 
 /**
- * Spoken voices, DM side: each new NPC line is read aloud by Kokoro in this browser, saved to
- * Storage as a short clip and linked on the chat line, so every player's device can play it.
+ * Spoken voices, DM side: each new NPC line is read aloud by an online voice service (Gemini, then
+ * Groq, then ElevenLabs, as each runs out) or by Kokoro in this browser, saved to Storage as a
+ * short clip and linked on the chat line, so every player's device can play it.
  * Players who don't know the line's language get a clip of the scrambled words instead.
  */
 export function useNpcSpeechMaker(opts: NpcSpeechMakerOptions) {
@@ -60,7 +64,9 @@ export function useNpcSpeechMaker(opts: NpcSpeechMakerOptions) {
   // Only one tab per browser makes clips
   useEffect(() => {
     if (!isDm || !enabled || !roomId || !storage) return;
-    speechEngine.load();
+    // Kokoro is the backup: download it up front only when there's no online voice key
+    const keys = optsRef.current.keys;
+    if (!keys.gemini?.trim() && !keys.groq?.trim() && !keys.elevenlabs?.trim()) speechEngine.load();
     let release: () => void = () => {};
     let cancelled = false;
     const begin = () => {
@@ -115,18 +121,19 @@ export function useNpcSpeechMaker(opts: NpcSpeechMakerOptions) {
       if (!hasWords(words)) continue;
       started.current.add(m.id);
 
-      const { mobs, crawlers, personalities, voicePicks, onAttachAudio } = optsRef.current;
+      const { mobs, crawlers, personalities, voicePicks, keys, onAttachAudio } = optsRef.current;
       const mob = mobs.find(x => x.id === baseMobId(m.authorId));
       const speaker = mob ? withNpcPersonality({ ...mob, id: m.authorId, name: m.authorName }, personalities) : undefined;
-      const { voice, speed } = speakerVoice(m.authorId, speaker, voicePicks);
+      const pick = voicePicks?.[baseMobId(m.authorId)];
+      const traits = voiceTraits(m.authorId, speaker, pick);
       const lang = m.language;
       // Beasts: players who don't know Beast see what the creature does, and hear nothing
       const scrambled = lang && lang !== BEAST_LANGUAGE_ID && crawlers.some(c => !crawlerUnderstands(c, lang)) ? speakableText(scrambleText(words, lang)) : '';
 
       const clip = async (text: string, suffix: string) => {
-        const wav = await speechEngine.speak(text, voice!, speed);
-        const fileRef = storageRef(store, `npcAudio/${roomId}/${at}-${m.id}${suffix}.wav`);
-        await uploadBytes(fileRef, wav, { contentType: 'audio/wav' });
+        const clip = await speakLine({ text, traits, pick }, keys);
+        const fileRef = storageRef(store, `npcAudio/${roomId}/${at}-${m.id}${suffix}.${clip.ext}`);
+        await uploadBytes(fileRef, clip.blob, { contentType: clip.blob.type });
         return getDownloadURL(fileRef);
       };
       void (async () => {
