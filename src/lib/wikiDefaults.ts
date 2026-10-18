@@ -1049,6 +1049,7 @@ Each crawler gets one try per NPC each noncombat turn (or every 10 minutes when 
 Open the Game Chat and tap the gear icon:
 - **NPC voices**: turn the feature on or off for this campaign
 - **Spoken voices**: read NPC lines aloud on every device, with a voice per NPC (see Spoken Voices above)
+- **Keys**: free Groq and Gemini keys (and an ElevenLabs key for voices), saved only in this browser
 - **NPC brain**: **Online** or **Laptop** (see below)
 - **Model**: **Best quality** (bigger, slower) or **Fast** (smaller, quicker)
 - **Mute all NPCs**, or mute one NPC
@@ -1062,7 +1063,10 @@ The dot next to the chat button is green when an NPC brain is listening. The cha
 
 NPCs can also say their lines out loud. Turn on **Spoken voices** in the Game Chat settings (gear icon). From then on, every NPC line is read aloud on every player's device at the same moment its speech bubble appears.
 
-- The voices come from Kokoro, a free voice model that runs in the DM's browser. The first time it's switched on, the browser downloads it (about 90 MB) and keeps it for next time. Keep the DM tab open during the game, the same as for the Online brain.
+- The voices come from online voice services, using free keys you paste into the chat settings: **Gemini** first, then **Groq**, then **ElevenLabs**. When one runs out of free use (or its key is missing or rejected), the next one takes over automatically, and the chat settings say which one is in use and when the others come back.
+- Gemini and Groq are told who is speaking (the NPC's name, Voice and manner notes and attitude), so a gruff dwarf sounds gruff and a nervous goblin sounds nervous.
+- When every service is used up, voices are made by Kokoro, a free voice model that runs in the DM's browser. It sounds flatter, and the first time it's needed the browser downloads it (about 330 MB) and keeps it for next time.
+- Keep the DM tab open during the game, the same as for the Online brain. The keys are saved only in that browser.
 - Each line is saved as a short sound clip that players' devices play once. Clips are deleted again after about 15 minutes.
 - Lines in a language a player doesn't know are read to them as the scrambled words, so it sounds foreign. Players who know the language, and the DM, hear the real words. Lines in Mindspeech or Ward sign aren't read aloud, and players who don't know Beast hear nothing from a beast (they still see what it does).
 - Actions written between asterisks (the NPC grinning, wiping its hands) are skipped; only the words are spoken.
@@ -1071,7 +1075,7 @@ NPCs can also say their lines out loud. Turn on **Spoken voices** in the Game Ch
 
 Every NPC gets a voice picked from its **Voice and manner** notes, name and description. Words like "gruff", "old" or "orc" give a deep, slower voice; "squeaky", "nervous" or "goblin" a quicker one; "posh", "noble" or "elf" a British accent; "she" or "lady" a woman's voice. Copies of a creature (Goblin A, Goblin B) share a voice but talk at slightly different speeds.
 
-To choose one yourself, open the chat settings. Under **NPCs on this map**, each NPC has a voice list (28 voices, American and British, men and women) and a speed (**Slow**, **Normal**, **Quick**). Tap ▶ to hear it say its last line. Picks apply to every copy of a creature.
+To choose one yourself, open the chat settings. Under **NPCs on this map**, each NPC has a voice list and a speed (**Slow**, **Normal**, **Quick**). The list shows the voices of the service in use right now (Gemini's 30 voices, Groq's 6, the voices on your ElevenLabs account, or Kokoro's 28). Your pick is kept per service, and the other services choose a voice of the same gender. Tap ▶ to hear it say its last line. Picks apply to every copy of a creature.
 
 ### Volume
 

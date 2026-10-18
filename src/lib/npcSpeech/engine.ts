@@ -63,7 +63,7 @@ class SpeechEngine {
     }
   }
 
-  /** Start downloading the voice model (about 90 MB the first time; the browser keeps it). */
+  /** Start downloading the voice model (about 330 MB the first time; the browser keeps it). */
   load() {
     if (this.state.status === 'loading' || this.state.status === 'ready') return;
     this.set({ status: 'loading', progress: 0 });
@@ -85,12 +85,3 @@ export const speechEngine = new SpeechEngine();
 
 /** The voice engine's download/ready state, for settings screens. */
 export const useSpeechEngineState = () => useSyncExternalStore(speechEngine.subscribe, speechEngine.getState);
-
-/** Read a line aloud in this browser only (the DM trying out a voice). */
-export async function previewVoice(text: string, voice: string, speed = 1): Promise<void> {
-  const wav = await speechEngine.speak(text, voice, speed);
-  const url = URL.createObjectURL(wav);
-  const audio = new Audio(url);
-  audio.onended = () => URL.revokeObjectURL(url);
-  await audio.play();
-}
