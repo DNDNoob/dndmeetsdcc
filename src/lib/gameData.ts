@@ -524,6 +524,25 @@ export const legacyMobType = (kind: MobKind, boss: boolean): Mob['type'] =>
 export const speakerAsMob = (speaker: NpcSpeaker, generated: Record<string, NpcGeneratedPersonality>): Mob & { personalityGenerated?: boolean } =>
   withNpcPersonality({ ...speaker.mob, id: speaker.id, name: speaker.name }, generated);
 
+/**
+ * What a speaker remembers from earlier conversations: rooms/{roomId}/npcAi/memories → { [speakerId]: NpcMemory }.
+ * Written by the NPC brain when a conversation goes quiet; the DM can edit or clear it.
+ */
+export interface NpcMemory {
+  notes: string[];
+  feelings?: Record<string, { name: string; score: number }>; // crawlerId → -3 (hostile) … 3 (fond)
+  name?: string;            // speaker name when it was written
+  episodeId?: string;       // creature copies: the episode this memory belongs to
+  updatedAt?: number;
+}
+
+export const NPC_MEMORY_MAX_NOTES = 8;
+
+/** A feeling score in words (same wording as feelingWord in src/lib/npc/brain.mjs). */
+export const npcFeelingWord = (score: number): string =>
+  score <= -3 ? 'hostile' : score === -2 ? 'dislikes them' : score === -1 ? 'wary'
+    : score === 0 ? 'neutral' : score === 1 ? 'warming to them' : score === 2 ? 'friendly' : 'fond of them';
+
 export type NpcModelChoice = 'quality' | 'fast';
 
 /** DM settings: rooms/{roomId}/npcAi/settings */

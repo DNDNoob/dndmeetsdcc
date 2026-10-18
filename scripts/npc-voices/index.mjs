@@ -63,6 +63,7 @@ const ENGINE_CONFIG = {
   globalGapMs: num(env.NPC_GLOBAL_GAP_SECONDS, DEFAULT_NPC_CONFIG.globalGapMs / 1000) * 1000,
   idleSilenceMs: num(env.NPC_IDLE_SECONDS, DEFAULT_NPC_CONFIG.idleSilenceMs / 1000) * 1000,
   unloadAfterMs: num(env.NPC_UNLOAD_MINUTES, DEFAULT_NPC_CONFIG.unloadAfterMs / 60_000) * 60_000,
+  memoryQuietMs: num(env.NPC_MEMORY_QUIET_SECONDS, DEFAULT_NPC_CONFIG.memoryQuietMs / 1000) * 1000,
 };
 
 const log = (...args) => console.log(new Date().toISOString(), ...args);

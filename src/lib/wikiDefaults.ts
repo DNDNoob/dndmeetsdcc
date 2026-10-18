@@ -948,6 +948,16 @@ NPCs listen as soon as the DM opens an episode in Show Time (you do not need to 
 
 Each line appears in a speech bubble over the NPC's head on the map, fades after a few seconds, and is saved in the Game Chat. A "…" bubble shows while the NPC is thinking. An NPC waits about 20 seconds between lines so it doesn't hog the conversation.
 
+## Memory
+
+NPCs remember the party. When a conversation with an NPC has been quiet for about 2 minutes, the AI writes down what mattered in a few short notes, such as "Biff promised to bring back my lantern". It also notes how the NPC now feels about each crawler who talked to it, from hostile to fond. From then on the NPC talks with that memory, so insult Greg and he stays cold with you next time.
+
+- **Characters** (like Grimble) keep their memory for the whole campaign, across maps and episodes.
+- **Creature copies** (like Goblin B) each remember their own conversations, but only for the episode they were made in.
+- Locked secrets never go into memory, since the AI doesn't know them.
+
+DMs can see and change what an NPC remembers: open the Game Chat settings and tap the brain icon next to the NPC. The number on it is how many notes it has. Edit the notes (one per line) and tap **Save**, or tap **Forget everything** to wipe its memory and feelings.
+
 ## Secrets
 
 The AI is **never told the secret** until you unlock it, so it can't let it slip. When a message in the chat looks like it meets the reveal condition, you get a prompt in the Game Chat:
@@ -970,6 +980,7 @@ Open the Game Chat and tap the gear icon:
 - **Model**: **Best quality** (bigger, slower) or **Fast** (smaller, quicker)
 - **Mute all NPCs**, or mute one NPC
 - **Secret** lock/unlock per NPC
+- **Memory** per NPC (brain icon): see and edit what it remembers
 - **Clear chat** for the current episode
 
 The dot next to the chat button is green when an NPC brain is listening. The chat header says which one is answering, for example "NPC voices online" or "Laptop covering".

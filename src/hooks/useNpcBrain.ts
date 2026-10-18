@@ -49,6 +49,10 @@ export function useNpcBrain(roomId: string | null | undefined, isDm: boolean) {
         roomId,
         role: 'online',
         llm: createOnlineLlm(() => keysRef.current, { testUrl: import.meta.env.VITE_NPC_TEST_LLM_URL }),
+        // Practice games can shorten how long a conversation must be quiet before it's saved to memory
+        config: import.meta.env.VITE_NPC_MEMORY_QUIET_SECONDS
+          ? { memoryQuietMs: Number(import.meta.env.VITE_NPC_MEMORY_QUIET_SECONDS) * 1000 }
+          : undefined,
         log: (...a) => console.log('[NpcBrain]', ...a),
         warn: (...a) => console.warn('[NpcBrain]', ...a),
       });

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { MessageSquare, Mic, Send, Settings, X, Volume2, VolumeX, Lock, Unlock, Trash2, Sparkles, User, Wand2 } from "lucide-react";
+import { MessageSquare, Mic, Send, Settings, X, Volume2, VolumeX, Lock, Unlock, Trash2, Sparkles, User, Wand2, Brain } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
 import {
@@ -12,7 +12,10 @@ import {
   type NpcSecretState,
   type NpcModelChoice,
   type NpcBrain,
+  type NpcMemory,
   isNpcAiOnline,
+  npcFeelingWord,
+  NPC_MEMORY_MAX_NOTES,
   baseMobId,
   NPC_TALK_RANGE_FEET,
 } from "@/lib/gameData";
@@ -47,6 +50,8 @@ interface NpcChatPanelProps {
   onSend: (text: string, viaVoice: boolean, toMobIds?: string[]) => void | Promise<void>;
   onUpdateSettings?: (updates: Partial<Omit<NpcAiSettings, "id">>) => void | Promise<void>;
   onSetSecretState?: (mobId: string, state: NpcSecretState) => void | Promise<void>;
+  memories?: Record<string, NpcMemory>;           // what each speaker remembers (DM view)
+  onSetMemory?: (speakerId: string, memory: NpcMemory) => void | Promise<void>;
   onClearChat?: () => void | Promise<void>;
   npcKeys?: NpcOnlineKeys;                        // DM only: free online model keys, saved in this browser
   onChangeNpcKeys?: (keys: NpcOnlineKeys) => void;
@@ -65,12 +70,15 @@ const formatTime = (ms: number) =>
 /** Shared in-game chat for Show Time, with NPC voices status and DM controls. */
 export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
   messages, author, isAdmin, mobs, npcsOnMap, mentionables = [], aiSettings, aiStatus, secrets,
-  onSend, onUpdateSettings, onSetSecretState, onClearChat, npcKeys, onChangeNpcKeys,
+  onSend, onUpdateSettings, onSetSecretState, memories = {}, onSetMemory, onClearChat, npcKeys, onChangeNpcKeys,
 }) => {
   const [open, setOpen] = useState(readOpen);
   const [showSettings, setShowSettings] = useState(false);
   const [draft, setDraft] = useState("");
   const [confirmClear, setConfirmClear] = useState(false);
+  // DM memory editor: which speaker is open, and the notes being edited (one per line)
+  const [memoryOpenId, setMemoryOpenId] = useState<string | null>(null);
+  const [memoryDraft, setMemoryDraft] = useState("");
   const [now, setNow] = useState(() => Date.now());
   const listRef = useRef<HTMLDivElement>(null);
   const seenCountRef = useRef(messages.length);
@@ -375,8 +383,13 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
                     const card = mob.personality
                       ? [mob.personality.voice, mob.personality.attitude && `Attitude: ${mob.personality.attitude}`, mob.personality.secret && `Secret: ${mob.personality.secret}`].filter(Boolean).join("\n")
                       : "";
+                    const memory = memories[mob.id];
+                    const memoryCount = memory?.notes?.length ?? 0;
+                    const memoryOpen = memoryOpenId === mob.id;
+                    const feelings = Object.values(memory?.feelings ?? {}).filter(f => f?.name);
                     return (
-                      <div key={mob.id} className="flex items-center gap-2 py-0.5">
+                      <div key={mob.id}>
+                      <div className="flex items-center gap-2 py-0.5">
                         <span className="flex-1 min-w-0 truncate" title={card || undefined}>
                           {mob.name}
                           {generated && <span className="ml-1 text-[10px] text-accent" title={card}>(AI personality)</span>}
@@ -401,6 +414,66 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
                         >
                           {muted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
                         </button>
+                        {onSetMemory && (
+                          <button
+                            type="button"
+                            data-testid={`npc-memory-${mob.id}`}
+                            onClick={() => {
+                              if (memoryOpen) { setMemoryOpenId(null); return; }
+                              setMemoryOpenId(mob.id);
+                              setMemoryDraft((memory?.notes ?? []).join("\n"));
+                            }}
+                            className={`flex items-center gap-0.5 p-1 ${memoryOpen ? "text-primary" : memoryCount ? "text-accent hover:text-primary" : "text-muted-foreground hover:text-primary"}`}
+                            aria-label={`What ${mob.name} remembers`}
+                            title={memoryCount ? `${mob.name} remembers ${memoryCount} thing${memoryCount === 1 ? "" : "s"}` : `${mob.name} doesn't remember anything yet`}
+                          >
+                            <Brain className="w-3.5 h-3.5" />
+                            {memoryCount > 0 && <span className="text-[10px]">{memoryCount}</span>}
+                          </button>
+                        )}
+                      </div>
+                      {memoryOpen && onSetMemory && (
+                        <div className="ml-2 mb-1 p-1.5 border border-border bg-muted/40 space-y-1" data-testid="npc-memory-editor">
+                          <p className="text-muted-foreground">
+                            What {mob.name} remembers, one note per line. Updated after each conversation goes quiet.
+                          </p>
+                          <textarea
+                            value={memoryDraft}
+                            onChange={(e) => setMemoryDraft(e.target.value)}
+                            rows={4}
+                            placeholder="Nothing yet"
+                            className="w-full bg-muted border border-border px-2 py-1 text-xs"
+                          />
+                          {feelings.length > 0 && (
+                            <p className="text-muted-foreground">
+                              Feels: {feelings.map(f => `${f.name} ${npcFeelingWord(f.score)}`).join(", ")}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-3">
+                            <button
+                              type="button"
+                              className="text-primary font-bold"
+                              onClick={() => {
+                                const notes = memoryDraft.split("\n").map(n => n.trim()).filter(Boolean).slice(0, NPC_MEMORY_MAX_NOTES);
+                                void onSetMemory(mob.id, { ...memory, notes, feelings: memory?.feelings ?? {} });
+                                setMemoryOpenId(null);
+                              }}
+                            >
+                              Save
+                            </button>
+                            <button
+                              type="button"
+                              className="text-muted-foreground hover:text-destructive"
+                              onClick={() => {
+                                void onSetMemory(mob.id, { ...memory, notes: [], feelings: {} });
+                                setMemoryOpenId(null);
+                              }}
+                            >
+                              Forget everything
+                            </button>
+                          </div>
+                        </div>
+                      )}
                       </div>
                     );
                   })}

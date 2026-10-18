@@ -19,6 +19,7 @@ export interface NpcEngineConfig {
   jobMaxAgeMs: number;
   transcriptLines: number;
   heartbeatMs: number;
+  memoryQuietMs: number;
 }
 
 export const DEFAULT_NPC_CONFIG: NpcEngineConfig;
