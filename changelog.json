@@ -2,6 +2,14 @@
   {
     "date": "2026-10-18",
     "changes": [
+      "🗣️ Languages: crawlers and mobs now know languages (Worldspeech, Dervish, Vernonacular, Mindspeech, Ward sign, Mewmew, Base64 and Kra Kow). Lines in a language you don't know show up as gibberish in Game Chat and speech bubbles",
+      "🧠 Mindspeech only works for crawlers the DM has marked Telepathic",
+      "🐉 Mobs have a Languages picker in the DM Console. NPCs answer in the language they're spoken to in, and can't understand languages they don't know",
+      "🌐 Players who know more than one language can pick which one they speak in the Game Chat",
+      "🤝 Translators: a crawler can translate for the party, either automatically or line by line, with the option to twist what was said. Only the translator and the DM know the truth",
+      "📜 Item descriptions and quest notes can be written in a language, scrambled for crawlers who don't know it",
+      "✏️ Anyone can make up a language from the Languages box on their profile; the DM decides who else learns it",
+      "🛒 Each copy of a creature merchant now runs its own shop: Goblin A and Goblin B have separate stock, gold and haggling. Character merchants like Grimble still have one shop",
       "🛒 Merchants: tick Is a merchant on any mob in the DM Console and give it stock, starting gold and a Scrooge Factor",
       "🤝 In Show Time, tap a merchant within 20 ft and choose Trade with Merchant to buy their items or sell your own",
       "📦 Merchant stock and gold are shared live by the whole party, so when one crawler buys the last knife no one else can",

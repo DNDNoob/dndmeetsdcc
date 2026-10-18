@@ -2,6 +2,10 @@ import { useState, useRef, useMemo } from "react";
 import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
+import { ForeignText } from "@/components/ForeignText";
+import { LanguageSelect } from "@/components/LanguagePicker";
+import { CrawlerLanguagesCard } from "@/components/CrawlerLanguagesCard";
+import { usableLanguageIds } from "@/lib/languages";
 import { HealthBar } from "@/components/ui/HealthBar";
 import { EquipmentSlot } from "@/components/ui/EquipmentSlot";
 import { Crawler, Mob, InventoryItem, createEmptyCrawler, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery, getInitialCrawlerId } from "@/lib/gameData";
@@ -371,7 +375,7 @@ const LootBoxSection: React.FC<{
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-semibold">{item.name}</p>
-                        {item.description && <p className="text-xs text-muted-foreground">{item.description}</p>}
+                        {item.description && <ForeignText text={item.description} language={item.language} className="block text-xs text-muted-foreground" />}
                       </div>
                     </div>
                   ))}
@@ -450,6 +454,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   // Quest tab state
   const [questExpandedId, setQuestExpandedId] = useState<string | null>(null);
   const [questNoteText, setQuestNoteText] = useState('');
+  const [questNoteLanguage, setQuestNoteLanguage] = useState<string | undefined>(undefined);
 
   // Tab and filtering state
   const [activeTab, setActiveTab] = useState<ProfileTab>('profile');
@@ -1495,6 +1500,13 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
           );
         })()}
 
+        <CrawlerLanguagesCard
+          crawler={selected}
+          isAdmin={isAdmin}
+          canCreate={isAdmin || currentPlayerId === selected.id}
+          onUpdateCrawler={onUpdateCrawler}
+        />
+
         {/* Inventory Summary - on profile tab */}
         <div className="bg-muted/30 border border-border rounded-lg p-4">
           <div className="flex items-center justify-between mb-3">
@@ -1786,7 +1798,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                                   {isExpanded && (
                                     <div className="mt-2 pt-2 border-t border-border/50 space-y-1.5">
                                       {item.description && (
-                                        <p className="text-xs text-muted-foreground">{item.description}</p>
+                                        <ForeignText text={item.description} language={item.language} className="block text-xs text-muted-foreground" />
                                       )}
                                       {item.statModifiers && Object.entries(item.statModifiers).some(([, v]) => v !== 0) && (
                                         <div className="flex flex-wrap gap-1">
@@ -2900,7 +2912,12 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                                               {new Date(note.createdAt).toLocaleDateString()}
                                             </span>
                                           </div>
-                                          <p className="text-xs text-foreground">{note.text}</p>
+                                          <ForeignText
+                                            text={note.text}
+                                            language={note.language}
+                                            alwaysReadable={note.crawlerId === currentPlayerId}
+                                            className="block text-xs text-foreground"
+                                          />
                                         </div>
                                       ))}
                                     </div>
@@ -2920,6 +2937,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                                               crawlerName: selected.name,
                                               text: questNoteText.trim(),
                                               createdAt: new Date().toISOString(),
+                                              ...(questNoteLanguage ? { language: questNoteLanguage } : {}),
                                             }],
                                           });
                                           setQuestNoteText('');
@@ -2940,6 +2958,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                                             crawlerName: selected.name,
                                             text: questNoteText.trim(),
                                             createdAt: new Date().toISOString(),
+                                            ...(questNoteLanguage ? { language: questNoteLanguage } : {}),
                                           }],
                                         });
                                         setQuestNoteText('');
@@ -2948,6 +2967,15 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                                       <Send className="w-4 h-4" />
                                     </DungeonButton>
                                   </div>
+                                  {usableLanguageIds(selected).length > 1 && (
+                                    <LanguageSelect
+                                      value={questNoteLanguage}
+                                      onChange={setQuestNoteLanguage}
+                                      onlyIds={usableLanguageIds(selected)}
+                                      noneLabel="Plain note (anyone can read it)"
+                                      className="mt-2 bg-background border border-border rounded px-2 py-1 text-xs"
+                                    />
+                                  )}
                                 </div>
                               </div>
                             )}

@@ -51,7 +51,7 @@ interface Creator {
 }
 
 // New documents in these collections are stamped with the signed-in user as their creator
-const CREATOR_COLLECTIONS: readonly string[] = ['maps', 'mobs', 'episodes', 'spells', 'quests', 'lootBoxTemplates'];
+const CREATOR_COLLECTIONS: readonly string[] = ['maps', 'mobs', 'episodes', 'spells', 'quests', 'lootBoxTemplates', 'languages'];
 
 /**
  * Firebase Data Store Hook - Real-time multiplayer support
@@ -90,7 +90,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
   };
 
   // Collections to sync
-  const collections: CollectionName[] = ['crawlers', 'mobs', 'maps', 'inventory', 'episodes', 'soundEffects', 'diceRolls', 'lootBoxes', 'lootBoxTemplates', 'noncombatTurns', 'gameClock', 'combatState', 'wiki', 'quests', 'assignedQuests', 'spells', 'chatMessages', 'npcAi', 'merchants'];
+  const collections: CollectionName[] = ['crawlers', 'mobs', 'maps', 'inventory', 'episodes', 'soundEffects', 'diceRolls', 'lootBoxes', 'lootBoxTemplates', 'noncombatTurns', 'gameClock', 'combatState', 'wiki', 'quests', 'assignedQuests', 'spells', 'chatMessages', 'npcAi', 'merchants', 'languages'];
 
   // Load and subscribe to real-time updates
   useEffect(() => {

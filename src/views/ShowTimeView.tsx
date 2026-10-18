@@ -20,9 +20,11 @@ import CombatTurnTimer from "@/components/CombatTurnTimer";
 import NpcChatPanel, { type NpcChatAuthor, type NpcChatMentionable } from "@/components/NpcChatPanel";
 import NpcSpeechBubbles from "@/components/ui/NpcSpeechBubbles";
 import type { NpcOnlineKeys } from "@/lib/npc/onlineLlm.mjs";
+import { useLanguages } from "@/contexts/LanguagesContext";
+import { readChatLine, usableLanguageIds, DEFAULT_LANGUAGE_ID } from "@/lib/languages";
 import MerchantPanel, { MerchantHagglePrompts } from "@/components/MerchantPanel";
 import { isMerchant, getHaggleBlocker, MERCHANT_TRADE_RANGE_FEET, type MerchantState } from "@/lib/gameData";
-import { withNpcPersonality, speakerAsMob, mapSpeakers, isPlacementHostile, NPC_TALK_RANGE_FEET, type ChatMessage, type NpcAiSettings, type NpcAiStatus, type NpcSecretEntry, type NpcSecretState, type NpcGeneratedPersonality, type NpcMemory } from "@/lib/gameData";
+import { withNpcPersonality, speakerAsMob, mapSpeakers, baseMobId, isPlacementHostile, NPC_TALK_RANGE_FEET, type TranslateMode, type ChatMessage, type NpcAiSettings, type NpcAiStatus, type NpcSecretEntry, type NpcSecretState, type NpcGeneratedPersonality, type NpcMemory } from "@/lib/gameData";
 
 const NO_GENERATED_PERSONALITIES: Record<string, NpcGeneratedPersonality> = {};
 const NO_NPC_MEMORIES: Record<string, NpcMemory> = {};
@@ -80,6 +82,7 @@ interface ShowTimeViewProps {
   onSetNpcSecretState?: (mobId: string, state: NpcSecretState) => Promise<void>;
   npcKeys?: NpcOnlineKeys;
   onChangeNpcKeys?: (keys: NpcOnlineKeys) => void;
+  onSetTranslateMode?: (crawlerId: string, mode: TranslateMode) => Promise<void>;
   // Merchants
   merchants?: MerchantState[];
   onBuyFromMerchant?: (mob: Mob, crawlerId: string, item: InventoryItem) => Promise<boolean>;
@@ -761,7 +764,7 @@ const InventoryPanel: React.FC<{
   );
 };
 
-const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock, noncombatTurnState, resetNoncombatTurns, combatState, onRemoveCombatant, onRuntimePlacementsChange, onGameActiveChange, onRegisterGameToggle, roomId, quests = [], assignedQuests = [], onAssignQuest, onUpdateQuest, onUpdateAssignedQuest, onDeleteAssignedQuest, currentPlayerId, onRecordCrawlerMove, onSetMobEncountered, chatMessages = [], npcAiSettings = null, npcAiStatus = null, npcSecrets = {}, npcPersonalities = NO_GENERATED_PERSONALITIES, npcMemories = NO_NPC_MEMORIES, onSetNpcMemory, onSendChatMessage, onClearChat, onUpdateNpcAiSettings, onSetNpcSecretState, npcKeys, onChangeNpcKeys, merchants = NO_MERCHANTS, onBuyFromMerchant, onSellToMerchant, onHaggleWithMerchant, onRestockMerchant, onResolveMerchantHaggle }) => {
+const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock, noncombatTurnState, resetNoncombatTurns, combatState, onRemoveCombatant, onRuntimePlacementsChange, onGameActiveChange, onRegisterGameToggle, roomId, quests = [], assignedQuests = [], onAssignQuest, onUpdateQuest, onUpdateAssignedQuest, onDeleteAssignedQuest, currentPlayerId, onRecordCrawlerMove, onSetMobEncountered, chatMessages = [], npcAiSettings = null, npcAiStatus = null, npcSecrets = {}, npcPersonalities = NO_GENERATED_PERSONALITIES, npcMemories = NO_NPC_MEMORIES, onSetNpcMemory, onSendChatMessage, onClearChat, onUpdateNpcAiSettings, onSetNpcSecretState, npcKeys, onChangeNpcKeys, merchants = NO_MERCHANTS, onBuyFromMerchant, onSellToMerchant, onHaggleWithMerchant, onRestockMerchant, onResolveMerchantHaggle, onSetTranslateMode }) => {
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
   const selectedEpisodeIdRef = useRef<string | null>(null);
   const [currentMapIndex, setCurrentMapIndex] = useState(0);
@@ -2235,10 +2238,43 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   }, [selectedEpisode, currentMapId]);
 
   // ======== In-game chat & talking NPCs ========
-  const episodeChatMessages = useMemo(
+  const episodeChatLines = useMemo(
     () => selectedEpisode ? chatMessages.filter(m => !m.episodeId || m.episodeId === selectedEpisode.id) : [],
     [chatMessages, selectedEpisode]
   );
+  // Translators' versions of lines are kept apart and shown in place of the line they translate
+  const episodeChatMessages = useMemo(() => episodeChatLines.filter(m => !m.translationOf), [episodeChatLines]);
+  const chatTranslations = useMemo(() => {
+    const byLine = new Map<string, ChatMessage[]>();
+    for (const m of episodeChatLines) {
+      if (!m.translationOf) continue;
+      byLine.set(m.translationOf, [...(byLine.get(m.translationOf) ?? []), m]);
+    }
+    return byLine;
+  }, [episodeChatLines]);
+
+  // Languages: what each line looks like to this viewer
+  const { languages: allLanguageList, customLanguages } = useLanguages();
+  const myChatCrawler = useMemo(
+    () => (!isAdmin && currentPlayerId ? crawlers.find(c => c.id === currentPlayerId) ?? null : null),
+    [isAdmin, currentPlayerId, crawlers]
+  );
+  const readChat = useCallback(
+    (m: ChatMessage) => readChatLine(m, chatTranslations.get(m.id) ?? [], { isAdmin, crawler: myChatCrawler, party: crawlers }, customLanguages),
+    [chatTranslations, isAdmin, myChatCrawler, crawlers, customLanguages]
+  );
+  // Speech bubbles show what this viewer can make out
+  const bubbleMessages = useMemo(
+    () => episodeChatMessages.map(m => (m.language ? { ...m, text: readChat(m).text } : m)),
+    [episodeChatMessages, readChat]
+  );
+  const mySpeakLanguages = useMemo(() => {
+    if (!myChatCrawler) return [];
+    const ids = usableLanguageIds(myChatCrawler);
+    // Worldspeech first when they know it, so it's the default
+    const ordered = ids.includes(DEFAULT_LANGUAGE_ID) ? [DEFAULT_LANGUAGE_ID, ...ids.filter(id => id !== DEFAULT_LANGUAGE_ID)] : ids;
+    return ordered.map(id => allLanguageList.find(l => l.id === id)).filter((l): l is NonNullable<typeof l> => !!l);
+  }, [myChatCrawler, allLanguageList]);
 
   // Mob tokens on the current map (episode + runtime placements)
   const mobPlacementsOnMap = useMemo(
@@ -2300,32 +2336,49 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   }, [npcsOnMap, isAdmin, myCrawlerSpot, npcSpeakers, isPointVisible, mapDistanceFeet, crawlerPlacements, currentMapId, crawlers, currentPlayerId]);
 
   // --- Merchants ---
-  // Distance from the player's crawler to the nearest visible copy of a merchant on this map
-  const merchantDistanceFeet = useCallback((mobId: string): number | null => {
+  // A shop is a speaker: a character has one shop wherever they stand, while each copy of a
+  // creature ("Goblin B") has its own stock and gold in merchants/{speaker id}.
+  const mapShops = useMemo(
+    () => mapSpeakers(mobPlacementsOnMap, mobs, [...(selectedEpisode?.mobPlacements ?? []), ...runtimeMobPlacements]),
+    [mobPlacementsOnMap, mobs, selectedEpisode?.mobPlacements, runtimeMobPlacements]
+  );
+  const shopIdForPlacement = useMemo(() => new Map(mapShops.map(s => [s.placement, s.id])), [mapShops]);
+
+  /** The merchant as the trade window sees it: its shop id and name ("Goblin B"), even off this map. */
+  const shopMob = useCallback((shopId: string): Mob | undefined => {
+    const onMap = mapShops.find(s => s.id === shopId);
+    const base = onMap?.mob ?? mobs.find(m => m.id === baseMobId(shopId));
+    if (!base || !isMerchant(base)) return undefined;
+    if (shopId === base.id) return base;
+    const name = onMap?.name ?? `${base.name} ${String.fromCharCode(65 + Number(shopId.split('~')[1] ?? 0))}`;
+    return { ...base, id: shopId, name };
+  }, [mapShops, mobs]);
+
+  // Distance from the player's crawler to the nearest visible token of a shop on this map
+  const merchantDistanceFeet = useCallback((shopId: string): number | null => {
     if (!myCrawlerSpot) return null;
-    const spots = mobPlacementsOnMap.filter(p => p.mobId === mobId && isPointVisible(p.x, p.y));
+    const spots = mapShops.filter(s => s.id === shopId && isPointVisible(s.placement.x, s.placement.y));
     if (spots.length === 0) return null;
-    return Math.min(...spots.map(p => mapDistanceFeet(myCrawlerSpot, p)));
-  }, [myCrawlerSpot, mobPlacementsOnMap, isPointVisible, mapDistanceFeet]);
+    return Math.min(...spots.map(s => mapDistanceFeet(myCrawlerSpot, s.placement)));
+  }, [myCrawlerSpot, mapShops, isPointVisible, mapDistanceFeet]);
 
   // A player tapping a merchant (not dragging it) gets the "Trade with Merchant" menu
-  const handleMerchantTap = (e: React.MouseEvent, mob: Mob) => {
+  const handleMerchantTap = (e: React.MouseEvent, mob: Mob, placement: EpisodeMobPlacement) => {
     if (isAdmin || !isMerchant(mob)) return;
     const start = mobPressRef.current;
     if (start && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 6) return;
     e.stopPropagation();
-    setMerchantMenu({ mobId: mob.id, x: e.clientX, y: e.clientY });
+    setMerchantMenu({ mobId: shopIdForPlacement.get(placement) ?? mob.id, x: e.clientX, y: e.clientY });
   };
   const recordMobPress = (x: number, y: number) => { mobPressRef.current = { x, y }; };
 
-  const merchantsWithState = useMemo(() => mobs
-    .filter(m => isMerchant(m))
-    .map(mob => ({ mob, state: merchants.find(st => st.id === mob.id) }))
-    .filter((m): m is { mob: Mob; state: MerchantState } => !!m.state),
-  [mobs, merchants]);
+  const merchantsWithState = useMemo(() => merchants
+    .map(state => ({ mob: shopMob(state.id), state }))
+    .filter((m): m is { mob: Mob; state: MerchantState } => !!m.mob),
+  [merchants, shopMob]);
 
   const myCrawler = currentPlayerId ? crawlers.find(c => c.id === currentPlayerId) : undefined;
-  const openMerchantMob = openMerchantId ? mobs.find(m => m.id === openMerchantId && isMerchant(m)) : undefined;
+  const openMerchantMob = openMerchantId ? shopMob(openMerchantId) : undefined;
 
   const chatAuthor = useMemo((): NpcChatAuthor | null => {
     if (isAdmin) return { type: 'dm', id: 'dm', name: 'DM' };
@@ -2333,7 +2386,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     return crawler ? { type: 'crawler', id: crawler.id, name: crawler.name } : null;
   }, [isAdmin, currentPlayerId, crawlers]);
 
-  const handleSendChat = useCallback(async (text: string, viaVoice: boolean, toMobIds: string[] = []) => {
+  const handleSendChat = useCallback(async (text: string, viaVoice: boolean, toMobIds: string[] = [], language?: string) => {
     if (!chatAuthor || !onSendChatMessage) return;
     // Players: note which mobs are in talking range, so only those answer
     const nearMobIds = chatAuthor.type === 'crawler'
@@ -2348,8 +2401,22 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       ...(viaVoice ? { viaVoice: true } : {}),
       ...(toMobIds.length ? { toMobIds } : {}),
       ...(nearMobIds ? { nearMobIds } : {}),
+      ...(chatAuthor.type === 'crawler' && language ? { language } : {}),
     });
   }, [chatAuthor, onSendChatMessage, selectedEpisode, chatMentionables]);
+
+  // A translator passes a line on to the party, as said or twisted
+  const handleTranslate = useCallback(async (m: ChatMessage, text: string) => {
+    if (!myChatCrawler || !onSendChatMessage) return;
+    await onSendChatMessage({
+      authorType: 'crawler',
+      authorId: myChatCrawler.id,
+      authorName: myChatCrawler.name,
+      text,
+      translationOf: m.id,
+      ...(m.episodeId ? { episodeId: m.episodeId } : {}),
+    });
+  }, [myChatCrawler, onSendChatMessage]);
 
   // Get the current map URL
   const currentMapUrl = useMemo(() => {
@@ -3345,7 +3412,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                   handleMobMouseDown(`${placement.mobId}-${globalIndex}`);
                 }}
                 onClick={(e) => {
-                  handleMerchantTap(e, mob);
+                  handleMerchantTap(e, mob, placement);
                   if (!isDragging && isAdmin) {
                     e.stopPropagation();
                     setSelectedMapEntity({ type: 'episode-mob', index: globalIndex });
@@ -3637,7 +3704,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                   setDraggingRuntimeId(`mob-${index}`);
                 }}
                 onClick={(e) => {
-                  handleMerchantTap(e, mob);
+                  handleMerchantTap(e, mob, placement);
                   if (!isDragging && isAdmin) {
                     e.stopPropagation();
                     setSelectedMapEntity({ type: 'runtime-mob', index });
@@ -3754,7 +3821,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
           {/* NPC speech bubbles over their tokens */}
           <NpcSpeechBubbles
-            messages={episodeChatMessages}
+            messages={bubbleMessages}
             thinking={npcAiStatus?.thinking ?? null}
             mapId={currentMapId}
             counterScale={iconCounterScale}
@@ -3912,7 +3979,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             );
           })()}
           {contextMob && isMerchant(contextMob) && (() => {
-            const mobId = contextMob.id;
+            const mobId = (contextPlacement && shopIdForPlacement.get(contextPlacement)) ?? contextMob.id;
             return (
               <button
                 onClick={() => { setOpenMerchantId(mobId); setContextMenu(null); }}
@@ -3936,7 +4003,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
       {/* Player tapped a merchant: offer to trade */}
       {merchantMenu && !isAdmin && (() => {
-        const mob = mobs.find(m => m.id === merchantMenu.mobId);
+        const mob = shopMob(merchantMenu.mobId);
         if (!mob) return null;
         const feet = merchantDistanceFeet(mob.id);
         const inRange = feet !== null && feet <= MERCHANT_TRADE_RANGE_FEET;
@@ -4010,6 +4077,11 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
           onSetMemory={onSetNpcMemory}
           npcKeys={npcKeys}
           onChangeNpcKeys={onChangeNpcKeys}
+          readLine={readChat}
+          speakLanguages={mySpeakLanguages}
+          translateMode={myChatCrawler?.translateMode ?? 'off'}
+          onSetTranslateMode={myChatCrawler && onSetTranslateMode ? (mode) => onSetTranslateMode(myChatCrawler.id, mode) : undefined}
+          onTranslate={myChatCrawler ? handleTranslate : undefined}
           onClearChat={onClearChat ? () => onClearChat(selectedEpisode.id) : undefined}
         />
       )}

@@ -859,6 +859,10 @@ In the DM Console, open a mob (new or existing), expand **Merchant** and tick **
 
 Each stock line shows its buy / sell price at the current Scrooge Factor.
 
+### Characters and creatures
+
+A **character** merchant (Grimble) has one shop wherever their token stands. A **creature** merchant is a template, so each copy on the map runs its own shop: Goblin A and Goblin B each start with the stock and gold you set, and buying out Goblin A doesn't empty Goblin B. Restock works on one copy at a time.
+
 ## Trading (Players)
 
 During Show Time, tap a merchant's token and choose **Trade with Merchant**. You must be within **20 ft** of the merchant; farther away, the option is greyed out and says how far you are.
@@ -908,7 +912,7 @@ Changes to stock and starting gold in the DM Console take effect at the next res
     order: 32,
     content: `# Talking NPCs
 
-Mobs with a personality speak for themselves during Show Time. An AI model writes one line of in-character dialogue at a time, based on the personality you wrote and what is happening in the game. The model runs either online through free AI services or on the DM's own computer (see NPC Brain below).
+Mobs with a personality speak for themselves during Show Time. An AI model writes one line of in-character dialogue at a time, based on the personality you wrote and what is happening in the game. NPCs speak the languages set on their mob, so players may need a translator; see [Languages](/wiki/languages). The model runs either online through free AI services or on the DM's own computer (see NPC Brain below).
 
 ## Giving a Mob a Personality
 
@@ -1010,6 +1014,73 @@ The keys are saved only in that browser on that device. They are never stored in
 The AI runs on the DM's computer with [Ollama](https://ollama.com), so nothing is sent to an outside service. A one-time installer sets it up; setup steps are in \`scripts/npc-voices/README.md\` in the project repository. Laptop mode only uses this local model, never Groq or Gemini. Pick it when you want the local AI; the Online brain is enough whenever the DM tab is open.
 
 If no brain is available (no keys, laptop off or asleep, or out of memory), the chat still works and NPCs just stay quiet. The chat header says why.`,
+  },
+  {
+    id: 'languages',
+    slug: 'languages',
+    title: 'Languages',
+    category: 'Features',
+    order: 32,
+    content: `# Languages
+
+Crawlers and mobs know languages. If someone talks in a language you don't know, you see gibberish in the Game Chat instead of their words. Notes and items can be written in a language too.
+
+## Built-in Languages
+
+| Language | Who uses it |
+|----------|-------------|
+| **Worldspeech** | Essentially the common tongue, spoken by most races. Every crawler starts with it |
+| **Dervish** | Small creatures like gnomes, dwarves and goblins |
+| **Vernonacular** | Magicians |
+| **Mindspeech** | Mental impressions; most useful with non-auditory or sub-sentient creatures. Crawlers must be **Telepathic** to use it |
+| **Ward sign** | A sign language built on abstract symbolism |
+| **Mewmew** | The Felinus races |
+| **Base64** | Machines and sentient robots |
+| **Kra Kow** | Usually goblins, orcs and trolls |
+
+Each language looks different when you can't read it: Kra Kow is harsh grunts, Mewmew is mrrps, Ward sign is symbols, Mindspeech is waves. Base64 really is Base64, so a crawler with a decoder and some patience might work it out.
+
+## What Your Crawler Knows
+
+Open a crawler's profile and look for the **Languages** box. The DM taps **Edit** to choose which languages a crawler knows and to turn on **Telepathic** (needed for Mindspeech).
+
+## Making Up a Language
+
+Anyone can make one up: in the Languages box on your own profile, open **Make up a language**, give it a name and (optionally) who speaks it. Your crawler knows it straight away. The DM decides who else learns it, and can delete made-up languages from the same box.
+
+## Mobs and NPCs
+
+In the DM Console, every mob has a **Languages** picker. Tap the languages it speaks; the first one is its native tongue. A mob with none picked speaks Worldspeech.
+
+When an NPC talks:
+- If someone speaks to it in a language it knows, it answers in that language.
+- If someone speaks to it in a language it doesn't know, it can't understand them and answers in its native tongue.
+- When it speaks up on its own, it uses the last language it was spoken to in, or its native tongue.
+
+## Talking in a Language
+
+If your crawler knows more than one language, a language menu appears above the chat box. Pick the language you talk in. Party members who don't know it see gibberish, and so do NPCs who don't know it.
+
+The DM sees every line as it was said, with the language marked.
+
+## Translators
+
+A crawler who knows a language can translate it for the party. Use the translate menu next to the language menu in the Game Chat:
+- **Not translating**: party members who don't know the language see gibberish.
+- **Translating**: everyone in the party sees lines in your languages, marked "translated by" you.
+- **Translating (check lines)**: the party sees "is translating…" until you act on each line. Tap **Pass on** to tell them exactly what was said, or **Twist** to tell them something else.
+
+A twisted translation looks just like an honest one to the party. Only the translator and the DM can see what was really said; the DM sees a **twisted** tag next to it. Party members who know the language themselves always see the real words, so they might catch you.
+
+## Items and Notes
+
+When the DM adds or edits an item, the **Written in** menu sets the language of its description. Crawlers who don't know that language see a scrambled description (the name stays readable).
+
+When you add a quest note and know more than one language, you can pick the language it's written in. Only crawlers who know it can read it (you can always read your own notes).
+
+## Good to Know
+
+The real words are still saved in the game's database, so this keeps honest players honest rather than stopping a determined snoop.`,
   },
   {
     id: 'sound-effects',
