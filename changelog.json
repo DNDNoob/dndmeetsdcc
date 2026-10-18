@@ -2,6 +2,10 @@
   {
     "date": "2026-10-18",
     "changes": [
+      "🧌 Mobs now come in two kinds: Creatures (templates like Goblin that you can place many times) and Characters (one named person who's part of the story, like Grimble). Boss is now a checkbox on either kind. Old mobs carry over automatically",
+      "🎲 Each copy of a creature on the map now has its own AI personality and talks as itself in Game Chat (\"Goblin B\"), so no two goblins feel the same",
+      "⚔️ Tokens can be friendly or hostile, and the DM can flip them mid-scene from the right-click menu. Hostile tokens are pre-ticked when combat starts; friendly ones can still be pulled in",
+      "📖 Mob Profiles now show encountered Creatures, Bosses and Characters in separate sections. A character can be linked to its creature (Grimble is a Goblin), and meeting them reveals both",
       "🔐 Accounts are now Google only: the email and password sign-up and sign-in options are gone, since those accounts couldn't save a profile",
       "👤 The Set Up Profile box now shows which account you're signed in with and has a Sign out button, so you're no longer stuck in it",
       "🐛 In Show Time, reaching for the red X or other map tools at the top right no longer pops open the top menu and shoves the tools panel down. The menu now opens only when you rest your mouse at the top-left edge for a moment",

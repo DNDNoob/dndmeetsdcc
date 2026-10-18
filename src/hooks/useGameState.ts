@@ -1503,7 +1503,17 @@ export const useGameState = () => {
 
   // Encountered mobs show in players' Mob Profiles; unencountered ones stay hidden there.
   // Same pairing the DM Console uses (encountered ⇔ not hidden).
+  // Meeting a character also reveals the creature they are (Grimble → Goblin).
   const setMobEncountered = async (mobId: string, encountered: boolean) => {
+    const speciesId = encountered ? mobs.find(m => m.id === mobId)?.speciesId : undefined;
+    const species = speciesId ? mobs.find(m => m.id === speciesId) : undefined;
+    if (species && !(species.encountered && !species.hidden)) {
+      await batchWrite([
+        { type: 'update', collection: 'mobs', id: mobId, data: { encountered, hidden: !encountered } },
+        { type: 'update', collection: 'mobs', id: species.id, data: { encountered: true, hidden: false } },
+      ]);
+      return;
+    }
     await updateItem('mobs', mobId, { encountered, hidden: !encountered } as Record<string, unknown>);
   };
 
