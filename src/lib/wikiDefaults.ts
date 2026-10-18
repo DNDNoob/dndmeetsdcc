@@ -19,7 +19,7 @@ When you first visit the site, you'll see the **Landing Page** — a cinematic o
 
 An account is **required** to access any game features. Anonymous browsing of the app is not available — you must sign in first.
 
-1. **Sign in** using Google or email/password (click "Enter the Dungeon" on the landing page).
+1. **Sign in** with Google (click "Enter the Dungeon" on the landing page).
 2. **Choose a username** and display name when prompted (first time only).
 3. You'll be taken to the **Campaign Selection** screen.
 
@@ -1060,20 +1060,19 @@ The app requires user accounts for all game interactions. Your account is how th
 ## How It Works
 
 - **All users must sign in** before accessing the app. The landing page at the site root introduces the app and prompts you to create an account or sign in.
-- **Signed-in users** (via Google or email/password) can create campaigns, join campaigns, and interact with all game features.
+- **Signed-in users** (via Google) can create campaigns, join campaigns, and interact with all game features.
 - If you sign out, you'll be redirected back to the landing page.
 
 ## Creating an Account
 
 1. Click **Enter the Dungeon** on the landing page, or click **Sign In** if you see it.
-2. Click **CREATE ACCOUNT** and fill in your email and password (at least 6 characters).
-3. Alternatively, click **Continue with Google** for one-click account creation.
-4. On first sign-in, you'll be prompted to choose a **username** (unique, 3-24 characters, letters/numbers/underscores) and **display name**.
-5. The Set Up Profile box shows which account you're signed in with. If it's the wrong one, click **Not you? Sign out** to go back and sign in again.
+2. Click **Continue with Google**. Your account is created the first time you sign in. (Accounts are Google only; email/password sign-up has been removed.)
+3. On first sign-in, you'll be prompted to choose a **username** (unique, 3-24 characters, letters/numbers/underscores) and **display name**.
+4. The Set Up Profile box shows which account you're signed in with. If it's the wrong one, click **Not you? Sign out** to go back and sign in again.
 
 ## Signing In
 
-1. Click **Sign In** and enter your email/password, or use Google.
+1. Click **Sign In**, then **Continue with Google**.
 2. After sign-in, you'll see the Campaign Selection screen.
 
 ## Signing Out
@@ -1085,7 +1084,7 @@ Click **Sign Out** to sign out. You can sign back in at any time.
 Your profile includes:
 - **Username** — unique identifier, used for lookups
 - **Display Name** — shown in campaigns and as the DM name
-- **Avatar** — pulled from your Google account if applicable (optional — email/password accounts simply have no avatar)
+- **Avatar** — pulled from your Google account
 
 ## Account Settings
 

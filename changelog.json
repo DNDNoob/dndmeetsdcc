@@ -2,6 +2,7 @@
   {
     "date": "2026-10-18",
     "changes": [
+      "🔐 Accounts are now Google only: the email and password sign-up and sign-in options are gone, since those accounts couldn't save a profile",
       "👤 The Set Up Profile box now shows which account you're signed in with and has a Sign out button, so you're no longer stuck in it",
       "🐛 If a profile can't be saved because you're not signed in with Google, the message now says so instead of just \"Failed to save profile\""
     ]
