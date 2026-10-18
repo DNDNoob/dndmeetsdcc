@@ -35,15 +35,23 @@ export interface SpeakRequest {
 interface EngineState { restUntil: number; why: string; key?: string }
 const rest: Partial<Record<VoiceEngine, EngineState>> = {};
 let lastEngine: VoiceEngine | null = null;
-let snapshot = { rest: { ...rest }, lastEngine };
+let problem: string | null = null;
+let snapshot = { rest: { ...rest }, lastEngine, problem };
 const listeners = new Set<() => void>();
 const changed = () => {
-  snapshot = { rest: { ...rest }, lastEngine };
+  snapshot = { rest: { ...rest }, lastEngine, problem };
   listeners.forEach(l => l());
 };
 const subscribe = (l: () => void) => { listeners.add(l); return () => { listeners.delete(l); }; };
 
-/** Which service read the last line, and which ones are resting and why. */
+/** Why the last line wasn't read aloud for the players (or null once one works again). */
+export const reportVoiceProblem = (why: string | null) => {
+  if (why === problem) return;
+  problem = why;
+  changed();
+};
+
+/** Which service read the last line, which ones are resting and why, and the last problem. */
 export const useVoiceServiceState = () => useSyncExternalStore(subscribe, () => snapshot);
 
 const clockTime = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
@@ -136,7 +144,12 @@ const chunks = (text: string, max: number): string[] => {
   return out;
 };
 
-const pace = (speed: number) => (speed <= 0.92 ? ', slowly' : speed >= 1.08 ? ', quickly' : '');
+const pace = (speed: number) => (speed <= 0.92 ? 'slow' : speed >= 1.08 ? 'fast' : '');
+// Gemini's delivery tags for each mood picked from the NPC's notes
+const GEMINI_TAGS: Record<string, string> = {
+  whisper: 'whispers', angry: 'anger', sad: 'negative', nervous: 'nervousness',
+  cheerful: 'enthusiasm', gruff: 'annoyance', sly: 'amusement',
+};
 
 // ── The services ──
 
@@ -145,13 +158,10 @@ let geminiModel = 0; // index of the first model name that works
 async function gemini(req: SpeakRequest, key: string, keys: NpcOnlineKeys): Promise<SpokenClip> {
   const voice = req.pick?.gemini && GEMINI_VOICES.some(v => v.id === req.pick!.gemini)
     ? req.pick.gemini : fitVoice(GEMINI_VOICES, req.traits)!.id;
-  // A short "Say <how>:" lead-in, the form Gemini treats as directions. Longer notes get read out.
-  const mood = moodOf(req.traits.manner).replace('whisper', 'hushed');
-  const how = [
-    mood || req.traits.deep ? `in a ${[mood, req.traits.deep ? 'deep' : ''].filter(Boolean).join(', ')} voice` : '',
-    req.traits.british ? 'with a British accent' : '',
-  ].filter(Boolean).join(' ') + pace(req.traits.speed);
-  const prompt = how ? `Say ${how.replace(/^, /, '')}: ${req.text}` : req.text;
+  // Only the line itself, led by one bracketed tag (Gemini's inline delivery tags are never spoken).
+  // Written directions, even short ones, sometimes get read out.
+  const tag = GEMINI_TAGS[moodOf(req.traits.manner)] ?? pace(req.traits.speed);
+  const prompt = tag ? `[${tag}] ${req.text}` : req.text;
   while (geminiModel < GEMINI_MODELS.length) {
     const model = GEMINI_MODELS[geminiModel];
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {

@@ -14,7 +14,7 @@ import { TELEPATHIC_LANGUAGE_ID, crawlerUnderstands, scrambleText } from '@/lib/
 import { BEAST_LANGUAGE_ID } from '@/lib/languageList.mjs';
 import type { NpcOnlineKeys } from '@/lib/npc/onlineLlm.mjs';
 import { speechEngine } from '@/lib/npcSpeech/engine';
-import { speakLine } from '@/lib/npcSpeech/providers';
+import { reportVoiceProblem, speakLine } from '@/lib/npcSpeech/providers';
 import { voiceTraits } from '@/lib/npcSpeech/voices';
 
 // Lines are only read aloud while they're fresh; the clips are deleted soon after
@@ -75,12 +75,24 @@ export function useNpcSpeechMaker(opts: NpcSpeechMakerOptions) {
       setActive(true);
     };
     const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined;
+    // Say so if another tab already has the job, since that tab may be an old copy of the game
+    const waiting = setTimeout(() => {
+      if (!cancelled) reportVoiceProblem('Voices are being made in another tab of this browser. Close the other game tabs if lines stay silent');
+    }, 3000);
     if (locks?.request) {
-      locks.request(`dcc-npc-speech-${roomId}`, () => new Promise<void>((resolve) => { release = resolve; begin(); })).catch(() => {});
+      locks.request(`dcc-npc-speech-${roomId}`, () => new Promise<void>((resolve) => {
+        release = resolve;
+        clearTimeout(waiting);
+        reportVoiceProblem(null);
+        begin();
+      })).catch(() => {});
     } else {
+      clearTimeout(waiting);
       begin();
     }
     return () => {
+      clearTimeout(waiting);
+      reportVoiceProblem(null);
       cancelled = true;
       setActive(false);
       release();
@@ -143,8 +155,10 @@ export function useNpcSpeechMaker(opts: NpcSpeechMakerOptions) {
             hasWords(scrambled) ? clip(scrambled, '-scrambled') : undefined,
           ]);
           await onAttachAudio(m.id, { audioUrl, audioScrambledUrl });
+          reportVoiceProblem(null);
         } catch (err) {
           console.warn('[NpcSpeech] Could not read a line aloud', err);
+          reportVoiceProblem(`${m.authorName}'s last line wasn't sent to players (${(err as Error)?.message ?? err})`);
         }
       })();
     }
