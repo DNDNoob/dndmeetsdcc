@@ -61,6 +61,8 @@ The navigation bar at the top of the screen gives you quick access to all sectio
 
 On mobile devices, the navigation collapses into a **hamburger menu** (☰) — tap it to access all sections from a dropdown.
 
+In **Show Time**, the navigation bar hides to give the map more room. Rest your mouse at the top-left edge of the screen for a moment to bring it back, or pin it open. Moving across the top of the screen on your way to the map tools won't pop it open.
+
 Use the **Campaigns** button to return to the campaign list at any time.`,
   },
   {
@@ -521,20 +523,36 @@ Fog of war state (which areas are revealed) persists in Firebase. If you close a
   {
     id: 'mobs',
     slug: 'mobs',
-    title: 'Mobs (Enemies & NPCs)',
+    title: 'Mobs (Creatures, Characters & Bosses)',
     category: 'Basics',
     order: 2,
-    content: `# Mobs (Enemies & NPCs)
+    content: `# Mobs (Creatures, Characters & Bosses)
 
-Mobs are the enemies and non-player characters that populate your game world.
+Mobs are everyone in the game world who isn't a crawler. They are all set up the same way and can all talk, trade and fight. The only difference is whether they're a one-off or part of the story.
 
-## Mob Types
+## Kinds
 
-| Type | Color | Purpose |
-|------|-------|---------|
-| Normal | Default | Standard enemies |
-| Boss | Red accent | Powerful enemies |
-| NPC | Blue accent | Non-hostile characters |
+| Kind | What it is | Example |
+|------|-----------|---------|
+| **Creature** | A template. Place it on the map as many times as you like; each copy is labelled A, B, C… and is transient | Goblin, Gnome |
+| **Character** | One named person who is part of the story and may come back | Grimble the Goblin Merchant |
+
+Tick **Boss** on either kind to mark it as a boss (red styling, its own section in Mob Profiles).
+
+A character can optionally be a creature (**Is a** in the DM Console): Grimble *is a* Goblin. When players meet Grimble, Goblin is revealed in their Mob Profiles too.
+
+Mobs made before kinds existed carry over automatically: Normal became Creature, Boss became a Creature with Boss ticked, and NPC became Character.
+
+## Friendly or Hostile
+
+Hostility belongs to each token on the map, not the mob, so it can change mid-scene. Creatures start out **hostile** and characters start out **friendly**.
+
+- **DM**: right-click a token in Show Time and choose **Make Friendly** / **Make Hostile**. The DM sees a red ring around hostile tokens and a green ring around friendly ones; players don't see the rings
+- **Combat**: when the DM starts a combat turn, hostile tokens are ticked and friendly ones are left unticked (marked *friendly*). The DM can still tick a friendly token to pull it into the fight
+
+## Mob Profiles (players)
+
+The Mobs page shows what the party has encountered in three sections: **Creatures**, **Bosses** and **Characters**. Characters show the creature they are when it's known ("A Goblin").
 
 ## Mob Properties
 
@@ -574,7 +592,11 @@ When placed on a map during episode setup or Show Time, mobs appear as circular 
 
 ## NPC Personality
 
-Every mob can talk for itself in Show Time when NPC voices are running. Each mob has an optional **NPC Personality** card (DM only) in the DM Console; leave it blank and the AI makes one up from the mob's details. See [Talking NPCs](/wiki/talking-npcs).`,
+Every mob can talk for itself in Show Time when NPC voices are running. Each mob has an optional **NPC Personality** card (DM only) in the DM Console; leave it blank and the AI makes one up from the mob's details. Each copy of a creature gets its own made-up personality, so Goblin A and Goblin B feel like different goblins. See [Talking NPCs](/wiki/talking-npcs).
+
+## Merchants
+
+Any mob can be a merchant that buys and sells items. Tick **Is a merchant** on the mob in the DM Console. See [Merchants](/wiki/merchants).`,
   },
   {
     id: 'dice-roller',
@@ -815,6 +837,70 @@ Everything in Show Time syncs in real time:
 The chat button in the bottom right opens the **Game Chat** for the running episode. Players talk as their crawler and the DM talks as the DM. Hold the microphone button to speak instead of typing. Mobs with a personality answer in the chat and in speech bubbles over their heads. See [Talking NPCs](/wiki/talking-npcs).`,
   },
   {
+    id: 'merchants',
+    slug: 'merchants',
+    title: 'Merchants',
+    category: 'Features',
+    order: 33,
+    content: `# Merchants
+
+Any mob can be a merchant. Crawlers walk up to them in Show Time to buy items and sell their own.
+
+## Setting Up a Merchant (DM)
+
+In the DM Console, open a mob (new or existing), expand **Merchant** and tick **Is a merchant**. Then set:
+
+| Setting | What it does |
+|---------|--------------|
+| Starting gold | How much gold the merchant has to buy items from crawlers |
+| Scrooge Factor | How greedy the merchant is (see Prices below) |
+| Haggle DC | The Persuasion roll a crawler needs to ask for better prices (15 if left blank) |
+| Stock | Items from the item library, with how many of each the merchant has |
+
+Each stock line shows its buy / sell price at the current Scrooge Factor.
+
+## Trading (Players)
+
+During Show Time, tap a merchant's token and choose **Trade with Merchant**. You must be within **20 ft** of the merchant; farther away, the option is greyed out and says how far you are.
+
+- **Buy**: shows what the merchant has, how many are left and the price. The gold comes out of your crawler's gold and the item goes into your inventory.
+- **Sell**: shows your inventory and what the merchant will pay. Selling an equipped item takes it off first.
+
+Stock and gold are shared by everyone. If one crawler buys a knife and the merchant had three, everyone else sees two left. If two crawlers try to buy the last one at the same moment, only one gets it; the other is told it's sold out.
+
+### When the Merchant Runs Low on Gold
+
+The merchant only pays with the gold they have. If an item is worth more than the merchant has left, you can **sell it for whatever gold they have**. A merchant with no gold can't buy anything until they make some sales or the DM restocks them.
+
+## Prices and the Scrooge Factor
+
+| Scrooge Factor | Crawlers pay | Crawlers get when selling |
+|----------------|--------------|---------------------------|
+| 0 | Item value | Item value |
+| 1 | 10% more | 10% less |
+| 2 | 20% more | 20% less |
+| ... | +10% per level | -10% per level |
+
+Prices are rounded to whole gold, up when buying and down when selling. Items with no gold value can't be sold.
+
+## Haggling
+
+In the trade window, press **Haggle** to roll Persuasion (d20 + your Charisma modifier, including equipment). The roll shows in the dice log.
+
+Haggling uses an action. In combat it takes your action, so you can only haggle on your turn before acting. Between fights it uses one of your rolls for the current turn.
+
+- If you meet the merchant's Haggle DC, the DM gets a prompt to lower your prices one Scrooge level. If they say yes, you trade at the lower level with that merchant.
+- If you fall short, or the DM says no, the merchant won't budge.
+
+Each crawler gets one haggle per merchant until the merchant is restocked. Haggling only lowers prices for the crawler who rolled.
+
+## Restocking (DM)
+
+Right-click a merchant's token in Show Time and choose **Open Merchant**. The DM sees the stock, the merchant's gold, and any haggles waiting for an answer (these also pop up in the bottom left of the map). **Restock** resets the stock, gold and haggling to the settings in the DM Console.
+
+Changes to stock and starting gold in the DM Console take effect at the next restock. Changes to the Scrooge Factor apply right away.`,
+  },
+  {
     id: 'talking-npcs',
     slug: 'talking-npcs',
     title: 'Talking NPCs',
@@ -843,6 +929,8 @@ Players never see this card.
 ### Auto-generated personalities
 
 Every mob can talk, even ones you never wrote a card for. The first time a mob without a card is needed (or while things are quiet), the AI writes one from everything the game knows about it: name, kind, level, description, strengths and abilities, weaknesses, hit points, the items it carries and its gold. It also rolls random ingredients (a temperament, a speech quirk, what drives it, how it sees the crawlers and something tied to its past) so no two mobs come out the same, even two of the same kind.
+
+**Creatures** get one per copy on the map: Goblin A, Goblin B and Goblin C each talk as themselves in the chat, with their own personality and secret. If you write a card on a creature, every copy uses your card. **Characters** are one person, so they always have one personality wherever their token stands.
 
 The generated personality includes a secret and a Persuasion DC based on the mob's level (bosses are harder). It stays the same for the rest of the campaign. In the chat settings it shows as **(AI personality)** next to the mob's name; hover to read it. Fill in the mob's card in the DM Console at any time to replace it with your own.
 

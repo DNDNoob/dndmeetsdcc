@@ -1,11 +1,13 @@
 import { useState, useRef, useEffect } from "react";
 import NpcPersonalityFields from "@/components/NpcPersonalityFields";
+import MerchantFields from "@/components/MerchantFields";
+import MobKindFields from "@/components/MobKindFields";
 import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import MapMobPlacementEditor from "@/components/ui/MapMobPlacementEditor";
 import MapDesignerPopout from "@/components/ui/MapDesignerPopout";
-import { Mob, Episode, EpisodeMobPlacement, Crawler, CrawlerPlacement, InventoryItem, LootBoxTemplate, LootBoxTier, getLootBoxTierColor, type EquipmentSlot, type EquippedItems, Quest, QuestReward, QuestActionItem, QuestRewardTier, type CampaignMapDoc, type PublicMap, type PublicMob, type PublicEpisode } from "@/lib/gameData";
+import { Mob, Episode, getMobKind, isBossMob, legacyMobType, EpisodeMobPlacement, Crawler, CrawlerPlacement, InventoryItem, LootBoxTemplate, LootBoxTier, getLootBoxTierColor, type EquipmentSlot, type EquippedItems, Quest, QuestReward, QuestActionItem, QuestRewardTier, type CampaignMapDoc, type PublicMap, type PublicMob, type PublicEpisode, isMerchant } from "@/lib/gameData";
 import { Brain, Upload, Plus, Trash2, Map, Skull, Image as ImageIcon, Save, Edit2, X, Layers, ChevronLeft, ChevronRight, User, Package, Search, Maximize2, Shield, ChevronDown as ChevronDownIcon, ScrollText, Eye, EyeOff, CheckSquare, GripVertical, Users, Globe } from "lucide-react";
 import { storage } from "@/lib/firebase";
 import { ShareToggle, ImportButton } from "@/components/ui/ShareToggle";
@@ -205,7 +207,10 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
       id: Date.now().toString(),
       name: newMob.name,
       level: newMob.level || 1,
-      type: newMob.type || "normal",
+      type: legacyMobType(getMobKind(newMob), isBossMob(newMob)),
+      kind: getMobKind(newMob),
+      boss: isBossMob(newMob),
+      ...(newMob.speciesId ? { speciesId: newMob.speciesId } : {}),
       description: newMob.description || "",
       encountered: false,
       hidden: true,
@@ -219,6 +224,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
       defaultInventory: newMob.defaultInventory,
       defaultGold: newMob.defaultGold,
       ...(newMob.personality ? { personality: newMob.personality } : {}),
+      ...(newMob.merchant ? { merchant: newMob.merchant } : {}),
     };
     console.log('[DungeonAI] ➕ Add Mob clicked', mob);
     try {
@@ -227,7 +233,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
     } catch (err) {
       console.error('[DungeonAI] ❌ Failed to persist mob', err);
     }
-    setNewMob({ name: "", level: 1, type: "normal", description: "", weaknesses: "", strengths: "", hitPoints: 50, personality: undefined });
+    setNewMob({ name: "", level: 1, type: "normal", kind: "creature", boss: false, speciesId: "", description: "", weaknesses: "", strengths: "", hitPoints: 50, personality: undefined, merchant: undefined });
   };
 
   const handleDeleteMob = async (id: string) => {
@@ -316,10 +322,13 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   const handleToggleEncountered = (id: string, currentEncountered: boolean) => {
     // When marking as encountered, automatically reveal (hidden=false)
     // When marking as unencountered, automatically hide (hidden=true)
-    handleUpdateMob(id, { 
-      encountered: !currentEncountered,
-      hidden: currentEncountered // if was encountered, now hide it; if was unencountered, now reveal it
-    });
+    // Meeting a character also reveals the creature they are (Grimble → Goblin)
+    const speciesId = !currentEncountered ? mobs.find(m => m.id === id)?.speciesId : undefined;
+    onUpdateMobs(mobs.map(m =>
+      m.id === id ? { ...m, encountered: !currentEncountered, hidden: currentEncountered }
+        : m.id === speciesId ? { ...m, encountered: true, hidden: false }
+        : m
+    ));
   };
 
   const handleStartEdit = (mob: Mob) => {
@@ -814,18 +823,11 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                         className="w-full bg-muted border border-border px-3 py-2"
                       />
                     </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground mb-1 block">Type</label>
-                      <select
-                        value={newMob.type || "normal"}
-                        onChange={(e) => setNewMob({ ...newMob, type: e.target.value as "normal" | "boss" | "npc" })}
-                        className="w-full bg-muted border border-border px-3 py-2"
-                      >
-                        <option value="normal">Normal</option>
-                        <option value="boss">Boss</option>
-                        <option value="npc">NPC</option>
-                      </select>
-                    </div>
+                    <MobKindFields
+                      value={newMob}
+                      onChange={(fields) => setNewMob({ ...newMob, ...fields })}
+                      creatures={mobs.filter(m => getMobKind(m) === "creature")}
+                    />
                   </div>
                   <div>
                     <label className="text-xs text-muted-foreground mb-1 block">Description</label>
@@ -859,6 +861,11 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                   <NpcPersonalityFields
                     value={newMob.personality}
                     onChange={(personality) => setNewMob({ ...newMob, personality })}
+                  />
+                  <MerchantFields
+                    value={newMob.merchant}
+                    onChange={(merchant) => setNewMob({ ...newMob, merchant })}
+                    items={getSharedInventory?.() ?? []}
                   />
                 </div>
                 <div className="flex flex-col items-center justify-center border border-dashed border-border p-4">
@@ -902,7 +909,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                   <div
                     key={mob.id}
                     className={`border p-3 ${
-                      mob.type === "boss" ? "border-destructive bg-destructive/5" : "border-border bg-muted/20"
+                      isBossMob(mob) ? "border-destructive bg-destructive/5" : "border-border bg-muted/20"
                     }`}
                   >
                     {isEditing ? (
@@ -937,18 +944,12 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                                 className="w-full bg-muted border border-border px-2 py-1 text-sm"
                               />
                             </div>
-                            <div>
-                              <label className="text-xs text-muted-foreground mb-1 block">Type</label>
-                              <select
-                                value={editedMob.type}
-                                onChange={(e) => setEditedMobData(prev => prev ? { ...prev, type: e.target.value as "normal" | "boss" | "npc" } : prev)}
-                                className="w-full bg-muted border border-border px-2 py-1 text-sm"
-                              >
-                                <option value="normal">Normal</option>
-                                <option value="boss">Boss</option>
-                                <option value="npc">NPC</option>
-                              </select>
-                            </div>
+                            <MobKindFields
+                              compact
+                              value={editedMob}
+                              onChange={(fields) => setEditedMobData(prev => prev ? { ...prev, ...fields } : prev)}
+                              creatures={mobs.filter(m => m.id !== mob.id && getMobKind(m) === "creature")}
+                            />
                           </div>
                         </div>
                         <div>
@@ -1018,6 +1019,14 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                           <NpcPersonalityFields
                             value={editedMob.personality}
                             onChange={(personality) => setEditedMobData(prev => prev ? { ...prev, personality } : prev)}
+                          />
+                        </div>
+
+                        <div className="mt-3">
+                          <MerchantFields
+                            value={editedMob.merchant}
+                            onChange={(merchant) => setEditedMobData(prev => prev ? { ...prev, merchant } : prev)}
+                            items={getSharedInventory?.() ?? []}
                           />
                         </div>
 
@@ -1306,7 +1315,10 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                             {mob.hitPoints !== undefined && (
                               <span className="text-xs text-muted-foreground">HP: {mob.hitPoints}</span>
                             )}
-                            {mob.type === "boss" && (
+                            <span className={`text-xs px-2 py-0.5 ${getMobKind(mob) === "character" ? "bg-green-500/20 text-green-500" : "bg-muted text-muted-foreground"}`}>
+                              {getMobKind(mob) === "character" ? "CHARACTER" : "CREATURE"}
+                            </span>
+                            {isBossMob(mob) && (
                               <span className="text-xs bg-destructive/20 text-destructive px-2 py-0.5">BOSS</span>
                             )}
                             <span
@@ -1337,6 +1349,12 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                               }).join(', ')}
                               {mob.defaultGold ? ` · ${mob.defaultGold} gold` : ''}
                             </div>
+                          )}
+                          {isMerchant(mob) && mob.merchant && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              <span className="text-accent">Merchant:</span>{' '}
+                              {mob.merchant.stock.reduce((n, e) => n + e.quantity, 0)} items · {mob.merchant.startingGold} gold · Scrooge {mob.merchant.scroogeFactor}
+                            </p>
                           )}
                         </div>
                         <div className="flex flex-wrap gap-2 mt-2 md:mt-0">
@@ -1398,8 +1416,8 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-display text-sm text-foreground">{pm.name}</span>
                           <span className="text-xs text-muted-foreground">Lvl {pm.level}</span>
-                          {pm.type === "boss" && <span className="text-[10px] bg-destructive/20 text-destructive px-1.5">BOSS</span>}
-                          {pm.type === "npc" && <span className="text-[10px] bg-primary/20 text-primary px-1.5">NPC</span>}
+                          {isBossMob(pm) && <span className="text-[10px] bg-destructive/20 text-destructive px-1.5">BOSS</span>}
+                          {getMobKind(pm) === "character" && <span className="text-[10px] bg-green-500/20 text-green-500 px-1.5">CHARACTER</span>}
                         </div>
                         {pm.description && <p className="text-xs text-muted-foreground line-clamp-2">{pm.description}</p>}
                         {pm.createdByUsername && (
