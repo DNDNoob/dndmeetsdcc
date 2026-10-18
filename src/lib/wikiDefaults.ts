@@ -592,7 +592,11 @@ When placed on a map during episode setup or Show Time, mobs appear as circular 
 
 ## NPC Personality
 
-Every mob can talk for itself in Show Time when NPC voices are running. Each mob has an optional **NPC Personality** card (DM only) in the DM Console; leave it blank and the AI makes one up from the mob's details. Each copy of a creature gets its own made-up personality, so Goblin A and Goblin B feel like different goblins. See [Talking NPCs](/wiki/talking-npcs).`,
+Every mob can talk for itself in Show Time when NPC voices are running. Each mob has an optional **NPC Personality** card (DM only) in the DM Console; leave it blank and the AI makes one up from the mob's details. Each copy of a creature gets its own made-up personality, so Goblin A and Goblin B feel like different goblins. See [Talking NPCs](/wiki/talking-npcs).
+
+## Merchants
+
+Any mob can be a merchant that buys and sells items. Tick **Is a merchant** on the mob in the DM Console. See [Merchants](/wiki/merchants).`,
   },
   {
     id: 'dice-roller',
@@ -831,6 +835,70 @@ Everything in Show Time syncs in real time:
 ## Game Chat
 
 The chat button in the bottom right opens the **Game Chat** for the running episode. Players talk as their crawler and the DM talks as the DM. Hold the microphone button to speak instead of typing. Mobs with a personality answer in the chat and in speech bubbles over their heads. See [Talking NPCs](/wiki/talking-npcs).`,
+  },
+  {
+    id: 'merchants',
+    slug: 'merchants',
+    title: 'Merchants',
+    category: 'Features',
+    order: 33,
+    content: `# Merchants
+
+Any mob can be a merchant. Crawlers walk up to them in Show Time to buy items and sell their own.
+
+## Setting Up a Merchant (DM)
+
+In the DM Console, open a mob (new or existing), expand **Merchant** and tick **Is a merchant**. Then set:
+
+| Setting | What it does |
+|---------|--------------|
+| Starting gold | How much gold the merchant has to buy items from crawlers |
+| Scrooge Factor | How greedy the merchant is (see Prices below) |
+| Haggle DC | The Persuasion roll a crawler needs to ask for better prices (15 if left blank) |
+| Stock | Items from the item library, with how many of each the merchant has |
+
+Each stock line shows its buy / sell price at the current Scrooge Factor.
+
+## Trading (Players)
+
+During Show Time, tap a merchant's token and choose **Trade with Merchant**. You must be within **20 ft** of the merchant; farther away, the option is greyed out and says how far you are.
+
+- **Buy**: shows what the merchant has, how many are left and the price. The gold comes out of your crawler's gold and the item goes into your inventory.
+- **Sell**: shows your inventory and what the merchant will pay. Selling an equipped item takes it off first.
+
+Stock and gold are shared by everyone. If one crawler buys a knife and the merchant had three, everyone else sees two left. If two crawlers try to buy the last one at the same moment, only one gets it; the other is told it's sold out.
+
+### When the Merchant Runs Low on Gold
+
+The merchant only pays with the gold they have. If an item is worth more than the merchant has left, you can **sell it for whatever gold they have**. A merchant with no gold can't buy anything until they make some sales or the DM restocks them.
+
+## Prices and the Scrooge Factor
+
+| Scrooge Factor | Crawlers pay | Crawlers get when selling |
+|----------------|--------------|---------------------------|
+| 0 | Item value | Item value |
+| 1 | 10% more | 10% less |
+| 2 | 20% more | 20% less |
+| ... | +10% per level | -10% per level |
+
+Prices are rounded to whole gold, up when buying and down when selling. Items with no gold value can't be sold.
+
+## Haggling
+
+In the trade window, press **Haggle** to roll Persuasion (d20 + your Charisma modifier, including equipment). The roll shows in the dice log.
+
+Haggling uses an action. In combat it takes your action, so you can only haggle on your turn before acting. Between fights it uses one of your rolls for the current turn.
+
+- If you meet the merchant's Haggle DC, the DM gets a prompt to lower your prices one Scrooge level. If they say yes, you trade at the lower level with that merchant.
+- If you fall short, or the DM says no, the merchant won't budge.
+
+Each crawler gets one haggle per merchant until the merchant is restocked. Haggling only lowers prices for the crawler who rolled.
+
+## Restocking (DM)
+
+Right-click a merchant's token in Show Time and choose **Open Merchant**. The DM sees the stock, the merchant's gold, and any haggles waiting for an answer (these also pop up in the bottom left of the map). **Restock** resets the stock, gold and haggling to the settings in the DM Console.
+
+Changes to stock and starting gold in the DM Console take effect at the next restock. Changes to the Scrooge Factor apply right away.`,
   },
   {
     id: 'talking-npcs',

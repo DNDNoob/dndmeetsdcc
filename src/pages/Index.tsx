@@ -214,6 +214,12 @@ const Index = () => {
     clearChat,
     updateNpcAiSettings,
     setNpcSecretState,
+    merchants,
+    buyFromMerchant,
+    sellToMerchant,
+    restockMerchant,
+    haggleWithMerchant,
+    resolveMerchantHaggle,
     spells,
     addSpell,
     updateSpell,
@@ -1128,6 +1134,12 @@ const Index = () => {
                 onSetNpcSecretState={isAdmin ? setNpcSecretState : undefined}
                 npcKeys={isAdmin ? npcKeys : undefined}
                 onChangeNpcKeys={isAdmin ? setNpcKeys : undefined}
+                merchants={merchants}
+                onBuyFromMerchant={buyFromMerchant}
+                onSellToMerchant={sellToMerchant}
+                onHaggleWithMerchant={haggleWithMerchant}
+                onRestockMerchant={isAdmin ? restockMerchant : undefined}
+                onResolveMerchantHaggle={isAdmin ? resolveMerchantHaggle : undefined}
               />
             )}
             {currentView === "sounds" && <SoundEffectsView />}
