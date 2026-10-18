@@ -124,6 +124,7 @@ export interface CrawlerActivityStats {
   lowHealthCount?: number; // times HP dropped below 10% of max HP
   killingBlows?: number; // mobs brought to 0 HP
   combatEndingBlows?: number; // killing blows that took down the last mob standing
+  mobsLooted?: number; // mobs whose loot this crawler shared in (raises their Looting level)
 }
 
 export type ActivityStatKey = keyof CrawlerActivityStats;
@@ -368,6 +369,7 @@ export interface Mob {
   hideHitPoints?: boolean;
   defaultInventory?: InventoryItem[]; // Default items this mob type carries
   defaultGold?: number; // Default gold this mob type carries
+  lootDestructionChance?: number; // % chance each stackable item copy or coin is smashed when looted (default DEFAULT_LOOT_DESTRUCTION_CHANCE)
   equippedItems?: EquippedItems; // Equipment mapping (slot → item ID)
   createdBy?: string;        // Firebase uid of creator (absent = made in this campaign by its DM)
   createdByUsername?: string; // Denormalized for display
@@ -464,6 +466,132 @@ export const getHaggleBlocker = (
     return 'Haggling uses a roll, and you have none left this turn.';
   }
   return null;
+};
+
+// ======== Item stacks & mob loot ========
+
+/** Copies of the same item share this key and are shown as one stack. */
+export const getItemStackKey = (item: InventoryItem): string => {
+  const modifiersStr = item.statModifiers
+    ? JSON.stringify(Object.entries(item.statModifiers).filter(([, v]) => v !== 0).sort())
+    : '';
+  return `${item.name}|${item.description || ''}|${item.equipSlot || ''}|${item.goldValue ?? 0}|${modifiersStr}`;
+};
+
+export interface ItemStack {
+  key: string;
+  item: InventoryItem; // first copy, used for display
+  count: number;
+  ids: string[];
+}
+
+/** Groups copies of the same item, keeping the order each item first appears in. */
+export const stackItems = (items: InventoryItem[]): ItemStack[] => {
+  const stacks = new Map<string, ItemStack>();
+  for (const item of items) {
+    const key = getItemStackKey(item);
+    const stack = stacks.get(key);
+    if (stack) {
+      stack.count++;
+      stack.ids.push(item.id);
+    } else {
+      stacks.set(key, { key, item, count: 1, ids: [item.id] });
+    }
+  }
+  return Array.from(stacks.values());
+};
+
+/** Inventory document holding items looted by the party that nobody has taken yet. */
+// (Firestore reserves ids like __name__, so this one has no underscores)
+export const PARTY_INVENTORY_ID = 'party-loot';
+
+export interface MobLootSplit {
+  gold: Record<string, number>; // crawlerId → gold received
+  items: Record<string, InventoryItem[]>; // crawlerId → items received
+  party: InventoryItem[]; // items for the party inventory
+  destroyedGold: number;
+  destroyed: InventoryItem[]; // stackable copies smashed while looting
+}
+
+// ---- Looting skill ----
+// Like spell mastery: Looting level N is reached after 5·N·(N+1) mobs looted (10, 30, 60, 100…),
+// and each level cuts the crawler's chance of loot being smashed by a tenth, up to level 10.
+export const DEFAULT_LOOT_DESTRUCTION_CHANCE = 25;
+export const MAX_LOOTING_LEVEL = 10;
+
+export const getLootingLevel = (mobsLooted = 0): number => {
+  let level = 0;
+  while (level < MAX_LOOTING_LEVEL && mobsLooted >= 5 * (level + 1) * (level + 2)) level++;
+  return level;
+};
+
+/** Mobs left to loot before the next Looting level, or null at the max level. */
+export const getLootsUntilNextLevel = (mobsLooted = 0): number | null => {
+  const level = getLootingLevel(mobsLooted);
+  return level >= MAX_LOOTING_LEVEL ? null : 5 * (level + 1) * (level + 2) - mobsLooted;
+};
+
+/** % chance a crawler's loot is smashed, given the mob's base chance and their Looting level. */
+export const getLootDestructionChance = (baseChance: number, lootingLevel: number): number =>
+  Math.max(0, baseChance * (1 - Math.min(lootingLevel, MAX_LOOTING_LEVEL) / MAX_LOOTING_LEVEL));
+
+/**
+ * Splits a defeated mob's loot between the crawlers who fought it. Gold is split evenly, with
+ * leftover coins going one each in `crawlerIds` order. Items the mob carries several copies of
+ * are dealt out evenly and leftovers go to the party; single items go to the party.
+ * Each coin and each copy of a stackable item then rolls against `chanceFor(crawlerId)` (in %)
+ * to be smashed instead; party leftovers roll against the best (lowest) chance in the fight.
+ * Single items are never smashed. Every item gets a fresh id so copies never collide.
+ */
+export const splitMobLoot = (
+  items: InventoryItem[],
+  gold: number,
+  crawlerIds: string[],
+  chanceFor: (crawlerId: string) => number = () => 0,
+  random: () => number = Math.random,
+): MobLootSplit => {
+  const split: MobLootSplit = { gold: {}, items: {}, party: [], destroyedGold: 0, destroyed: [] };
+  const fresh = (item: InventoryItem): InventoryItem => {
+    const { equipped: _eq, ...rest } = item;
+    return { ...rest, id: `item-${crypto.randomUUID()}` };
+  };
+  const smashed = (chance: number) => chance > 0 && random() * 100 < chance;
+  const n = crawlerIds.length;
+  if (n === 0) {
+    split.party = items.map(fresh);
+    return split;
+  }
+  const partyChance = Math.min(...crawlerIds.map(chanceFor));
+  const coins = Math.max(0, Math.floor(gold || 0));
+  crawlerIds.forEach((id, i) => {
+    const dealt = Math.floor(coins / n) + (i < coins % n ? 1 : 0);
+    const chance = chanceFor(id);
+    let share = dealt;
+    for (let c = 0; c < dealt; c++) {
+      if (smashed(chance)) { share--; split.destroyedGold++; }
+    }
+    if (share > 0) split.gold[id] = share;
+  });
+  for (const stack of stackItems(items)) {
+    const copies = items.filter(i => getItemStackKey(i) === stack.key);
+    if (stack.count === 1) {
+      split.party.push(fresh(copies[0]));
+      continue;
+    }
+    const each = Math.floor(stack.count / n);
+    crawlerIds.forEach((id, i) => {
+      const chance = chanceFor(id);
+      for (const copy of copies.slice(i * each, (i + 1) * each)) {
+        if (smashed(chance)) split.destroyed.push(copy);
+        else split.items[id] = [...(split.items[id] ?? []), fresh(copy)];
+      }
+    });
+    for (const copy of copies.slice(each * n)) {
+      if (smashed(partyChance)) split.destroyed.push(copy);
+      else split.party.push(fresh(copy));
+    }
+  }
+  return split;
 };
 
 /** Two items count as the same stock line when everything but the id matches. */
@@ -717,6 +845,7 @@ export interface CombatantEntry {
   avatar?: string; // Deprecated: no longer saved (images made combat docs too big); look up the crawler/mob instead
   currentHP?: number; // per-combatant HP tracking (used for mob instances)
   feetMovedThisTurn?: number; // crawler movement used this turn (reset when the turn ends)
+  looted?: boolean; // mob only: its items and gold were already handed out when it went down
 }
 
 // Combat state - synced via Firebase (singleton doc, id = 'current')

@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
-import { Crawler, InventoryItem, EquipmentSlot as SlotType, StatModifiers, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, Spell, SpellData } from "@/lib/gameData";
+import { Crawler, InventoryItem, getItemStackKey, stackItems, EquipmentSlot as SlotType, StatModifiers, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, Spell, SpellData } from "@/lib/gameData";
 import { Coins, Package, Sword, Shield, Plus, Trash2, Edit2, Save, HardHat, Search, BookOpen, Gem, Footprints, Shirt, Hand, Crosshair, ChevronDown, ChevronUp, Wand2, Globe, Lock, Users, Bookmark } from "lucide-react";
 import { SpellDataEditor } from "@/views/SpellsView";
 
@@ -62,35 +62,16 @@ interface InventoryViewProps {
   showPublicContent?: boolean;
 }
 
-// Helper to create item signature for grouping
-const getItemSignature = (item: InventoryItem): string => {
-  const modifiersStr = item.statModifiers
-    ? JSON.stringify(Object.entries(item.statModifiers).filter(([, v]) => v !== 0).sort())
-    : '';
-  return `${item.name}|${item.description || ''}|${item.equipSlot || ''}|${item.goldValue ?? 0}|${modifiersStr}`;
-};
+// Copies of the same item are grouped into one stack
+const getItemSignature = getItemStackKey;
 
-// Consolidate items by signature
 interface ConsolidatedItem {
   item: InventoryItem;
   count: number;
   ids: string[];
 }
 
-const consolidateItems = (items: InventoryItem[]): ConsolidatedItem[] => {
-  const groups = new Map<string, ConsolidatedItem>();
-  for (const item of items) {
-    const sig = getItemSignature(item);
-    const existing = groups.get(sig);
-    if (existing) {
-      existing.count++;
-      existing.ids.push(item.id);
-    } else {
-      groups.set(sig, { item, count: 1, ids: [item.id] });
-    }
-  }
-  return Array.from(groups.values());
-};
+const consolidateItems = (items: InventoryItem[]): ConsolidatedItem[] => stackItems(items);
 
 const InventoryView: React.FC<InventoryViewProps> = ({
   crawlers,
