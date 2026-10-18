@@ -24,11 +24,11 @@ import { collection, doc, onSnapshot, setDoc, FieldPath } from 'firebase/firesto
 import {
   hasPersonality, distance, mentionsName, timeOfDay, hpWords,
   buildSystemPrompt, buildLinePrompt, buildShouldSpeakPrompt, buildSecretCheckPrompt,
-  formatTranscript, isYes, cleanLine, parseBeastLine,
+  formatTranscript, isYes, cleanLine, parseGestureLine, hasGestureStyle,
   rollPersonalityTraits, buildPersonalityPrompt, parsePersonality, defaultPersuasionDC, PERSONALITY_SYSTEM_PROMPT,
   MEMORY_SYSTEM_PROMPT, buildMemoryPrompt, parseMemory,
 } from './brain.mjs';
-import { mobLanguageIds, languageName, BEAST_LANGUAGE_ID } from '../languageList.mjs';
+import { mobLanguageIds, languageName, DEAD_LANGUAGE_ID } from '../languageList.mjs';
 import { mapSpeakers, getMobKind } from './speakers.mjs';
 
 export const DEFAULT_NPC_CONFIG = {
@@ -407,6 +407,11 @@ export class NpcRoom {
     return languageName(id, this.state.languages);
   }
 
+  /** Corpses (mobs that speak Dead) stay silent unless someone talks to them in Dead. */
+  isCorpse(mob) {
+    return !!mob && mobLanguageIds(mob).includes(DEAD_LANGUAGE_ID);
+  }
+
   mobKnows(mob, languageId) {
     return !languageId || mobLanguageIds(mob).includes(languageId);
   }
@@ -672,6 +677,8 @@ export class NpcRoom {
     if (!this.live || !this.enabled || this.settings.mutedAll) return;
     job.createdAt = Date.now();
     if (job.kind === 'line') {
+      const mob = this.npcPlacements().find((n) => n.mobId === job.mobId)?.mob;
+      if (this.isCorpse(mob) && job.heard !== DEAD_LANGUAGE_ID) return;
       const existing = this.queue.findIndex((j) => j.kind === 'line' && j.mobId === job.mobId);
       if (existing >= 0) {
         if (job.direct || !this.queue[existing].direct) this.queue[existing] = job;
@@ -840,18 +847,18 @@ export class NpcRoom {
     const known = mobLanguageIds(mob);
     if (job.heard && known.includes(job.heard)) this.lastLanguageByMob.set(mob.id, job.heard);
     const lastHeard = this.lastLanguageByMob.get(mob.id);
-    const language = lastHeard && known.includes(lastHeard) ? lastHeard : known[0];
-    const beast = language === BEAST_LANGUAGE_ID;
+    const language = this.isCorpse(mob) ? DEAD_LANGUAGE_ID : lastHeard && known.includes(lastHeard) ? lastHeard : known[0];
+    const gestureStyle = hasGestureStyle(language) ? language : undefined;
     let line = '';
     let gesture = '';
     try {
       const secretUnlocked = this.secrets[mob.id]?.state === 'unlocked';
       const system = buildSystemPrompt({
         mob, secretUnlocked, scene: this.scene(placement), memory: this.memoryFor(mob),
-        speaking: this.languageName(language), knownLanguages: known.map((id) => this.languageName(id)), beast,
+        speaking: this.languageName(language), knownLanguages: known.map((id) => this.languageName(id)), gesture: gestureStyle,
       });
-      const raw = await this.ask(tier, system, buildLinePrompt({ mob, transcript, trigger: job.trigger }), { maxTokens: beast ? 110 : 80, temperature: 0.8 });
-      if (beast) ({ text: line, gesture } = parseBeastLine(raw, mob.name));
+      const raw = await this.ask(tier, system, buildLinePrompt({ mob, transcript, trigger: job.trigger }), { maxTokens: gestureStyle ? 110 : 80, temperature: 0.8 });
+      if (gestureStyle) ({ text: line, gesture } = parseGestureLine(raw, mob.name));
       else line = cleanLine(raw, mob.name);
     } finally {
       await this.writeStatus({ thinking: null });

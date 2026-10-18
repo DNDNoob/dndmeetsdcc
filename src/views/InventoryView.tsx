@@ -134,6 +134,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     isSpellTome?: boolean;
     spellTomeData?: { entries: Array<{ spellId?: string; customSpell?: Spell }> };
     language?: string;
+    grantsLanguage?: string;
   }>({
     name: "", description: "", equipSlot: undefined, goldValue: undefined, statModifiers: undefined, weaponData: undefined,
   });
@@ -209,6 +210,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
       isSpellTome: item.isSpellTome,
       spellTomeData: item.spellTomeData,
       language: item.language,
+      grantsLanguage: item.grantsLanguage,
     });
     setShowWeaponConfig(!!item.weaponData);
     setShowSpellTomeConfig(!!item.isSpellTome);
@@ -244,6 +246,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
               equipSlot: newLibraryItem.equipSlot,
               goldValue: newLibraryItem.goldValue,
               language: newLibraryItem.language,
+              grantsLanguage: newLibraryItem.grantsLanguage,
               ...(mods && Object.keys(mods).length > 0 ? { statModifiers: mods } : { statModifiers: undefined }),
               ...weaponFields,
               ...spellTomeFields,
@@ -271,6 +274,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 equipSlot: newLibraryItem.equipSlot,
                 goldValue: newLibraryItem.goldValue,
                 language: newLibraryItem.language,
+                grantsLanguage: newLibraryItem.grantsLanguage,
                 ...(mods && Object.keys(mods).length > 0 ? { statModifiers: mods } : { statModifiers: undefined }),
                 ...weaponFields,
                 ...spellTomeFields,
@@ -292,6 +296,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
         equipSlot: newLibraryItem.equipSlot,
         goldValue: newLibraryItem.goldValue,
         ...(newLibraryItem.language ? { language: newLibraryItem.language } : {}),
+        ...(newLibraryItem.grantsLanguage ? { grantsLanguage: newLibraryItem.grantsLanguage } : {}),
         ...(mods && Object.keys(mods).length > 0 ? { statModifiers: mods } : {}),
         ...weaponFields,
         ...spellTomeFields,
@@ -666,6 +671,14 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 value={newLibraryItem.language}
                 onChange={(language) => setNewLibraryItem({ ...newLibraryItem, language })}
                 noneLabel="Description readable by anyone"
+                className="bg-muted border border-border px-2 py-1 text-sm w-full"
+              />
+              <LanguageSelect
+                value={newLibraryItem.grantsLanguage}
+                onChange={(grantsLanguage) => setNewLibraryItem({ ...newLibraryItem, grantsLanguage })}
+                noneLabel="Grants no language"
+                optionLabel={(name) => `While equipped, knows ${name}`}
+                ariaLabel="Grants language while equipped"
                 className="bg-muted border border-border px-2 py-1 text-sm w-full"
               />
               <div className="flex gap-2">

@@ -21,7 +21,7 @@ import NpcChatPanel, { type NpcChatAuthor, type NpcChatMentionable } from "@/com
 import NpcSpeechBubbles from "@/components/ui/NpcSpeechBubbles";
 import type { NpcOnlineKeys } from "@/lib/npc/onlineLlm.mjs";
 import { useLanguages } from "@/contexts/LanguagesContext";
-import { readChatLine, usableLanguageIds, DEFAULT_LANGUAGE_ID } from "@/lib/languages";
+import { readChatLine, usableLanguageIds, languageEffectLeft, DEFAULT_LANGUAGE_ID } from "@/lib/languages";
 import MerchantPanel, { MerchantHagglePrompts } from "@/components/MerchantPanel";
 import { isMerchant, getHaggleBlocker, MERCHANT_TRADE_RANGE_FEET, type MerchantState } from "@/lib/gameData";
 import { withNpcPersonality, speakerAsMob, mapSpeakers, baseMobId, isPlacementHostile, NPC_TALK_RANGE_FEET, type TranslateMode, type ChatMessage, type NpcAiSettings, type NpcAiStatus, type NpcSecretEntry, type NpcSecretState, type NpcGeneratedPersonality, type NpcMemory } from "@/lib/gameData";
@@ -2276,7 +2276,15 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     const ids = usableLanguageIds(myChatCrawler);
     // Worldspeech first when they know it, so it's the default
     const ordered = ids.includes(DEFAULT_LANGUAGE_ID) ? [DEFAULT_LANGUAGE_ID, ...ids.filter(id => id !== DEFAULT_LANGUAGE_ID)] : ids;
-    return ordered.map(id => allLanguageList.find(l => l.id === id)).filter((l): l is NonNullable<typeof l> => !!l);
+    // Spell languages say how long they have left: "Dead (Speak with Dead, 3 questions left)"
+    const effects = myChatCrawler.languageEffects ?? [];
+    return ordered.map(id => {
+      const l = allLanguageList.find(x => x.id === id);
+      const effect = effects.find(e => e.languageId === id);
+      if (!l || !effect || myChatCrawler.languages?.includes(id)) return l;
+      const left = languageEffectLeft(effect);
+      return { ...l, name: `${l.name} (${effect.name}${left ? `, ${left}` : ''})` };
+    }).filter((l): l is NonNullable<typeof l> => !!l);
   }, [myChatCrawler, allLanguageList]);
 
   // Mob tokens on the current map (episode + runtime placements)

@@ -41,12 +41,31 @@ export interface Crawler {
   languages?: string[];   // Language ids this crawler knows; none set = Worldspeech only
   telepathic?: boolean;   // Needed to use Mindspeech (DM sets it)
   translateMode?: TranslateMode; // Translating chat lines for party members who don't know the language
+  languageEffects?: LanguageEffect[]; // Spells like Speak with Animals: languages known for a while
+  itemLanguages?: string[]; // Worked out from equipped items when crawlers load; not something to save
 }
 
 // ======== Languages ========
 
 /** off: not translating. auto: lines pass on to the party as said. review: the translator passes each line on (or twists it) first. */
 export type TranslateMode = 'off' | 'auto' | 'review';
+
+/**
+ * A language a crawler knows for a while, from casting a spell. It ends when a countdown it has
+ * reaches 0: noncombat turns tick at each new noncombat turn, combat rounds at each new round. A spell
+ * timed only in combat rounds also ends at the next noncombat turn (an hour passes). With neither, it
+ * lasts until the DM or the crawler ends it. questionsLeft (Speak with Dead) only limits speaking:
+ * at 0 the crawler can't talk in the language any more but still understands the last answer.
+ */
+export interface LanguageEffect {
+  id: string;
+  name: string;          // the spell, e.g. "Speak with Animals"
+  spellId?: string;
+  languageId: string;
+  noncombatTurnsLeft?: number;
+  combatRoundsLeft?: number;
+  questionsLeft?: number;
+}
 
 /** A language someone made up: rooms/{roomId}/languages/{id}. Built-in languages live in src/lib/languageList.mjs. */
 export interface CustomLanguage {
@@ -261,6 +280,8 @@ export interface SpellData {
   specialEffect?: string;
   splashDamage?: boolean;
   reactionTrigger?: string; // For Reaction spells: describes what triggers the reaction (e.g. "when you are hit by an attack")
+  grantsLanguage?: string;  // Casting it lets the caster know this language for the spell's duration (Speak with Animals → Beast)
+  questionLimit?: number;   // With grantsLanguage: lines the caster can say in it per casting (Speak with Dead: 5)
 }
 
 export interface Spell {
@@ -330,6 +351,7 @@ export interface InventoryItem {
   createdByUsername?: string; // Denormalized for display
   isPublic?: boolean;        // Whether visible to players outside the campaign
   language?: string;         // Written in this language: the description is scrambled for crawlers who don't know it
+  grantsLanguage?: string;   // While equipped, the crawler knows this language (a druid's charm grants Beast)
 }
 
 // Compute total stat modifiers from all equipped items on a crawler

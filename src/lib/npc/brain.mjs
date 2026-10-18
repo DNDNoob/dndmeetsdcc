@@ -136,11 +136,31 @@ export const parseMemory = (raw, crawlers, prev) => {
 };
 
 /**
+ * Languages with no words for outsiders. Each line is "meaning || what you do": crawlers who know the
+ * language read the meaning, everyone else sees the body language.
+ */
+const GESTURE_STYLES = {
+  beast: {
+    intro: 'You are a creature that talks in animal sounds and body language (Beast). Only crawlers who can speak with animals understand your words; everyone else just sees what you do.',
+    example: 'Food first, then I show you the tunnel. || squeaks twice and backs toward the hole, eyeing your cheese',
+  },
+  plant: {
+    intro: 'You are a plant that talks in rustling, creaking and slow movement (Plant). Only crawlers who can speak with plants understand your words; everyone else just sees what you do. You only know slow, local things: who walked past, weather, water, light, what grows and rots around you. You think in seasons, not minutes.',
+    example: 'Heavy boots came at moonrise and crushed my roots. They went east. || its leaves shiver and a vine curls toward the east tunnel',
+  },
+  dead: {
+    intro: 'You are dead. A spell (Speak with Dead) gives your corpse a voice for a few questions (Dead). You only know what you knew in life, up to the moment you died; you learn nothing new and cannot see the present. Answer briefly, and often cryptically. You are not obliged to be truthful to those you hated in life.',
+    example: 'The one with the iron ring. He laughed as I fell. || its jaw creaks open and a dry whisper escapes',
+  },
+};
+
+/**
  * System prompt for one NPC line. The secret is only included when the DM has unlocked it,
  * so the model can't leak what it hasn't been told.
  */
-export const buildSystemPrompt = ({ mob, secretUnlocked, scene, memory, speaking, knownLanguages, beast }) => {
+export const buildSystemPrompt = ({ mob, secretUnlocked, scene, memory, speaking, knownLanguages, gesture }) => {
   const p = mob.personality || {};
+  const style = gesture ? GESTURE_STYLES[gesture] : null;
   const lines = [
     `You are ${mob.name}, a character in a gritty, darkly funny dungeon-crawl tabletop game.`,
   ];
@@ -158,8 +178,8 @@ export const buildSystemPrompt = ({ mob, secretUnlocked, scene, memory, speaking
     }
   }
   lines.push(...describeMemory(memory));
-  if (beast) {
-    lines.push('You are a creature that talks in animal sounds and body language (Beast). Only crawlers who can speak with animals understand your words; everyone else just sees what you do.');
+  if (style) {
+    lines.push(style.intro);
   } else if (speaking) {
     lines.push(`You are speaking ${speaking}${knownLanguages?.length > 1 ? ` (you know ${knownLanguages.join(', ')})` : ''}. Write your words in plain English; the game shows them in ${speaking}.`);
   }
@@ -171,9 +191,9 @@ export const buildSystemPrompt = ({ mob, secretUnlocked, scene, memory, speaking
   if (scene.nearby.length) lines.push(`- Crawlers right next to you: ${scene.nearby.map(describeCrawler).join('; ')}`);
   if (scene.farther.length) lines.push(`- Crawlers farther away: ${scene.farther.map(describeCrawler).join('; ')}`);
   lines.push('');
-  if (beast) {
+  if (style) {
     lines.push('Rules: Reply with ONE line in this exact form: what you mean, in plain words (25 words or fewer) || what the crawlers see and hear you do (15 words or fewer, third person, no name).');
-    lines.push('Example: Food first, then I show you the tunnel. || squeaks twice and backs toward the hole, eyeing your cheese');
+    lines.push(`Example: ${style.example}`);
     lines.push('Stay in character. No quotation marks, no name prefix.');
   } else {
     lines.push('Rules: Reply with ONE line of spoken dialogue, 25 words or fewer. Stay in character.');
@@ -238,11 +258,14 @@ export const cleanLine = (raw, name) => {
   return text;
 };
 
+/** Languages that get the "meaning || what you do" format (see GESTURE_LANGUAGE_IDS). */
+export const hasGestureStyle = (languageId) => Object.hasOwn(GESTURE_STYLES, languageId);
+
 /**
- * Split a Beast reply ("words || body language") into the words (for those who understand) and
- * what everyone else sees, as "*squeaks and backs away*". No body language → gesture is ''.
+ * Split a Beast, Plant or Dead reply ("words || body language") into the words (for those who
+ * understand) and what everyone else sees, as "*squeaks and backs away*". No body language → gesture is ''.
  */
-export const parseBeastLine = (raw, name) => {
+export const parseGestureLine = (raw, name) => {
   const text = stripThinking(raw).trim();
   const firstLine = text.split(/\r?\n/).map((l) => l.trim()).find((l) => l.length > 0) || '';
   const [words, ...rest] = firstLine.split('||');
