@@ -2,6 +2,13 @@
   {
     "date": "2026-10-18",
     "changes": [
+      "💰 Mob loot: when a hostile mob goes down in combat, its gold and items are looted automatically and shared by every crawler in the fight",
+      "🧪 Gold is split evenly. Items a mob has several copies of, like potions, are dealt out evenly, and anything left over goes to the party inventory",
+      "🎒 New party inventory on the Profiles page holds unclaimed loot. Any crawler can Take what they need, and the DM can take for a crawler or discard items",
+      "📜 Each kill posts a Looted line to the dice history showing who got what",
+      "💥 Some loot gets smashed: each coin and each copy of a stackable item has a chance to be destroyed when a mob is looted (25% by default, set per mob in the DM Console). Single items are never smashed",
+      "🧤 New Looting level on each crawler's profile: every mob you help loot counts, and each level makes your loot a tenth less likely to be smashed (level 10 never loses anything)",
+      "📦 Copies of the same item now always stack (Health Potion x3) in the Show Time inventory panel, loot boxes, merchant sell lists and mob item lists, not just on profiles",
       "🗣️ Languages: crawlers and mobs now know languages (Worldspeech, Dervish, Vernonacular, Mindspeech, Ward sign, Mewmew, Base64 and Kra Kow). Lines in a language you don't know show up as gibberish in Game Chat and speech bubbles",
       "🧠 Mindspeech only works for crawlers the DM has marked Telepathic",
       "🐉 Mobs have a Languages picker in the DM Console. NPCs answer in the language they're spoken to in, and can't understand languages they don't know",
@@ -26,6 +33,8 @@
       "🐛 In Show Time, reaching for the red X or other map tools at the top right no longer pops open the top menu and shoves the tools panel down. The menu now opens only when you rest your mouse at the top-left edge for a moment",
       "🐛 If a profile can't be saved because you're not signed in with Google, the message now says so instead of just \"Failed to save profile\"",
       "🧠 Laptop NPC brain now always uses the local AI model on the DM's computer, never Groq or Gemini. Online stays the fast option that runs in the DM's tab",
+      "🐾 New Beast language for animals: crawlers who know Beast (Speak with Animals) read what the creature means, everyone else sees what it does, like *squeaks twice and backs toward the hole*",
+      "🤐 Silent checkbox on mobs: oozes, constructs and the like never talk in Game Chat and can't be @ mentioned",
       "🧠 NPCs now remember conversations: once a chat with an NPC goes quiet, the AI saves a few notes and how the NPC feels about each crawler, and the NPC brings them up next time. Characters remember for the whole campaign; creature copies for their episode",
       "✏️ DMs can see, edit or wipe what each NPC remembers from the brain icon in the Game Chat settings",
       "👂 NPCs now follow more of the conversation (the last 25 messages they heard, up from 10), but only what they could have heard: nothing from other maps or out of earshot, in replies or in memory",

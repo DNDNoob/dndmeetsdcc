@@ -266,6 +266,10 @@ Each item can have:
 - Remove items with the trash icon
 - Edit item names and descriptions inline
 
+## Item Stacks
+
+Copies of the same item always stack. A crawler carrying three Health Potions sees one **Health Potion x3** row in their inventory, in the Show Time inventory panel, in loot boxes, in a merchant's sell list and in a mob's item list. Two items count as copies when their name, description, equipment slot, gold value and stat modifiers all match. Removing or selling takes one copy off the stack.
+
 ## Gold
 
 Each crawler has their own gold balance. The total party gold is displayed at the top of the inventory page. In edit mode, you can adjust gold with +10/-10 buttons or type a specific amount.
@@ -311,6 +315,68 @@ If you have **Show Public Content** enabled in your account settings, a "Communi
 
 - DMs can click **+** on a community item to copy it into their local item library
 - Copied items start as private and belong to the DM who imported them`,
+  },
+  {
+    id: 'mob-loot',
+    slug: 'mob-loot',
+    title: 'Mob Loot & Party Inventory',
+    category: 'Game Mechanics',
+    order: 13,
+    content: `# Mob Loot & Party Inventory
+
+When a hostile mob goes down in combat, its items and gold are looted automatically. Nobody has to hand anything out.
+
+## What a Mob Drops
+
+A mob drops the items and gold set on it in the DM Console. If the DM gave that mob a different inventory or gold amount for this episode (in the map's mob placement editor), those are used instead.
+
+Friendly mobs keep their things when they go down, because the crawlers weren't fighting them.
+
+## Who Gets What
+
+Loot is shared by every crawler in the combat's initiative list, including anyone who is knocked out.
+
+- **Gold** is split evenly. Leftover coins go one each to crawlers in initiative order. (10 gold between 3 crawlers is 4, 3 and 3.)
+- **Items the mob carries more than one copy of**, like potions, are dealt out evenly. Copies that can't be split evenly go to the party inventory. (4 potions between 3 crawlers is 1 each, plus 1 for the party.)
+- **Single items**, like a mob's one dagger, go to the party inventory.
+
+## Smashed Loot
+
+Looting is rough work, and some loot gets smashed. Each coin and each copy of a stackable item (anything the mob carries more than one of) rolls a chance to be destroyed instead of looted. Single items, like a mob's one dagger, are never smashed.
+
+- The chance is **25%** by default. The DM can change it for each mob with **Smash chance** in the DM Console, next to the mob's gold.
+- Each crawler's share rolls against their own Looting level. Leftovers headed for the party inventory roll against the best looter in the fight.
+- The **Looted** line in the dice history lists what was smashed.
+
+## Looting Level
+
+Every mob a crawler helps loot counts toward their **Looting level**, shown on their profile under Activity with how many more mobs they need for the next level.
+
+| Level | Mobs looted | Loot smashed |
+|-------|-------------|--------------|
+| 0 | 0 | normal rate |
+| 1 | 10 | 10% less often |
+| 2 | 30 | 20% less often |
+| 3 | 60 | 30% less often |
+| 4 | 100 | 40% less often |
+| 5 | 150 | half as often |
+| 10 | 550 | never |
+
+Each level cuts the chance by a tenth, so with a 25% smash chance a level 5 looter only loses about 12%. A toast celebrates each level-up.
+
+## When It Happens
+
+Loot drops the moment the mob's HP reaches 0, whether from an attack or from the DM setting its HP. A mob is only looted once: healing it and bringing it down again doesn't drop anything more, and its body stays empty in later fights in that episode.
+
+Every kill posts a **Looted** line to the dice history showing what each crawler got, what was smashed and what went to the party.
+
+## Party Inventory
+
+The party inventory holds looted items nobody has claimed yet. It appears on the Profiles page under the inventory summary whenever it has something in it.
+
+- Click **Take** to move one copy into the crawler you're viewing, or **All** to take the whole stack.
+- If two players click Take on the last copy at the same time, only one gets it.
+- The DM can take items for any crawler, and can discard items with the trash icon.`,
   },
   {
     id: 'combat',
@@ -959,6 +1025,7 @@ NPCs remember the party. When a conversation with an NPC has been quiet for abou
 - **Characters** (like Grimble) keep their memory for the whole campaign, across maps and episodes.
 - **Creature copies** (like Goblin B) each remember their own conversations, but only for the episode they were made in.
 - Locked secrets never go into memory, since the AI doesn't know them.
+- Animals that speak **Beast** show body language to crawlers who don't know Beast, and **Silent** mobs never talk. See [Languages](/wiki/languages).
 - NPCs only know what they could have heard: messages players sent while the NPC was within 20 ft, your narration (unless you @ someone else), and other NPCs talking close by on the same map. Each reply uses the last 25 messages the NPC heard, and nothing from other maps or out of earshot goes into its replies or its memory.
 
 DMs can see and change what an NPC remembers: open the Game Chat settings and tap the brain icon next to the NPC. The number on it is how many notes it has. Edit the notes (one per line) and tap **Save**, or tap **Forget everything** to wipe its memory and feelings.
@@ -997,7 +1064,7 @@ NPCs can also say their lines out loud. Turn on **Spoken voices** in the Game Ch
 
 - The voices come from Kokoro, a free voice model that runs in the DM's browser. The first time it's switched on, the browser downloads it (about 90 MB) and keeps it for next time. Keep the DM tab open during the game, the same as for the Online brain.
 - Each line is saved as a short sound clip that players' devices play once. Clips are deleted again after about 15 minutes.
-- Lines in a language a player doesn't know are read to them as the scrambled words, so it sounds foreign. Players who know the language, and the DM, hear the real words. Lines in Mindspeech or Ward sign aren't read aloud.
+- Lines in a language a player doesn't know are read to them as the scrambled words, so it sounds foreign. Players who know the language, and the DM, hear the real words. Lines in Mindspeech or Ward sign aren't read aloud, and players who don't know Beast hear nothing from a beast (they still see what it does).
 - Actions written between asterisks (the NPC grinning, wiping its hands) are skipped; only the words are spoken.
 
 ### Picking a voice
@@ -1057,6 +1124,7 @@ Crawlers and mobs know languages. If someone talks in a language you don't know,
 | **Mewmew** | The Felinus races |
 | **Base64** | Machines and sentient robots |
 | **Kra Kow** | Usually goblins, orcs and trolls |
+| **Beast** | Animal sounds and body language. Give it to a crawler with Speak with Animals or a similar gift |
 
 Each language looks different when you can't read it: Kra Kow is harsh grunts, Mewmew is mrrps, Ward sign is symbols, Mindspeech is waves. Base64 really is Base64, so a crawler with a decoder and some patience might work it out.
 
@@ -1076,6 +1144,14 @@ When an NPC talks:
 - If someone speaks to it in a language it knows, it answers in that language.
 - If someone speaks to it in a language it doesn't know, it can't understand them and answers in its native tongue.
 - When it speaks up on its own, it uses the last language it was spoken to in, or its native tongue.
+
+### Beasts
+
+Pick **Beast** for animals. A crawler who knows Beast reads what the animal means in plain words. Everyone else sees what it does instead, such as *squeaks twice and backs toward the hole*, so the party can still read its mood.
+
+### Silent Mobs
+
+Tick **Silent** on a mob that never talks (oozes, constructs). It stays quiet in the Game Chat and can't be @ mentioned, even if it has a personality.
 
 ## Talking in a Language
 

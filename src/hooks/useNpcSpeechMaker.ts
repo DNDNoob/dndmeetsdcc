@@ -11,6 +11,7 @@ import {
   type NpcSpeechVoice,
 } from '@/lib/gameData';
 import { TELEPATHIC_LANGUAGE_ID, crawlerUnderstands, scrambleText } from '@/lib/languages';
+import { BEAST_LANGUAGE_ID } from '@/lib/languageList.mjs';
 import { speechEngine } from '@/lib/npcSpeech/engine';
 import { speakerVoice } from '@/lib/npcSpeech/voices';
 
@@ -119,7 +120,8 @@ export function useNpcSpeechMaker(opts: NpcSpeechMakerOptions) {
       const speaker = mob ? withNpcPersonality({ ...mob, id: m.authorId, name: m.authorName }, personalities) : undefined;
       const { voice, speed } = speakerVoice(m.authorId, speaker, voicePicks);
       const lang = m.language;
-      const scrambled = lang && crawlers.some(c => !crawlerUnderstands(c, lang)) ? speakableText(scrambleText(words, lang)) : '';
+      // Beasts: players who don't know Beast see what the creature does, and hear nothing
+      const scrambled = lang && lang !== BEAST_LANGUAGE_ID && crawlers.some(c => !crawlerUnderstands(c, lang)) ? speakableText(scrambleText(words, lang)) : '';
 
       const clip = async (text: string, suffix: string) => {
         const wav = await speechEngine.speak(text, voice!, speed);

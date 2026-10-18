@@ -139,7 +139,7 @@ export const parseMemory = (raw, crawlers, prev) => {
  * System prompt for one NPC line. The secret is only included when the DM has unlocked it,
  * so the model can't leak what it hasn't been told.
  */
-export const buildSystemPrompt = ({ mob, secretUnlocked, scene, memory, speaking, knownLanguages }) => {
+export const buildSystemPrompt = ({ mob, secretUnlocked, scene, memory, speaking, knownLanguages, beast }) => {
   const p = mob.personality || {};
   const lines = [
     `You are ${mob.name}, a character in a gritty, darkly funny dungeon-crawl tabletop game.`,
@@ -158,7 +158,9 @@ export const buildSystemPrompt = ({ mob, secretUnlocked, scene, memory, speaking
     }
   }
   lines.push(...describeMemory(memory));
-  if (speaking) {
+  if (beast) {
+    lines.push('You are a creature that talks in animal sounds and body language (Beast). Only crawlers who can speak with animals understand your words; everyone else just sees what you do.');
+  } else if (speaking) {
     lines.push(`You are speaking ${speaking}${knownLanguages?.length > 1 ? ` (you know ${knownLanguages.join(', ')})` : ''}. Write your words in plain English; the game shows them in ${speaking}.`);
   }
   lines.push('');
@@ -169,8 +171,14 @@ export const buildSystemPrompt = ({ mob, secretUnlocked, scene, memory, speaking
   if (scene.nearby.length) lines.push(`- Crawlers right next to you: ${scene.nearby.map(describeCrawler).join('; ')}`);
   if (scene.farther.length) lines.push(`- Crawlers farther away: ${scene.farther.map(describeCrawler).join('; ')}`);
   lines.push('');
-  lines.push('Rules: Reply with ONE line of spoken dialogue, 25 words or fewer. Stay in character.');
-  lines.push('No narration, no stage directions, no actions in asterisks, no quotation marks, no name prefix.');
+  if (beast) {
+    lines.push('Rules: Reply with ONE line in this exact form: what you mean, in plain words (25 words or fewer) || what the crawlers see and hear you do (15 words or fewer, third person, no name).');
+    lines.push('Example: Food first, then I show you the tunnel. || squeaks twice and backs toward the hole, eyeing your cheese');
+    lines.push('Stay in character. No quotation marks, no name prefix.');
+  } else {
+    lines.push('Rules: Reply with ONE line of spoken dialogue, 25 words or fewer. Stay in character.');
+    lines.push('No narration, no stage directions, no actions in asterisks, no quotation marks, no name prefix.');
+  }
   lines.push('Never speak or decide for the players.');
   return lines.join('\n');
 };
@@ -228,6 +236,20 @@ export const cleanLine = (raw, name) => {
   text = text.replace(/^["“”'‘’]+|["“”'‘’]+$/g, '').trim();
   if (text.length > 220) text = text.slice(0, 217).replace(/\s+\S*$/, '') + '…';
   return text;
+};
+
+/**
+ * Split a Beast reply ("words || body language") into the words (for those who understand) and
+ * what everyone else sees, as "*squeaks and backs away*". No body language → gesture is ''.
+ */
+export const parseBeastLine = (raw, name) => {
+  const text = stripThinking(raw).trim();
+  const firstLine = text.split(/\r?\n/).map((l) => l.trim()).find((l) => l.length > 0) || '';
+  const [words, ...rest] = firstLine.split('||');
+  let gesture = rest.join(' ').trim().replace(/^\*+|\*+$/g, '').trim();
+  if (name) gesture = gesture.replace(new RegExp(`^${escapeRegex(name)}\\s+`, 'i'), '');
+  if (gesture.length > 140) gesture = gesture.slice(0, 137).replace(/\s+\S*$/, '') + '…';
+  return { text: cleanLine(words, name), gesture: gesture ? `*${gesture}*` : '' };
 };
 
 // ── Auto-generated personalities ──

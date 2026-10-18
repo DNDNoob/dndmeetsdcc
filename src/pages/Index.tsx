@@ -168,6 +168,9 @@ const Index = () => {
     claimLootBoxItems,
     deleteLootBox,
     getCrawlerLootBoxes,
+    getPartyInventory,
+    updatePartyInventory,
+    takeFromPartyInventory,
     lootBoxTemplates,
     addLootBoxTemplate,
     updateLootBoxTemplate,
@@ -997,6 +1000,9 @@ const Index = () => {
                 onStatRoll={handleStatRoll}
                 getCrawlerLootBoxes={getCrawlerLootBoxes}
                 claimLootBoxItems={claimLootBoxItems}
+                getPartyInventory={getPartyInventory}
+                onTakeFromPartyInventory={takeFromPartyInventory}
+                onUpdatePartyInventory={updatePartyInventory}
                 noncombatTurnState={noncombatTurnState}
                 getNoncombatRollsRemaining={getNoncombatRollsRemaining}
                 recordNoncombatRoll={recordNoncombatRoll}
