@@ -865,8 +865,16 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                     <LanguagePicker
                       value={newMob.languages}
                       onChange={(languages) => setNewMob({ ...newMob, languages })}
-                      hint="Tap the languages it speaks. The first one is its native tongue. Players who don't know the language it uses see gibberish."
+                      hint="Tap the languages it speaks. The first one is its native tongue. Players who don't know the language it uses see gibberish. Pick Beast for animals: players without it see what the animal does instead."
                     />
+                    <label className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
+                      <input
+                        type="checkbox"
+                        checked={!!newMob.silent}
+                        onChange={(e) => setNewMob({ ...newMob, silent: e.target.checked })}
+                      />
+                      Silent: never talks in Game Chat (oozes, constructs)
+                    </label>
                   </div>
                   <NpcPersonalityFields
                     value={newMob.personality}
@@ -1030,8 +1038,17 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                           <LanguagePicker
                             value={editedMob.languages}
                             onChange={(languages) => setEditedMobData(prev => prev ? { ...prev, languages } : prev)}
-                            hint="Tap the languages it speaks. The first one is its native tongue. Players who don't know the language it uses see gibberish."
+                            hint="Tap the languages it speaks. The first one is its native tongue. Players who don't know the language it uses see gibberish. Pick Beast for animals: players without it see what the animal does instead."
                           />
+                          <label className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
+                            <input
+                              type="checkbox"
+                              checked={!!editedMob.silent}
+                              onChange={(e) => setEditedMobData(prev => prev ? { ...prev, silent: e.target.checked } : prev)}
+                              data-testid="mob-silent"
+                            />
+                            Silent: never talks in Game Chat (oozes, constructs)
+                          </label>
                         </div>
 
                         <div className="mt-3">

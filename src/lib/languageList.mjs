@@ -7,6 +7,9 @@ export const DEFAULT_LANGUAGE_ID = 'worldspeech';
 /** Only crawlers with the Telepathic switch on can use this one. */
 export const TELEPATHIC_LANGUAGE_ID = 'mindspeech';
 
+/** Animal speech: anyone who doesn't know it sees the creature's sounds and body language instead. */
+export const BEAST_LANGUAGE_ID = 'beast';
+
 export const BUILT_IN_LANGUAGES = [
   { id: 'worldspeech', name: 'Worldspeech', description: 'Essentially the common tongue, spoken by most races.' },
   { id: 'dervish', name: 'Dervish', description: 'A common language of small creatures like gnomes, dwarves and goblins.' },
@@ -16,6 +19,7 @@ export const BUILT_IN_LANGUAGES = [
   { id: 'mewmew', name: 'Mewmew', description: 'Spoken by the Felinus races.' },
   { id: 'base64', name: 'Base64', description: 'A numerical language, often used by machines and sentient robots.' },
   { id: 'kra-kow', name: 'Kra Kow', description: 'Usually spoken by goblins, orcs and trolls.' },
+  { id: 'beast', name: 'Beast', description: 'Animal sounds and body language. Crawlers need Speak with Animals (or a similar gift) to understand the words; everyone else sees what the creature does.' },
 ];
 
 /** A mob's languages; mobs with none set speak Worldspeech. The first one is its native tongue. */

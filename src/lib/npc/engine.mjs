@@ -24,11 +24,11 @@ import { collection, doc, onSnapshot, setDoc, FieldPath } from 'firebase/firesto
 import {
   hasPersonality, distance, mentionsName, timeOfDay, hpWords,
   buildSystemPrompt, buildLinePrompt, buildShouldSpeakPrompt, buildSecretCheckPrompt,
-  formatTranscript, isYes, cleanLine,
+  formatTranscript, isYes, cleanLine, parseBeastLine,
   rollPersonalityTraits, buildPersonalityPrompt, parsePersonality, defaultPersuasionDC, PERSONALITY_SYSTEM_PROMPT,
   MEMORY_SYSTEM_PROMPT, buildMemoryPrompt, parseMemory,
 } from './brain.mjs';
-import { mobLanguageIds, languageName } from '../languageList.mjs';
+import { mobLanguageIds, languageName, BEAST_LANGUAGE_ID } from '../languageList.mjs';
 import { mapSpeakers, getMobKind } from './speakers.mjs';
 
 export const DEFAULT_NPC_CONFIG = {
@@ -254,7 +254,7 @@ export class NpcRoom {
     const runtime = this.state.runtimeMobPlacements.filter((p) => p.mapId === mapId);
     const muted = new Set(this.settings.mutedMobIds || []);
     return mapSpeakers([...episodePlacements, ...runtime], this.state.mobs, [...(ep.mobPlacements || []), ...runtime])
-      .filter((s) => !s.mob.hidden && !muted.has(s.id) && !muted.has(s.mob.id))
+      .filter((s) => !s.mob.hidden && !s.mob.silent && !muted.has(s.id) && !muted.has(s.mob.id))
       .map((s) => ({ ...s.placement, mobId: s.id, sourceMobId: s.mob.id, mob: this.speakerMob(s) }));
   }
 
@@ -841,14 +841,18 @@ export class NpcRoom {
     if (job.heard && known.includes(job.heard)) this.lastLanguageByMob.set(mob.id, job.heard);
     const lastHeard = this.lastLanguageByMob.get(mob.id);
     const language = lastHeard && known.includes(lastHeard) ? lastHeard : known[0];
+    const beast = language === BEAST_LANGUAGE_ID;
     let line = '';
+    let gesture = '';
     try {
       const secretUnlocked = this.secrets[mob.id]?.state === 'unlocked';
       const system = buildSystemPrompt({
         mob, secretUnlocked, scene: this.scene(placement), memory: this.memoryFor(mob),
-        speaking: this.languageName(language), knownLanguages: known.map((id) => this.languageName(id)),
+        speaking: this.languageName(language), knownLanguages: known.map((id) => this.languageName(id)), beast,
       });
-      line = cleanLine(await this.ask(tier, system, buildLinePrompt({ mob, transcript, trigger: job.trigger }), { maxTokens: 80, temperature: 0.8 }), mob.name);
+      const raw = await this.ask(tier, system, buildLinePrompt({ mob, transcript, trigger: job.trigger }), { maxTokens: beast ? 110 : 80, temperature: 0.8 });
+      if (beast) ({ text: line, gesture } = parseBeastLine(raw, mob.name));
+      else line = cleanLine(raw, mob.name);
     } finally {
       await this.writeStatus({ thinking: null });
     }
@@ -863,6 +867,7 @@ export class NpcRoom {
       authorName: mob.name,
       text: line,
       language,
+      ...(gesture ? { gesture } : {}),
       createdAt: Date.now(),
       episodeId: this.showtime?.episodeId,
       mapId,

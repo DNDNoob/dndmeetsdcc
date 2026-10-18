@@ -2285,11 +2285,11 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     [currentMapMobPlacements, runtimeMobPlacements, currentMapId]
   );
 
-  // Every token that can talk (hidden mobs stay quiet). Characters speak as one; each creature
+  // Every token that can talk (hidden and silent mobs stay quiet). Characters speak as one; each creature
   // copy is its own speaker ("Goblin B") with its own personality.
   const npcSpeakers = useMemo(
     () => mapSpeakers(mobPlacementsOnMap, mobs, [...(selectedEpisode?.mobPlacements ?? []), ...runtimeMobPlacements])
-      .filter(s => !s.mob.hidden),
+      .filter(s => !s.mob.hidden && !s.mob.silent),
     [mobPlacementsOnMap, mobs, selectedEpisode?.mobPlacements, runtimeMobPlacements]
   );
 

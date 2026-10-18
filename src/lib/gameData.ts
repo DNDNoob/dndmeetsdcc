@@ -376,6 +376,7 @@ export interface Mob {
   isPublic?: boolean;        // Shared to the community (publicMobs)
   personality?: NpcPersonality; // DM-only: drives AI dialogue for talking NPCs
   languages?: string[];      // Language ids it speaks, native first; none set = Worldspeech
+  silent?: boolean;          // Never talks in Game Chat (oozes, constructs...)
   merchant?: MerchantConfig;  // NPCs that buy and sell items with crawlers
 }
 
@@ -646,6 +647,7 @@ export interface ChatMessage {
   nearMobIds?: string[]; // Player messages: mobs within talking range of the crawler when sent
   language?: string;     // Spoken in this language (none = everyone understands, e.g. the DM narrating)
   translationOf?: string; // A translator's version of another line, shown to party members who can't read it
+  gesture?: string;      // Beast lines: the sounds and body language seen by those who don't know Beast
 }
 
 /** Players can only talk to mobs this close to their crawler. */

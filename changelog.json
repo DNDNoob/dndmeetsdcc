@@ -33,6 +33,8 @@
       "🐛 In Show Time, reaching for the red X or other map tools at the top right no longer pops open the top menu and shoves the tools panel down. The menu now opens only when you rest your mouse at the top-left edge for a moment",
       "🐛 If a profile can't be saved because you're not signed in with Google, the message now says so instead of just \"Failed to save profile\"",
       "🧠 Laptop NPC brain now always uses the local AI model on the DM's computer, never Groq or Gemini. Online stays the fast option that runs in the DM's tab",
+      "🐾 New Beast language for animals: crawlers who know Beast (Speak with Animals) read what the creature means, everyone else sees what it does, like *squeaks twice and backs toward the hole*",
+      "🤐 Silent checkbox on mobs: oozes, constructs and the like never talk in Game Chat and can't be @ mentioned",
       "🧠 NPCs now remember conversations: once a chat with an NPC goes quiet, the AI saves a few notes and how the NPC feels about each crawler, and the NPC brings them up next time. Characters remember for the whole campaign; creature copies for their episode",
       "✏️ DMs can see, edit or wipe what each NPC remembers from the brain icon in the Game Chat settings",
       "👂 NPCs now follow more of the conversation (the last 25 messages they heard, up from 10), but only what they could have heard: nothing from other maps or out of earshot, in replies or in memory"
