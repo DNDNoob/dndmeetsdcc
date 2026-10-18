@@ -1064,7 +1064,8 @@ The dot next to the chat button is green when an NPC brain is listening. The cha
 NPCs can also say their lines out loud. Turn on **Spoken voices** in the Game Chat settings (gear icon). From then on, every NPC line is read aloud on every player's device at the same moment its speech bubble appears.
 
 - The voices come from online voice services, using free keys you paste into the chat settings: **Gemini** first, then **Groq**, then **ElevenLabs**. When one runs out of free use (or its key is missing or rejected), the next one takes over automatically, and the chat settings say which one is in use and when the others come back.
-- Gemini and Groq are told who is speaking (the NPC's name, Voice and manner notes and attitude), so a gruff dwarf sounds gruff and a nervous goblin sounds nervous.
+- Gemini and Groq get a short direction worked out from the NPC's Voice and manner notes and attitude (deep, gruff, nervous, cheerful, hushed, a British accent, slow or quick), so a gruff dwarf sounds gruff and a nervous goblin sounds nervous. Only the line itself is spoken.
+- Lines play by themselves. If a browser won't play sound until you've tapped the page, the line waits and plays on your first tap.
 - When every service is used up, voices are made by Kokoro, a free voice model that runs in the DM's browser. It sounds flatter, and the first time it's needed the browser downloads it (about 330 MB) and keeps it for next time.
 - Keep the DM tab open during the game, the same as for the Online brain. The keys are saved only in that browser.
 - Each line is saved as a short sound clip that players' devices play once. Clips are deleted again after about 15 minutes.
