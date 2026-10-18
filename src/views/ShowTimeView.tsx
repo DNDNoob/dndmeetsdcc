@@ -21,7 +21,7 @@ import NpcChatPanel, { type NpcChatAuthor, type NpcChatMentionable } from "@/com
 import NpcSpeechBubbles from "@/components/ui/NpcSpeechBubbles";
 import type { NpcOnlineKeys } from "@/lib/npc/onlineLlm.mjs";
 import MerchantPanel, { MerchantHagglePrompts } from "@/components/MerchantPanel";
-import { isMerchant, MERCHANT_TRADE_RANGE_FEET, type MerchantState } from "@/lib/gameData";
+import { isMerchant, getHaggleBlocker, MERCHANT_TRADE_RANGE_FEET, type MerchantState } from "@/lib/gameData";
 import { withNpcPersonality, NPC_TALK_RANGE_FEET, type ChatMessage, type NpcAiSettings, type NpcAiStatus, type NpcSecretEntry, type NpcSecretState, type NpcGeneratedPersonality } from "@/lib/gameData";
 
 const NO_GENERATED_PERSONALITIES: Record<string, NpcGeneratedPersonality> = {};
@@ -3933,6 +3933,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
           crawler={myCrawler}
           crawlerInventory={myCrawler ? getCrawlerInventory?.(myCrawler.id) ?? [] : []}
           distanceFeet={merchantDistanceFeet(openMerchantMob.id)}
+          haggleBlocker={myCrawler ? getHaggleBlocker(myCrawler.id, combatState, noncombatTurnState) : null}
           onBuy={async (item) => { if (myCrawler) await onBuyFromMerchant?.(openMerchantMob, myCrawler.id, item); }}
           onSell={async (itemId, minGold) => { if (myCrawler) await onSellToMerchant?.(openMerchantMob, myCrawler.id, itemId, minGold); }}
           onHaggle={async () => { if (myCrawler) await onHaggleWithMerchant?.(openMerchantMob, myCrawler); }}

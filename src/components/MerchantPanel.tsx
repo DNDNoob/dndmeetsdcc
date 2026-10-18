@@ -26,6 +26,8 @@ interface MerchantPanelProps {
   crawlerInventory?: InventoryItem[];
   /** Distance from the player's crawler to the merchant, or null when it can't be measured */
   distanceFeet: number | null;
+  /** Why the player can't spend an action on haggling right now, or null */
+  haggleBlocker?: string | null;
   onBuy: (item: InventoryItem) => Promise<unknown>;
   onSell: (itemId: string, minGold: number) => Promise<unknown>;
   onHaggle: () => Promise<unknown>;
@@ -38,7 +40,7 @@ type Tab = "buy" | "sell";
 
 /** Trade window for a merchant NPC in Show Time. Stock and gold are live for everyone. */
 export const MerchantPanel: React.FC<MerchantPanelProps> = ({
-  mob, state, isAdmin, crawler, crawlerInventory = [], distanceFeet,
+  mob, state, isAdmin, crawler, crawlerInventory = [], distanceFeet, haggleBlocker = null,
   onBuy, onSell, onHaggle, onRestock, onResolveHaggle, onClose,
 }) => {
   const [tab, setTab] = useState<Tab>("buy");
@@ -130,9 +132,10 @@ export const MerchantPanel: React.FC<MerchantPanelProps> = ({
               {!haggle ? (
                 <>
                   <span className="flex-1 text-muted-foreground">
-                    Haggle: roll Persuasion vs DC {haggleDC}. If you make it, the DM can lower your prices one level.
+                    Haggle: uses an action to roll Persuasion vs DC {haggleDC}. If you make it, the DM can lower your prices one level.
+                    {haggleBlocker && <span className="block text-destructive">{haggleBlocker}</span>}
                   </span>
-                  <DungeonButton size="sm" disabled={busy || scrooge === 0} onClick={() => run(onHaggle)}>
+                  <DungeonButton size="sm" disabled={busy || scrooge === 0 || !!haggleBlocker} onClick={() => run(onHaggle)}>
                     <Dices className="w-3 h-3 mr-1" /> Haggle
                   </DungeonButton>
                 </>

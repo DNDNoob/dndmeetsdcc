@@ -413,6 +413,29 @@ export const getMerchantBuyPrice = (goldValue: number | undefined, scrooge: numb
 export const getMerchantSellPrice = (goldValue: number | undefined, scrooge: number): number =>
   Math.max(0, Math.floor(Math.round((goldValue ?? 0) * (10 - scrooge)) / 10));
 
+/**
+ * Haggling uses an action, like the Actions tab: in combat it takes the crawler's action on
+ * their turn; between fights it uses one of their rolls for this noncombat turn.
+ * Returns why the crawler can't act right now, or null if they can.
+ */
+export const getHaggleBlocker = (
+  crawlerId: string,
+  combatState: Pick<CombatState, 'active' | 'phase' | 'combatants' | 'currentTurnIndex'> | null | undefined,
+  noncombatTurnState: Pick<NoncombatTurnState, 'rollsUsed' | 'maxRolls'> | null | undefined,
+): string | null => {
+  if (combatState?.active && combatState.phase !== 'ended') {
+    if (combatState.phase !== 'combat' || combatState.combatants[combatState.currentTurnIndex]?.id !== crawlerId) {
+      return 'Haggling uses your action. Wait for your turn.';
+    }
+    if (combatState.combatants.find(c => c.id === crawlerId)?.hasUsedAction) return 'You already used your action this turn.';
+    return null;
+  }
+  if (noncombatTurnState && (noncombatTurnState.rollsUsed?.[crawlerId] ?? 0) >= noncombatTurnState.maxRolls) {
+    return 'Haggling uses a roll, and you have none left this turn.';
+  }
+  return null;
+};
+
 /** Two items count as the same stock line when everything but the id matches. */
 export const merchantItemKey = (item: InventoryItem): string => {
   const { id: _id, equipped: _eq, ...rest } = item;

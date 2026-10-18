@@ -869,6 +869,8 @@ Prices are rounded to whole gold, up when buying and down when selling. Items wi
 
 In the trade window, press **Haggle** to roll Persuasion (d20 + your Charisma modifier, including equipment). The roll shows in the dice log.
 
+Haggling uses an action. In combat it takes your action, so you can only haggle on your turn before acting. Between fights it uses one of your rolls for the current turn.
+
 - If you meet the merchant's Haggle DC, the DM gets a prompt to lower your prices one Scrooge level. If they say yes, you trade at the lower level with that merchant.
 - If you fall short, or the DM says no, the merchant won't budge.
 

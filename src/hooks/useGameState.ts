@@ -50,6 +50,7 @@ import {
   getMerchantSellPrice,
   merchantItemKey,
   DEFAULT_HAGGLE_DC,
+  getHaggleBlocker,
 } from "@/lib/gameData";
 import { useGame } from "@/contexts/GameContext";
 import type { BatchOperation } from "@/hooks/useFirebaseStore";
@@ -1956,6 +1957,7 @@ export const useGameState = () => {
   /**
    * Rolls Persuasion (d20 + CHA mod, with equipment) to haggle. A roll that meets the DC asks the
    * DM to approve one Scrooge level off for this crawler. One try per crawler until the next restock.
+   * Uses the crawler's action in combat, or one of their rolls this noncombat turn.
    */
   const haggleWithMerchant = async (mob: Mob, crawler: Crawler) => {
     if (!mob.merchant) return null;
@@ -1963,6 +1965,11 @@ export const useGameState = () => {
     const existing = merchants.find(m => m.id === mob.id);
     if (existing?.haggles?.[crawler.id]) {
       toast.error(`You already haggled with ${mob.name}. Try again after they restock.`);
+      return null;
+    }
+    const blocker = getHaggleBlocker(crawler.id, combatState, noncombatTurnState);
+    if (blocker) {
+      toast.error(blocker);
       return null;
     }
     const cha = crawler.cha + (getEquippedModifiers(crawler, getCrawlerInventory(crawler.id)).cha ?? 0);
@@ -1977,6 +1984,9 @@ export const useGameState = () => {
       return [merchantDocOps(mob, !!merchantDoc, { ...state, haggles: { ...(state.haggles ?? {}), [crawler.id]: entry } })];
     });
     if (!ok) return null;
+    // Haggling costs the action (combat) or one of this turn's rolls (noncombat)
+    if (combatState?.active && combatState.phase !== 'ended') await recordCombatAction(crawler.id, 'action');
+    else await recordNoncombatRoll(crawler.id);
     await addDiceRoll({
       id: crypto.randomUUID(),
       crawlerName: crawler.name,
