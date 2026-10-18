@@ -959,6 +959,7 @@ NPCs remember the party. When a conversation with an NPC has been quiet for abou
 - **Characters** (like Grimble) keep their memory for the whole campaign, across maps and episodes.
 - **Creature copies** (like Goblin B) each remember their own conversations, but only for the episode they were made in.
 - Locked secrets never go into memory, since the AI doesn't know them.
+- Animals that speak **Beast** show body language to crawlers who don't know Beast, and **Silent** mobs never talk. See [Languages](/wiki/languages).
 - NPCs only know what they could have heard: messages players sent while the NPC was within 20 ft, your narration (unless you @ someone else), and other NPCs talking close by on the same map. Each reply uses the last 25 messages the NPC heard, and nothing from other maps or out of earshot goes into its replies or its memory.
 
 DMs can see and change what an NPC remembers: open the Game Chat settings and tap the brain icon next to the NPC. The number on it is how many notes it has. Edit the notes (one per line) and tap **Save**, or tap **Forget everything** to wipe its memory and feelings.
@@ -1037,6 +1038,7 @@ Crawlers and mobs know languages. If someone talks in a language you don't know,
 | **Mewmew** | The Felinus races |
 | **Base64** | Machines and sentient robots |
 | **Kra Kow** | Usually goblins, orcs and trolls |
+| **Beast** | Animal sounds and body language. Give it to a crawler with Speak with Animals or a similar gift |
 
 Each language looks different when you can't read it: Kra Kow is harsh grunts, Mewmew is mrrps, Ward sign is symbols, Mindspeech is waves. Base64 really is Base64, so a crawler with a decoder and some patience might work it out.
 
@@ -1056,6 +1058,14 @@ When an NPC talks:
 - If someone speaks to it in a language it knows, it answers in that language.
 - If someone speaks to it in a language it doesn't know, it can't understand them and answers in its native tongue.
 - When it speaks up on its own, it uses the last language it was spoken to in, or its native tongue.
+
+### Beasts
+
+Pick **Beast** for animals. A crawler who knows Beast reads what the animal means in plain words. Everyone else sees what it does instead, such as *squeaks twice and backs toward the hole*, so the party can still read its mood.
+
+### Silent Mobs
+
+Tick **Silent** on a mob that never talks (oozes, constructs). It stays quiet in the Game Chat and can't be @ mentioned, even if it has a personality.
 
 ## Talking in a Language
 

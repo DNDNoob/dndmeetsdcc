@@ -1,6 +1,6 @@
 // App-side language rules: who understands what, scrambled text, and how a chat line reads
 // for each viewer (including party translators). Built-in languages are in languageList.mjs.
-import { BUILT_IN_LANGUAGES, DEFAULT_LANGUAGE_ID, TELEPATHIC_LANGUAGE_ID, languageName, type LanguageInfo } from './languageList.mjs';
+import { BUILT_IN_LANGUAGES, BEAST_LANGUAGE_ID, DEFAULT_LANGUAGE_ID, TELEPATHIC_LANGUAGE_ID, languageName, type LanguageInfo } from './languageList.mjs';
 import type { ChatMessage, Crawler, CustomLanguage } from './gameData';
 
 export { BUILT_IN_LANGUAGES, DEFAULT_LANGUAGE_ID, TELEPATHIC_LANGUAGE_ID, languageName, mobLanguageIds } from './languageList.mjs';
@@ -61,6 +61,7 @@ const SYLLABLES: Record<string, string[]> = {
   vernonacular: ['ae', 'thir', 'vel', 'quor', 'ixa', 'lum', 'ser', 'eth', "y'ra", 'oth', 'zan', 'ilm'],
   mewmew: ['mew', 'mrrp', 'mrow', 'prr', 'nya', 'mreow', 'hss', 'mip'],
   'kra-kow': ['KRA', 'KOW', 'grok', 'ugg', 'zug', 'THRAK', 'gar', 'muk', 'rrah', 'dak'],
+  beast: ['grr', 'yip', 'squeak', 'snrf', 'hss', 'huff', 'chrr', 'rrr', 'awoo', 'chuff'],
 };
 const WARD_SIGNS = ['◬', '⟁', '⌖', '⊹', '⋔', '⟡', '⌬', '⍟', '⧖', '⟐', '⏃', '⎔'];
 const MIND_WAVES = ['∿', '≈', '≋', '~', '◌', '∾'];
@@ -177,7 +178,8 @@ export const readChatLine = (
   if (auto) return { text: m.text, languageId, languageName: name, scrambled: false, via: auto.name };
   const checking = translators.find(c => c.translateMode === 'review');
   return {
-    text: scrambleText(m.text, languageId), languageId, languageName: name, scrambled: true,
+    // Beast: show what the creature does rather than gibberish
+    text: (languageId === BEAST_LANGUAGE_ID && m.gesture) || scrambleText(m.text, languageId), languageId, languageName: name, scrambled: true,
     ...(checking ? { translating: checking.name } : {}),
   };
 };

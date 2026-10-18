@@ -541,7 +541,7 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
                         </span>
                       )}
                       <p
-                        className={`leading-snug ${line.scrambled ? "break-all text-muted-foreground" : "break-words"} ${m.authorType === "npc" ? "italic" : ""}`}
+                        className={`leading-snug ${line.scrambled ? `${line.languageId === "beast" ? "break-words" : "break-all"} text-muted-foreground` : "break-words"} ${m.authorType === "npc" ? "italic" : ""}`}
                         data-testid={line.scrambled ? "chat-line-scrambled" : undefined}
                       >
                         {line.text}
