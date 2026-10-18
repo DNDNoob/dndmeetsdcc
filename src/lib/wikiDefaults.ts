@@ -523,20 +523,36 @@ Fog of war state (which areas are revealed) persists in Firebase. If you close a
   {
     id: 'mobs',
     slug: 'mobs',
-    title: 'Mobs (Enemies & NPCs)',
+    title: 'Mobs (Creatures, Characters & Bosses)',
     category: 'Basics',
     order: 2,
-    content: `# Mobs (Enemies & NPCs)
+    content: `# Mobs (Creatures, Characters & Bosses)
 
-Mobs are the enemies and non-player characters that populate your game world.
+Mobs are everyone in the game world who isn't a crawler. They are all set up the same way and can all talk, trade and fight. The only difference is whether they're a one-off or part of the story.
 
-## Mob Types
+## Kinds
 
-| Type | Color | Purpose |
-|------|-------|---------|
-| Normal | Default | Standard enemies |
-| Boss | Red accent | Powerful enemies |
-| NPC | Blue accent | Non-hostile characters |
+| Kind | What it is | Example |
+|------|-----------|---------|
+| **Creature** | A template. Place it on the map as many times as you like; each copy is labelled A, B, C… and is transient | Goblin, Gnome |
+| **Character** | One named person who is part of the story and may come back | Grimble the Goblin Merchant |
+
+Tick **Boss** on either kind to mark it as a boss (red styling, its own section in Mob Profiles).
+
+A character can optionally be a creature (**Is a** in the DM Console): Grimble *is a* Goblin. When players meet Grimble, Goblin is revealed in their Mob Profiles too.
+
+Mobs made before kinds existed carry over automatically: Normal became Creature, Boss became a Creature with Boss ticked, and NPC became Character.
+
+## Friendly or Hostile
+
+Hostility belongs to each token on the map, not the mob, so it can change mid-scene. Creatures start out **hostile** and characters start out **friendly**.
+
+- **DM**: right-click a token in Show Time and choose **Make Friendly** / **Make Hostile**. The DM sees a red ring around hostile tokens and a green ring around friendly ones; players don't see the rings
+- **Combat**: when the DM starts a combat turn, hostile tokens are ticked and friendly ones are left unticked (marked *friendly*). The DM can still tick a friendly token to pull it into the fight
+
+## Mob Profiles (players)
+
+The Mobs page shows what the party has encountered in three sections: **Creatures**, **Bosses** and **Characters**. Characters show the creature they are when it's known ("A Goblin").
 
 ## Mob Properties
 
@@ -576,7 +592,7 @@ When placed on a map during episode setup or Show Time, mobs appear as circular 
 
 ## NPC Personality
 
-Every mob can talk for itself in Show Time when NPC voices are running. Each mob has an optional **NPC Personality** card (DM only) in the DM Console; leave it blank and the AI makes one up from the mob's details. See [Talking NPCs](/wiki/talking-npcs).`,
+Every mob can talk for itself in Show Time when NPC voices are running. Each mob has an optional **NPC Personality** card (DM only) in the DM Console; leave it blank and the AI makes one up from the mob's details. Each copy of a creature gets its own made-up personality, so Goblin A and Goblin B feel like different goblins. See [Talking NPCs](/wiki/talking-npcs).`,
   },
   {
     id: 'dice-roller',
@@ -845,6 +861,8 @@ Players never see this card.
 ### Auto-generated personalities
 
 Every mob can talk, even ones you never wrote a card for. The first time a mob without a card is needed (or while things are quiet), the AI writes one from everything the game knows about it: name, kind, level, description, strengths and abilities, weaknesses, hit points, the items it carries and its gold. It also rolls random ingredients (a temperament, a speech quirk, what drives it, how it sees the crawlers and something tied to its past) so no two mobs come out the same, even two of the same kind.
+
+**Creatures** get one per copy on the map: Goblin A, Goblin B and Goblin C each talk as themselves in the chat, with their own personality and secret. If you write a card on a creature, every copy uses your card. **Characters** are one person, so they always have one personality wherever their token stands.
 
 The generated personality includes a secret and a Persuasion DC based on the mob's level (bosses are harder). It stays the same for the rest of the campaign. In the chat settings it shows as **(AI personality)** next to the mob's name; hover to read it. Fill in the mob's card in the DM Console at any time to replace it with your own.
 
