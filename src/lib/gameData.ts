@@ -648,6 +648,9 @@ export interface ChatMessage {
   language?: string;     // Spoken in this language (none = everyone understands, e.g. the DM narrating)
   translationOf?: string; // A translator's version of another line, shown to party members who can't read it
   gesture?: string;      // Beast lines: the sounds and body language seen by those who don't know Beast
+  // NPC lines read aloud (made in the DM's browser, short-lived files in Storage npcAudio/)
+  audioUrl?: string;          // the real words
+  audioScrambledUrl?: string; // the scrambled words, for players who don't know the language
 }
 
 /** Players can only talk to mobs this close to their crawler. */
@@ -705,6 +708,14 @@ export interface NpcAiSettings {
   mutedAll?: boolean;
   mutedMobIds?: string[];
   brain?: NpcBrain;         // where NPC lines are written; default 'online'
+  speech?: boolean;         // Spoken voices: the DM's browser reads NPC lines aloud (default off)
+  voices?: Record<string, NpcSpeechVoice>; // DM's voice picks by mob id (creature copies share one)
+}
+
+/** A Kokoro voice and speaking speed (1 = normal). */
+export interface NpcSpeechVoice {
+  voice?: string;
+  speed?: number;
 }
 
 /** 'online': the DM's browser using free Groq/Gemini keys. 'laptop': the NPC script with Ollama. */
