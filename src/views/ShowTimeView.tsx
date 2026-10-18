@@ -22,7 +22,7 @@ import NpcSpeechBubbles from "@/components/ui/NpcSpeechBubbles";
 import type { NpcOnlineKeys } from "@/lib/npc/onlineLlm.mjs";
 import MerchantPanel, { MerchantHagglePrompts } from "@/components/MerchantPanel";
 import { isMerchant, getHaggleBlocker, MERCHANT_TRADE_RANGE_FEET, type MerchantState } from "@/lib/gameData";
-import { withNpcPersonality, speakerAsMob, mapSpeakers, isPlacementHostile, NPC_TALK_RANGE_FEET, type ChatMessage, type NpcAiSettings, type NpcAiStatus, type NpcSecretEntry, type NpcSecretState, type NpcGeneratedPersonality } from "@/lib/gameData";
+import { withNpcPersonality, speakerAsMob, mapSpeakers, baseMobId, isPlacementHostile, NPC_TALK_RANGE_FEET, type ChatMessage, type NpcAiSettings, type NpcAiStatus, type NpcSecretEntry, type NpcSecretState, type NpcGeneratedPersonality } from "@/lib/gameData";
 
 const NO_GENERATED_PERSONALITIES: Record<string, NpcGeneratedPersonality> = {};
 
@@ -2288,32 +2288,49 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   }, [npcsOnMap, isAdmin, myCrawlerSpot, npcSpeakers, isPointVisible, mapDistanceFeet, crawlerPlacements, currentMapId, crawlers, currentPlayerId]);
 
   // --- Merchants ---
-  // Distance from the player's crawler to the nearest visible copy of a merchant on this map
-  const merchantDistanceFeet = useCallback((mobId: string): number | null => {
+  // A shop is a speaker: a character has one shop wherever they stand, while each copy of a
+  // creature ("Goblin B") has its own stock and gold in merchants/{speaker id}.
+  const mapShops = useMemo(
+    () => mapSpeakers(mobPlacementsOnMap, mobs, [...(selectedEpisode?.mobPlacements ?? []), ...runtimeMobPlacements]),
+    [mobPlacementsOnMap, mobs, selectedEpisode?.mobPlacements, runtimeMobPlacements]
+  );
+  const shopIdForPlacement = useMemo(() => new Map(mapShops.map(s => [s.placement, s.id])), [mapShops]);
+
+  /** The merchant as the trade window sees it: its shop id and name ("Goblin B"), even off this map. */
+  const shopMob = useCallback((shopId: string): Mob | undefined => {
+    const onMap = mapShops.find(s => s.id === shopId);
+    const base = onMap?.mob ?? mobs.find(m => m.id === baseMobId(shopId));
+    if (!base || !isMerchant(base)) return undefined;
+    if (shopId === base.id) return base;
+    const name = onMap?.name ?? `${base.name} ${String.fromCharCode(65 + Number(shopId.split('~')[1] ?? 0))}`;
+    return { ...base, id: shopId, name };
+  }, [mapShops, mobs]);
+
+  // Distance from the player's crawler to the nearest visible token of a shop on this map
+  const merchantDistanceFeet = useCallback((shopId: string): number | null => {
     if (!myCrawlerSpot) return null;
-    const spots = mobPlacementsOnMap.filter(p => p.mobId === mobId && isPointVisible(p.x, p.y));
+    const spots = mapShops.filter(s => s.id === shopId && isPointVisible(s.placement.x, s.placement.y));
     if (spots.length === 0) return null;
-    return Math.min(...spots.map(p => mapDistanceFeet(myCrawlerSpot, p)));
-  }, [myCrawlerSpot, mobPlacementsOnMap, isPointVisible, mapDistanceFeet]);
+    return Math.min(...spots.map(s => mapDistanceFeet(myCrawlerSpot, s.placement)));
+  }, [myCrawlerSpot, mapShops, isPointVisible, mapDistanceFeet]);
 
   // A player tapping a merchant (not dragging it) gets the "Trade with Merchant" menu
-  const handleMerchantTap = (e: React.MouseEvent, mob: Mob) => {
+  const handleMerchantTap = (e: React.MouseEvent, mob: Mob, placement: EpisodeMobPlacement) => {
     if (isAdmin || !isMerchant(mob)) return;
     const start = mobPressRef.current;
     if (start && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 6) return;
     e.stopPropagation();
-    setMerchantMenu({ mobId: mob.id, x: e.clientX, y: e.clientY });
+    setMerchantMenu({ mobId: shopIdForPlacement.get(placement) ?? mob.id, x: e.clientX, y: e.clientY });
   };
   const recordMobPress = (x: number, y: number) => { mobPressRef.current = { x, y }; };
 
-  const merchantsWithState = useMemo(() => mobs
-    .filter(m => isMerchant(m))
-    .map(mob => ({ mob, state: merchants.find(st => st.id === mob.id) }))
-    .filter((m): m is { mob: Mob; state: MerchantState } => !!m.state),
-  [mobs, merchants]);
+  const merchantsWithState = useMemo(() => merchants
+    .map(state => ({ mob: shopMob(state.id), state }))
+    .filter((m): m is { mob: Mob; state: MerchantState } => !!m.mob),
+  [merchants, shopMob]);
 
   const myCrawler = currentPlayerId ? crawlers.find(c => c.id === currentPlayerId) : undefined;
-  const openMerchantMob = openMerchantId ? mobs.find(m => m.id === openMerchantId && isMerchant(m)) : undefined;
+  const openMerchantMob = openMerchantId ? shopMob(openMerchantId) : undefined;
 
   const chatAuthor = useMemo((): NpcChatAuthor | null => {
     if (isAdmin) return { type: 'dm', id: 'dm', name: 'DM' };
@@ -3333,7 +3350,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                   handleMobMouseDown(`${placement.mobId}-${globalIndex}`);
                 }}
                 onClick={(e) => {
-                  handleMerchantTap(e, mob);
+                  handleMerchantTap(e, mob, placement);
                   if (!isDragging && isAdmin) {
                     e.stopPropagation();
                     setSelectedMapEntity({ type: 'episode-mob', index: globalIndex });
@@ -3625,7 +3642,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                   setDraggingRuntimeId(`mob-${index}`);
                 }}
                 onClick={(e) => {
-                  handleMerchantTap(e, mob);
+                  handleMerchantTap(e, mob, placement);
                   if (!isDragging && isAdmin) {
                     e.stopPropagation();
                     setSelectedMapEntity({ type: 'runtime-mob', index });
@@ -3900,7 +3917,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             );
           })()}
           {contextMob && isMerchant(contextMob) && (() => {
-            const mobId = contextMob.id;
+            const mobId = (contextPlacement && shopIdForPlacement.get(contextPlacement)) ?? contextMob.id;
             return (
               <button
                 onClick={() => { setOpenMerchantId(mobId); setContextMenu(null); }}
@@ -3924,7 +3941,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
       {/* Player tapped a merchant: offer to trade */}
       {merchantMenu && !isAdmin && (() => {
-        const mob = mobs.find(m => m.id === merchantMenu.mobId);
+        const mob = shopMob(merchantMenu.mobId);
         if (!mob) return null;
         const feet = merchantDistanceFeet(mob.id);
         const inRange = feet !== null && feet <= MERCHANT_TRADE_RANGE_FEET;

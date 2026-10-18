@@ -859,6 +859,10 @@ In the DM Console, open a mob (new or existing), expand **Merchant** and tick **
 
 Each stock line shows its buy / sell price at the current Scrooge Factor.
 
+### Characters and creatures
+
+A **character** merchant (Grimble) has one shop wherever their token stands. A **creature** merchant is a template, so each copy on the map runs its own shop: Goblin A and Goblin B each start with the stock and gold you set, and buying out Goblin A doesn't empty Goblin B. Restock works on one copy at a time.
+
 ## Trading (Players)
 
 During Show Time, tap a merchant's token and choose **Trade with Merchant**. You must be within **20 ft** of the merchant; farther away, the option is greyed out and says how far you are.
