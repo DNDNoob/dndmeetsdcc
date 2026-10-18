@@ -28,7 +28,11 @@
       "🧠 Laptop NPC brain now always uses the local AI model on the DM's computer, never Groq or Gemini. Online stays the fast option that runs in the DM's tab",
       "🧠 NPCs now remember conversations: once a chat with an NPC goes quiet, the AI saves a few notes and how the NPC feels about each crawler, and the NPC brings them up next time. Characters remember for the whole campaign; creature copies for their episode",
       "✏️ DMs can see, edit or wipe what each NPC remembers from the brain icon in the Game Chat settings",
-      "👂 NPCs now follow more of the conversation (the last 25 messages they heard, up from 10), but only what they could have heard: nothing from other maps or out of earshot, in replies or in memory"
+      "👂 NPCs now follow more of the conversation (the last 25 messages they heard, up from 10), but only what they could have heard: nothing from other maps or out of earshot, in replies or in memory",
+      "🔊 Spoken voices: NPCs can now say their lines out loud. Turn on Spoken voices in the Game Chat settings and every NPC line is read aloud on every player's device, in a voice picked from the NPC's Voice and manner notes",
+      "🎙️ DMs can pick each NPC's voice (28 American and British voices) and speed in the Game Chat settings, and tap ▶ to hear it",
+      "🗣️ If a player doesn't know the language an NPC is speaking, they hear the scrambled words, so it sounds foreign",
+      "🔈 Everyone can mute NPC voices or change their volume from the speaker icon in the Game Chat header"
     ]
   },
   {

@@ -981,6 +981,7 @@ Each crawler gets one try per NPC each noncombat turn (or every 10 minutes when 
 
 Open the Game Chat and tap the gear icon:
 - **NPC voices**: turn the feature on or off for this campaign
+- **Spoken voices**: read NPC lines aloud on every device, with a voice per NPC (see Spoken Voices above)
 - **NPC brain**: **Online** or **Laptop** (see below)
 - **Model**: **Best quality** (bigger, slower) or **Fast** (smaller, quicker)
 - **Mute all NPCs**, or mute one NPC
@@ -989,6 +990,25 @@ Open the Game Chat and tap the gear icon:
 - **Clear chat** for the current episode
 
 The dot next to the chat button is green when an NPC brain is listening. The chat header says which one is answering, for example "NPC voices online" or "Laptop covering".
+
+## Spoken Voices
+
+NPCs can also say their lines out loud. Turn on **Spoken voices** in the Game Chat settings (gear icon). From then on, every NPC line is read aloud on every player's device at the same moment its speech bubble appears.
+
+- The voices come from Kokoro, a free voice model that runs in the DM's browser. The first time it's switched on, the browser downloads it (about 90 MB) and keeps it for next time. Keep the DM tab open during the game, the same as for the Online brain.
+- Each line is saved as a short sound clip that players' devices play once. Clips are deleted again after about 15 minutes.
+- Lines in a language a player doesn't know are read to them as the scrambled words, so it sounds foreign. Players who know the language, and the DM, hear the real words. Lines in Mindspeech or Ward sign aren't read aloud.
+- Actions written between asterisks (the NPC grinning, wiping its hands) are skipped; only the words are spoken.
+
+### Picking a voice
+
+Every NPC gets a voice picked from its **Voice and manner** notes, name and description. Words like "gruff", "old" or "orc" give a deep, slower voice; "squeaky", "nervous" or "goblin" a quicker one; "posh", "noble" or "elf" a British accent; "she" or "lady" a woman's voice. Copies of a creature (Goblin A, Goblin B) share a voice but talk at slightly different speeds.
+
+To choose one yourself, open the chat settings. Under **NPCs on this map**, each NPC has a voice list (28 voices, American and British, men and women) and a speed (**Slow**, **Normal**, **Quick**). Tap ▶ to hear it say its last line. Picks apply to every copy of a creature.
+
+### Volume
+
+Everyone, players included, can tap the speaker icon in the Game Chat header to switch NPC voices off on their own device or change the volume. This is saved on that device. On phones, audio starts after you first tap anywhere on the page.
 
 ## Voice Input
 

@@ -2072,6 +2072,11 @@ export const useGameState = () => {
     await addItem('chatMessages', entry as unknown as Record<string, unknown>);
   };
 
+  // Spoken voices: link the clips the DM's browser made for an NPC line
+  const attachChatAudio = async (messageId: string, audio: Pick<ChatMessage, 'audioUrl' | 'audioScrambledUrl'>) => {
+    await updateItem('chatMessages', messageId, audio as unknown as Record<string, unknown>);
+  };
+
   // Deletes chat lines (all of them, or one episode's). Batches are capped well under Firestore's 500.
   const clearChat = async (episodeId?: string) => {
     const all = getCollection('chatMessages') as unknown as ChatMessage[];
@@ -2201,6 +2206,7 @@ export const useGameState = () => {
     npcMemories,
     setNpcMemory,
     sendChatMessage,
+    attachChatAudio,
     clearChat,
     customLanguages,
     createLanguage,
