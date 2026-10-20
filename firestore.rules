@@ -1,0 +1,118 @@
+rules_version = '2';
+// Live Firestore rules. Publish with: python3 -I scripts/firestore-rules.py publish firestore.rules
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function isGoogle() { return signedIn() && request.auth.token.firebase.sign_in_provider == 'google.com'; }
+    // The DM's NPC voices script account (scripts/npc-voices)
+    function isNpcBot() { return signedIn() && request.auth.uid == 'uZ6RK22nj4VADh2uw0zvGUpjYqA3'; }
+
+    function campaignPath(id) { return /databases/$(database)/documents/campaigns/$(id); }
+    function isDm(id) {
+      return signedIn() && exists(campaignPath(id)) && get(campaignPath(id)).data.ownerId == request.auth.uid;
+    }
+    function isMember(id) {
+      return signedIn() && exists(campaignPath(id)) && (
+        get(campaignPath(id)).data.ownerId == request.auth.uid
+        || request.auth.uid in get(campaignPath(id)).data.memberIds);
+    }
+    function changedOnly(keys) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys); }
+
+    // Private per-user folders
+    match /userContent/{uid}/{document=**} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    // Campaigns: visible to their DM and members only
+    match /campaigns/{campaignId} {
+      allow read: if isNpcBot()
+        || (signedIn() && (resource.data.ownerId == request.auth.uid || request.auth.uid in resource.data.memberIds));
+      allow create: if isGoogle()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.memberIds == [request.auth.uid];
+      allow delete: if signedIn() && resource.data.ownerId == request.auth.uid;
+      allow update: if isGoogle() && (
+        // The DM edits anything but ownership
+        (resource.data.ownerId == request.auth.uid && request.resource.data.ownerId == resource.data.ownerId)
+        // Joining: add only yourself, with the current invite code, while there is room
+        || (changedOnly(['memberIds', 'updatedAt', 'lastJoinCode'])
+            && !(request.auth.uid in resource.data.memberIds)
+            && request.resource.data.memberIds == resource.data.memberIds.concat([request.auth.uid])
+            && request.resource.data.lastJoinCode == resource.data.inviteCode
+            && resource.data.memberIds.size() < resource.data.maxMembers)
+        // Leaving: remove only yourself
+        || (changedOnly(['memberIds', 'updatedAt'])
+            && request.auth.uid in resource.data.memberIds
+            && request.resource.data.memberIds == resource.data.memberIds.removeAll([request.auth.uid])));
+    }
+
+    // Invite code lookup: fetch one by its code, never list them
+    match /campaignInvites/{code} {
+      allow get: if signedIn();
+      allow create: if isDm(request.resource.data.campaignId)
+        && get(campaignPath(request.resource.data.campaignId)).data.inviteCode == code;
+      allow delete: if isDm(resource.data.campaignId);
+    }
+
+    // Campaign game data: the campaign's DM and members only
+    match /rooms/{roomId}/{document=**} {
+      allow read: if isMember(roomId) || isNpcBot();
+      allow write: if isGoogle() && isMember(roomId);
+    }
+    match /rooms/{roomId}/chatMessages/{messageId} {
+      allow write: if isNpcBot();
+    }
+    match /rooms/{roomId}/npcAi/{docId} {
+      allow write: if isNpcBot();
+    }
+
+    // Profiles: anyone signed in can look up a username; only you edit yours
+    match /userProfiles/{uid} {
+      allow read: if signedIn();
+      allow write: if isGoogle() && request.auth.uid == uid;
+    }
+
+    match /friendRequests/{requestId} {
+      allow read, update, delete: if signedIn()
+        && (resource.data.fromUserId == request.auth.uid || resource.data.toUserId == request.auth.uid);
+      allow create: if isGoogle() && request.resource.data.fromUserId == request.auth.uid;
+    }
+
+    match /userDecisions/{decisionId} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isGoogle() && request.resource.data.userId == request.auth.uid;
+    }
+
+    // Shared community content: everyone reads, only the publisher changes it
+    match /{publicCollection}/{docId} {
+      allow read: if signedIn()
+        && publicCollection in ['publicItems', 'publicSpells', 'publicMaps', 'publicMobs', 'publicEpisodes'];
+      allow create: if isGoogle()
+        && publicCollection in ['publicItems', 'publicSpells', 'publicMaps', 'publicMobs', 'publicEpisodes']
+        && request.resource.data.createdBy == request.auth.uid;
+      allow update, delete: if isGoogle()
+        && publicCollection in ['publicItems', 'publicSpells', 'publicMaps', 'publicMobs', 'publicEpisodes']
+        && resource.data.createdBy == request.auth.uid
+        && (request.method == 'delete' || request.resource.data.createdBy == request.auth.uid);
+    }
+    match /publicEpisodes/{episodeId}/{sub}/{docId} {
+      allow read: if signedIn();
+      allow write: if isGoogle() && (
+        !exists(/databases/$(database)/documents/publicEpisodes/$(episodeId))
+        || get(/databases/$(database)/documents/publicEpisodes/$(episodeId)).data.createdBy == request.auth.uid);
+    }
+
+    // Pixel-art icons and mob portraits shared by every campaign: everyone reads, Google accounts add
+    match /iconLibrary/{iconId} {
+      allow read: if signedIn();
+      allow create: if isGoogle() && request.resource.data.createdBy == request.auth.uid;
+    }
+
+    // Old shared game data from before campaigns: read-only
+    match /{legacyCollection}/{docId} {
+      allow read: if signedIn() && !(legacyCollection in [
+        'userContent', 'campaigns', 'campaignInvites', 'friendRequests', 'userDecisions']);
+    }
+  }
+}

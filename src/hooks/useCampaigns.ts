@@ -12,6 +12,7 @@ import {
   getDocs,
   getDoc,
   writeBatch,
+  arrayUnion,
 } from '@/lib/firebase';
 import { toast } from 'sonner';
 import type { Campaign, UserProfile } from '@/lib/gameData';
@@ -23,6 +24,15 @@ function generateInviteCode(): string {
     code += chars[Math.floor(Math.random() * chars.length)];
   }
   return code;
+}
+
+// campaignInvites/{inviteCode} → { campaignId }. Only someone holding the code can look a
+// campaign up; the campaign itself is readable by its owner and members only.
+const INVITES = 'campaignInvites';
+
+async function writeInvite(inviteCode: string, campaignId: string): Promise<void> {
+  if (!db) return;
+  await setDoc(doc(db, INVITES, inviteCode), { campaignId, createdAt: Date.now() });
 }
 
 export function useCampaigns(userId: string | null) {
@@ -38,11 +48,20 @@ export function useCampaigns(userId: string | null) {
       return;
     }
 
+    const ensuredInvites = new Set<string>();
     const q = query(collection(db, 'campaigns'), where('ownerId', '==', userId));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const campaigns = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Campaign));
       setMyCampaigns(campaigns);
       setLoading(false);
+      // Campaigns made before invite lookups existed get theirs on the owner's next visit
+      for (const c of campaigns) {
+        if (!c.inviteCode || ensuredInvites.has(c.inviteCode)) continue;
+        ensuredInvites.add(c.inviteCode);
+        getDoc(doc(db!, INVITES, c.inviteCode))
+          .then(snap => (snap.exists() ? undefined : writeInvite(c.inviteCode, c.id)))
+          .catch(err => console.error('[Campaigns] Error saving invite code:', err));
+      }
     }, (error) => {
       console.error('[Campaigns] Error subscribing to owned campaigns:', error);
       setLoading(false);
@@ -92,6 +111,7 @@ export function useCampaigns(userId: string | null) {
 
     try {
       await setDoc(doc(db, 'campaigns', id), campaign);
+      await writeInvite(campaign.inviteCode, id);
       toast.success(`Campaign "${name}" created!`);
       return campaign;
     } catch (error) {
@@ -134,7 +154,10 @@ export function useCampaigns(userId: string | null) {
         }
       }
 
-      // Delete the campaign document itself
+      // Retire the invite code, then delete the campaign document itself
+      const campaignSnap = await getDoc(doc(db, 'campaigns', campaignId));
+      const inviteCode = campaignSnap.exists() ? (campaignSnap.data() as Campaign).inviteCode : '';
+      if (inviteCode) await deleteDoc(doc(db, INVITES, inviteCode));
       await deleteDoc(doc(db, 'campaigns', campaignId));
       toast.success('Campaign deleted');
     } catch (error) {
@@ -174,6 +197,7 @@ export function useCampaigns(userId: string | null) {
       };
 
       await setDoc(doc(db, 'campaigns', newId), newCampaign);
+      await writeInvite(newCampaign.inviteCode, newId);
 
       // Copy room-scoped collections (except transient state)
       const collectionsToCopy = ['mobs', 'maps', 'episodes', 'lootBoxTemplates', 'wiki', 'quests', 'languages'];
@@ -204,37 +228,37 @@ export function useCampaigns(userId: string | null) {
     if (!userId || !db) return null;
 
     try {
-      const q = query(collection(db, 'campaigns'), where('inviteCode', '==', inviteCode));
-      const snapshot = await getDocs(q);
-
-      if (snapshot.empty) {
+      const inviteSnap = await getDoc(doc(db, INVITES, inviteCode));
+      if (!inviteSnap.exists()) {
         toast.error('Invalid invite code');
         return null;
       }
+      const campaignRef = doc(db, 'campaigns', (inviteSnap.data() as { campaignId: string }).campaignId);
 
-      const campaignDoc = snapshot.docs[0];
-      const campaign = { id: campaignDoc.id, ...campaignDoc.data() } as Campaign;
-
-      // Check if already a member
-      if (campaign.memberIds.includes(userId)) {
+      // Members can read the campaign; anyone else gets permission-denied until they join
+      const existing = await getDoc(campaignRef).catch(() => null);
+      if (existing?.exists() && (existing.data() as Campaign).memberIds.includes(userId)) {
         toast('You are already a member of this campaign');
-        return campaign;
+        return { id: existing.id, ...existing.data() } as Campaign;
       }
 
-      // Check member limit
-      if (campaign.memberIds.length >= campaign.maxMembers) {
-        toast.error('This campaign is full');
+      // The database checks the code and the member limit when adding us
+      try {
+        await updateDoc(campaignRef, {
+          memberIds: arrayUnion(userId),
+          lastJoinCode: inviteCode,
+          updatedAt: Date.now(),
+        });
+      } catch (error) {
+        console.error('[Campaigns] Join refused:', error);
+        toast.error('This campaign is full or the invite code has changed');
         return null;
       }
 
-      // Add user to memberIds
-      await updateDoc(doc(db, 'campaigns', campaign.id), {
-        memberIds: [...campaign.memberIds, userId],
-        updatedAt: Date.now(),
-      });
-
+      const joined = await getDoc(campaignRef);
+      const campaign = { id: joined.id, ...joined.data() } as Campaign;
       toast.success(`Joined campaign "${campaign.name}"!`);
-      return { ...campaign, memberIds: [...campaign.memberIds, userId] };
+      return campaign;
     } catch (error) {
       console.error('[Campaigns] Error joining campaign:', error);
       toast.error('Failed to join campaign');
@@ -308,10 +332,15 @@ export function useCampaigns(userId: string | null) {
     if (!db) return null;
     const newCode = generateInviteCode();
     try {
-      await updateDoc(doc(db, 'campaigns', campaignId), {
+      const campaignRef = doc(db, 'campaigns', campaignId);
+      const snap = await getDoc(campaignRef);
+      const oldCode = snap.exists() ? (snap.data() as Campaign).inviteCode : '';
+      await updateDoc(campaignRef, {
         inviteCode: newCode,
         updatedAt: Date.now(),
       });
+      await writeInvite(newCode, campaignId);
+      if (oldCode) await deleteDoc(doc(db, INVITES, oldCode)).catch(() => undefined);
       toast.success('Invite code regenerated');
       return newCode;
     } catch (error) {

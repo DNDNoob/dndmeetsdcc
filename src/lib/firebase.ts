@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, initializeFirestore, collection, doc, setDoc, getDoc, getDocs, deleteDoc, updateDoc, onSnapshot, query, where, writeBatch, runTransaction } from 'firebase/firestore';
+import { getFirestore, initializeFirestore, collection, doc, setDoc, getDoc, getDocs, deleteDoc, updateDoc, onSnapshot, query, where, writeBatch, runTransaction, arrayUnion } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import {
   getAuth,
@@ -236,5 +236,6 @@ export {
   query,
   where,
   writeBatch,
-  runTransaction
+  runTransaction,
+  arrayUnion
 };

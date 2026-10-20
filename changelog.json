@@ -2,6 +2,10 @@
   {
     "date": "2026-10-20",
     "changes": [
+      "🎨 New items and spells now get a pixel-art icon automatically, made by a free AI image generator from the item's name and description. When the daily free limit runs out, the app picks the closest matching icon from every icon made before",
+      "🧌 DMs can auto-generate a pixel-art portrait for new mob types: leave Auto-generate pixel portrait ticked when adding a mob, or click Generate on an existing one. When the daily limit runs out, the closest earlier portrait is used",
+      "🔒 Campaigns are now private: only the DM and players who joined can see or change a campaign's data. Before, anyone signed in with Google could edit any campaign",
+      "🔒 Wiki links now only work for web, email and wiki addresses, which closes a hole that let a wiki page run code in other players' browsers",
       "🧑 New character creator: tap New on the Profiles page to make a crawler step by step, with a name, a backstory, ability points and languages",
       "📜 Backstories have five parts: profession, an accomplishment, a hobby, where you were when the world ended, and the most important person, thing or animal to you. Pick a suggestion or write your own, and edit it later on your profile",
       "🎲 New crawlers spend 10 ability points (up to 5 in one ability). Each point is +1 to rolls, and abilities left at 0 roll with disadvantage",
@@ -20,7 +24,13 @@
       "💀 The DM can @ a corpse and get an answer, without Speak with Dead",
       "🔇 Players can mute one NPC's voice by tapping the speaker next to its name in Game Chat",
       "✂️ The burst of static some voices left after the last word is now cut off",
-      "💻 The Laptop brain's Fast setting now uses qwen3:4b-instruct-2507, the quickest model on the DM laptop, and Best quality uses qwen3:8b, falling back to Fast if it can't load"
+      "💻 The Laptop brain's Fast setting now uses qwen3:4b-instruct-2507, the quickest model on the DM laptop, and Best quality uses qwen3:8b, falling back to Fast if it can't load",
+      "🐛 The item library on the Inventory page saves again in a campaign that had no library yet. Before, Firebase refused the save, so new library items vanished and the library stayed empty",
+      "💬 Scrolling over the Game Chat now scrolls the chat instead of zooming the map, and the same goes for the dice roller, game clock and map tools",
+      "👆 The Game Chat and the dice roller close when you click or tap anywhere else",
+      "🪟 Pop-up boxes (new spell, send gold, weapon upgrade, heal and damage targets) close when you click outside them, and now sit above the top menu so their tops aren't hidden",
+      "💀 The Mobs page and the DM Console mob list are split into Bosses, Mobs and Characters tabs",
+      "📐 More room between the backstory and the Activity section on profiles"
     ]
   },
   {

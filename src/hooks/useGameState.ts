@@ -18,6 +18,8 @@ import {
   type MobLootSplit,
   stackItems,
   PARTY_INVENTORY_ID,
+  SHARED_LIBRARY_ID,
+  SHARED_LIBRARY_DOC_ID,
   CombatTurnSnapshot,
   WikiPage,
   Quest,
@@ -665,19 +667,20 @@ export const useGameState = () => {
   };
 
   const getSharedInventory = () => {
-    return inventory.find((i) => i.crawlerId === '__shared__')?.items || [];
+    return inventory.find((i) => i.crawlerId === SHARED_LIBRARY_ID)?.items || [];
   };
 
   const updateSharedInventory = async (items: InventoryItem[]) => {
-    return updateCrawlerInventory('__shared__', items);
+    return updateCrawlerInventory(SHARED_LIBRARY_ID, items);
   };
 
   // Only the change from what this client showed is saved, so two people editing the same
   // inventory (e.g. the shared item library) at once don't overwrite each other's items.
   const updateCrawlerInventory = async (crawlerId: string, items: InventoryItem[]) => {
     const existing = inventory.find((i) => i.crawlerId === crawlerId) as InventoryEntry | undefined;
-    // Use the existing document ID; new entries use crawlerId as the document ID per convention
-    const docId = existing?.id || crawlerId;
+    // Use the existing document ID; new entries use crawlerId as the document ID per convention,
+    // except the item library, whose crawlerId Firestore won't accept as a document ID
+    const docId = existing?.id || (crawlerId === SHARED_LIBRARY_ID ? SHARED_LIBRARY_DOC_ID : crawlerId);
     return mergeArrayById(
       'inventory',
       docId,

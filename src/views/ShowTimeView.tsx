@@ -1924,6 +1924,8 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     if (!selectedMap) return;
 
     const handleWheel = (e: WheelEvent) => {
+      // Over a floating panel (game chat, dice, ping panel, menus) the wheel scrolls that panel
+      if ((e.target as Element | null)?.closest?.('.fixed, [role="dialog"], [data-radix-popper-content-wrapper]')) return;
       e.preventDefault();
       // Proportional zoom: step scales with current zoom level for smooth feel
       // At 100% → step ~3, at 50% → step ~1.5, at 200% → step ~6

@@ -1,5 +1,6 @@
 import type { NpcSpeaker } from './npc/speakers.mjs';
 export { getMobKind, isBossMob, isPlacementHostile, baseMobId, mapSpeakers } from './npc/speakers.mjs';
+import { getMobKind as mobKindOf, isBossMob as mobIsBoss } from './npc/speakers.mjs';
 export type { NpcSpeaker } from './npc/speakers.mjs';
 
 export type EquipmentSlot = 'head' | 'chest' | 'legs' | 'feet' | 'leftHand' | 'rightHand' | 'ringFinger' | 'weapon';
@@ -330,9 +331,22 @@ export interface Spell {
   description: string;
   tags?: string[];
   spellData: SpellData;
+  iconId?: string;           // References an entry in the global iconLibrary collection
   createdBy?: string;        // Firebase uid of creator
   createdByUsername?: string; // Denormalized for display
   isPublic?: boolean;        // Whether visible to players outside the campaign
+}
+
+/** A pixel-art icon in the global `iconLibrary` collection, shared by every campaign. */
+export interface IconLibraryEntry {
+  id: string;
+  image: string;       // small PNG data URL (48x48 icon, or 128x128 mob portrait)
+  tags: string[];      // normalized descriptor tags used to match icons to new items/spells/mobs
+  kind: 'item' | 'spell' | 'mob';
+  sourceName: string;  // name of the item or spell the icon was generated for
+  prompt?: string;
+  createdAt: string;
+  createdBy?: string;
 }
 
 export const SPELL_LEARNED_FROM = ['tome', 'quest', 'level', 'race', 'class', 'granted'] as const;
@@ -381,6 +395,7 @@ export interface InventoryItem {
   weaponData?: WeaponData; // Weapon-specific data (only for items with "weapon" tag or weapon equipSlot)
   isUpgraded?: boolean; // Whether this item has been upgraded by a crawler
   isSpellTome?: boolean; // Consumable that teaches a spell when used
+  iconId?: string; // References an entry in the global iconLibrary collection
   spellTomeData?: {
     entries: Array<{
       spellId?: string; // References a spell in the library
@@ -568,6 +583,11 @@ export const stackItems = (items: InventoryItem[]): ItemStack[] => {
 // (Firestore reserves ids like __name__, so this one has no underscores)
 export const PARTY_INVENTORY_ID = 'party-loot';
 
+/** The campaign's item library is the inventory entry with this crawlerId. */
+export const SHARED_LIBRARY_ID = '__shared__';
+/** Document ID for a new item library (Firestore rejects SHARED_LIBRARY_ID itself as a document ID). */
+export const SHARED_LIBRARY_DOC_ID = 'shared-library';
+
 export interface MobLootSplit {
   gold: Record<string, number>; // crawlerId → gold received
   items: Record<string, InventoryItem[]>; // crawlerId → items received
@@ -730,6 +750,10 @@ export const withNpcPersonality = (mob: Mob, generated: Record<string, NpcGenera
   if (hasNpcPersonality(mob) || !generated[mob.id]) return mob;
   return { ...mob, personality: generated[mob.id], personalityGenerated: true };
 };
+
+/** Which Mobs subtab a mob is listed under: bosses first, then mobs (creatures) or characters. */
+export type MobSection = 'boss' | MobKind;
+export const mobSection = (mob: Mob): MobSection => (mobIsBoss(mob) ? 'boss' : mobKindOf(mob) as MobKind);
 
 /** The legacy type field that matches a kind and boss flag. */
 export const legacyMobType = (kind: MobKind, boss: boolean): Mob['type'] =>
@@ -1129,6 +1153,7 @@ export interface Campaign {
   memberIds: string[];    // Firebase uids of players who have joined (max 10)
   maxMembers: number;     // Max player count (default 10)
   inviteCode: string;     // Short unique code for invite links
+  lastJoinCode?: string;  // Invite code the latest joiner used (security rules check it matches inviteCode)
   createdAt: number;
   updatedAt: number;
 }
