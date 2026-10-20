@@ -29,6 +29,10 @@ export type CollectionName =
   | 'userProfiles'
   | 'campaigns'
   | 'friendRequests'
+  | 'chatMessages'
+  | 'npcAi'
+  | 'languages'
+  | 'merchants'
   | string; // Allow any string for flexibility
 
 /**

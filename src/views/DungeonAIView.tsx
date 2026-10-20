@@ -1,10 +1,14 @@
 import { useState, useRef, useEffect } from "react";
+import NpcPersonalityFields from "@/components/NpcPersonalityFields";
+import { LanguagePicker } from "@/components/LanguagePicker";
+import MerchantFields from "@/components/MerchantFields";
+import MobKindFields from "@/components/MobKindFields";
 import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import MapMobPlacementEditor from "@/components/ui/MapMobPlacementEditor";
 import MapDesignerPopout from "@/components/ui/MapDesignerPopout";
-import { Mob, Episode, EpisodeMobPlacement, Crawler, CrawlerPlacement, InventoryItem, LootBoxTemplate, LootBoxTier, getLootBoxTierColor, type EquipmentSlot, type EquippedItems, Quest, QuestReward, QuestActionItem, QuestRewardTier, type CampaignMapDoc, type PublicMap, type PublicMob, type PublicEpisode } from "@/lib/gameData";
+import { Mob, Episode, stackItems, DEFAULT_LOOT_DESTRUCTION_CHANCE, getMobKind, isBossMob, legacyMobType, EpisodeMobPlacement, Crawler, CrawlerPlacement, InventoryItem, LootBoxTemplate, LootBoxTier, getLootBoxTierColor, type EquipmentSlot, type EquippedItems, Quest, QuestReward, QuestActionItem, QuestRewardTier, type CampaignMapDoc, type PublicMap, type PublicMob, type PublicEpisode, isMerchant } from "@/lib/gameData";
 import { Brain, Upload, Plus, Trash2, Map, Skull, Image as ImageIcon, Save, Edit2, X, Layers, ChevronLeft, ChevronRight, User, Package, Search, Maximize2, Shield, ChevronDown as ChevronDownIcon, ScrollText, Eye, EyeOff, CheckSquare, GripVertical, Users, Globe } from "lucide-react";
 import { storage } from "@/lib/firebase";
 import { ShareToggle, ImportButton } from "@/components/ui/ShareToggle";
@@ -131,6 +135,9 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   const [selectedMobsForEpisode, setSelectedMobsForEpisode] = useState<EpisodeMobPlacement[]>([]);
   const [selectedCrawlersForEpisode, setSelectedCrawlersForEpisode] = useState<CrawlerPlacement[]>([]);
   const [editingEpisodeId, setEditingEpisodeId] = useState<string | null>(null);
+  // Placements as they were when Edit was opened; Show Time keeps changing the live episode
+  // (mob moves, HP) while the editor is open, so only touched placements are saved back
+  const editLoadedPlacements = useRef<{ mobs: EpisodeMobPlacement[]; crawlers: CrawlerPlacement[] } | null>(null);
   const [currentMapIndexForEditor, setCurrentMapIndexForEditor] = useState(0);
   // Per-map settings: { [mapId]: { fogOfWar: boolean, scale: number } }
   const [mapSettingsForEpisode, setMapSettingsForEpisode] = useState<{ [mapId: string]: { fogOfWar: boolean; scale: number } }>({});
@@ -201,7 +208,10 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
       id: Date.now().toString(),
       name: newMob.name,
       level: newMob.level || 1,
-      type: newMob.type || "normal",
+      type: legacyMobType(getMobKind(newMob), isBossMob(newMob)),
+      kind: getMobKind(newMob),
+      boss: isBossMob(newMob),
+      ...(newMob.speciesId ? { speciesId: newMob.speciesId } : {}),
       description: newMob.description || "",
       encountered: false,
       hidden: true,
@@ -214,6 +224,9 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
       hideStrengths: false,
       defaultInventory: newMob.defaultInventory,
       defaultGold: newMob.defaultGold,
+      ...(newMob.personality ? { personality: newMob.personality } : {}),
+      ...(newMob.languages?.length ? { languages: newMob.languages } : {}),
+      ...(newMob.merchant ? { merchant: newMob.merchant } : {}),
     };
     console.log('[DungeonAI] ➕ Add Mob clicked', mob);
     try {
@@ -222,7 +235,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
     } catch (err) {
       console.error('[DungeonAI] ❌ Failed to persist mob', err);
     }
-    setNewMob({ name: "", level: 1, type: "normal", description: "", weaknesses: "", strengths: "", hitPoints: 50 });
+    setNewMob({ name: "", level: 1, type: "normal", kind: "creature", boss: false, speciesId: "", description: "", weaknesses: "", strengths: "", hitPoints: 50, personality: undefined, merchant: undefined, languages: undefined });
   };
 
   const handleDeleteMob = async (id: string) => {
@@ -311,10 +324,13 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   const handleToggleEncountered = (id: string, currentEncountered: boolean) => {
     // When marking as encountered, automatically reveal (hidden=false)
     // When marking as unencountered, automatically hide (hidden=true)
-    handleUpdateMob(id, { 
-      encountered: !currentEncountered,
-      hidden: currentEncountered // if was encountered, now hide it; if was unencountered, now reveal it
-    });
+    // Meeting a character also reveals the creature they are (Grimble → Goblin)
+    const speciesId = !currentEncountered ? mobs.find(m => m.id === id)?.speciesId : undefined;
+    onUpdateMobs(mobs.map(m =>
+      m.id === id ? { ...m, encountered: !currentEncountered, hidden: currentEncountered }
+        : m.id === speciesId ? { ...m, encountered: true, hidden: false }
+        : m
+    ));
   };
 
   const handleStartEdit = (mob: Mob) => {
@@ -499,18 +515,33 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
 
     if (editingEpisodeId) {
       // Update existing episode
+      const loaded = editLoadedPlacements.current;
+      const live = episodes.find(e => e.id === editingEpisodeId);
+      const samePlacement = (a: EpisodeMobPlacement, b: EpisodeMobPlacement) =>
+        a.mobId === b.mobId && a.mapId === b.mapId && a.x === b.x && a.y === b.y;
+      const mobsChanged = !loaded || JSON.stringify(selectedMobsForEpisode) !== JSON.stringify(loaded.mobs);
+      const crawlersChanged = !loaded || JSON.stringify(selectedCrawlersForEpisode) !== JSON.stringify(loaded.crawlers);
+      // Mobs the DM didn't move in the editor keep their live position and HP from Show Time
+      const mobPlacementsToSave = selectedMobsForEpisode.map(p => {
+        const loadedIdx = loaded?.mobs.findIndex(l => samePlacement(l, p)) ?? -1;
+        const livePlacement = loadedIdx >= 0 ? live?.mobPlacements[loadedIdx] : undefined;
+        return livePlacement && livePlacement.mobId === p.mobId
+          ? { ...livePlacement, mapId: livePlacement.mapId || p.mapId, scale: p.scale }
+          : p;
+      });
       onUpdateEpisode(editingEpisodeId, {
         name: newEpisodeName,
         description: newEpisodeDescription,
         mapIds: selectedMapsForEpisode,
-        mobPlacements: selectedMobsForEpisode,
-        crawlerPlacements: selectedCrawlersForEpisode,
+        ...(mobsChanged ? { mobPlacements: mobPlacementsToSave } : {}),
+        ...(crawlersChanged ? { crawlerPlacements: selectedCrawlersForEpisode } : {}),
         mapSettings: mapSettings,
         lootBoxIds: selectedLootBoxIdsForEpisode.length > 0 ? selectedLootBoxIdsForEpisode : undefined,
         questIds: selectedQuestIdsForEpisode.length > 0 ? selectedQuestIdsForEpisode : undefined,
         startingGameTime: parsedStartingTime,
       });
       setEditingEpisodeId(null);
+      editLoadedPlacements.current = null;
     } else {
       // Create new episode
       const episode: Episode = {
@@ -615,7 +646,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
     setSelectedMapsForEpisode(episode.mapIds);
 
     // Load mob placements - add mapId if missing (backwards compatibility)
-    setSelectedMobsForEpisode(episode.mobPlacements.map(p => ({
+    const loadedMobs = episode.mobPlacements.map(p => ({
       mobId: p.mobId,
       mapId: p.mapId || episode.mapIds[0] || '0', // Default to first map if no mapId
       x: p.x,
@@ -624,15 +655,19 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
       currentHP: p.currentHP,
       inventoryOverride: p.inventoryOverride,
       goldOverride: p.goldOverride,
-    })));
+      letterIndex: p.letterIndex,
+    }));
+    setSelectedMobsForEpisode(loadedMobs);
 
     // Load crawler placements
-    setSelectedCrawlersForEpisode(episode.crawlerPlacements?.map(p => ({
+    const loadedCrawlers = episode.crawlerPlacements?.map(p => ({
       crawlerId: p.crawlerId,
       mapId: p.mapId || episode.mapIds[0] || '0',
       x: p.x,
       y: p.y,
-    })) || []);
+    })) || [];
+    setSelectedCrawlersForEpisode(loadedCrawlers);
+    editLoadedPlacements.current = { mobs: loadedMobs, crawlers: loadedCrawlers };
 
     // Load per-map settings
     const loadedMapSettings: { [mapId: string]: { fogOfWar: boolean; scale: number } } = {};
@@ -790,18 +825,11 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                         className="w-full bg-muted border border-border px-3 py-2"
                       />
                     </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground mb-1 block">Type</label>
-                      <select
-                        value={newMob.type || "normal"}
-                        onChange={(e) => setNewMob({ ...newMob, type: e.target.value as "normal" | "boss" | "npc" })}
-                        className="w-full bg-muted border border-border px-3 py-2"
-                      >
-                        <option value="normal">Normal</option>
-                        <option value="boss">Boss</option>
-                        <option value="npc">NPC</option>
-                      </select>
-                    </div>
+                    <MobKindFields
+                      value={newMob}
+                      onChange={(fields) => setNewMob({ ...newMob, ...fields })}
+                      creatures={mobs.filter(m => getMobKind(m) === "creature")}
+                    />
                   </div>
                   <div>
                     <label className="text-xs text-muted-foreground mb-1 block">Description</label>
@@ -832,6 +860,31 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                       className="w-full bg-muted border border-border px-3 py-2"
                     />
                   </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Languages</label>
+                    <LanguagePicker
+                      value={newMob.languages}
+                      onChange={(languages) => setNewMob({ ...newMob, languages })}
+                      hint="Tap the languages it speaks. The first one is its native tongue. Players who don't know the language it uses see gibberish. Pick Beast for animals or Plant for plants: players without it see what the creature does instead. Pick Dead for a corpse: it only answers crawlers using Speak with Dead."
+                    />
+                    <label className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
+                      <input
+                        type="checkbox"
+                        checked={!!newMob.silent}
+                        onChange={(e) => setNewMob({ ...newMob, silent: e.target.checked })}
+                      />
+                      Silent: never talks in Game Chat (oozes, constructs)
+                    </label>
+                  </div>
+                  <NpcPersonalityFields
+                    value={newMob.personality}
+                    onChange={(personality) => setNewMob({ ...newMob, personality })}
+                  />
+                  <MerchantFields
+                    value={newMob.merchant}
+                    onChange={(merchant) => setNewMob({ ...newMob, merchant })}
+                    items={getSharedInventory?.() ?? []}
+                  />
                 </div>
                 <div className="flex flex-col items-center justify-center border border-dashed border-border p-4">
                   <label className="text-xs text-muted-foreground mb-2">Mob Image</label>
@@ -874,7 +927,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                   <div
                     key={mob.id}
                     className={`border p-3 ${
-                      mob.type === "boss" ? "border-destructive bg-destructive/5" : "border-border bg-muted/20"
+                      isBossMob(mob) ? "border-destructive bg-destructive/5" : "border-border bg-muted/20"
                     }`}
                   >
                     {isEditing ? (
@@ -909,18 +962,12 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                                 className="w-full bg-muted border border-border px-2 py-1 text-sm"
                               />
                             </div>
-                            <div>
-                              <label className="text-xs text-muted-foreground mb-1 block">Type</label>
-                              <select
-                                value={editedMob.type}
-                                onChange={(e) => setEditedMobData(prev => prev ? { ...prev, type: e.target.value as "normal" | "boss" | "npc" } : prev)}
-                                className="w-full bg-muted border border-border px-2 py-1 text-sm"
-                              >
-                                <option value="normal">Normal</option>
-                                <option value="boss">Boss</option>
-                                <option value="npc">NPC</option>
-                              </select>
-                            </div>
+                            <MobKindFields
+                              compact
+                              value={editedMob}
+                              onChange={(fields) => setEditedMobData(prev => prev ? { ...prev, ...fields } : prev)}
+                              creatures={mobs.filter(m => m.id !== mob.id && getMobKind(m) === "creature")}
+                            />
                           </div>
                         </div>
                         <div>
@@ -986,6 +1033,39 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                           </div>
                         </div>
 
+                        <div className="mt-3">
+                          <label className="text-xs text-muted-foreground mb-1 block">Languages</label>
+                          <LanguagePicker
+                            value={editedMob.languages}
+                            onChange={(languages) => setEditedMobData(prev => prev ? { ...prev, languages } : prev)}
+                            hint="Tap the languages it speaks. The first one is its native tongue. Players who don't know the language it uses see gibberish. Pick Beast for animals or Plant for plants: players without it see what the creature does instead. Pick Dead for a corpse: it only answers crawlers using Speak with Dead."
+                          />
+                          <label className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
+                            <input
+                              type="checkbox"
+                              checked={!!editedMob.silent}
+                              onChange={(e) => setEditedMobData(prev => prev ? { ...prev, silent: e.target.checked } : prev)}
+                              data-testid="mob-silent"
+                            />
+                            Silent: never talks in Game Chat (oozes, constructs)
+                          </label>
+                        </div>
+
+                        <div className="mt-3">
+                          <NpcPersonalityFields
+                            value={editedMob.personality}
+                            onChange={(personality) => setEditedMobData(prev => prev ? { ...prev, personality } : prev)}
+                          />
+                        </div>
+
+                        <div className="mt-3">
+                          <MerchantFields
+                            value={editedMob.merchant}
+                            onChange={(merchant) => setEditedMobData(prev => prev ? { ...prev, merchant } : prev)}
+                            items={getSharedInventory?.() ?? []}
+                          />
+                        </div>
+
                         {/* Hide Detail Toggles */}
                         <div className="bg-muted/40 border border-border p-2 mt-3 rounded">
                           <p className="text-xs text-muted-foreground font-semibold mb-2">Hide Details From Players:</p>
@@ -1032,6 +1112,16 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                               onChange={(e) => setEditedMobData(prev => prev ? { ...prev, defaultGold: parseInt(e.target.value) || 0 } : prev)}
                               className="w-20 bg-muted border border-border px-2 py-0.5 text-sm text-center"
                             />
+                            <label className="text-xs text-muted-foreground ml-2" title="Chance that each coin and each copy of a stackable item is smashed when this mob is looted. Crawlers' Looting levels lower it.">Smash chance:</label>
+                            <input
+                              type="number"
+                              min={0}
+                              max={100}
+                              value={editedMob.lootDestructionChance ?? DEFAULT_LOOT_DESTRUCTION_CHANCE}
+                              onChange={(e) => setEditedMobData(prev => prev ? { ...prev, lootDestructionChance: Math.min(100, Math.max(0, parseInt(e.target.value) || 0)) } : prev)}
+                              className="w-16 bg-muted border border-border px-2 py-0.5 text-sm text-center"
+                            />
+                            <span className="text-xs text-muted-foreground">%</span>
                           </div>
                           {/* Search and add items from shared inventory */}
                           {(() => {
@@ -1271,7 +1361,10 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                             {mob.hitPoints !== undefined && (
                               <span className="text-xs text-muted-foreground">HP: {mob.hitPoints}</span>
                             )}
-                            {mob.type === "boss" && (
+                            <span className={`text-xs px-2 py-0.5 ${getMobKind(mob) === "character" ? "bg-green-500/20 text-green-500" : "bg-muted text-muted-foreground"}`}>
+                              {getMobKind(mob) === "character" ? "CHARACTER" : "CREATURE"}
+                            </span>
+                            {isBossMob(mob) && (
                               <span className="text-xs bg-destructive/20 text-destructive px-2 py-0.5">BOSS</span>
                             )}
                             <span
@@ -1296,12 +1389,20 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                           {((mob.defaultInventory && mob.defaultInventory.length > 0) || (mob.defaultGold && mob.defaultGold > 0)) && (
                             <div className="text-xs text-muted-foreground mt-1">
                               <span className="text-accent">Inventory:</span>{' '}
-                              {mob.defaultInventory?.map(i => {
+                              {stackItems(mob.defaultInventory ?? []).map(({ item: i, count }) => {
                                 const equipped = isMobItemEquipped(mob.equippedItems, i.id);
-                                return equipped ? `[E] ${i.name}` : i.name;
+                                const name = count > 1 ? `${i.name} ×${count}` : i.name;
+                                return equipped ? `[E] ${name}` : name;
                               }).join(', ')}
                               {mob.defaultGold ? ` · ${mob.defaultGold} gold` : ''}
+                              {` · ${mob.lootDestructionChance ?? DEFAULT_LOOT_DESTRUCTION_CHANCE}% smash chance`}
                             </div>
+                          )}
+                          {isMerchant(mob) && mob.merchant && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              <span className="text-accent">Merchant:</span>{' '}
+                              {mob.merchant.stock.reduce((n, e) => n + e.quantity, 0)} items · {mob.merchant.startingGold} gold · Scrooge {mob.merchant.scroogeFactor}
+                            </p>
                           )}
                         </div>
                         <div className="flex flex-wrap gap-2 mt-2 md:mt-0">
@@ -1363,8 +1464,8 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-display text-sm text-foreground">{pm.name}</span>
                           <span className="text-xs text-muted-foreground">Lvl {pm.level}</span>
-                          {pm.type === "boss" && <span className="text-[10px] bg-destructive/20 text-destructive px-1.5">BOSS</span>}
-                          {pm.type === "npc" && <span className="text-[10px] bg-primary/20 text-primary px-1.5">NPC</span>}
+                          {isBossMob(pm) && <span className="text-[10px] bg-destructive/20 text-destructive px-1.5">BOSS</span>}
+                          {getMobKind(pm) === "character" && <span className="text-[10px] bg-green-500/20 text-green-500 px-1.5">CHARACTER</span>}
                         </div>
                         {pm.description && <p className="text-xs text-muted-foreground line-clamp-2">{pm.description}</p>}
                         {pm.createdByUsername && (
@@ -1908,6 +2009,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                       variant="default"
                       onClick={() => {
                         setEditingEpisodeId(null);
+                        editLoadedPlacements.current = null;
                         setNewEpisodeName("");
                         setNewEpisodeDescription("");
                         setSelectedMapsForEpisode([]);

@@ -25,10 +25,13 @@ import { useFriends } from "@/hooks/useFriends";
 import { usePublicContent } from "@/hooks/usePublicContent";
 import { useMyContent } from "@/hooks/useMyContent";
 import { useIconLibrary } from "@/hooks/useIconLibrary";
+import { useNpcBrain } from "@/hooks/useNpcBrain";
+import { useNpcSpeechMaker } from "@/hooks/useNpcSpeechMaker";
 import { toast } from "sonner";
-import { getNoChildLeftBehindBump } from "@/lib/gameData";
+import { getNoChildLeftBehindBump, rollD20, rollsWithDisadvantage } from "@/lib/gameData";
 import type { Episode, Campaign, CrawlerPlacement, EpisodeMobPlacement, Mob, PublicMap, PublicMob, PublicEpisode, InventoryItem, Spell } from "@/lib/gameData";
 import { publicDocId, buildEpisodeBundle } from "@/lib/publicContent";
+import { LanguagesProvider } from "@/contexts/LanguagesContext";
 
 type AppScreen = "splash" | "menu" | "game";
 type GameView = "profiles" | "maps" | "inventory" | "mobs" | "dungeonai" | "showtime" | "sounds" | "wiki" | "spells";
@@ -166,6 +169,9 @@ const Index = () => {
     claimLootBoxItems,
     deleteLootBox,
     getCrawlerLootBoxes,
+    getPartyInventory,
+    updatePartyInventory,
+    takeFromPartyInventory,
     lootBoxTemplates,
     addLootBoxTemplate,
     updateLootBoxTemplate,
@@ -196,6 +202,7 @@ const Index = () => {
     applyNoChildLeftBehind,
     revokeTrophy,
     overrideMobHealth,
+    setMobEncountered,
     endCombat,
     cancelCombat,
     removeCombatant,
@@ -204,6 +211,27 @@ const Index = () => {
     wikiPages,
     addWikiPage,
     updateWikiPage,
+    chatMessages,
+    npcAiSettings,
+    npcAiStatus,
+    npcSecrets,
+    npcPersonalities,
+    npcMemories,
+    setNpcMemory,
+    sendChatMessage,
+    attachChatAudio,
+    clearChat,
+    customLanguages,
+    createLanguage,
+    deleteLanguage,
+    updateNpcAiSettings,
+    setNpcSecretState,
+    merchants,
+    buyFromMerchant,
+    sellToMerchant,
+    restockMerchant,
+    haggleWithMerchant,
+    resolveMerchantHaggle,
     spells,
     addSpell,
     updateSpell,
@@ -236,6 +264,23 @@ const Index = () => {
     if (!activeCampaign || !user) return false;
     return activeCampaign.ownerId === user.uid;
   }, [activeCampaign, user]);
+
+  // Online NPC brain: runs in the DM's browser during a live game (keys stay in this browser)
+  const { npcKeys, setNpcKeys } = useNpcBrain(roomId, isAdmin);
+
+  // Spoken voices: the DM's browser reads new NPC lines aloud and shares the clips with players
+  useNpcSpeechMaker({
+    roomId,
+    isDm: isAdmin,
+    enabled: !!npcAiSettings?.speech,
+    messages: chatMessages,
+    mobs,
+    crawlers,
+    personalities: npcPersonalities,
+    voicePicks: npcAiSettings?.voices,
+    keys: npcKeys,
+    onAttachAudio: attachChatAudio,
+  });
 
   // Public content (cross-campaign sharing)
   const showPublicContent = userProfile?.showPublicContent ?? false;
@@ -542,18 +587,19 @@ const Index = () => {
   }, [isAuthenticated, user, userProfile?.username, setCreator]);
 
   // "No Child Left Behind": the DM's client lifts a sole slowest crawler to the second slowest speed.
-  // Only the DM runs it so the trophy isn't awarded once per connected player.
+  // Only the DM runs it so the trophy isn't awarded once per connected player, and only while a game
+  // is being played, so speeds the DM sets while creating crawlers aren't overridden mid-setup.
   const noChildLeftBehindKey = (() => {
     const bump = getNoChildLeftBehindBump(crawlers, getCrawlerInventory);
     return bump ? `${bump.crawlerId}:${bump.moveSpeed}` : '';
   })();
   const lastNoChildLeftBehindKey = useRef('');
   useEffect(() => {
-    if (!isAdmin || !isLoaded || !noChildLeftBehindKey) return;
+    if (!isAdmin || !isLoaded || !isGameActive || !noChildLeftBehindKey) return;
     if (lastNoChildLeftBehindKey.current === noChildLeftBehindKey) return;
     lastNoChildLeftBehindKey.current = noChildLeftBehindKey;
     applyNoChildLeftBehind().catch(err => console.error('[Index] No Child Left Behind failed:', err));
-  }, [isAdmin, isLoaded, noChildLeftBehindKey, applyNoChildLeftBehind]);
+  }, [isAdmin, isLoaded, isGameActive, noChildLeftBehindKey, applyNoChildLeftBehind]);
 
   // Restore campaign from URL query param on cold load (deep linking)
   const campaignRestoredRef = useRef(false);
@@ -635,12 +681,13 @@ const Index = () => {
       navigate('/app', { replace: true });
       return;
     }
-    // Non-admin trying to access dungeonai → menu
-    if (pathSegment === 'dungeonai' && !isAdmin) {
+    // Non-admin trying to access dungeonai → menu. Wait for sign-in to restore first,
+    // otherwise a DM refreshing the DM Console is briefly "not admin" and gets bounced.
+    if (pathSegment === 'dungeonai' && !authLoading && !isAdmin) {
       navigate('/app/menu', { replace: true });
       return;
     }
-  }, [pathSegment, currentPlayer, navigate, isAdmin]);
+  }, [pathSegment, currentPlayer, navigate, isAdmin, authLoading]);
 
   // Persist player to localStorage (global + per-campaign)
   useEffect(() => {
@@ -708,16 +755,16 @@ const Index = () => {
 
   const handleStatRoll = (crawlerName: string, crawlerId: string, stat: string, totalStat: number) => {
     const modifier = Math.floor((totalStat - 10) / 2);
-    const rawRoll = Math.floor(Math.random() * 20) + 1;
+    const { rawRoll, results, diceLabel } = rollD20(rollsWithDisadvantage(crawlers.find(c => c.id === crawlerId), totalStat));
     const total = rawRoll + modifier;
     const entry: DiceRollEntry = {
       id: crypto.randomUUID(),
       crawlerName,
       crawlerId,
       timestamp: Date.now(),
-      results: [{ dice: 'D20', result: rawRoll }],
+      results,
       total,
-      statRoll: { stat, modifier, rawRoll },
+      statRoll: { stat, modifier, rawRoll, diceLabel },
     };
     addDiceRoll(entry);
   };
@@ -860,6 +907,12 @@ const Index = () => {
     setGameActiveRef.current = fn;
   }, []);
 
+  // Whose languages decide what's readable: the DM reads everything
+  const languageReader = useMemo(
+    () => (isAdmin ? null : crawlers.find(c => c.id === currentPlayer?.id) ?? null),
+    [isAdmin, crawlers, currentPlayer?.id]
+  );
+
   // While auth is still loading, show a loading indicator to avoid flashing
   // the splash screen before we know if the user should be redirected to landing
   if (authLoading) {
@@ -918,6 +971,13 @@ const Index = () => {
   }
 
   return (
+    <LanguagesProvider
+      customLanguages={customLanguages}
+      isAdmin={isAdmin}
+      readerCrawler={languageReader}
+      createLanguage={createLanguage}
+      deleteLanguage={deleteLanguage}
+    >
     <div className="min-h-screen">
       <a href="#main-content" className="skip-nav">Skip to main content</a>
       <AnimatePresence mode="wait">
@@ -982,6 +1042,9 @@ const Index = () => {
                 onStatRoll={handleStatRoll}
                 getCrawlerLootBoxes={getCrawlerLootBoxes}
                 claimLootBoxItems={claimLootBoxItems}
+                getPartyInventory={getPartyInventory}
+                onTakeFromPartyInventory={takeFromPartyInventory}
+                onUpdatePartyInventory={updatePartyInventory}
                 noncombatTurnState={noncombatTurnState}
                 getNoncombatRollsRemaining={getNoncombatRollsRemaining}
                 recordNoncombatRoll={recordNoncombatRoll}
@@ -1060,6 +1123,7 @@ const Index = () => {
                 onToggleSpellPublic={handleToggleSpellPublic}
                 showPublicContent={showPublicContent}
                 iconImages={iconImages}
+                currentPlayerId={currentPlayer?.id}
               />
             )}
             {currentView === "mobs" && <MobsView mobs={mobs} />}
@@ -1142,6 +1206,27 @@ const Index = () => {
                 onDeleteAssignedQuest={deleteAssignedQuest}
                 currentPlayerId={currentPlayer?.id}
                 onRecordCrawlerMove={recordCrawlerMove}
+                onSetMobEncountered={setMobEncountered}
+                chatMessages={chatMessages}
+                npcAiSettings={npcAiSettings}
+                npcAiStatus={npcAiStatus}
+                npcSecrets={npcSecrets}
+                npcPersonalities={npcPersonalities}
+                npcMemories={npcMemories}
+                onSetNpcMemory={isAdmin ? setNpcMemory : undefined}
+                onSendChatMessage={sendChatMessage}
+                onClearChat={isAdmin ? clearChat : undefined}
+                onUpdateNpcAiSettings={isAdmin ? updateNpcAiSettings : undefined}
+                onSetNpcSecretState={isAdmin ? setNpcSecretState : undefined}
+                npcKeys={isAdmin ? npcKeys : undefined}
+                onChangeNpcKeys={isAdmin ? setNpcKeys : undefined}
+                onSetTranslateMode={async (crawlerId, mode) => { await updateCrawler(crawlerId, { translateMode: mode }); }}
+                merchants={merchants}
+                onBuyFromMerchant={buyFromMerchant}
+                onSellToMerchant={sellToMerchant}
+                onHaggleWithMerchant={haggleWithMerchant}
+                onRestockMerchant={isAdmin ? restockMerchant : undefined}
+                onResolveMerchantHaggle={isAdmin ? resolveMerchantHaggle : undefined}
               />
             )}
             {currentView === "sounds" && <SoundEffectsView />}
@@ -1211,6 +1296,7 @@ const Index = () => {
               onEndCombat={endCombat}
               onCancelCombat={cancelCombat}
               onOverrideMobHealth={overrideMobHealth}
+              onSetMobEncountered={setMobEncountered}
               onRemoveCombatant={removeCombatant}
               runtimeCrawlerPlacements={runtimeCrawlerPlacements}
               runtimeMobPlacements={runtimeMobPlacements}
@@ -1233,6 +1319,7 @@ const Index = () => {
         </>
       )}
     </div>
+    </LanguagesProvider>
   );
 };
 

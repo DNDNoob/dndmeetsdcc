@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { DungeonButton } from './ui/DungeonButton';
 import { useAuth } from '@/contexts/AuthContext';
-import { User } from 'lucide-react';
+import { User, LogOut } from 'lucide-react';
 
 const UsernameSetupModal: React.FC = () => {
-  const { needsUsername, user, saveUserProfile } = useAuth();
+  const { needsUsername, user, saveUserProfile, signOut } = useAuth();
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState(() => user?.displayName || '');
   const [submitting, setSubmitting] = useState(false);
@@ -62,6 +62,11 @@ const UsernameSetupModal: React.FC = () => {
           <p className="text-sm text-muted-foreground mb-4">
             Choose a username and display name to get started.
           </p>
+          {user?.email && (
+            <p className="text-xs text-muted-foreground mb-4">
+              Signed in as <span className="text-foreground font-mono">{user.email}</span>
+            </p>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
@@ -116,6 +121,16 @@ const UsernameSetupModal: React.FC = () => {
             >
               {submitting ? 'Saving...' : 'Continue'}
             </DungeonButton>
+
+            {/* Escape hatch: lets someone signed in with the wrong account get back out */}
+            <button
+              type="button"
+              onClick={() => { void signOut(); }}
+              className="w-full flex items-center justify-center gap-2 text-xs text-muted-foreground hover:text-primary py-1"
+            >
+              <LogOut className="w-3 h-3" />
+              Not you? Sign out
+            </button>
           </form>
         </div>
       </motion.div>

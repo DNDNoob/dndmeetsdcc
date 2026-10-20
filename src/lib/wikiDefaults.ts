@@ -19,7 +19,7 @@ When you first visit the site, you'll see the **Landing Page** — a cinematic o
 
 An account is **required** to access any game features. Anonymous browsing of the app is not available — you must sign in first.
 
-1. **Sign in** using Google or email/password (click "Enter the Dungeon" on the landing page).
+1. **Sign in** with Google (click "Enter the Dungeon" on the landing page).
 2. **Choose a username** and display name when prompted (first time only).
 3. You'll be taken to the **Campaign Selection** screen.
 
@@ -61,6 +61,8 @@ The navigation bar at the top of the screen gives you quick access to all sectio
 
 On mobile devices, the navigation collapses into a **hamburger menu** (☰) — tap it to access all sections from a dropdown.
 
+In **Show Time**, the navigation bar hides to give the map more room. Rest your mouse at the top-left edge of the screen for a moment to bring it back, or pin it open. Moving across the top of the screen on your way to the map tools won't pop it open.
+
 Use the **Campaigns** button to return to the campaign list at any time.`,
   },
   {
@@ -71,7 +73,26 @@ Use the **Campaigns** button to return to the campaign list at any time.`,
     order: 1,
     content: `# Crawlers (Player Characters)
 
-Crawlers are the player characters in the game. Each crawler has a name, race, job, level, and a set of core stats.
+Crawlers are the player characters in the game. Each crawler has a name, race, job (class), level, and a set of core stats.
+
+## Creating a Crawler
+
+Tap **New** next to the crawler picker on the Profiles page. The character creator walks you through it one step at a time:
+
+1. **Name**
+2. **Backstory**, five questions. Pick one of the suggestions or write your own answer:
+   - **Profession**: what you did for a living (bug exterminator, used car salesman)
+   - **Accomplishment**: something small and real. "3rd place at state in the 400m" is fine, "Olympic gold" is not
+   - **Hobby**: what you did for fun
+   - **Where you were when the world ended**
+   - **The most important person, thing or animal in the world to you**
+3. **Ability points**: spend 10 points (2 per ability) however you like, up to 5 in one ability. Each point adds +1 to that ability's rolls. An ability left at **0 points rolls with disadvantage** (two d20s, take the lower), and shows **DIS** next to it on your profile.
+4. **Languages**: everyone speaks Worldspeech, plus 2 more you pick. Mindspeech, Beast, Plant and Dead can't be picked at the start; they need a gift or a spell.
+5. **Review**, then **Create crawler**.
+
+Every new crawler starts as a **Human** with **no class**, at Level 1 with **25 HP**, **10 mana** and **0 gold**. Race and class change later, when the DM decides. Starting items are set up by the DM.
+
+Your answers appear in the **Backstory** section of your profile. Tap **Edit** to change them at any time; the DM may ask you to tone down an answer.
 
 > **New campaigns:** until you create or save a crawler, a brand-new campaign shows the sample crawlers (Carl and Princess Donut). Editing and saving a sample crawler saves it to your campaign as a real crawler.
 
@@ -87,7 +108,7 @@ Every crawler has these core attributes:
 | Intelligence | INT | Knowledge, magic power |
 | Charisma | CHA | Social skills, some special abilities |
 
-Stats start at a base value and can be modified by equipped items. The modifier for any stat is calculated as: **(stat - 10) / 2**, rounded down. For example, a STR of 14 gives a +2 modifier.
+Stats start at a base value and can be modified by equipped items. For crawlers made with the character creator, each ability point is worth 2 stat points (0 points = 10, 5 points = 20), so the modifier equals the points. The modifier for any stat is calculated as: **(stat - 10) / 2**, rounded down. For example, a STR of 14 gives a +2 modifier.
 
 ## Health and Mana
 
@@ -151,7 +172,8 @@ Nobody gets left behind. If exactly one crawler in the campaign is slower than e
 
 - Speed here means the crawler's speed after equipment bonuses.
 - If two or more crawlers are tied for slowest, nothing happens.
-- It happens again any time a single crawler becomes the slowest, and the trophy counts up each time.
+- It only runs while a game is being played (after the DM clicks **Play the Game** in Show Time), so the DM can set up crawlers with any speed beforehand.
+- It happens again any time a single crawler becomes the slowest during a game. The trophy is awarded once per crawler.
 - It runs while the DM has the campaign open.`,
   },
   {
@@ -263,6 +285,10 @@ Each item can have:
 - Remove items with the trash icon
 - Edit item names and descriptions inline
 
+## Item Stacks
+
+Copies of the same item always stack. A crawler carrying three Health Potions sees one **Health Potion x3** row in their inventory, in the Show Time inventory panel, in loot boxes, in a merchant's sell list and in a mob's item list. Two items count as copies when their name, description, equipment slot, gold value and stat modifiers all match. Removing or selling takes one copy off the stack.
+
 ## Gold
 
 Each crawler has their own gold balance. The total party gold is displayed at the top of the inventory page. In edit mode, you can adjust gold with +10/-10 buttons or type a specific amount.
@@ -310,6 +336,68 @@ If you have **Show Public Content** enabled in your account settings, a "Communi
 - Copied items start as private and belong to the DM who imported them`,
   },
   {
+    id: 'mob-loot',
+    slug: 'mob-loot',
+    title: 'Mob Loot & Party Inventory',
+    category: 'Game Mechanics',
+    order: 13,
+    content: `# Mob Loot & Party Inventory
+
+When a hostile mob goes down in combat, its items and gold are looted automatically. Nobody has to hand anything out.
+
+## What a Mob Drops
+
+A mob drops the items and gold set on it in the DM Console. If the DM gave that mob a different inventory or gold amount for this episode (in the map's mob placement editor), those are used instead.
+
+Friendly mobs keep their things when they go down, because the crawlers weren't fighting them.
+
+## Who Gets What
+
+Loot is shared by every crawler in the combat's initiative list, including anyone who is knocked out.
+
+- **Gold** is split evenly. Leftover coins go one each to crawlers in initiative order. (10 gold between 3 crawlers is 4, 3 and 3.)
+- **Items the mob carries more than one copy of**, like potions, are dealt out evenly. Copies that can't be split evenly go to the party inventory. (4 potions between 3 crawlers is 1 each, plus 1 for the party.)
+- **Single items**, like a mob's one dagger, go to the party inventory.
+
+## Smashed Loot
+
+Looting is rough work, and some loot gets smashed. Each coin and each copy of a stackable item (anything the mob carries more than one of) rolls a chance to be destroyed instead of looted. Single items, like a mob's one dagger, are never smashed.
+
+- The chance is **25%** by default. The DM can change it for each mob with **Smash chance** in the DM Console, next to the mob's gold.
+- Each crawler's share rolls against their own Looting level. Leftovers headed for the party inventory roll against the best looter in the fight.
+- The **Looted** line in the dice history lists what was smashed.
+
+## Looting Level
+
+Every mob a crawler helps loot counts toward their **Looting level**, shown on their profile under Activity with how many more mobs they need for the next level.
+
+| Level | Mobs looted | Loot smashed |
+|-------|-------------|--------------|
+| 0 | 0 | normal rate |
+| 1 | 10 | 10% less often |
+| 2 | 30 | 20% less often |
+| 3 | 60 | 30% less often |
+| 4 | 100 | 40% less often |
+| 5 | 150 | half as often |
+| 10 | 550 | never |
+
+Each level cuts the chance by a tenth, so with a 25% smash chance a level 5 looter only loses about 12%. A toast celebrates each level-up.
+
+## When It Happens
+
+Loot drops the moment the mob's HP reaches 0, whether from an attack or from the DM setting its HP. A mob is only looted once: healing it and bringing it down again doesn't drop anything more, and its body stays empty in later fights in that episode.
+
+Every kill posts a **Looted** line to the dice history showing what each crawler got, what was smashed and what went to the party.
+
+## Party Inventory
+
+The party inventory holds looted items nobody has claimed yet. It appears on the Profiles page under the inventory summary whenever it has something in it.
+
+- Click **Take** to move one copy into the crawler you're viewing, or **All** to take the whole stack.
+- If two players click Take on the last copy at the same time, only one gets it.
+- The DM can take items for any crawler, and can discard items with the trash icon.`,
+  },
+  {
     id: 'combat',
     slug: 'combat',
     title: 'Combat System',
@@ -322,6 +410,8 @@ The combat system handles turn-based encounters with initiative, action tracking
 ## Starting Combat
 
 The DM starts combat from the game clock panel during Show Time. They select which crawlers and mobs participate. You can also add combatants mid-combat using the "Add to Combat" button.
+
+Every mob placed in the episode can join combat, including mobs the party hasn't encountered yet. Unencountered mobs are tagged *unencountered* in the setup list and have a **Reveal** button. Players see every combatant in the turn order either way.
 
 ## Initiative Phase
 
@@ -437,6 +527,14 @@ Each map in an episode has independent settings:
 - **Mob Placements**: Mobs are placed on specific maps, not the episode as a whole
 - **Crawler Placements**: Player character positions are per-map
 
+## Editing an Episode During a Game
+
+You can open an episode in the DM Console editor while it's running in Show Time. Saving it keeps the live positions and HP of mobs you didn't touch in the editor, so moves made in Show Time aren't undone.
+
+## Deleting Maps
+
+If you delete a map, every episode that uses it is updated: the map is removed from the episode along with the mobs and crawlers placed on it, and the episode's other maps keep their mobs, settings and fog.
+
 ## Ending an Episode
 
 The DM can click "Game Over" to end the episode for all players, or "Back to Episodes" to return to the episode selection screen.`,
@@ -510,20 +608,36 @@ Fog of war state (which areas are revealed) persists in Firebase. If you close a
   {
     id: 'mobs',
     slug: 'mobs',
-    title: 'Mobs (Enemies & NPCs)',
+    title: 'Mobs (Creatures, Characters & Bosses)',
     category: 'Basics',
     order: 2,
-    content: `# Mobs (Enemies & NPCs)
+    content: `# Mobs (Creatures, Characters & Bosses)
 
-Mobs are the enemies and non-player characters that populate your game world.
+Mobs are everyone in the game world who isn't a crawler. They are all set up the same way and can all talk, trade and fight. The only difference is whether they're a one-off or part of the story.
 
-## Mob Types
+## Kinds
 
-| Type | Color | Purpose |
-|------|-------|---------|
-| Normal | Default | Standard enemies |
-| Boss | Red accent | Powerful enemies |
-| NPC | Blue accent | Non-hostile characters |
+| Kind | What it is | Example |
+|------|-----------|---------|
+| **Creature** | A template. Place it on the map as many times as you like; each copy is labelled A, B, C… and is transient | Goblin, Gnome |
+| **Character** | One named person who is part of the story and may come back | Grimble the Goblin Merchant |
+
+Tick **Boss** on either kind to mark it as a boss (red styling, its own section in Mob Profiles).
+
+A character can optionally be a creature (**Is a** in the DM Console): Grimble *is a* Goblin. When players meet Grimble, Goblin is revealed in their Mob Profiles too.
+
+Mobs made before kinds existed carry over automatically: Normal became Creature, Boss became a Creature with Boss ticked, and NPC became Character.
+
+## Friendly or Hostile
+
+Hostility belongs to each token on the map, not the mob, so it can change mid-scene. Creatures start out **hostile** and characters start out **friendly**.
+
+- **DM**: right-click a token in Show Time and choose **Make Friendly** / **Make Hostile**. The DM sees a red ring around hostile tokens and a green ring around friendly ones; players don't see the rings
+- **Combat**: when the DM starts a combat turn, hostile tokens are ticked and friendly ones are left unticked (marked *friendly*). The DM can still tick a friendly token to pull it into the fight
+
+## Mob Profiles (players)
+
+The Mobs page shows what the party has encountered in three sections: **Creatures**, **Bosses** and **Characters**. Characters show the creature they are when it's known ("A Goblin").
 
 ## Mob Properties
 
@@ -537,10 +651,19 @@ Each mob has:
 - **Default Gold**
 - **Equipped Items** (items the mob has equipped, shown with a shield icon)
 
+## Encountered Mobs
+
+New mobs start as **unencountered**: they don't appear in players' Mob Profiles until the party meets them. They still show on the map and can join combat.
+
+The DM can mark a mob encountered (or unencountered) from:
+- The DM Console Mobs tab
+- Show Time: right-click a mob token and choose **Mark Encountered**
+- The combat panel: the **Reveal** / **Hide** button next to the mob
+
 ## Mob Visibility
 
 The DM can choose to hide or show various mob details:
-- **Hidden**: The mob doesn't appear to players at all
+- **Unencountered**: The mob is left out of players' Mob Profiles
 - **Hide HP**: Health bar is hidden from players
 - **Hide Strengths/Weaknesses**: Stat details hidden until the DM reveals them
 
@@ -550,7 +673,15 @@ From the DM Console Mobs tab, the DM can create, edit, and delete mobs. This inc
 
 ## Mobs on Maps
 
-When placed on a map during episode setup or Show Time, mobs appear as circular icons. Each mob instance tracks its own HP independently, so duplicate mobs can take different amounts of damage.`,
+When placed on a map during episode setup or Show Time, mobs appear as circular icons. Each mob instance tracks its own HP independently, so duplicate mobs can take different amounts of damage.
+
+## NPC Personality
+
+Every mob can talk for itself in Show Time when NPC voices are running. Each mob has an optional **NPC Personality** card (DM only) in the DM Console; leave it blank and the AI makes one up from the mob's details. Each copy of a creature gets its own made-up personality, so Goblin A and Goblin B feel like different goblins. See [Talking NPCs](/wiki/talking-npcs).
+
+## Merchants
+
+Any mob can be a merchant that buys and sells items. Tick **Is a merchant** on the mob in the DM Console. See [Merchants](/wiki/merchants).`,
   },
   {
     id: 'dice-roller',
@@ -757,6 +888,8 @@ Show Time is the main gameplay view where the DM presents maps, mobs, and encoun
 5. Manage combat, loot, and turns from the game clock panel
 6. Click "Game Over" to end the session
 
+If you refresh the page or visit another page (like the DM Console) during a game, Show Time picks up where you left off when you come back, and players stay in the game.
+
 ## For Players
 
 1. Navigate to Show Time
@@ -781,7 +914,334 @@ Everything in Show Time syncs in real time:
 - Combat state and turn order
 - Pings and shape annotations
 - Loot box distribution
-- Quest assignments and progress`,
+- Quest assignments and progress
+- Game chat and NPC speech bubbles
+
+## Game Chat
+
+The chat button in the bottom right opens the **Game Chat** for the running episode. Players talk as their crawler and the DM talks as the DM. Hold the microphone button to speak instead of typing. Mobs with a personality answer in the chat and in speech bubbles over their heads. See [Talking NPCs](/wiki/talking-npcs).`,
+  },
+  {
+    id: 'merchants',
+    slug: 'merchants',
+    title: 'Merchants',
+    category: 'Features',
+    order: 33,
+    content: `# Merchants
+
+Any mob can be a merchant. Crawlers walk up to them in Show Time to buy items and sell their own.
+
+## Setting Up a Merchant (DM)
+
+In the DM Console, open a mob (new or existing), expand **Merchant** and tick **Is a merchant**. Then set:
+
+| Setting | What it does |
+|---------|--------------|
+| Starting gold | How much gold the merchant has to buy items from crawlers |
+| Scrooge Factor | How greedy the merchant is (see Prices below) |
+| Haggle DC | The Persuasion roll a crawler needs to ask for better prices (15 if left blank) |
+| Stock | Items from the item library, with how many of each the merchant has |
+
+Each stock line shows its buy / sell price at the current Scrooge Factor.
+
+### Characters and creatures
+
+A **character** merchant (Grimble) has one shop wherever their token stands. A **creature** merchant is a template, so each copy on the map runs its own shop: Goblin A and Goblin B each start with the stock and gold you set, and buying out Goblin A doesn't empty Goblin B. Restock works on one copy at a time.
+
+## Trading (Players)
+
+During Show Time, tap a merchant's token and choose **Trade with Merchant**. You must be within **20 ft** of the merchant; farther away, the option is greyed out and says how far you are.
+
+- **Buy**: shows what the merchant has, how many are left and the price. The gold comes out of your crawler's gold and the item goes into your inventory.
+- **Sell**: shows your inventory and what the merchant will pay. Selling an equipped item takes it off first.
+
+Stock and gold are shared by everyone. If one crawler buys a knife and the merchant had three, everyone else sees two left. If two crawlers try to buy the last one at the same moment, only one gets it; the other is told it's sold out.
+
+### When the Merchant Runs Low on Gold
+
+The merchant only pays with the gold they have. If an item is worth more than the merchant has left, you can **sell it for whatever gold they have**. A merchant with no gold can't buy anything until they make some sales or the DM restocks them.
+
+## Prices and the Scrooge Factor
+
+| Scrooge Factor | Crawlers pay | Crawlers get when selling |
+|----------------|--------------|---------------------------|
+| 0 | Item value | Item value |
+| 1 | 10% more | 10% less |
+| 2 | 20% more | 20% less |
+| ... | +10% per level | -10% per level |
+
+Prices are rounded to whole gold, up when buying and down when selling. Items with no gold value can't be sold.
+
+## Haggling
+
+In the trade window, press **Haggle** to roll Persuasion (d20 + your Charisma modifier, including equipment). The roll shows in the dice log.
+
+Haggling uses an action. In combat it takes your action, so you can only haggle on your turn before acting. Between fights it uses one of your rolls for the current turn.
+
+- If you meet the merchant's Haggle DC, the DM gets a prompt to lower your prices one Scrooge level. If they say yes, you trade at the lower level with that merchant.
+- If you fall short, or the DM says no, the merchant won't budge.
+
+Each crawler gets one haggle per merchant until the merchant is restocked. Haggling only lowers prices for the crawler who rolled.
+
+## Restocking (DM)
+
+Right-click a merchant's token in Show Time and choose **Open Merchant**. The DM sees the stock, the merchant's gold, and any haggles waiting for an answer (these also pop up in the bottom left of the map). **Restock** resets the stock, gold and haggling to the settings in the DM Console.
+
+Changes to stock and starting gold in the DM Console take effect at the next restock. Changes to the Scrooge Factor apply right away.`,
+  },
+  {
+    id: 'talking-npcs',
+    slug: 'talking-npcs',
+    title: 'Talking NPCs',
+    category: 'Features',
+    order: 32,
+    content: `# Talking NPCs
+
+Mobs with a personality speak for themselves during Show Time. An AI model writes one line of in-character dialogue at a time, based on the personality you wrote and what is happening in the game. NPCs speak the languages set on their mob, so players may need a translator; see [Languages](/wiki/languages). The model runs either online through free AI services or on the DM's own computer (see NPC Brain below).
+
+## Giving a Mob a Personality
+
+In the DM Console, open a mob (new or existing) and expand **NPC Personality**. Fill in any of these:
+
+| Field | What it does |
+|-------|--------------|
+| Voice and manner | How they talk ("Gruff dwarf smith. Calls everyone kid") |
+| Wants | What they are after |
+| Knows | Things they can tell the party |
+| Secret | Something they hide until you unlock it |
+| Reveals the secret when | The condition for giving it up ("The party pays him") |
+| Attitude toward the party | Friendly, grumpy, scared, hostile... |
+| Persuasion DC | How hard they are to talk into giving up the secret (optional) |
+
+Players never see this card.
+
+### Auto-generated personalities
+
+Every mob can talk, even ones you never wrote a card for. The first time a mob without a card is needed (or while things are quiet), the AI writes one from everything the game knows about it: name, kind, level, description, strengths and abilities, weaknesses, hit points, the items it carries and its gold. It also rolls random ingredients (a temperament, a speech quirk, what drives it, how it sees the crawlers and something tied to its past) so no two mobs come out the same, even two of the same kind.
+
+**Creatures** get one per copy on the map: Goblin A, Goblin B and Goblin C each talk as themselves in the chat, with their own personality and secret. If you write a card on a creature, every copy uses your card. **Characters** are one person, so they always have one personality wherever their token stands.
+
+The generated personality includes a secret and a Persuasion DC based on the mob's level (bosses are harder). It stays the same for the rest of the campaign. In the chat settings it shows as **(AI personality)** next to the mob's name; hover to read it. Fill in the mob's card in the DM Console at any time to replace it with your own.
+
+Hidden mobs never talk.
+
+## When NPCs Speak
+
+NPCs listen as soon as the DM opens an episode in Show Time (you do not need to start the game clock), and talk on their own, no button needed:
+- **Spoken to by name**: "Grimble, where's the key?" gets an answer. You can also type **@** in the chat box to pick who you're talking to from a list. After that, your messages keep going to that mob (the chat shows **Talking to …** above the box) until you pick someone else or tap the ✕
+- **Within 20 feet**: players can only talk to mobs within 20 ft of their crawler (measured like the Ruler). The @ list only shows mobs in range, with how far away they are, and mobs farther away don't answer. The DM can talk to any mob
+- **Someone talks nearby**: the closest NPC may chime in
+- **A crawler walks up** to them
+- **A crawler gets badly hurt**, a **fight breaks out**, a **mob dies**, or a **loot box is opened** nearby
+- **Quiet moments**: after about a minute of silence, an NPC near the party may mutter something
+
+Each line appears in a speech bubble over the NPC's head on the map, fades after a few seconds, and is saved in the Game Chat. A "…" bubble shows while the NPC is thinking. An NPC waits about 20 seconds between lines so it doesn't hog the conversation.
+
+## Memory
+
+NPCs remember the party. When a conversation with an NPC has been quiet for about 2 minutes, the AI writes down what mattered in a few short notes, such as "Biff promised to bring back my lantern". It also notes how the NPC now feels about each crawler who talked to it, from hostile to fond. From then on the NPC talks with that memory, so insult Greg and he stays cold with you next time.
+
+- **Characters** (like Grimble) keep their memory for the whole campaign, across maps and episodes.
+- **Creature copies** (like Goblin B) each remember their own conversations, but only for the episode they were made in.
+- Locked secrets never go into memory, since the AI doesn't know them.
+- Animals that speak **Beast** and plants that speak **Plant** show body language to crawlers who don't know the language. Corpses that speak **Dead** only answer crawlers using Speak with Dead, and **Silent** mobs never talk. See [Languages](/wiki/languages).
+- NPCs only know what they could have heard: messages players sent while the NPC was within 20 ft, your narration (unless you @ someone else), and other NPCs talking close by on the same map. Each reply uses the last 25 messages the NPC heard, and nothing from other maps or out of earshot goes into its replies or its memory.
+
+DMs can see and change what an NPC remembers: open the Game Chat settings and tap the brain icon next to the NPC. The number on it is how many notes it has. Edit the notes (one per line) and tap **Save**, or tap **Forget everything** to wipe its memory and feelings.
+
+## Secrets
+
+The AI is **never told the secret** until you unlock it, so it can't let it slip. When a message in the chat looks like it meets the reveal condition, you get a prompt in the Game Chat:
+
+> Vex: "Here are 10 gold coins." Unlock Grimble's secret?  **Unlock** / **Not yet**
+
+Unlock tells the NPC the secret and it shares it right away. You can also lock or unlock any secret by hand in the chat settings.
+
+### Persuasion Rolls
+
+If the NPC has a **Persuasion DC**, a crawler can try to talk them into it: roll **Persuasion** from your profile while standing next to the NPC on the map (or right after talking to them in the chat). If the total meets the DC, the DM gets the same Unlock / Not yet prompt, showing the roll. If it falls short, the NPC brushes you off.
+
+Each crawler gets one try per NPC each noncombat turn (or every 10 minutes when turns aren't running).
+
+## DM Settings
+
+Open the Game Chat and tap the gear icon:
+- **NPC voices**: turn the feature on or off for this campaign
+- **Spoken voices**: read NPC lines aloud on every device, with a voice per NPC (see Spoken Voices above)
+- **Keys**: free Groq and Gemini keys (and an ElevenLabs key for voices), saved only in this browser
+- **NPC brain**: **Online** or **Laptop** (see below)
+- **Model**: **Best quality** (bigger, slower) or **Fast** (smaller, quicker)
+- **Mute all NPCs**, or mute one NPC
+- **Secret** lock/unlock per NPC
+- **Memory** per NPC (brain icon): see and edit what it remembers
+- **Clear chat** for the current episode
+
+The dot next to the chat button is green when an NPC brain is listening. The chat header says which one is answering, for example "NPC voices online" or "Laptop covering".
+
+## Spoken Voices
+
+NPCs can also say their lines out loud. Turn on **Spoken voices** in the Game Chat settings (gear icon). From then on, every NPC line is read aloud on every player's device at the same moment its speech bubble appears.
+
+- The voices come from online voice services, using free keys you paste into the chat settings: **Gemini** first, then **Groq**, then **ElevenLabs**. When one runs out of free use (or its key is missing or rejected), the next one takes over automatically, and the chat settings say which one is in use and when the others come back.
+- Gemini and Groq get a one-word mood tag worked out from the NPC's Voice and manner notes and attitude (gruff, nervous, cheerful, angry, sly, whispering, slow or fast), so a gruff dwarf sounds gruff and a nervous goblin sounds nervous. Only the line itself is spoken; accents come from the voice you pick.
+- If a line can't be voiced for the players, the chat settings say why under Spoken voices.
+- Lines play by themselves. If a browser won't play sound until you've tapped the page, the line waits and plays on your first tap.
+- When every service is used up, voices are made by Kokoro, a free voice model that runs in the DM's browser. It sounds flatter, and the first time it's needed the browser downloads it (about 330 MB) and keeps it for next time.
+- Keep the DM tab open during the game, the same as for the Online brain. The keys are saved only in that browser.
+- Each line is saved in the game's database as a small sound clip that players' devices play once. Clips are deleted again after about 15 minutes.
+- Lines in a language a player doesn't know are read to them as the scrambled words, so it sounds foreign. Players who know the language, and the DM, hear the real words. Lines in Mindspeech or Ward sign aren't read aloud, and players who don't know Beast hear nothing from a beast (they still see what it does).
+- Actions written between asterisks (the NPC grinning, wiping its hands) are skipped; only the words are spoken.
+
+### Creature sounds
+
+Each NPC can also have a creature sound, an effect put on whatever voice reads its lines:
+
+- **Goblin**: higher, quicker and a little nasal
+- **Tiny**: very high and fast, like a pixie or a cartoon mouse
+- **Giant**: deeper and slower, with a bit of boom
+- **Dragon**: much deeper, with a growl and an echo
+- **Ghost**: hollow, wavering and echoing
+
+It's picked from the NPC's name, description and Voice and manner notes (a "goblin" gets Goblin, a "red dragon" gets Dragon). You can choose another one, or None, under the NPC's voice in the chat settings. The sound works with every voice service and costs nothing.
+
+### ElevenLabs character voices
+
+ElevenLabs has a voice library with goblins, trolls, dragons and cartoon characters. Add the ones you like to your ElevenLabs account, then pick one for an NPC with the **ElevenLabs** menu under its voice. NPCs with an ElevenLabs voice are read by ElevenLabs first, even when other services still have free use, so they keep their character voice until your ElevenLabs credits run out. Everyone else keeps the usual order.
+
+### Picking a voice
+
+Every NPC gets a voice picked from its **Voice and manner** notes, name and description. Words like "gruff", "old" or "orc" give a deep, slower voice; "squeaky", "nervous" or "goblin" a quicker one; "posh", "noble" or "elf" a British accent; "she" or "lady" a woman's voice. Copies of a creature (Goblin A, Goblin B) share a voice but talk at slightly different speeds.
+
+To choose one yourself, open the chat settings. Under **NPCs on this map**, each NPC has a voice list and a speed (**Slow**, **Normal**, **Quick**). The list shows the voices of the service in use right now (Gemini's 30 voices, Groq's 6, the voices on your ElevenLabs account, or Kokoro's 28). Your pick is kept per service, and the other services choose a voice of the same gender. Tap ▶ to hear it say its last line. Picks apply to every copy of a creature.
+
+### Volume
+
+Everyone, players included, can tap the speaker icon in the Game Chat header to switch NPC voices off on their own device or change the volume. This is saved on that device. On phones, audio starts after you first tap anywhere on the page.
+
+## Voice Input
+
+Hold the microphone button next to the chat box, talk, and let go. Your words appear in the chat as a message. This works in Chrome, Edge and Safari; it isn't available in Firefox.
+
+## NPC Brain
+
+Choose where the AI runs in the chat settings (gear icon) under **NPC brain**.
+
+### Online (default)
+
+The AI runs in the DM's own browser using free online models. Nothing to install: keep Show Time open on the DM's device during the game.
+
+1. Get a free key from [Groq](https://console.groq.com/keys) and, as a backup, one from [Google AI Studio](https://aistudio.google.com/apikey) (Gemini).
+2. In the chat settings, paste them into **Groq key** and **Gemini key**.
+
+NPCs use Groq first. If Groq's free requests run out, they switch to Gemini automatically, and the chat header says so. If both run out, the laptop covers when it is running; otherwise NPCs stay quiet until the free limit resets.
+
+The keys are saved only in that browser on that device. They are never stored in the game or shared with players, so add them again if you DM from another device or browser. Only one tab runs the NPCs at a time.
+
+### Laptop
+
+The AI runs on the DM's computer with [Ollama](https://ollama.com), so nothing is sent to an outside service. A one-time installer sets it up; setup steps are in \`scripts/npc-voices/README.md\` in the project repository. Laptop mode only uses this local model, never Groq or Gemini. Pick it when you want the local AI; the Online brain is enough whenever the DM tab is open.
+
+If no brain is available (no keys, laptop off or asleep, or out of memory), the chat still works and NPCs just stay quiet. The chat header says why.`,
+  },
+  {
+    id: 'languages',
+    slug: 'languages',
+    title: 'Languages',
+    category: 'Features',
+    order: 32,
+    content: `# Languages
+
+Crawlers and mobs know languages. If someone talks in a language you don't know, you see gibberish in the Game Chat instead of their words. Notes and items can be written in a language too.
+
+## Built-in Languages
+
+| Language | Who uses it |
+|----------|-------------|
+| **Worldspeech** | Essentially the common tongue, spoken by most races. Every crawler starts with it |
+| **Dervish** | Small creatures like gnomes, dwarves and goblins |
+| **Vernonacular** | Magicians |
+| **Mindspeech** | Mental impressions; most useful with non-auditory or sub-sentient creatures. Crawlers must be **Telepathic** to use it |
+| **Ward sign** | A sign language built on abstract symbolism |
+| **Mewmew** | The Felinus races |
+| **Base64** | Machines and sentient robots |
+| **Kra Kow** | Usually goblins, orcs and trolls |
+| **Spanish** | Spanish, carried down into the dungeon from the world above |
+| **Beast** | Animal sounds and body language. Give it to a crawler with Speak with Animals or a similar gift |
+| **Plant** | Rustling, creaking and slow movement. Speak with Plants grants it |
+| **Dead** | The voice of a corpse. Speak with Dead grants it |
+
+Each language looks different when you can't read it: Kra Kow is harsh grunts, Mewmew is mrrps, Ward sign is symbols, Mindspeech is waves. Base64 really is Base64, so a crawler with a decoder and some patience might work it out.
+
+## What Your Crawler Knows
+
+Open a crawler's profile and look for the **Languages** box. The DM taps **Edit** to choose which languages a crawler knows and to turn on **Telepathic** (needed for Mindspeech).
+
+## Languages From Spells and Items
+
+A spell can grant a language for a while: give it a **Grants Language** in the spell editor (Speak with Animals grants Beast). When a crawler casts it, they know that language for the spell's duration:
+
+- **Noncombat turns** count down each time the DM starts a new noncombat turn.
+- **Combat turns** count down each new combat round. A spell timed only in combat turns ends when the next noncombat turn starts, since an hour has passed.
+- With no duration it lasts until someone ends it.
+- **Questions** (Speak with Dead: 5) limits how many lines the crawler can say in the language. Once they're used up the crawler can't speak it any more, but still understands the last answer until the spell ends.
+
+Casting it again starts it over. Spell languages show in the Languages box with the time or questions left. The crawler or the DM can tap the ✕ to end one early. They also show in the chat's language menu, like *Dead (Speak with Dead, 3 questions left)*.
+
+An item can grant a language while it's equipped: pick one under **While equipped, knows** when making the item (a druid's charm that grants Beast). It shows in the Languages box as *from equipped item*.
+
+## Making Up a Language
+
+Anyone can make one up: in the Languages box on your own profile, open **Make up a language**, give it a name and (optionally) who speaks it. Your crawler knows it straight away. The DM decides who else learns it, and can delete made-up languages from the same box.
+
+## Mobs and NPCs
+
+In the DM Console, every mob has a **Languages** picker. Tap the languages it speaks; the first one is its native tongue. A mob with none picked speaks Worldspeech.
+
+When an NPC talks:
+- If someone speaks to it in a language it knows, it answers in that language.
+- If someone speaks to it in a language it doesn't know, it can't understand them and answers in its native tongue.
+- When it speaks up on its own, it uses the last language it was spoken to in, or its native tongue.
+
+### Beasts
+
+Pick **Beast** for animals. A crawler who knows Beast reads what the animal means in plain words. Everyone else sees what it does instead, such as *squeaks twice and backs toward the hole*, so the party can still read its mood.
+
+### Plants
+
+Pick **Plant** for talking plants. It works like Beast: crawlers who know Plant read the words, everyone else sees what the plant does. Plants only know slow, local things like who walked past and where they went.
+
+### Corpses
+
+Pick **Dead** for a corpse. Any mob whose token drops to 0 HP also counts as a corpse automatically, and still remembers what it knew alive. A corpse stays silent until a crawler talks to it in Dead, usually by casting Speak with Dead. It only knows what it knew in life and answers briefly, often cryptically. Each casting gets as many questions as the spell allows; then the corpse falls silent again. Crawlers without Dead see what the corpse does, such as *its jaw creaks open and a dry whisper escapes*.
+
+### Silent Mobs
+
+Tick **Silent** on a mob that never talks (oozes, constructs). It stays quiet in the Game Chat and can't be @ mentioned, even if it has a personality.
+
+## Talking in a Language
+
+If your crawler knows more than one language, a language menu appears above the chat box. Pick the language you talk in. Party members who don't know it see gibberish, and so do NPCs who don't know it.
+
+The DM sees every line as it was said, with the language marked.
+
+## Translators
+
+A crawler who knows a language can translate it for the party. Use the translate menu next to the language menu in the Game Chat:
+- **Not translating**: party members who don't know the language see gibberish.
+- **Translating**: everyone in the party sees lines in your languages, marked "translated by" you.
+- **Translating (check lines)**: the party sees "is translating…" until you act on each line. Tap **Pass on** to tell them exactly what was said, or **Twist** to tell them something else.
+
+A twisted translation looks just like an honest one to the party. Only the translator and the DM can see what was really said; the DM sees a **twisted** tag next to it. Party members who know the language themselves always see the real words, so they might catch you.
+
+## Items and Notes
+
+When the DM adds or edits an item, the **Written in** menu sets the language of its description. Crawlers who don't know that language see a scrambled description (the name stays readable).
+
+When you add a quest note and know more than one language, you can pick the language it's written in. Only crawlers who know it can read it (you can always read your own notes).
+
+## Good to Know
+
+The real words are still saved in the game's database, so this keeps honest players honest rather than stopping a determined snoop.`,
   },
   {
     id: 'sound-effects',
@@ -910,7 +1370,7 @@ The wiki supports standard Markdown:
 - Lists: \`- item\` or \`1. item\`
 - Tables: Standard Markdown table syntax
 - Code: \`\\\`inline code\\\`\` or fenced code blocks
-- Links: \`[text](url)\`
+- Links: \`[text](url)\` (web links starting with https://, email links, or wiki links like \`/wiki/campaigns\`; other kinds show as plain text)
 
 ## Content Guidelines
 
@@ -932,19 +1392,19 @@ The app requires user accounts for all game interactions. Your account is how th
 ## How It Works
 
 - **All users must sign in** before accessing the app. The landing page at the site root introduces the app and prompts you to create an account or sign in.
-- **Signed-in users** (via Google or email/password) can create campaigns, join campaigns, and interact with all game features.
+- **Signed-in users** (via Google) can create campaigns, join campaigns, and interact with all game features.
 - If you sign out, you'll be redirected back to the landing page.
 
 ## Creating an Account
 
 1. Click **Enter the Dungeon** on the landing page, or click **Sign In** if you see it.
-2. Click **CREATE ACCOUNT** and fill in your email and password (at least 6 characters).
-3. Alternatively, click **Continue with Google** for one-click account creation.
-4. On first sign-in, you'll be prompted to choose a **username** (unique, 3-24 characters, letters/numbers/underscores) and **display name**.
+2. Click **Continue with Google**. Your account is created the first time you sign in. (Accounts are Google only; email/password sign-up has been removed.)
+3. On first sign-in, you'll be prompted to choose a **username** (unique, 3-24 characters, letters/numbers/underscores) and **display name**.
+4. The Set Up Profile box shows which account you're signed in with. If it's the wrong one, click **Not you? Sign out** to go back and sign in again.
 
 ## Signing In
 
-1. Click **Sign In** and enter your email/password, or use Google.
+1. Click **Sign In**, then **Continue with Google**.
 2. After sign-in, you'll see the Campaign Selection screen.
 
 ## Signing Out
@@ -956,7 +1416,7 @@ Click **Sign Out** to sign out. You can sign back in at any time.
 Your profile includes:
 - **Username** — unique identifier, used for lookups
 - **Display Name** — shown in campaigns and as the DM name
-- **Avatar** — pulled from your Google account if applicable (optional — email/password accounts simply have no avatar)
+- **Avatar** — pulled from your Google account
 
 ## Account Settings
 
@@ -1006,6 +1466,12 @@ Players join campaigns via **invite codes** or **invite links**.
 1. The DM shares the invite link (e.g., \`https://yoursite.com/join/abc123\`) or the invite code.
 2. Click the link, or go to the Campaign Selection screen and click **Join Campaign**, then paste the invite code.
 3. You'll be added to the campaign's member list.
+
+## Who Can See a Campaign
+
+Only the DM and the campaign's members can see or change its crawlers, maps, episodes, chat and everything else in it. Anyone else who signs in can't see the campaign at all unless they have its invite code.
+
+If you **regenerate** the invite code, the old link stops working for new players. People who already joined stay in.
 
 ## Player Limit
 
@@ -1207,6 +1673,8 @@ Each spell has the following configurable properties:
 | **Hit Modifiers** | Stat bonuses applied to hit roll (STR/DEX/CON/INT/CHA) |
 | **Damage Modifiers** | Stat bonuses applied to damage roll |
 | **Duration** | Combat turns, noncombat turns, or a custom label |
+| **Grants Language** | Casting it lets the caster use a language for the spell's duration (see [Languages](/wiki/languages)) |
+| **Questions** | With Grants Language: how many lines the caster can say in it per casting (Speak with Dead: 5) |
 | **Saving Throw** | Which stat the target rolls to resist |
 | **Splash Damage** | Whether the spell can hit multiple targets |
 | **Special Effect** | Free-text description of any on-hit effects |

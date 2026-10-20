@@ -33,6 +33,8 @@ export default defineConfig(({ mode }) => ({
     },
   },
   plugins: [react()],
+  // The voice engine worker (Kokoro) loads its runtime in pieces, which needs module workers
+  worker: { format: "es" },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Clock, ChevronUp, ChevronDown, RotateCcw, Sun, Moon, Swords, Zap, SkipForward, XCircle, Heart, Plus, Play, Square, Timer, Pause, Footprints, Dices } from "lucide-react";
-import { type Crawler, type Mob, type NoncombatTurnState, type GameClockState, type Episode, type CombatState, type CrawlerPlacement, type EpisodeMobPlacement, type CombatantEntry, type InventoryItem, getEffectiveMoveSpeed, NONCOMBAT_MOVE_MULTIPLIER } from "@/lib/gameData";
+import { Clock, ChevronUp, ChevronDown, RotateCcw, Sun, Moon, Swords, Zap, SkipForward, XCircle, Heart, Plus, Play, Square, Timer, Pause, Footprints, Dices, Eye, EyeOff } from "lucide-react";
+import { type Crawler, type Mob, type NoncombatTurnState, type GameClockState, type Episode, type CombatState, type CrawlerPlacement, type EpisodeMobPlacement, type CombatantEntry, type InventoryItem, getEffectiveMoveSpeed, isPlacementHostile, NONCOMBAT_MOVE_MULTIPLIER } from "@/lib/gameData";
 import UndoTurnButton from "@/components/UndoTurnButton";
 
 interface PingPanelProps {
@@ -22,6 +22,7 @@ interface PingPanelProps {
   onEndCombat?: () => Promise<void>;
   onCancelCombat?: () => Promise<void>;
   onOverrideMobHealth?: (mobId: string, newHP: number) => Promise<void>;
+  onSetMobEncountered?: (mobId: string, encountered: boolean) => Promise<void>;
   onRemoveCombatant?: (combatantId: string) => Promise<void>;
   runtimeCrawlerPlacements?: CrawlerPlacement[];
   runtimeMobPlacements?: EpisodeMobPlacement[];
@@ -33,6 +34,26 @@ interface PingPanelProps {
   currentPlayerId?: string;
   onUndoCombatTurn?: () => Promise<boolean>;
 }
+
+// Matches the DM Console toggle: encountered mobs are revealed, unencountered ones hidden
+const isMobEncountered = (mob: Mob) => !!mob.encountered && !mob.hidden;
+
+// DM-only button that reveals (or re-hides) a mob in players' Mob Profiles
+const EncounterToggle: React.FC<{ encountered: boolean; onToggle: () => void }> = ({ encountered, onToggle }) => (
+  <button
+    type="button"
+    onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggle(); }}
+    className={`flex items-center gap-0.5 text-[10px] px-1 rounded border transition-colors ${
+      encountered
+        ? 'border-border text-muted-foreground hover:text-accent'
+        : 'border-accent/50 text-accent hover:bg-accent/10'
+    }`}
+    title={encountered ? 'Mark unencountered (hide from Mob Profiles)' : 'Mark encountered (show in Mob Profiles)'}
+  >
+    {encountered ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+    {encountered ? 'HIDE' : 'REVEAL'}
+  </button>
+);
 
 const PingPanel: React.FC<PingPanelProps> = ({
   isAdmin,
@@ -52,6 +73,7 @@ const PingPanel: React.FC<PingPanelProps> = ({
   onEndCombat,
   onCancelCombat,
   onOverrideMobHealth,
+  onSetMobEncountered,
   onRemoveCombatant,
   runtimeCrawlerPlacements,
   runtimeMobPlacements,
@@ -142,7 +164,8 @@ const PingPanel: React.FC<PingPanelProps> = ({
     const mobIndices: Record<string, number> = {};
     return allPlacements.map((p, placementIdx) => {
       const mob = (mobs ?? []).find(m => m.id === p.mobId);
-      if (!mob || mob.hidden) return null;
+      // Unencountered mobs can still join combat; the DM can reveal them from here
+      if (!mob) return null;
       const count = mobCounts[p.mobId];
       const currentIndex = mobIndices[p.mobId] ?? 0;
       mobIndices[p.mobId] = currentIndex + 1;
@@ -154,6 +177,8 @@ const PingPanel: React.FC<PingPanelProps> = ({
         mobId: p.mobId,
         name: `${mob.name}${suffix}`,
         hitPoints: p.currentHP ?? mob.hitPoints,
+        encountered: isMobEncountered(mob),
+        hostile: isPlacementHostile(p, mob),
       };
     }).filter((e): e is NonNullable<typeof e> => e !== null);
   }, [activeEpisode?.mobPlacements, runtimeMobPlacements, mobs]);
@@ -241,13 +266,11 @@ const PingPanel: React.FC<PingPanelProps> = ({
         hasRolledInitiative: false,
         hasUsedAction: false,
         hasUsedBonusAction: false,
-        avatar: c.avatar,
       });
     }
     // Add selected mobs (auto-roll initiative)
     for (const entry of availableToAdd.mobs) {
       if (!selectedIds.has(entry.combatId)) continue;
-      const mob = (mobs ?? []).find(m => m.id === entry.mobId);
       const roll = Math.floor(Math.random() * 20) + 1;
       newEntries.push({
         id: entry.combatId,
@@ -258,7 +281,6 @@ const PingPanel: React.FC<PingPanelProps> = ({
         hasRolledInitiative: true,
         hasUsedAction: false,
         hasUsedBonusAction: false,
-        avatar: mob?.image,
         currentHP: entry.hitPoints,
       });
     }
@@ -268,14 +290,14 @@ const PingPanel: React.FC<PingPanelProps> = ({
     setSelectedNewCombatants({});
   };
 
-  // Open combat setup with all mobs/crawlers pre-selected
+  // Open combat setup with every crawler and hostile token pre-selected (friendly ones can still be ticked)
   const openCombatSetup = () => {
     const crawlerSel: Record<string, boolean> = {};
     playerCrawlers.forEach(c => { crawlerSel[c.id] = true; });
     setSelectedCombatCrawlers(crawlerSel);
 
     const mobSel: Record<string, boolean> = {};
-    mobCombatEntries.forEach(e => { mobSel[e.combatId] = true; });
+    mobCombatEntries.forEach(e => { mobSel[e.combatId] = e.hostile; });
     setSelectedCombatMobs(mobSel);
 
     setShowCombatSetup(true);
@@ -520,6 +542,17 @@ const PingPanel: React.FC<PingPanelProps> = ({
                           <span>{entry.name}</span>
                           {entry.hitPoints != null && (
                             <span className="text-muted-foreground">({entry.hitPoints} HP)</span>
+                          )}
+                          {!entry.hostile && (
+                            <span className="text-[10px] text-green-500 italic">friendly</span>
+                          )}
+                          {!entry.encountered && (
+                            <span className="text-[10px] text-muted-foreground italic">unencountered</span>
+                          )}
+                          {!entry.encountered && onSetMobEncountered && (
+                            <span className="ml-auto">
+                              <EncounterToggle encountered={false} onToggle={() => onSetMobEncountered(entry.mobId, true)} />
+                            </span>
                           )}
                         </label>
                       ))}
@@ -806,6 +839,12 @@ const PingPanel: React.FC<PingPanelProps> = ({
                                 </button>
                               )}
                             </>
+                          )}
+                          {isAdmin && c.type === 'mob' && mob && onSetMobEncountered && (
+                            <EncounterToggle
+                              encountered={isMobEncountered(mob)}
+                              onToggle={() => onSetMobEncountered(mob.id, !isMobEncountered(mob))}
+                            />
                           )}
                           {isAdmin && (
                             <button

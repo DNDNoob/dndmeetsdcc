@@ -401,7 +401,7 @@ const LandingPage = () => {
               {
                 step: "01",
                 title: "CREATE ACCOUNT",
-                desc: "Sign up with Google or email — takes seconds.",
+                desc: "Sign up with Google — takes seconds.",
               },
               {
                 step: "02",
