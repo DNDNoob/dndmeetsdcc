@@ -30,7 +30,8 @@
       "👆 The Game Chat and the dice roller close when you click or tap anywhere else",
       "🪟 Pop-up boxes (new spell, send gold, weapon upgrade, heal and damage targets) close when you click outside them, and now sit above the top menu so their tops aren't hidden",
       "💀 The Mobs page and the DM Console mob list are split into Bosses, Mobs and Characters tabs",
-      "📐 More room between the backstory and the Activity section on profiles"
+      "📐 More room between the backstory and the Activity section on profiles",
+      "🧭 Show Time's hidden top menu now slides down when you move the mouse anywhere along the top edge, for players too, and no longer pops open over the map tools when you reach for their buttons"
     ]
   },
   {

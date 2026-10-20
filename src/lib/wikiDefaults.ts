@@ -898,6 +898,10 @@ If you refresh the page or visit another page (like the DM Console) during a gam
 4. Interact with the map: click to ping, view mob details, see your position
 5. Roll dice and perform actions from your profile page
 
+## Top Menu
+
+The top menu hides during Show Time to make room for the map. Move the mouse to the very top edge of the page and hold it there for a moment to bring it back, or tap the pin to keep it showing.
+
 ## Map Interaction
 
 - **Zoom**: Scroll to zoom in/out on the map. Scrolling over a panel (Game Chat, dice, game clock, map tools) scrolls that panel instead
