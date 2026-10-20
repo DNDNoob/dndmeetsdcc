@@ -1,3 +1,4 @@
+import { closeOnBackdrop } from "@/hooks/useClickAway";
 import { useState } from "react";
 import PixelIcon from '@/components/ui/PixelIcon';
 import { motion } from "framer-motion";
@@ -795,7 +796,7 @@ function SpellEditorModal({
   const isValid = draft.name.trim().length > 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4" onMouseDown={closeOnBackdrop(onClose)}>
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
