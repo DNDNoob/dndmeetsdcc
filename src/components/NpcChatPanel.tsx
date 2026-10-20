@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { MessageSquare, Mic, Send, Settings, X, Volume2, VolumeX, Lock, Unlock, Trash2, Sparkles, User, Wand2, Languages, Check, Pencil, Brain, Play, AudioLines } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
+import { useClickAway } from "@/hooks/useClickAway";
 import {
   type ChatMessage,
   type Mob,
@@ -157,6 +158,10 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
     writeOpen(next);
   };
 
+  // Clicking anywhere else (the map, another panel) tucks the chat away
+  const rootRef = useRef<HTMLDivElement>(null);
+  useClickAway(rootRef, () => setPanelOpen(false), open);
+
   const enabled = aiSettings?.enabled !== false;
   const speechOn = !!aiSettings?.speech;
   const voicePicks = aiSettings?.voices ?? {};
@@ -305,7 +310,7 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
   const mobById = (id: string) => mobs.find(m => m.id === id) ?? mobs.find(m => m.id === baseMobId(id));
 
   return (
-    <div className="fixed bottom-24 right-2 sm:right-4 z-[98] flex flex-col items-end gap-2 pointer-events-none">
+    <div ref={rootRef} className="fixed bottom-24 right-2 sm:right-4 z-[98] flex flex-col items-end gap-2 pointer-events-none">
       <AnimatePresence>
         {open && (
           <motion.div

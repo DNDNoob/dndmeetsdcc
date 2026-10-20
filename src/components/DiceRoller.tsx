@@ -4,6 +4,7 @@ import { DungeonButton } from "./ui/DungeonButton";
 import { Dices, ChevronUp, ChevronDown, Plus, X, Package, ScrollText, Undo2, Coins } from "lucide-react";
 import { getLootBoxTierColor } from "@/lib/gameData";
 import { DiceRollEntry } from "@/hooks/useGameState";
+import { useClickAway } from "@/hooks/useClickAway";
 
 const diceTypes = [
   { sides: 4, label: "D4" },
@@ -121,6 +122,10 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
     rollIntervalRef.current = interval;
   };
 
+  // Clicking anywhere outside the dice roller closes it
+  const rootRef = useRef<HTMLDivElement>(null);
+  useClickAway(rootRef, () => setIsExpanded(false), isExpanded);
+
   // Auto-scroll roll history to bottom when new rolls arrive or panel opens
   const rollHistoryRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -140,7 +145,7 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
   };
 
   return (
-    <div className="fixed bottom-10 right-2 sm:right-4 z-[100] flex items-end gap-2">
+    <div ref={rootRef} className="fixed bottom-10 right-2 sm:right-4 z-[100] flex items-end gap-2">
       {/* Toggle tab - now to the left of the panel */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}

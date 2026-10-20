@@ -251,7 +251,7 @@ export const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onCreate, on
   };
 
   return (
-    <div className="fixed inset-0 bg-background/80 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-background/80 z-[80] flex items-center justify-center p-4">
       <div className="bg-background border-2 border-primary rounded-lg p-5 max-w-md w-full shadow-xl max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between mb-2">
           <h3 className="font-display text-lg text-primary text-glow-cyan">New Crawler</h3>

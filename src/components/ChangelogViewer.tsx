@@ -36,14 +36,14 @@ const ChangelogViewer: React.FC<ChangelogViewerProps> = ({ isOpen, onClose }) =>
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-background/90 z-50"
+            className="fixed inset-0 bg-background/90 z-[80]"
             onClick={onClose}
           />
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
-            className="fixed inset-4 md:inset-10 lg:inset-20 bg-background border-2 border-primary z-50 flex flex-col"
+            className="fixed inset-4 md:inset-10 lg:inset-20 bg-background border-2 border-primary z-[80] flex flex-col"
           >
             <div className="flex items-center justify-between border-b-2 border-primary p-4 bg-primary/5">
               <h2 className="font-display text-xl text-primary text-glow-cyan flex items-center gap-2">

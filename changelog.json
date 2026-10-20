@@ -16,7 +16,12 @@
       "💍 Items can grant a language while equipped, like a druid's charm that lets you speak Beast",
       "🔈 NPC voice clips are now saved as small MP3s in the game's database instead of file storage, whose free daily allowance was running out, so spoken lines reach every player again",
       "🧠 A DM window without NPC keys no longer switches off NPC replies from another DM window that has them",
-      "🐛 The item library on the Inventory page saves again in a campaign that had no library yet. Before, Firebase refused the save, so new library items vanished and the library stayed empty"
+      "🐛 The item library on the Inventory page saves again in a campaign that had no library yet. Before, Firebase refused the save, so new library items vanished and the library stayed empty",
+      "💬 Scrolling over the Game Chat now scrolls the chat instead of zooming the map, and the same goes for the dice roller, game clock and map tools",
+      "👆 The Game Chat and the dice roller close when you click or tap anywhere else",
+      "🪟 Pop-up boxes (new spell, send gold, weapon upgrade, heal and damage targets) close when you click outside them, and now sit above the top menu so their tops aren't hidden",
+      "💀 The Mobs page and the DM Console mob list are split into Bosses, Mobs and Characters tabs",
+      "📐 More room between the backstory and the Activity section on profiles"
     ]
   },
   {
