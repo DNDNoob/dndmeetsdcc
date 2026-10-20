@@ -2611,7 +2611,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                               return next;
                             })}
                             className="p-1 hover:bg-muted rounded"
-                            title={item.visible ? "Visible to players" : "Hidden from players"}
+                            title={item.visible ? "Shown to players when handed out" : "Hidden from players when handed out"}
                           >
                             {item.visible ? <Eye className="w-3 h-3 text-green-400" /> : <EyeOff className="w-3 h-3 text-muted-foreground" />}
                           </button>
@@ -2712,7 +2712,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                               return next;
                             })}
                             className="p-1 hover:bg-muted rounded"
-                            title={reward.visible ? "Visible to players" : "Hidden from players"}
+                            title={reward.visible ? "Shown to players when handed out" : "Hidden from players when handed out"}
                           >
                             {reward.visible ? <Eye className="w-3 h-3 text-green-400" /> : <EyeOff className="w-3 h-3 text-muted-foreground" />}
                           </button>
