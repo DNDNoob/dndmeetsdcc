@@ -568,6 +568,11 @@ export const stackItems = (items: InventoryItem[]): ItemStack[] => {
 // (Firestore reserves ids like __name__, so this one has no underscores)
 export const PARTY_INVENTORY_ID = 'party-loot';
 
+/** The campaign's item library is the inventory entry with this crawlerId. */
+export const SHARED_LIBRARY_ID = '__shared__';
+/** Document ID for a new item library (Firestore rejects SHARED_LIBRARY_ID itself as a document ID). */
+export const SHARED_LIBRARY_DOC_ID = 'shared-library';
+
 export interface MobLootSplit {
   gold: Record<string, number>; // crawlerId → gold received
   items: Record<string, InventoryItem[]>; // crawlerId → items received
