@@ -2272,7 +2272,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     (m: ChatMessage) => isAdmin || crawlerUnderstands(myChatCrawler, m.language),
     [isAdmin, myChatCrawler]
   );
-  const { speechMuted, speechVolume, setSpeechPrefs } = useNpcSpeechPlayer({
+  const { speechMuted, speechVolume, setSpeechPrefs, mutedSpeakers, toggleSpeakerMuted } = useNpcSpeechPlayer({
     roomId, messages: episodeChatMessages, understands: understandsChatLine, mapId: currentMapId,
   });
   // Speech bubbles show what this viewer can make out
@@ -4106,6 +4106,8 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
           speechMuted={speechMuted}
           speechVolume={speechVolume}
           onSetSpeechPrefs={setSpeechPrefs}
+          mutedSpeakers={mutedSpeakers}
+          onToggleSpeakerMuted={toggleSpeakerMuted}
         />
       )}
     </motion.div>

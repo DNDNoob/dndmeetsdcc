@@ -10,8 +10,8 @@ Both brains share the same engine in `src/lib/npc/` (`engine.mjs` for when and w
 
 1. Install [Ollama](https://ollama.com) and pull the models:
    ```
-   ollama pull qwen3:14b
    ollama pull qwen3:8b
+   ollama pull qwen3.5:4b
    ```
 2. Install Node.js 18 or newer (`winget install OpenJS.NodeJS.LTS`).
 3. Clone this repo and put a `.env` at its root with the same `VITE_FIREBASE_*` values the web app uses.
@@ -36,7 +36,7 @@ npm run npc-voices
 ## How it behaves
 
 - Only runs model calls while the DM has an episode open in Show Time; otherwise it sleeps. It keeps the computer awake during a game.
-- **Best quality** uses `qwen3:14b`, **Fast** uses `qwen3:8b` (DM picks in the chat settings). If there isn't enough free memory for Best quality it uses Fast and says so in the chat.
+- **Best quality** uses `qwen3:8b`, **Fast** uses `qwen3.5:4b`, the quickest on the DM laptop (DM picks in the chat settings). If there isn't enough free memory for Best quality, or it fails to load, it uses Fast and says so in the chat.
 - Unloads the model after 15 minutes without activity.
 - Secrets are only added to the prompt after the DM unlocks them.
 - Remembers conversations: when a chat with an NPC has been quiet for 2 minutes, the model saves a few memory notes and how the NPC feels about each crawler (`npcAi/memories`), and they go into that NPC's prompt from then on.
@@ -49,10 +49,10 @@ npm run npc-voices
 | Variable | Default | Meaning |
 |----------|---------|---------|
 | `OLLAMA_URL` | `http://127.0.0.1:11434` | Ollama address |
-| `NPC_MODEL_QUALITY` / `NPC_MODEL_FAST` | `qwen3:14b` / `qwen3:8b` | Models to use |
+| `NPC_MODEL_QUALITY` / `NPC_MODEL_FAST` | `qwen3:8b` / `qwen3.5:4b` | Models to use |
 | `NPC_COOLDOWN_SECONDS` | `20` | Gap between lines from the same NPC |
 | `NPC_IDLE_SECONDS` | `60` | Silence before an NPC may mutter |
 | `NPC_NEAR_DISTANCE` | `12` | How close (map %) counts as "next to" an NPC |
 | `NPC_UNLOAD_MINUTES` | `15` | Idle time before unloading the model |
 | `NPC_MEMORY_QUIET_SECONDS` | `120` | How long a conversation with an NPC must be quiet before it's saved to the NPC's memory |
-| `NPC_QUALITY_MIN_FREE_GB` / `NPC_FAST_MIN_FREE_GB` | `6` / `2.5` | Free memory needed for each model |
+| `NPC_QUALITY_MIN_FREE_GB` / `NPC_FAST_MIN_FREE_GB` | `4` / `2.5` | Free memory needed for each model |

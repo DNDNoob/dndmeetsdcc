@@ -1070,7 +1070,7 @@ Open the Game Chat and tap the gear icon:
 - **Spoken voices**: read NPC lines aloud on every device, with a voice per NPC (see Spoken Voices above)
 - **Keys**: free Groq and Gemini keys (and an ElevenLabs key for voices), saved only in this browser
 - **NPC brain**: **Online** or **Laptop** (see below)
-- **Model**: **Best quality** (bigger, slower) or **Fast** (smaller, quicker)
+- **Model**: **Best quality** (bigger, slower) or **Fast** (smaller, quicker). On the Laptop brain, Fast uses qwen3.5:4b, the quickest model on the DM laptop
 - **Mute all NPCs**, or mute one NPC
 - **Secret** lock/unlock per NPC
 - **Memory** per NPC (brain icon): see and edit what it remembers
@@ -1089,7 +1089,11 @@ NPCs can also say their lines out loud. Turn on **Spoken voices** in the Game Ch
 - When every service is used up, voices are made by Kokoro, a free voice model that runs in the DM's browser. It sounds flatter, and the first time it's needed the browser downloads it (about 330 MB) and keeps it for next time.
 - Keep the DM tab open during the game, the same as for the Online brain. The keys are saved only in that browser.
 - Each line is saved in the game's database as a small sound clip that players' devices play once. Clips are deleted again after about 15 minutes.
-- Lines in a language a player doesn't know are read to them as the scrambled words, so it sounds foreign. Players who know the language, and the DM, hear the real words. Lines in Mindspeech or Ward sign aren't read aloud, and players who don't know Beast hear nothing from a beast (they still see what it does).
+- Lines in a language a player doesn't know are read to them as the scrambled words, so it sounds foreign. Players who know the language, and the DM, hear the real words. If nobody in the party knows the language, everyone (the DM too) hears the scrambled words. Spanish is read in Spanish for everyone.
+- Base64 lines are beeps, whistles and warbles, like a little astromech droid, instead of a voice.
+- Lines in Mindspeech or Ward sign aren't read aloud (thoughts and signs make no sound), and players who don't know Beast, Plant or Dead hear nothing from those speakers (they still see what they do).
+- The bit of static some voice services leave after the last word is cut off.
+- **Mute one character:** tap the little speaker next to an NPC's name in the chat to stop hearing that character (every copy of a creature). It's just for you. Muted characters are listed under the speaker button at the top of the chat, where you can unmute them.
 - Actions written between asterisks (the NPC grinning, wiping its hands) are skipped; only the words are spoken.
 
 ### Creature sounds
@@ -1170,7 +1174,7 @@ Crawlers and mobs know languages. If someone talks in a language you don't know,
 | **Plant** | Rustling, creaking and slow movement. Speak with Plants grants it |
 | **Dead** | The voice of a corpse. Speak with Dead grants it |
 
-Each language looks different when you can't read it: Kra Kow is harsh grunts, Mewmew is mrrps, Ward sign is symbols, Mindspeech is waves. Base64 really is Base64, so a crawler with a decoder and some patience might work it out.
+Each language looks different when you can't read it: Kra Kow is harsh grunts, Mewmew is mrrps, Ward sign is symbols, Mindspeech is waves. Base64 really is Base64, so a crawler with a decoder and some patience might work it out. Spanish is real Spanish: NPCs write their lines in Spanish, and crawlers who don't know it see the same Spanish words.
 
 ## What Your Crawler Knows
 
@@ -1201,6 +1205,7 @@ When an NPC talks:
 - If someone speaks to it in a language it knows, it answers in that language.
 - If someone speaks to it in a language it doesn't know, it can't understand them and answers in its native tongue.
 - When it speaks up on its own, it uses the last language it was spoken to in, or its native tongue.
+- If nobody in the party knows the language it answers in, the AI is skipped: it says a short preset line instead (the players only see gibberish anyway), and the DM sees a small **preset** tag on it. Lines the DM sends still get a real answer. Beasts, plants and corpses always get a real answer, since everyone sees their body language.
 
 ### Beasts
 
@@ -1212,7 +1217,7 @@ Pick **Plant** for talking plants. It works like Beast: crawlers who know Plant 
 
 ### Corpses
 
-Pick **Dead** for a corpse. Any mob whose token drops to 0 HP also counts as a corpse automatically, and still remembers what it knew alive. A corpse stays silent until a crawler talks to it in Dead, usually by casting Speak with Dead. It only knows what it knew in life and answers briefly, often cryptically. Each casting gets as many questions as the spell allows; then the corpse falls silent again. Crawlers without Dead see what the corpse does, such as *its jaw creaks open and a dry whisper escapes*.
+Pick **Dead** for a corpse. Any mob whose token drops to 0 HP also counts as a corpse automatically, and still remembers what it knew alive. A corpse stays silent until a crawler talks to it in Dead, usually by casting Speak with Dead. The DM can always get an answer by @-tagging the corpse. It only knows what it knew in life and answers briefly, often cryptically. Each casting gets as many questions as the spell allows; then the corpse falls silent again. Crawlers without Dead see what the corpse does, such as *its jaw creaks open and a dry whisper escapes*.
 
 ### Silent Mobs
 

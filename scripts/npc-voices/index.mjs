@@ -50,9 +50,10 @@ const num = (v, d) => (v !== undefined && v !== '' && !Number.isNaN(Number(v)) ?
 
 const CONFIG = {
   ollamaUrl: (env.OLLAMA_URL || 'http://127.0.0.1:11434').replace(/\/$/, ''),
-  models: { quality: env.NPC_MODEL_QUALITY || 'qwen3:14b', fast: env.NPC_MODEL_FAST || 'qwen3:8b' },
-  // Free RAM needed before loading each model (GB). The 14B splits across GPU and RAM.
-  minFreeGB: { quality: num(env.NPC_QUALITY_MIN_FREE_GB, 6), fast: num(env.NPC_FAST_MIN_FREE_GB, 2.5) },
+  // qwen3.5:4b was the quickest on the DM laptop (about 29 tokens/s); qwen3:14b no longer fits in its free memory
+  models: { quality: env.NPC_MODEL_QUALITY || 'qwen3:8b', fast: env.NPC_MODEL_FAST || 'qwen3.5:4b' },
+  // Free RAM needed before loading each model (GB). Bigger models split across GPU and RAM.
+  minFreeGB: { quality: num(env.NPC_QUALITY_MIN_FREE_GB, 4), fast: num(env.NPC_FAST_MIN_FREE_GB, 2.5) },
 };
 
 // Timers shared with the online brain (src/lib/npc/engine.mjs); env overrides for testing
@@ -195,7 +196,15 @@ const ollamaLlm = {
   },
   async generate({ system, user, maxTokens, temperature, json }) {
     const model = this.chosen || CONFIG.models.fast;
-    return { text: await chat(model, system, user, { maxTokens, temperature, json }), label: model };
+    try {
+      return { text: await chat(model, system, user, { maxTokens, temperature, json }), label: model };
+    } catch (err) {
+      // The bigger model can fail to load when memory is tight: answer with the fast one instead
+      if (model === CONFIG.models.fast) throw err;
+      warn(`${model} failed (${err.message}); using ${CONFIG.models.fast}`);
+      this.chosen = CONFIG.models.fast;
+      return { text: await chat(this.chosen, system, user, { maxTokens, temperature, json }), label: this.chosen };
+    }
   },
   idle: () => unloadAll(),
 };

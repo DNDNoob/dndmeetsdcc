@@ -709,10 +709,11 @@ export interface ChatMessage {
   nearMobIds?: string[]; // Player messages: mobs within talking range of the crawler when sent
   language?: string;     // Spoken in this language (none = everyone understands, e.g. the DM narrating)
   translationOf?: string; // A translator's version of another line, shown to party members who can't read it
-  gesture?: string;      // Beast lines: the sounds and body language seen by those who don't know Beast
-  // NPC lines read aloud (made in the DM's browser, short-lived files in Storage npcAudio/)
+  gesture?: string;      // Beast, Plant and Dead lines: the sounds and body language seen by those who don't know the language
+  preset?: boolean;      // NPC line picked from presets (nobody in the party knew its language), not written by the AI
+  // NPC lines read aloud (made in the DM's browser, short-lived clips in Firestore npcClips/)
   audioUrl?: string;          // the real words
-  audioScrambledUrl?: string; // the scrambled words, for players who don't know the language
+  audioScrambledUrl?: string; // the scrambled words, for players who don't know the language (may be the same clip)
 }
 
 /** Players can only talk to mobs this close to their crawler. */
