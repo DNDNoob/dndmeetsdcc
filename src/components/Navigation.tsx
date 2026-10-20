@@ -113,21 +113,31 @@ const Navigation: React.FC<NavigationProps> = ({
 
   return (
     <>
-      {/* Hover trigger zone when collapsed */}
+      {/* Hover trigger zones when collapsed: a deeper strip on the left, and a thin
+          strip along the whole top edge that stays above the map tools box */}
       {autoCollapse && !isPinned && !isHovered && (
-        <div
-          className="fixed top-0 left-0 h-8 z-[60]"
-          style={{ width: '40%' }}
-          onMouseEnter={startReveal}
-          onMouseLeave={cancelReveal}
-        />
+        <>
+          <div
+            className="fixed top-0 left-0 h-8 z-[60]"
+            style={{ width: '40%' }}
+            onMouseEnter={startReveal}
+            onMouseLeave={cancelReveal}
+          />
+          <div
+            className="fixed top-0 inset-x-0 h-1.5 z-[60]"
+            onMouseEnter={startReveal}
+            onMouseLeave={cancelReveal}
+          />
+        </>
       )}
       <motion.nav
         initial={{ y: -50, opacity: 0 }}
         animate={{
-          y: shouldCollapse ? -100 : 0,
+          y: shouldCollapse ? '-100%' : 0,
           opacity: shouldCollapse ? 0 : 1
         }}
+        // While hidden it must not catch the mouse, or reaching for the map tools opens it
+        style={{ pointerEvents: shouldCollapse ? 'none' : 'auto' }}
         transition={{ duration: 0.2 }}
         className="sticky top-0 z-[55] bg-background/95 backdrop-blur border-b-2 border-primary px-4 py-3"
         onMouseEnter={() => setIsHovered(true)}

@@ -1,22 +1,23 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
-import { Mob, getMobKind, isBossMob } from "@/lib/gameData";
+import { Mob, getMobKind, isBossMob, mobSection, type MobSection } from "@/lib/gameData";
 import { Skull, Crown, HelpCircle, Heart, Shield, Zap, User } from "lucide-react";
 
 interface MobsViewProps {
   mobs: Mob[];
 }
 
-type Section = "creature" | "boss" | "character";
+type Section = MobSection;
 
 const SECTION_STYLE: Record<Section, { label: string; icon: typeof Skull; text: string; badge: string; border: string; empty: string }> = {
   creature: {
-    label: "CREATURES",
+    label: "MOBS",
     icon: Skull,
     text: "text-destructive",
     badge: "bg-destructive/20 text-destructive",
     border: "border-destructive/50 bg-destructive/5",
-    empty: "No creatures encountered yet.",
+    empty: "No mobs encountered yet.",
   },
   boss: {
     label: "BOSSES",
@@ -36,13 +37,14 @@ const SECTION_STYLE: Record<Section, { label: string; icon: typeof Skull; text: 
   },
 };
 
-const sectionOf = (mob: Mob): Section => (isBossMob(mob) ? "boss" : getMobKind(mob));
+const sectionOf = mobSection;
 
 const MobsView: React.FC<MobsViewProps> = ({ mobs }) => {
   // Filter out hidden mobs for player view
   const visibleMobs = mobs.filter((mob) => !mob.hidden);
   const hiddenCount = mobs.filter((mob) => mob.hidden).length;
-  const sections: Section[] = ["creature", "boss", "character"];
+  const sections: Section[] = ["boss", "creature", "character"];
+  const [tab, setTab] = useState<Section>("boss");
   const bySection = (section: Section) => visibleMobs.filter((mob) => sectionOf(mob) === section);
   const speciesName = (mob: Mob) => {
     const species = mob.speciesId ? mobs.find((m) => m.id === mob.speciesId) : undefined;
@@ -155,27 +157,36 @@ const MobsView: React.FC<MobsViewProps> = ({ mobs }) => {
           ENCOUNTERED MOBS
         </h2>
 
-        <div className="space-y-8">
+        {/* Subtabs: bosses, mobs and characters */}
+        <div className="grid grid-cols-3 gap-2 mb-6" role="tablist">
           {sections.map((section) => {
             const style = SECTION_STYLE[section];
             const Icon = style.icon;
-            const list = bySection(section);
+            const active = tab === section;
             return (
-              <section key={section}>
-                <h3 className={`font-display text-lg mb-3 flex items-center gap-2 ${style.text}`}>
-                  <Icon className="w-5 h-5" />
-                  {style.label}
-                  <span className="text-xs text-muted-foreground font-normal">({list.length})</span>
-                </h3>
-                {list.length > 0 ? (
-                  <div className="space-y-4">{list.map(renderMob)}</div>
-                ) : (
-                  <p className="text-sm text-muted-foreground italic">{style.empty}</p>
-                )}
-              </section>
+              <button
+                key={section}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setTab(section)}
+                className={`flex items-center justify-center gap-1.5 px-1 py-2 border-2 font-display text-[11px] sm:text-sm transition-colors ${
+                  active ? `${style.border} ${style.text}` : "border-border text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Icon className="w-4 h-4 shrink-0 hidden sm:block" />
+                <span className="truncate">{style.label}</span>
+                <span className="hidden sm:inline text-xs font-normal opacity-70">({bySection(section).length})</span>
+              </button>
             );
           })}
         </div>
+
+        {bySection(tab).length > 0 ? (
+          <div className="space-y-4">{bySection(tab).map(renderMob)}</div>
+        ) : (
+          <p className="text-sm text-muted-foreground italic">{SECTION_STYLE[tab].empty}</p>
+        )}
 
         {/* Stats */}
         <div className="mt-8 border-t border-border pt-6 grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
@@ -185,7 +196,7 @@ const MobsView: React.FC<MobsViewProps> = ({ mobs }) => {
                 {bySection(section).filter((m) => m.encountered).length}
               </p>
               <p className="text-xs text-muted-foreground">
-                {section === "creature" ? "Creatures" : section === "boss" ? "Bosses" : "Characters"}
+                {section === "creature" ? "Mobs" : section === "boss" ? "Bosses" : "Characters"}
               </p>
             </div>
           ))}

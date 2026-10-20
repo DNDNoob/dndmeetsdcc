@@ -10,6 +10,7 @@ import {
 } from '@/lib/gameData';
 import { TELEPATHIC_LANGUAGE_ID, crawlerUnderstands, scrambleText } from '@/lib/languages';
 import { GESTURE_LANGUAGE_IDS } from '@/lib/languageList.mjs';
+import { droidClip } from '@/lib/npcSpeech/droid';
 import type { NpcOnlineKeys } from '@/lib/npc/onlineLlm.mjs';
 import { speechEngine } from '@/lib/npcSpeech/engine';
 import { saveClip, sweepClips } from '@/lib/npcSpeech/clipStore';
@@ -22,6 +23,8 @@ const CLIP_LIFETIME_MS = 15 * 60_000;
 const SWEEP_EVERY_MS = 5 * 60_000;
 // Spoken to the mind or in signs: nothing to hear
 const SILENT_LANGUAGES = [TELEPATHIC_LANGUAGE_ID, 'ward-sign'];
+// Machines: beeps and whistles made in this browser, for everyone
+const DROID_LANGUAGES = ['base64'];
 
 /** What gets read aloud: no *actions*, emoji or stray symbols. */
 export const speakableText = (text: string): string =>
@@ -133,19 +136,39 @@ export function useNpcSpeechMaker(opts: NpcSpeechMakerOptions) {
       const traits = voiceTraits(m.authorId, speaker, pick);
       const lang = m.language;
       // Beast, Plant and Dead: players who don't know the language see what the speaker does, and hear nothing
-      const scrambled = lang && !GESTURE_LANGUAGE_IDS.includes(lang) && crawlers.some(c => !crawlerUnderstands(c, lang)) ? speakableText(scrambleText(words, lang)) : '';
+      let scrambled = lang && !GESTURE_LANGUAGE_IDS.includes(lang) && crawlers.some(c => !crawlerUnderstands(c, lang)) ? speakableText(scrambleText(words, lang)) : '';
+      // Real languages (Spanish) sound the same to everyone: one clip
+      const sameForAll = scrambled === words;
+      if (sameForAll) scrambled = '';
+      // Nobody in the party knows it: everyone, the DM too, hears the scrambled words (one clip, not two)
+      const nobodyKnows = !!scrambled && !crawlers.some(c => crawlerUnderstands(c, lang));
 
       const clip = async (text: string, suffix: string) => {
         const clip = await speakLine({ text, traits, pick }, keys);
         return saveClip(roomId, `${m.id}${suffix}`, clip.blob, at);
       };
+      const attach = async (): Promise<Pick<ChatMessage, 'audioUrl' | 'audioScrambledUrl'>> => {
+        if (lang && DROID_LANGUAGES.includes(lang)) {
+          const ref = await saveClip(roomId, m.id, droidClip(words), at);
+          return { audioUrl: ref, audioScrambledUrl: ref };
+        }
+        if (sameForAll) {
+          const ref = await clip(words, '');
+          return { audioUrl: ref, audioScrambledUrl: ref };
+        }
+        if (nobodyKnows && hasWords(scrambled)) {
+          const ref = await clip(scrambled, '-scrambled');
+          return { audioUrl: ref, audioScrambledUrl: ref };
+        }
+        const [audioUrl, audioScrambledUrl] = await Promise.all([
+          clip(words, ''),
+          hasWords(scrambled) ? clip(scrambled, '-scrambled') : undefined,
+        ]);
+        return { audioUrl, audioScrambledUrl };
+      };
       void (async () => {
         try {
-          const [audioUrl, audioScrambledUrl] = await Promise.all([
-            clip(words, ''),
-            hasWords(scrambled) ? clip(scrambled, '-scrambled') : undefined,
-          ]);
-          await onAttachAudio(m.id, { audioUrl, audioScrambledUrl });
+          await onAttachAudio(m.id, await attach());
           reportVoiceProblem(null);
         } catch (err) {
           console.warn('[NpcSpeech] Could not read a line aloud', err);

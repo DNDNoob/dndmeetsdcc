@@ -1926,6 +1926,8 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     if (!selectedMap) return;
 
     const handleWheel = (e: WheelEvent) => {
+      // Over a floating panel (game chat, dice, ping panel, menus) the wheel scrolls that panel
+      if ((e.target as Element | null)?.closest?.('.fixed, [role="dialog"], [data-radix-popper-content-wrapper]')) return;
       e.preventDefault();
       // Proportional zoom: step scales with current zoom level for smooth feel
       // At 100% → step ~3, at 50% → step ~1.5, at 200% → step ~6
@@ -2274,7 +2276,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     (m: ChatMessage) => isAdmin || crawlerUnderstands(myChatCrawler, m.language),
     [isAdmin, myChatCrawler]
   );
-  const { speechMuted, speechVolume, setSpeechPrefs } = useNpcSpeechPlayer({
+  const { speechMuted, speechVolume, setSpeechPrefs, mutedSpeakers, toggleSpeakerMuted } = useNpcSpeechPlayer({
     roomId, messages: episodeChatMessages, understands: understandsChatLine, mapId: currentMapId,
   });
   // Speech bubbles show what this viewer can make out
@@ -4114,6 +4116,8 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
           speechMuted={speechMuted}
           speechVolume={speechVolume}
           onSetSpeechPrefs={setSpeechPrefs}
+          mutedSpeakers={mutedSpeakers}
+          onToggleSpeakerMuted={toggleSpeakerMuted}
         />
       )}
     </motion.div>

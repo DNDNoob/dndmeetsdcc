@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { MessageSquare, Mic, Send, Settings, X, Volume2, VolumeX, Lock, Unlock, Trash2, Sparkles, User, Wand2, Languages, Check, Pencil, Brain, Play, AudioLines } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
+import { useClickAway } from "@/hooks/useClickAway";
 import {
   type ChatMessage,
   type Mob,
@@ -75,6 +76,8 @@ interface NpcChatPanelProps {
   speechMuted?: boolean;
   speechVolume?: number;
   onSetSpeechPrefs?: (prefs: { muted?: boolean; volume?: number }) => void;
+  mutedSpeakers?: string[];                       // characters this viewer muted (mob ids)
+  onToggleSpeakerMuted?: (speakerId: string) => void;
 }
 
 const SPEEDS = [["0.85", "Slow"], ["1", "Normal"], ["1.15", "Quick"]] as const;
@@ -95,7 +98,7 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
   messages, author, isAdmin, mobs, npcsOnMap, mentionables = [], aiSettings, aiStatus, secrets,
   onSend, onUpdateSettings, onSetSecretState, memories = {}, onSetMemory, onClearChat, npcKeys, onChangeNpcKeys,
   readLine, speakLanguages = [], translateMode = "off", onSetTranslateMode, onTranslate,
-  speechMuted = false, speechVolume = 0.9, onSetSpeechPrefs,
+  speechMuted = false, speechVolume = 0.9, onSetSpeechPrefs, mutedSpeakers = [], onToggleSpeakerMuted,
 }) => {
   const [open, setOpen] = useState(readOpen);
   const [showSettings, setShowSettings] = useState(false);
@@ -156,6 +159,10 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
     setOpen(next);
     writeOpen(next);
   };
+
+  // Clicking anywhere else (the map, another panel) tucks the chat away
+  const rootRef = useRef<HTMLDivElement>(null);
+  useClickAway(rootRef, () => setPanelOpen(false), open);
 
   const enabled = aiSettings?.enabled !== false;
   const speechOn = !!aiSettings?.speech;
@@ -305,7 +312,7 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
   const mobById = (id: string) => mobs.find(m => m.id === id) ?? mobs.find(m => m.id === baseMobId(id));
 
   return (
-    <div className="fixed bottom-24 right-2 sm:right-4 z-[98] flex flex-col items-end gap-2 pointer-events-none">
+    <div ref={rootRef} className="fixed bottom-24 right-2 sm:right-4 z-[98] flex flex-col items-end gap-2 pointer-events-none">
       <AnimatePresence>
         {open && (
           <motion.div
@@ -366,6 +373,28 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
                   className="flex-1 min-w-0 accent-primary"
                   aria-label="NPC voice volume"
                 />
+              </div>
+            )}
+            {speechOn && showSound && onToggleSpeakerMuted && (
+              <div className="shrink-0 px-3 pb-1.5 border-b border-border text-[11px] text-muted-foreground" data-testid="npc-muted-speakers">
+                {mutedSpeakers.length === 0 ? (
+                  <span>Tap the speaker next to a name to mute just that character.</span>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-1">
+                    <span>Muted:</span>
+                    {mutedSpeakers.map(id => (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => onToggleSpeakerMuted(id)}
+                        className="flex items-center gap-0.5 px-1.5 border border-border rounded hover:text-primary"
+                        title="Hear this character again"
+                      >
+                        <VolumeX className="w-3 h-3" />{mobById(id)?.name ?? "Unknown"}<X className="w-2.5 h-2.5" />
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -718,6 +747,24 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
                     )}
                     <div className="min-w-0">
                       <span className={`font-bold text-xs ${nameClass}`}>{m.authorName}</span>
+                      {m.authorType === "npc" && speechOn && onToggleSpeakerMuted && (() => {
+                        const speakerMuted = mutedSpeakers.includes(baseMobId(m.authorId));
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => onToggleSpeakerMuted(m.authorId)}
+                            className={`ml-1 align-middle ${speakerMuted ? "text-destructive" : "text-muted-foreground/60 hover:text-primary"}`}
+                            aria-label={speakerMuted ? `Unmute ${m.authorName}` : `Mute ${m.authorName}`}
+                            title={speakerMuted ? `Hear ${m.authorName} again` : `Mute ${m.authorName}'s voice (just for you)`}
+                            data-testid="mute-speaker"
+                          >
+                            {speakerMuted ? <VolumeX className="w-3 h-3 inline" /> : <Volume2 className="w-3 h-3 inline" />}
+                          </button>
+                        );
+                      })()}
+                      {isAdmin && m.preset && (
+                        <span className="ml-1.5 text-[10px] text-muted-foreground border border-border px-1" title="Nobody in the party speaks this language, so a preset line was used instead of asking the AI">preset</span>
+                      )}
                       <span className="text-[10px] text-muted-foreground ml-1.5">{formatTime(m.createdAt)}{m.viaVoice ? " 🎙" : ""}</span>
                       {line.languageName && (
                         <span

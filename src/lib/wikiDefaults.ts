@@ -636,7 +636,7 @@ Mobs are everyone in the game world who isn't a crawler. They are all set up the
 | **Creature** | A template. Place it on the map as many times as you like; each copy is labelled A, B, C… and is transient | Goblin, Gnome |
 | **Character** | One named person who is part of the story and may come back | Grimble the Goblin Merchant |
 
-Tick **Boss** on either kind to mark it as a boss (red styling, its own section in Mob Profiles).
+Tick **Boss** on either kind to mark it as a boss (red styling, its own Bosses tab in Mob Profiles).
 
 A character can optionally be a creature (**Is a** in the DM Console): Grimble *is a* Goblin. When players meet Grimble, Goblin is revealed in their Mob Profiles too.
 
@@ -651,7 +651,7 @@ Hostility belongs to each token on the map, not the mob, so it can change mid-sc
 
 ## Mob Profiles (players)
 
-The Mobs page shows what the party has encountered in three sections: **Creatures**, **Bosses** and **Characters**. Characters show the creature they are when it's known ("A Goblin").
+The Mobs page shows what the party has encountered in three tabs: **Bosses**, **Mobs** (creatures) and **Characters**. Each tab shows how many it holds. Characters show the creature they are when it's known ("A Goblin").
 
 ## Mob Properties
 
@@ -683,7 +683,7 @@ The DM can choose to hide or show various mob details:
 
 ## Mob Management (DM Console)
 
-From the DM Console Mobs tab, the DM can create, edit, and delete mobs. This includes setting up their inventory, equipping items via double-click or right-click context menu, and configuring their stats.
+From the DM Console Mobs tab, the DM can create, edit, and delete mobs. The **Existing Mobs** list has the same Bosses, Mobs and Characters tabs. This includes setting up their inventory, equipping items via double-click or right-click context menu, and configuring their stats.
 
 ## Mobs on Maps
 
@@ -918,9 +918,13 @@ If you refresh the page or visit another page (like the DM Console) during a gam
 4. Interact with the map: click to ping, view mob details, see your position
 5. Roll dice and perform actions from your profile page
 
+## Top Menu
+
+The top menu hides during Show Time to make room for the map. Move the mouse to the very top edge of the page and hold it there for a moment to bring it back, or tap the pin to keep it showing.
+
 ## Map Interaction
 
-- **Zoom**: Scroll to zoom in/out on the map
+- **Zoom**: Scroll to zoom in/out on the map. Scrolling over a panel (Game Chat, dice, game clock, map tools) scrolls that panel instead
 - **Pan**: The map scrolls naturally within its container
 - **Ping**: Click on the map to send a colored ping visible to all players
 - **Mob Cards**: Click on mob icons to see their details (strengths, weaknesses, HP)
@@ -939,7 +943,9 @@ Everything in Show Time syncs in real time:
 
 ## Game Chat
 
-The chat button in the bottom right opens the **Game Chat** for the running episode. Players talk as their crawler and the DM talks as the DM. Hold the microphone button to speak instead of typing. Mobs with a personality answer in the chat and in speech bubbles over their heads. See [Talking NPCs](/wiki/talking-npcs).`,
+The chat button in the bottom right opens the **Game Chat** for the running episode. Players talk as their crawler and the DM talks as the DM. Hold the microphone button to speak instead of typing. Mobs with a personality answer in the chat and in speech bubbles over their heads. See [Talking NPCs](/wiki/talking-npcs).
+
+The chat tucks away when you click or tap anywhere outside it, and the dice roller does the same.`,
   },
   {
     id: 'merchants',
@@ -1090,7 +1096,7 @@ Open the Game Chat and tap the gear icon:
 - **Spoken voices**: read NPC lines aloud on every device, with a voice per NPC (see Spoken Voices above)
 - **Keys**: free Groq and Gemini keys (and an ElevenLabs key for voices), saved only in this browser
 - **NPC brain**: **Online** or **Laptop** (see below)
-- **Model**: **Best quality** (bigger, slower) or **Fast** (smaller, quicker)
+- **Model**: **Best quality** (bigger, slower) or **Fast** (smaller, quicker). On the Laptop brain, Fast uses qwen3:4b-instruct-2507, the quickest model on the DM laptop
 - **Mute all NPCs**, or mute one NPC
 - **Secret** lock/unlock per NPC
 - **Memory** per NPC (brain icon): see and edit what it remembers
@@ -1109,7 +1115,11 @@ NPCs can also say their lines out loud. Turn on **Spoken voices** in the Game Ch
 - When every service is used up, voices are made by Kokoro, a free voice model that runs in the DM's browser. It sounds flatter, and the first time it's needed the browser downloads it (about 330 MB) and keeps it for next time.
 - Keep the DM tab open during the game, the same as for the Online brain. The keys are saved only in that browser.
 - Each line is saved in the game's database as a small sound clip that players' devices play once. Clips are deleted again after about 15 minutes.
-- Lines in a language a player doesn't know are read to them as the scrambled words, so it sounds foreign. Players who know the language, and the DM, hear the real words. Lines in Mindspeech or Ward sign aren't read aloud, and players who don't know Beast hear nothing from a beast (they still see what it does).
+- Lines in a language a player doesn't know are read to them as the scrambled words, so it sounds foreign. Players who know the language, and the DM, hear the real words. If nobody in the party knows the language, everyone (the DM too) hears the scrambled words. Spanish is read in Spanish for everyone.
+- Base64 lines are beeps, whistles and warbles, like a little astromech droid, instead of a voice.
+- Lines in Mindspeech or Ward sign aren't read aloud (thoughts and signs make no sound), and players who don't know Beast, Plant or Dead hear nothing from those speakers (they still see what they do).
+- The bit of static some voice services leave after the last word is cut off.
+- **Mute one character:** tap the little speaker next to an NPC's name in the chat to stop hearing that character (every copy of a creature). It's just for you. Muted characters are listed under the speaker button at the top of the chat, where you can unmute them.
 - Actions written between asterisks (the NPC grinning, wiping its hands) are skipped; only the words are spoken.
 
 ### Creature sounds
@@ -1190,7 +1200,7 @@ Crawlers and mobs know languages. If someone talks in a language you don't know,
 | **Plant** | Rustling, creaking and slow movement. Speak with Plants grants it |
 | **Dead** | The voice of a corpse. Speak with Dead grants it |
 
-Each language looks different when you can't read it: Kra Kow is harsh grunts, Mewmew is mrrps, Ward sign is symbols, Mindspeech is waves. Base64 really is Base64, so a crawler with a decoder and some patience might work it out.
+Each language looks different when you can't read it: Kra Kow is harsh grunts, Mewmew is mrrps, Ward sign is symbols, Mindspeech is waves. Base64 really is Base64, so a crawler with a decoder and some patience might work it out. Spanish is real Spanish: NPCs write their lines in Spanish, and crawlers who don't know it see the same Spanish words.
 
 ## What Your Crawler Knows
 
@@ -1221,6 +1231,7 @@ When an NPC talks:
 - If someone speaks to it in a language it knows, it answers in that language.
 - If someone speaks to it in a language it doesn't know, it can't understand them and answers in its native tongue.
 - When it speaks up on its own, it uses the last language it was spoken to in, or its native tongue.
+- If nobody in the party knows the language it answers in, the AI is skipped: it says a short preset line instead (the players only see gibberish anyway), and the DM sees a small **preset** tag on it. Lines the DM sends still get a real answer. Beasts, plants and corpses always get a real answer, since everyone sees their body language.
 
 ### Beasts
 
@@ -1232,7 +1243,7 @@ Pick **Plant** for talking plants. It works like Beast: crawlers who know Plant 
 
 ### Corpses
 
-Pick **Dead** for a corpse. Any mob whose token drops to 0 HP also counts as a corpse automatically, and still remembers what it knew alive. A corpse stays silent until a crawler talks to it in Dead, usually by casting Speak with Dead. It only knows what it knew in life and answers briefly, often cryptically. Each casting gets as many questions as the spell allows; then the corpse falls silent again. Crawlers without Dead see what the corpse does, such as *its jaw creaks open and a dry whisper escapes*.
+Pick **Dead** for a corpse. Any mob whose token drops to 0 HP also counts as a corpse automatically, and still remembers what it knew alive. A corpse stays silent until a crawler talks to it in Dead, usually by casting Speak with Dead. The DM can always get an answer by @-tagging the corpse. It only knows what it knew in life and answers briefly, often cryptically. Each casting gets as many questions as the spell allows; then the corpse falls silent again. Crawlers without Dead see what the corpse does, such as *its jaw creaks open and a dry whisper escapes*.
 
 ### Silent Mobs
 
@@ -1390,7 +1401,7 @@ The wiki supports standard Markdown:
 - Lists: \`- item\` or \`1. item\`
 - Tables: Standard Markdown table syntax
 - Code: \`\\\`inline code\\\`\` or fenced code blocks
-- Links: \`[text](url)\`
+- Links: \`[text](url)\` (web links starting with https://, email links, or wiki links like \`/wiki/campaigns\`; other kinds show as plain text)
 
 ## Content Guidelines
 
@@ -1486,6 +1497,12 @@ Players join campaigns via **invite codes** or **invite links**.
 1. The DM shares the invite link (e.g., \`https://yoursite.com/join/abc123\`) or the invite code.
 2. Click the link, or go to the Campaign Selection screen and click **Join Campaign**, then paste the invite code.
 3. You'll be added to the campaign's member list.
+
+## Who Can See a Campaign
+
+Only the DM and the campaign's members can see or change its crawlers, maps, episodes, chat and everything else in it. Anyone else who signs in can't see the campaign at all unless they have its invite code.
+
+If you **regenerate** the invite code, the old link stops working for new players. People who already joined stay in.
 
 ## Player Limit
 
@@ -1914,5 +1931,42 @@ When enabling public content, you will see a one-time warning:
 > *Public content is created by other players and may not be suitable for all ages. Items and spells shared publicly have not been reviewed or moderated.*
 
 You must confirm before the toggle activates. This confirmation is recorded in your Decision History.`,
+  },
+  {
+    id: 'pixel-icons',
+    slug: 'pixel-icons',
+    title: 'Pixel Icons & Mob Portraits',
+    category: 'Game Mechanics',
+    order: 13,
+    content: `# Pixel Icons & Mob Portraits
+
+Every new item in the **Item Library**, every new spell in the **Spell Library**, and every item you add to **My Content** gets a pixel-art icon automatically. You don't need to do anything.
+
+## How an Icon Is Picked
+
+1. **Generated** — the app sends the item or spell's name, description, slot, weapon type, damage type or spell school to an AI image generator and turns the picture into a small 48×48 pixel icon. This takes a few seconds; the icon appears once it's ready.
+2. **Matched from the icon library** — the generator is free but has a daily limit (it resets at midnight UTC). When it runs out, the app instead picks the closest icon from every icon made before, using descriptor tags. For example a new "Ember Katana" reuses the icon of a "Flaming Longsword" (sword + fire), and an "Elixir of Mending" reuses a "Healing Potion" icon.
+
+If nothing in the library is related, the item keeps its normal slot icon.
+
+## Mob Portraits (DMs)
+
+New mob types can get a 128×128 pixel-art portrait too, used as their map token and on the Mob Profiles page.
+
+- In the **DM Console → Mobs** tab, leave **Auto-generate pixel portrait** ticked and don't upload an image. When you click **Add Mob**, the app paints a portrait from the mob's name, description, strengths, weaknesses, level and boss setting.
+- To make a portrait for an existing mob, open it for editing and click **Generate**, then save.
+- An image you upload always wins and is never replaced.
+- Every copy of a creature on the map (Goblin A, B, C) shares the creature's portrait. A character linked to a creature, like Grimble the Goblin, gets his own portrait.
+- When the daily limit is used up, a character uses his creature's portrait, and anything else gets the closest earlier mob portrait (a new Hobgoblin reuses the Goblin portrait). If nothing fits, the mob is added without an image and you can click Generate the next day.
+
+## The Icon Library
+
+Every generated icon is saved to one shared icon library with tags such as *sword*, *fire*, *potion*, *healing*, *ice* or *death*. The library is shared across all campaigns, so the more icons people create, the better the matches get when the daily limit is reached.
+
+## Notes
+
+- Icons are generated only for players signed in with Google. Guests still get matched icons.
+- Copying an item or spell from public content or My Content keeps its icon.
+- Crawler copies of a library item show the library item's icon.`,
   },
 ];
