@@ -1,4 +1,4 @@
-import type { IconLibraryEntry, InventoryItem, Spell } from '@/lib/gameData';
+import type { IconLibraryEntry, InventoryItem, Mob, Spell } from '@/lib/gameData';
 
 /**
  * Pixel-art icon helpers: prompt building, descriptor tags, library matching and the
@@ -7,9 +7,19 @@ import type { IconLibraryEntry, InventoryItem, Spell } from '@/lib/gameData';
 
 export type IconSubject =
   | { kind: 'item'; item: InventoryItem }
-  | { kind: 'spell'; spell: Spell };
+  | { kind: 'spell'; spell: Spell }
+  | { kind: 'mob'; mob: Pick<Mob, 'name' | 'description'> & Partial<Mob> };
 
 export const ICON_SIZE = 48;
+/** Mob portraits are shown as map tokens, so they get more pixels than item icons. */
+export const PORTRAIT_SIZE = 128;
+
+function subjectTarget(subject: IconSubject): { name: string; description: string; tags?: string[] } {
+  if (subject.kind === 'item') return subject.item;
+  if (subject.kind === 'spell') return subject.spell;
+  const { mob } = subject;
+  return { name: mob.name, description: [mob.description, mob.strengths, mob.weaknesses].filter(Boolean).join('. ') };
+}
 const ICON_API_URL = (import.meta.env.VITE_ICON_API_URL as string | undefined)?.replace(/\/$/, '');
 const QUOTA_KEY = 'iconGen.quotaExhaustedUntil';
 
@@ -66,6 +76,13 @@ const CONCEPTS: Record<string, string[]> = {
   vision: ['divination', 'eye', 'see', 'sight', 'detect', 'scry', 'reveal', 'vision', 'foresight', 'insight'],
   speed: ['speed', 'haste', 'fast', 'quick', 'swift', 'dash', 'run'],
   strength: ['strength', 'strong', 'might', 'power', 'rage', 'berserk', 'muscle'],
+  goblin: ['goblin', 'goblins', 'hobgoblin', 'kobold', 'imp', 'gremlin', 'gnome', 'gnomes'],
+  orc: ['orc', 'orcs', 'ogre', 'troll', 'brute', 'barbarian'],
+  giant: ['giant', 'titan', 'colossus', 'golem', 'cyclops'],
+  humanoid: ['human', 'man', 'woman', 'person', 'merchant', 'shopkeeper', 'guard', 'soldier', 'knight', 'bandit', 'thief', 'wizard', 'mage', 'priest', 'king', 'queen', 'villager', 'elf', 'dwarf', 'halfling'],
+  demon: ['demon', 'devil', 'fiend', 'infernal', 'hellhound'],
+  slime: ['slime', 'ooze', 'blob', 'jelly', 'goo'],
+  insect: ['insect', 'bug', 'beetle', 'ant', 'wasp', 'scorpion', 'centipede', 'mantis', 'roach', 'cockroach'],
   animal: ['animal', 'beast', 'wolf', 'bear', 'cat', 'dog', 'bird', 'snake', 'spider', 'rat', 'dragon', 'fang', 'claw', 'feather', 'scale'],
 };
 
@@ -114,7 +131,7 @@ export function getIconTags(subject: IconSubject): Map<string, number> {
   const add = (tag: string | undefined, w: number) => {
     if (tag) weights.set(tag, Math.max(weights.get(tag) ?? 0, w));
   };
-  const target = subject.kind === 'item' ? subject.item : subject.spell;
+  const target = subjectTarget(subject);
   conceptsIn(target.description).forEach(c => add(c, 1));
   (target.tags || []).forEach(t => conceptsIn(t).forEach(c => add(c, 2)));
 
@@ -126,6 +143,10 @@ export function getIconTags(subject: IconSubject): Map<string, number> {
       add(DAMAGE_CONCEPT[item.weaponData.damageType], 2);
     }
     if (item.isSpellTome) add('book', 3);
+  } else if (subject.kind === 'mob') {
+    const { mob } = subject;
+    if (mob.boss) add('strength', 1);
+    if (mob.kind === 'character' && !weights.size) add('humanoid', 1);
   } else {
     const { spellData } = subject.spell;
     add(SCHOOL_CONCEPT[spellData?.school], 2);
@@ -137,9 +158,15 @@ export function getIconTags(subject: IconSubject): Map<string, number> {
 
 /** Text prompt for the image model, built from everything known about the item or spell. */
 export function buildIconPrompt(subject: IconSubject): string {
-  const target = subject.kind === 'item' ? subject.item : subject.spell;
+  const target = subjectTarget(subject);
   const desc = (target.description || '').replace(/\s+/g, ' ').trim().slice(0, 220).replace(/([^.!?])$/, '$1.');
   let detail = '';
+  if (subject.kind === 'mob') {
+    const { mob } = subject;
+    const bits = [mob.boss && 'fearsome boss', mob.level && `level ${mob.level}`, mob.kind === 'character' ? 'unique named character' : 'creature'].filter(Boolean);
+    return `16-bit pixel art RPG character portrait of ${target.name} (${bits.join(', ')}). ${desc} ` +
+      'Full body, facing the viewer, centered, bold dark outline, limited color palette, crisp pixels, plain dark background, no text, no border.';
+  }
   if (subject.kind === 'item') {
     const { item } = subject;
     const bits = [
@@ -162,11 +189,13 @@ export function buildIconPrompt(subject: IconSubject): string {
  */
 export function matchLibraryIcon(subject: IconSubject, library: IconLibraryEntry[]): IconLibraryEntry | undefined {
   const tags = getIconTags(subject);
-  const target = subject.kind === 'item' ? subject.item : subject.spell;
+  const target = subjectTarget(subject);
   const nameWords = new Set(words(target.name).filter(w => w.length > 3));
   let best: IconLibraryEntry | undefined;
   let bestScore = 0;
   for (const entry of library) {
+    // Mob portraits and item/spell icons are different sizes and framings, so they never mix
+    if ((entry.kind === 'mob') !== (subject.kind === 'mob')) continue;
     let score = 0;
     for (const t of entry.tags) score += tags.get(t) ?? 0;
     if (score === 0) continue;
@@ -205,20 +234,20 @@ function markQuotaExhausted() {
 }
 
 /** Downscale a generated image to a small pixel-art PNG data URL. */
-async function pixelate(base64Jpeg: string): Promise<string> {
+async function pixelate(base64Jpeg: string, size: number): Promise<string> {
   const img = new Image();
   img.src = `data:image/jpeg;base64,${base64Jpeg}`;
   await img.decode();
   const canvas = document.createElement('canvas');
-  canvas.width = ICON_SIZE;
-  canvas.height = ICON_SIZE;
+  canvas.width = size;
+  canvas.height = size;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('canvas unavailable');
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(img, 0, 0, ICON_SIZE, ICON_SIZE);
+  ctx.drawImage(img, 0, 0, size, size);
   // Posterize to a limited palette so the result reads as pixel art
-  const data = ctx.getImageData(0, 0, ICON_SIZE, ICON_SIZE);
+  const data = ctx.getImageData(0, 0, size, size);
   const step = 32;
   for (let i = 0; i < data.data.length; i += 4) {
     for (let c = 0; c < 3; c++) data.data[i + c] = Math.min(255, Math.round(data.data[i + c] / step) * step);
@@ -231,7 +260,7 @@ async function pixelate(base64Jpeg: string): Promise<string> {
  * Ask the icon Worker for a new icon. Resolves to a PNG data URL, or null when generation is
  * unavailable (not configured, daily free quota used up, or any error) so callers can fall back.
  */
-export async function generateIconImage(prompt: string, idToken: string): Promise<string | null> {
+export async function generateIconImage(prompt: string, idToken: string, size = ICON_SIZE): Promise<string | null> {
   if (!ICON_API_URL || quotaExhausted()) return null;
   try {
     const res = await fetch(`${ICON_API_URL}/icon`, {
@@ -245,7 +274,7 @@ export async function generateIconImage(prompt: string, idToken: string): Promis
     }
     if (!res.ok) return null;
     const { image } = await res.json() as { image?: string };
-    return image ? await pixelate(image) : null;
+    return image ? await pixelate(image, size) : null;
   } catch (err) {
     console.warn('[IconGen] generation failed, falling back to library match', err);
     return null;

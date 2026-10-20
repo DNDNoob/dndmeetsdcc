@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { User } from 'firebase/auth';
 import { db, collection, doc, setDoc, onSnapshot } from '@/lib/firebase';
-import type { IconLibraryEntry } from '@/lib/gameData';
-import { buildIconPrompt, generateIconImage, getIconTags, matchLibraryIcon, type IconSubject } from '@/lib/iconGen';
+import type { IconLibraryEntry, Mob } from '@/lib/gameData';
+import { buildIconPrompt, generateIconImage, getIconTags, matchLibraryIcon, PORTRAIT_SIZE, type IconSubject } from '@/lib/iconGen';
 
 /**
  * The global pixel-art icon library (top-level `iconLibrary` collection, shared by every campaign).
@@ -10,6 +10,7 @@ import { buildIconPrompt, generateIconImage, getIconTags, matchLibraryIcon, type
  * `assignIcon` gives a new item or spell an icon: it generates one through the Cloudflare icon
  * Worker and adds it to the library, or, when generation is unavailable (free quota used up,
  * not configured, not signed in with Google), picks the best existing icon by descriptor tags.
+ * `generateMobImage` does the same for mob types with larger portraits.
  */
 export function useIconLibrary(user: User | null, canGenerate: boolean) {
   const [icons, setIcons] = useState<IconLibraryEntry[]>([]);
@@ -31,32 +32,48 @@ export function useIconLibrary(user: User | null, canGenerate: boolean) {
     return map;
   }, [icons]);
 
-  const assignIcon = useCallback(async (subject: IconSubject): Promise<string | undefined> => {
-    const target = subject.kind === 'item' ? subject.item : subject.spell;
-    if (canGenerate && user && db) {
-      const prompt = buildIconPrompt(subject);
-      const image = await generateIconImage(prompt, await user.getIdToken());
-      if (image) {
-        const entry: IconLibraryEntry = {
-          id: crypto.randomUUID(),
-          image,
-          tags: [...getIconTags(subject).keys()],
-          kind: subject.kind,
-          sourceName: target.name,
-          prompt,
-          createdAt: new Date().toISOString(),
-          createdBy: user.uid,
-        };
-        try {
-          await setDoc(doc(db, 'iconLibrary', entry.id), entry);
-          return entry.id;
-        } catch (err) {
-          console.error('[IconLibrary] failed to save generated icon:', err);
-        }
-      }
+  // Generate a new image and add it to the library; null when generation is unavailable
+  const generateEntry = useCallback(async (subject: IconSubject, size?: number): Promise<IconLibraryEntry | null> => {
+    if (!canGenerate || !user || !db) return null;
+    const prompt = buildIconPrompt(subject);
+    const image = await generateIconImage(prompt, await user.getIdToken(), size);
+    if (!image) return null;
+    const entry: IconLibraryEntry = {
+      id: crypto.randomUUID(),
+      image,
+      tags: [...getIconTags(subject).keys()],
+      kind: subject.kind,
+      sourceName: subject.kind === 'item' ? subject.item.name : subject.kind === 'spell' ? subject.spell.name : subject.mob.name,
+      prompt,
+      createdAt: new Date().toISOString(),
+      createdBy: user.uid,
+    };
+    try {
+      await setDoc(doc(db, 'iconLibrary', entry.id), entry);
+    } catch (err) {
+      console.error('[IconLibrary] failed to save generated image:', err);
     }
-    return matchLibraryIcon(subject, iconsRef.current)?.id;
+    return entry;
   }, [user, canGenerate]);
 
-  return { icons, iconImages, assignIcon };
+  const assignIcon = useCallback(async (subject: IconSubject): Promise<string | undefined> => {
+    const entry = await generateEntry(subject);
+    if (entry) return entry.id;
+    return matchLibraryIcon(subject, iconsRef.current)?.id;
+  }, [generateEntry]);
+
+  /**
+   * Pixel portrait for a mob type (returned as an image, since mobs keep their own image field).
+   * Falls back to a character's creature portrait, then the closest earlier mob portrait.
+   */
+  const generateMobImage = useCallback(async (mob: Pick<Mob, 'name' | 'description'> & Partial<Mob>, allMobs: Mob[]): Promise<string | undefined> => {
+    const subject: IconSubject = { kind: 'mob', mob };
+    const entry = await generateEntry(subject, PORTRAIT_SIZE);
+    if (entry) return entry.image;
+    const species = mob.speciesId ? allMobs.find(m => m.id === mob.speciesId) : undefined;
+    if (species?.image) return species.image;
+    return matchLibraryIcon(subject, iconsRef.current)?.image;
+  }, [generateEntry]);
+
+  return { icons, iconImages, assignIcon, generateMobImage };
 }

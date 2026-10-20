@@ -3,6 +3,7 @@
     "date": "2026-10-20",
     "changes": [
       "🎨 New items and spells now get a pixel-art icon automatically, made by a free AI image generator from the item's name and description. When the daily free limit runs out, the app picks the closest matching icon from every icon made before",
+      "🧌 DMs can auto-generate a pixel-art portrait for new mob types: leave Auto-generate pixel portrait ticked when adding a mob, or click Generate on an existing one. When the daily limit runs out, the closest earlier portrait is used",
       "🔒 Campaigns are now private: only the DM and players who joined can see or change a campaign's data. Before, anyone signed in with Google could edit any campaign",
       "🔒 Wiki links now only work for web, email and wiki addresses, which closes a hole that let a wiki page run code in other players' browsers",
       "🧑 New character creator: tap New on the Profiles page to make a crawler step by step, with a name, a backstory, ability points and languages",

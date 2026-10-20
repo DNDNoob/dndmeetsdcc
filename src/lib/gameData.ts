@@ -339,9 +339,9 @@ export interface Spell {
 /** A pixel-art icon in the global `iconLibrary` collection, shared by every campaign. */
 export interface IconLibraryEntry {
   id: string;
-  image: string;       // small PNG data URL (48x48 pixel art)
-  tags: string[];      // normalized descriptor tags used to match icons to new items/spells
-  kind: 'item' | 'spell';
+  image: string;       // small PNG data URL (48x48 icon, or 128x128 mob portrait)
+  tags: string[];      // normalized descriptor tags used to match icons to new items/spells/mobs
+  kind: 'item' | 'spell' | 'mob';
   sourceName: string;  // name of the item or spell the icon was generated for
   prompt?: string;
   createdAt: string;

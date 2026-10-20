@@ -103,6 +103,12 @@ service cloud.firestore {
         || get(/databases/$(database)/documents/publicEpisodes/$(episodeId)).data.createdBy == request.auth.uid);
     }
 
+    // Pixel-art icons and mob portraits shared by every campaign: everyone reads, Google accounts add
+    match /iconLibrary/{iconId} {
+      allow read: if signedIn();
+      allow create: if isGoogle() && request.resource.data.createdBy == request.auth.uid;
+    }
+
     // Old shared game data from before campaigns: read-only
     match /{legacyCollection}/{docId} {
       allow read: if signedIn() && !(legacyCollection in [

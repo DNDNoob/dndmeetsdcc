@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { toast } from "sonner";
 import NpcPersonalityFields from "@/components/NpcPersonalityFields";
 import { LanguagePicker } from "@/components/LanguagePicker";
 import MerchantFields from "@/components/MerchantFields";
@@ -9,7 +10,7 @@ import { DungeonButton } from "@/components/ui/DungeonButton";
 import MapMobPlacementEditor from "@/components/ui/MapMobPlacementEditor";
 import MapDesignerPopout from "@/components/ui/MapDesignerPopout";
 import { Mob, Episode, stackItems, DEFAULT_LOOT_DESTRUCTION_CHANCE, getMobKind, isBossMob, legacyMobType, EpisodeMobPlacement, Crawler, CrawlerPlacement, InventoryItem, LootBoxTemplate, LootBoxTier, getLootBoxTierColor, type EquipmentSlot, type EquippedItems, Quest, QuestReward, QuestActionItem, QuestRewardTier, type CampaignMapDoc, type PublicMap, type PublicMob, type PublicEpisode, isMerchant } from "@/lib/gameData";
-import { Brain, Upload, Plus, Trash2, Map, Skull, Image as ImageIcon, Save, Edit2, X, Layers, ChevronLeft, ChevronRight, User, Package, Search, Maximize2, Shield, ChevronDown as ChevronDownIcon, ScrollText, Eye, EyeOff, CheckSquare, GripVertical, Users, Globe } from "lucide-react";
+import { Brain, Sparkles, Upload, Plus, Trash2, Map, Skull, Image as ImageIcon, Save, Edit2, X, Layers, ChevronLeft, ChevronRight, User, Package, Search, Maximize2, Shield, ChevronDown as ChevronDownIcon, ScrollText, Eye, EyeOff, CheckSquare, GripVertical, Users, Globe } from "lucide-react";
 import { storage } from "@/lib/firebase";
 import { ShareToggle, ImportButton } from "@/components/ui/ShareToggle";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -17,6 +18,8 @@ import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage
 interface DungeonAIViewProps {
   mobs: Mob[];
   onUpdateMobs: (mobs: Mob[]) => void;
+  /** Pixel-art portrait for a mob type: generated, or matched from earlier portraits. */
+  onGenerateMobImage?: (mob: Mob) => Promise<string | undefined>;
   maps: string[];
   onUpdateMaps: (maps: string[]) => Promise<void> | void;
   mapNames?: string[];
@@ -65,6 +68,7 @@ const CommunityOptInHint: React.FC<{ what: string }> = ({ what }) => (
 const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   mobs,
   onUpdateMobs,
+  onGenerateMobImage,
   maps,
   onUpdateMaps,
   mapNames,
@@ -119,6 +123,11 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
     hitPoints: 50,
   });
   const mobImageRef = useRef<HTMLInputElement>(null);
+  const [autoGenerateMobImage, setAutoGenerateMobImage] = useState(true);
+  const [generatingMobImage, setGeneratingMobImage] = useState<string | null>(null); // 'new' or a mob id
+  // Painting a portrait takes a few seconds; save against the mob list as it is by then
+  const latestMobsRef = useRef(mobs);
+  latestMobsRef.current = mobs;
   const mapImageRef = useRef<HTMLInputElement>(null);
   const [editingMobId, setEditingMobId] = useState<string | null>(null);
   const [editedMobData, setEditedMobData] = useState<Mob | null>(null);
@@ -204,7 +213,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
 
   const handleAddMob = async () => {
     if (!newMob.name?.trim()) return;
-    const mob: Mob = {
+    let mob: Mob = {
       id: Date.now().toString(),
       name: newMob.name,
       level: newMob.level || 1,
@@ -228,9 +237,16 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
       ...(newMob.languages?.length ? { languages: newMob.languages } : {}),
       ...(newMob.merchant ? { merchant: newMob.merchant } : {}),
     };
+    if (!mob.image && autoGenerateMobImage && onGenerateMobImage) {
+      setGeneratingMobImage('new');
+      const image = await onGenerateMobImage(mob).catch(() => undefined);
+      setGeneratingMobImage(null);
+      if (image) mob = { ...mob, image };
+      else toast.info('No portrait available right now. Use Generate on the mob later.');
+    }
     console.log('[DungeonAI] ➕ Add Mob clicked', mob);
     try {
-      await onUpdateMobs([...mobs, mob]);
+      await onUpdateMobs([...latestMobsRef.current, mob]);
       console.log('[DungeonAI] ✅ Mob persisted request sent');
     } catch (err) {
       console.error('[DungeonAI] ❌ Failed to persist mob', err);
@@ -907,11 +923,23 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                   >
                     <Upload className="w-4 h-4 mr-1" /> Upload Image
                   </DungeonButton>
+                  {onGenerateMobImage && !newMob.image && (
+                    <label className="flex items-center gap-1.5 text-xs text-muted-foreground mt-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={autoGenerateMobImage}
+                        onChange={(e) => setAutoGenerateMobImage(e.target.checked)}
+                      />
+                      <Sparkles className="w-3 h-3 text-primary" /> Auto-generate pixel portrait
+                    </label>
+                  )}
                 </div>
               </div>
               <div className="mt-4">
-                <DungeonButton variant="admin" onClick={handleAddMob}>
-                  <Plus className="w-4 h-4 mr-2" /> Add Mob
+                <DungeonButton variant="admin" onClick={handleAddMob} disabled={generatingMobImage === 'new'}>
+                  {generatingMobImage === 'new'
+                    ? <><Sparkles className="w-4 h-4 mr-2 animate-pulse" /> Painting portrait...</>
+                    : <><Plus className="w-4 h-4 mr-2" /> Add Mob</>}
                 </DungeonButton>
               </div>
             </div>
@@ -1001,6 +1029,23 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                               className="text-xs w-full"
                             />
                           </div>
+                          {onGenerateMobImage && (
+                            <DungeonButton
+                              variant="default"
+                              size="sm"
+                              disabled={generatingMobImage === mob.id}
+                              onClick={async () => {
+                                setGeneratingMobImage(mob.id);
+                                const image = await onGenerateMobImage({ ...editedMob, image: undefined }).catch(() => undefined);
+                                setGeneratingMobImage(null);
+                                if (image) setEditedMobData(prev => prev ? { ...prev, image } : prev);
+                                else toast.info('No portrait available right now. Try again tomorrow.');
+                              }}
+                              title="Generate a pixel-art portrait"
+                            >
+                              <Sparkles className={`w-3 h-3 mr-1 ${generatingMobImage === mob.id ? 'animate-pulse' : ''}`} /> Generate
+                            </DungeonButton>
+                          )}
                           {editedMob.image && (
                             <DungeonButton
                               variant="default"
