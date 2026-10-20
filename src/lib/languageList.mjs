@@ -10,6 +10,15 @@ export const TELEPATHIC_LANGUAGE_ID = 'mindspeech';
 /** Animal speech: anyone who doesn't know it sees the creature's sounds and body language instead. */
 export const BEAST_LANGUAGE_ID = 'beast';
 
+/** Plant speech (rustles and creaks), shown as what the plant does to anyone who doesn't know it. */
+export const PLANT_LANGUAGE_ID = 'plant';
+
+/** Corpses speak this. A mob that knows it only answers someone who talks to it in Dead (Speak with Dead). */
+export const DEAD_LANGUAGE_ID = 'dead';
+
+/** Languages with no words for outsiders: they see the speaker's body language (the line's gesture) instead. */
+export const GESTURE_LANGUAGE_IDS = [BEAST_LANGUAGE_ID, PLANT_LANGUAGE_ID, DEAD_LANGUAGE_ID];
+
 export const BUILT_IN_LANGUAGES = [
   { id: 'worldspeech', name: 'Worldspeech', description: 'Essentially the common tongue, spoken by most races.' },
   { id: 'dervish', name: 'Dervish', description: 'A common language of small creatures like gnomes, dwarves and goblins.' },
@@ -20,6 +29,8 @@ export const BUILT_IN_LANGUAGES = [
   { id: 'base64', name: 'Base64', description: 'A numerical language, often used by machines and sentient robots.' },
   { id: 'kra-kow', name: 'Kra Kow', description: 'Usually spoken by goblins, orcs and trolls.' },
   { id: 'beast', name: 'Beast', description: 'Animal sounds and body language. Crawlers need Speak with Animals (or a similar gift) to understand the words; everyone else sees what the creature does.' },
+  { id: 'plant', name: 'Plant', description: 'Rustling, creaking and slow movement. Crawlers need Speak with Plants (or a similar gift) to understand the words; everyone else sees what the plant does.' },
+  { id: 'dead', name: 'Dead', description: 'The voice of a corpse. A corpse only answers crawlers who speak to it in Dead, usually through Speak with Dead.' },
 ];
 
 /** A mob's languages; mobs with none set speak Worldspeech. The first one is its native tongue. */

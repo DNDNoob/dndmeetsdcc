@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Plus, Trash2, ChevronDown, ChevronUp, BookOpen, Zap, Star, Wand2, X, Check, Globe, Lock, Users, Bookmark } from "lucide-react";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import { DungeonCard } from "@/components/ui/DungeonCard";
+import { LanguageSelect } from "@/components/LanguagePicker";
 import {
   Crawler,
   getInitialCrawlerId,
@@ -365,6 +366,36 @@ function SpellDataEditor({ spellData, onChange }: SpellDataEditorProps) {
             onChange={(e) => onChange({ duration: { ...sd.duration, description: e.target.value || undefined } })}
             placeholder="e.g. Instant"
             className="bg-muted border border-border px-2 py-1 text-xs w-full"
+          />
+        </div>
+      </div>
+
+      {/* Language it grants (Speak with Animals → Beast) */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="col-span-2">
+          <label className="text-[10px] text-muted-foreground block mb-0.5">Grants Language</label>
+          <LanguageSelect
+            value={sd.grantsLanguage}
+            onChange={(id) => onChange({ grantsLanguage: id, ...(id ? {} : { questionLimit: undefined }) })}
+            noneLabel="No language"
+            optionLabel={(name) => `Lets the caster use ${name}`}
+            ariaLabel="Grants language"
+            className="bg-muted border border-border px-2 py-1 text-xs w-full"
+          />
+        </div>
+        <div>
+          <label className="text-[10px] text-muted-foreground block mb-0.5">Questions</label>
+          <input
+            type="number" min={0} value={sd.questionLimit ?? ''}
+            disabled={!sd.grantsLanguage}
+            onChange={(e) => {
+              const v = parseInt(e.target.value);
+              onChange({ questionLimit: isNaN(v) || v <= 0 ? undefined : v });
+            }}
+            placeholder="No limit"
+            title="Lines the caster can say in the language per casting (Speak with Dead: 5)"
+            aria-label="Questions per casting"
+            className="bg-muted border border-border px-2 py-1 text-xs w-full disabled:opacity-50"
           />
         </div>
       </div>

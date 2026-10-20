@@ -865,7 +865,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                     <LanguagePicker
                       value={newMob.languages}
                       onChange={(languages) => setNewMob({ ...newMob, languages })}
-                      hint="Tap the languages it speaks. The first one is its native tongue. Players who don't know the language it uses see gibberish. Pick Beast for animals: players without it see what the animal does instead."
+                      hint="Tap the languages it speaks. The first one is its native tongue. Players who don't know the language it uses see gibberish. Pick Beast for animals or Plant for plants: players without it see what the creature does instead. Pick Dead for a corpse: it only answers crawlers using Speak with Dead."
                     />
                     <label className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
                       <input
@@ -1038,7 +1038,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                           <LanguagePicker
                             value={editedMob.languages}
                             onChange={(languages) => setEditedMobData(prev => prev ? { ...prev, languages } : prev)}
-                            hint="Tap the languages it speaks. The first one is its native tongue. Players who don't know the language it uses see gibberish. Pick Beast for animals: players without it see what the animal does instead."
+                            hint="Tap the languages it speaks. The first one is its native tongue. Players who don't know the language it uses see gibberish. Pick Beast for animals or Plant for plants: players without it see what the creature does instead. Pick Dead for a corpse: it only answers crawlers using Speak with Dead."
                           />
                           <label className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
                             <input

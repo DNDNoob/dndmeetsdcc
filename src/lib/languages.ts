@@ -1,7 +1,7 @@
 // App-side language rules: who understands what, scrambled text, and how a chat line reads
 // for each viewer (including party translators). Built-in languages are in languageList.mjs.
-import { BUILT_IN_LANGUAGES, BEAST_LANGUAGE_ID, DEFAULT_LANGUAGE_ID, TELEPATHIC_LANGUAGE_ID, languageName, type LanguageInfo } from './languageList.mjs';
-import type { ChatMessage, Crawler, CustomLanguage } from './gameData';
+import { BUILT_IN_LANGUAGES, GESTURE_LANGUAGE_IDS, DEFAULT_LANGUAGE_ID, TELEPATHIC_LANGUAGE_ID, languageName, type LanguageInfo } from './languageList.mjs';
+import type { ChatMessage, Crawler, CustomLanguage, LanguageEffect } from './gameData';
 
 export { BUILT_IN_LANGUAGES, DEFAULT_LANGUAGE_ID, TELEPATHIC_LANGUAGE_ID, languageName, mobLanguageIds } from './languageList.mjs';
 export type { LanguageInfo } from './languageList.mjs';
@@ -20,12 +20,48 @@ export const allLanguages = (custom: CustomLanguage[]): Language[] => [
     .map(l => ({ id: l.id, name: l.name, description: l.description, custom: true, createdByCrawlerId: l.createdByCrawlerId })),
 ];
 
-/** The languages a crawler knows; none set = Worldspeech. */
-export const crawlerLanguageIds = (crawler: Pick<Crawler, 'languages'> | null | undefined): string[] =>
-  crawler?.languages ?? [DEFAULT_LANGUAGE_ID];
+type KnowsLanguages = Pick<Crawler, 'languages' | 'languageEffects' | 'itemLanguages'>;
+
+/** The languages a crawler knows, including ones from spells and equipped items; none set = Worldspeech. */
+export const crawlerLanguageIds = (crawler: KnowsLanguages | null | undefined): string[] => {
+  const own = crawler?.languages ?? [DEFAULT_LANGUAGE_ID];
+  const granted = [...(crawler?.languageEffects ?? []).map(e => e.languageId), ...(crawler?.itemLanguages ?? [])];
+  return granted.length ? [...new Set([...own, ...granted])] : own;
+};
+
+/** Languages the crawler has only for now (spells and items), not the ones they really know. */
+export const borrowedLanguageIds = (crawler: KnowsLanguages | null | undefined): string[] => {
+  const own = crawler?.languages ?? [DEFAULT_LANGUAGE_ID];
+  return crawlerLanguageIds(crawler).filter(id => !own.includes(id));
+};
+
+/** Speak with Dead style limits: the language's only source is a spell with no questions left. */
+const outOfQuestions = (crawler: KnowsLanguages | null | undefined, languageId: string): boolean => {
+  if (!crawler || (crawler.languages ?? [DEFAULT_LANGUAGE_ID]).includes(languageId) || crawler.itemLanguages?.includes(languageId)) return false;
+  const effects = (crawler.languageEffects ?? []).filter(e => e.languageId === languageId);
+  return effects.length > 0 && effects.every(e => e.questionsLeft !== undefined && e.questionsLeft <= 0);
+};
+
+/** The spell effect a line in this language should count against (one with questions left), if any. */
+export const questionEffectFor = (crawler: KnowsLanguages | null | undefined, languageId: string | undefined): LanguageEffect | undefined => {
+  if (!crawler || !languageId || (crawler.languages ?? [DEFAULT_LANGUAGE_ID]).includes(languageId) || crawler.itemLanguages?.includes(languageId)) return undefined;
+  const effects = (crawler.languageEffects ?? []).filter(e => e.languageId === languageId);
+  if (effects.some(e => e.questionsLeft === undefined)) return undefined; // another spell gives it with no limit
+  return effects.find(e => (e.questionsLeft ?? 0) > 0);
+};
+
+/** "3 turns left", "2 questions left" and so on, for showing a spell's language. */
+export const languageEffectLeft = (e: LanguageEffect): string => {
+  const parts: string[] = [];
+  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  if (e.questionsLeft !== undefined) parts.push(`${plural(e.questionsLeft, 'question')} left`);
+  if (e.noncombatTurnsLeft !== undefined) parts.push(`${plural(e.noncombatTurnsLeft, 'turn')} left`);
+  else if (e.combatRoundsLeft !== undefined) parts.push(`${plural(e.combatRoundsLeft, 'round')} left`);
+  return parts.join(', ');
+};
 
 /** Mindspeech only works for telepathic crawlers. */
-export const crawlerUnderstands = (crawler: Pick<Crawler, 'languages' | 'telepathic'> | null | undefined, languageId: string | undefined): boolean => {
+export const crawlerUnderstands = (crawler: (KnowsLanguages & Pick<Crawler, 'telepathic'>) | null | undefined, languageId: string | undefined): boolean => {
   if (!languageId) return true;
   if (!crawler) return false;
   if (languageId === TELEPATHIC_LANGUAGE_ID && !crawler.telepathic) return false;
@@ -33,8 +69,8 @@ export const crawlerUnderstands = (crawler: Pick<Crawler, 'languages' | 'telepat
 };
 
 /** The languages a crawler can speak in chat, in their own order. */
-export const usableLanguageIds = (crawler: Pick<Crawler, 'languages' | 'telepathic'> | null | undefined): string[] =>
-  crawlerLanguageIds(crawler).filter(id => crawlerUnderstands(crawler, id));
+export const usableLanguageIds = (crawler: (KnowsLanguages & Pick<Crawler, 'telepathic'>) | null | undefined): string[] =>
+  crawlerLanguageIds(crawler).filter(id => crawlerUnderstands(crawler, id) && !outOfQuestions(crawler, id));
 
 // ── Scrambled text ──
 
@@ -62,6 +98,8 @@ const SYLLABLES: Record<string, string[]> = {
   mewmew: ['mew', 'mrrp', 'mrow', 'prr', 'nya', 'mreow', 'hss', 'mip'],
   'kra-kow': ['KRA', 'KOW', 'grok', 'ugg', 'zug', 'THRAK', 'gar', 'muk', 'rrah', 'dak'],
   beast: ['grr', 'yip', 'squeak', 'snrf', 'hss', 'huff', 'chrr', 'rrr', 'awoo', 'chuff'],
+  plant: ['rustle', 'creak', 'shff', 'krr', 'swsh', 'tikk', 'hsss', 'crrk'],
+  dead: ['hhh', 'khh', 'sss', 'rrhh', 'ahh', 'thh', 'kkt', 'uhh'],
 };
 const WARD_SIGNS = ['◬', '⟁', '⌖', '⊹', '⋔', '⟡', '⌬', '⍟', '⧖', '⟐', '⏃', '⎔'];
 const MIND_WAVES = ['∿', '≈', '≋', '~', '◌', '∾'];
@@ -178,8 +216,8 @@ export const readChatLine = (
   if (auto) return { text: m.text, languageId, languageName: name, scrambled: false, via: auto.name };
   const checking = translators.find(c => c.translateMode === 'review');
   return {
-    // Beast: show what the creature does rather than gibberish
-    text: (languageId === BEAST_LANGUAGE_ID && m.gesture) || scrambleText(m.text, languageId), languageId, languageName: name, scrambled: true,
+    // Beast, Plant and Dead: show what the speaker does rather than gibberish
+    text: (GESTURE_LANGUAGE_IDS.includes(languageId) && m.gesture) || scrambleText(m.text, languageId), languageId, languageName: name, scrambled: true,
     ...(checking ? { translating: checking.name } : {}),
   };
 };

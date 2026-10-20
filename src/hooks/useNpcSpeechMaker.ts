@@ -9,7 +9,7 @@ import {
   type NpcSpeechVoice,
 } from '@/lib/gameData';
 import { TELEPATHIC_LANGUAGE_ID, crawlerUnderstands, scrambleText } from '@/lib/languages';
-import { BEAST_LANGUAGE_ID } from '@/lib/languageList.mjs';
+import { GESTURE_LANGUAGE_IDS } from '@/lib/languageList.mjs';
 import type { NpcOnlineKeys } from '@/lib/npc/onlineLlm.mjs';
 import { speechEngine } from '@/lib/npcSpeech/engine';
 import { saveClip, sweepClips } from '@/lib/npcSpeech/clipStore';
@@ -132,8 +132,8 @@ export function useNpcSpeechMaker(opts: NpcSpeechMakerOptions) {
       const pick = voicePicks?.[baseMobId(m.authorId)];
       const traits = voiceTraits(m.authorId, speaker, pick);
       const lang = m.language;
-      // Beasts: players who don't know Beast see what the creature does, and hear nothing
-      const scrambled = lang && lang !== BEAST_LANGUAGE_ID && crawlers.some(c => !crawlerUnderstands(c, lang)) ? speakableText(scrambleText(words, lang)) : '';
+      // Beast, Plant and Dead: players who don't know the language see what the speaker does, and hear nothing
+      const scrambled = lang && !GESTURE_LANGUAGE_IDS.includes(lang) && crawlers.some(c => !crawlerUnderstands(c, lang)) ? speakableText(scrambleText(words, lang)) : '';
 
       const clip = async (text: string, suffix: string) => {
         const clip = await speakLine({ text, traits, pick }, keys);

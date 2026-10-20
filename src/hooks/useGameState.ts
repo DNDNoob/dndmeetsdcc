@@ -51,6 +51,7 @@ import {
   type PublicEpisode,
   type PublicEpisodeAssets,
   type CustomLanguage,
+  type LanguageEffect,
   type MerchantState,
   type MerchantStockEntry,
   type MerchantHaggle,
@@ -63,7 +64,7 @@ import {
   getHaggleBlocker,
 } from "@/lib/gameData";
 import { useGame } from "@/contexts/GameContext";
-import { DEFAULT_LANGUAGE_ID } from "@/lib/languages";
+import { DEFAULT_LANGUAGE_ID, questionEffectFor } from "@/lib/languages";
 import type { BatchOperation } from "@/hooks/useFirebaseStore";
 import { db, storage } from "@/lib/firebase";
 import { doc, getDoc, setDoc, deleteDoc, updateDoc, serverTimestamp } from "firebase/firestore";
@@ -158,17 +159,24 @@ export const useGameState = () => {
   };
 
   // Get collections with defaults - using stable references
-  const crawlers = useMemo(() => {
-    const stored = getStableCollection<Crawler>('crawlers');
-    if (!isLoaded || stored.length === 0) return defaultCrawlers;
-    return stored;
-  }, [getCollection, isLoaded]);
-
   const inventory = useMemo(() => {
     const stored = getStableCollection<InventoryEntry>('inventory');
     if (!isLoaded || stored.length === 0) return defaultInventory;
     return stored;
   }, [getCollection, isLoaded]);
+
+  // Crawlers, with itemLanguages worked out from what they have equipped (a druid's charm grants Beast)
+  const crawlers = useMemo(() => {
+    const stored = getStableCollection<Crawler>('crawlers');
+    if (!isLoaded || stored.length === 0) return defaultCrawlers;
+    return stored.map(c => {
+      const equippedIds = Object.values(c.equippedItems ?? {});
+      const items = equippedIds.length ? (inventory.find(e => e.crawlerId === c.id)?.items ?? []) : [];
+      const itemLanguages = [...new Set(items.filter(i => equippedIds.includes(i.id) && i.grantsLanguage).map(i => i.grantsLanguage as string))];
+      if (itemLanguages.length) return { ...c, itemLanguages };
+      return c.itemLanguages ? { ...c, itemLanguages: undefined } : c;
+    });
+  }, [getCollection, isLoaded, inventory]);
 
   const mobs = useMemo(() => {
     const stored = getStableCollection<Mob>('mobs');
@@ -929,6 +937,8 @@ export const useGameState = () => {
       await advanceGameClock(1);
     }
 
+    if (current) await tickLanguageEffects('noncombat');
+
     const turnData = {
       turnNumber: (current?.turnNumber ?? 0) + 1,
       rollsUsed: {},
@@ -1272,6 +1282,7 @@ export const useGameState = () => {
       return c;
     });
     const newIndex = isNewRound ? 0 : nextIndex;
+    if (isNewRound) await tickLanguageEffects('combat');
     await updateItem('combatState', 'current', {
       combatants: resetCombatants,
       currentTurnIndex: newIndex,
@@ -1944,11 +1955,51 @@ export const useGameState = () => {
     const newCastCount = prev.castCount + 1;
     const newMastery = getSpellMasteryLevel(newCastCount);
     knownSpells[idx] = { ...prev, castCount: newCastCount };
-    await updateCrawler(crawlerId, { knownSpells, mana: currentMana - cost });
+    // Spells like Speak with Animals: know the language for the spell's duration (casting again restarts it)
+    const grants = spell?.spellData.grantsLanguage;
+    let languageEffects: LanguageEffect[] | undefined;
+    if (spell && grants) {
+      const d = spell.spellData.duration;
+      const effect: LanguageEffect = {
+        id: `${spellId}-${Date.now()}`,
+        name: prev.spellName,
+        spellId,
+        languageId: grants,
+        ...(d?.noncombatTurns ? { noncombatTurnsLeft: d.noncombatTurns } : {}),
+        ...(d?.combatTurns ? { combatRoundsLeft: d.combatTurns } : {}),
+        ...(spell.spellData.questionLimit ? { questionsLeft: spell.spellData.questionLimit } : {}),
+      };
+      languageEffects = [...(crawler.languageEffects ?? []).filter(e => e.spellId !== spellId), effect];
+    }
+    await updateCrawler(crawlerId, { knownSpells, mana: currentMana - cost, ...(languageEffects ? { languageEffects } : {}) });
     if (newMastery > prevMastery) {
       toast.success(`${crawler.name} leveled up ${prev.spellName} to mastery level ${newMastery}!`);
     }
     return true;
+  };
+
+  // Count down spell languages at a new noncombat turn or combat round and drop the ones that run out.
+  // Spells timed only in combat rounds end when a noncombat turn starts (an hour passes), and Speak with
+  // Dead style spells with no questions left end at the next tick.
+  const tickLanguageEffects = async (kind: 'noncombat' | 'combat') => {
+    const ops: BatchOperation[] = [];
+    for (const c of crawlers) {
+      const effects = c.languageEffects;
+      if (!effects?.length) continue;
+      const next = effects.flatMap((e): LanguageEffect[] => {
+        if (e.questionsLeft !== undefined && e.questionsLeft <= 0) return [];
+        if (kind === 'noncombat') {
+          if (e.noncombatTurnsLeft === undefined) return e.combatRoundsLeft === undefined ? [e] : [];
+          return e.noncombatTurnsLeft > 1 ? [{ ...e, noncombatTurnsLeft: e.noncombatTurnsLeft - 1 }] : [];
+        }
+        if (e.combatRoundsLeft === undefined) return [e];
+        return e.combatRoundsLeft > 1 ? [{ ...e, combatRoundsLeft: e.combatRoundsLeft - 1 }] : [];
+      });
+      if (JSON.stringify(next) !== JSON.stringify(effects)) {
+        ops.push({ type: 'update', collection: 'crawlers', id: c.id, data: { languageEffects: next } });
+      }
+    }
+    if (ops.length > 0) await batchWrite(ops);
   };
 
   // Restore HP to a crawler, capped at their effective max HP (equipment included)
@@ -2260,6 +2311,16 @@ export const useGameState = () => {
       createdAt: Date.now(),
     };
     await addItem('chatMessages', entry as unknown as Record<string, unknown>);
+    // Speak with Dead style spells: each line in the language uses up a question
+    if (entry.authorType === 'crawler' && !entry.translationOf) {
+      const crawler = crawlers.find(c => c.id === entry.authorId);
+      const effect = questionEffectFor(crawler, entry.language);
+      if (crawler && effect) {
+        await updateCrawler(crawler.id, {
+          languageEffects: (crawler.languageEffects ?? []).map(e => (e.id === effect.id ? { ...e, questionsLeft: (e.questionsLeft ?? 1) - 1 } : e)),
+        });
+      }
+    }
   };
 
   // Spoken voices: link the clips the DM's browser made for an NPC line

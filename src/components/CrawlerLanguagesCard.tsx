@@ -1,10 +1,10 @@
 import React, { useState } from "react";
-import { Languages, Brain, Plus, Trash2 } from "lucide-react";
+import { Languages, Brain, Plus, Trash2, Sparkles, X } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import { LanguagePicker } from "@/components/LanguagePicker";
 import { useLanguages } from "@/contexts/LanguagesContext";
-import { crawlerLanguageIds, TELEPATHIC_LANGUAGE_ID } from "@/lib/languages";
+import { DEFAULT_LANGUAGE_ID, TELEPATHIC_LANGUAGE_ID, languageEffectLeft } from "@/lib/languages";
 import type { Crawler } from "@/lib/gameData";
 
 interface CrawlerLanguagesCardProps {
@@ -24,7 +24,11 @@ export const CrawlerLanguagesCard: React.FC<CrawlerLanguagesCardProps> = ({ craw
   const [newName, setNewName] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const known = crawlerLanguageIds(crawler);
+  const known = crawler.languages ?? [DEFAULT_LANGUAGE_ID];
+  const nameOf = (id: string) => languages.find(l => l.id === id)?.name ?? id;
+  const effects = crawler.languageEffects ?? [];
+  // Item languages the crawler doesn't already know some other way
+  const itemOnly = (crawler.itemLanguages ?? []).filter(id => !known.includes(id));
   const knownLanguages = known.map(id => languages.find(l => l.id === id)).filter((l): l is NonNullable<typeof l> => !!l);
   const customLanguages = languages.filter(l => l.custom);
 
@@ -101,6 +105,35 @@ export const CrawlerLanguagesCard: React.FC<CrawlerLanguagesCardProps> = ({ craw
               <Brain className="w-3 h-3" /> Telepathic
             </span>
           )}
+        </div>
+      )}
+
+      {(effects.length > 0 || itemOnly.length > 0) && (
+        <div className="flex flex-wrap gap-1.5 mt-2" data-testid="borrowed-languages">
+          {effects.map(e => {
+            const left = languageEffectLeft(e);
+            return (
+              <span key={e.id} className="flex items-center gap-1 px-2 py-0.5 text-xs rounded border border-accent/50 text-accent bg-accent/10" title={`${e.name} lets ${crawler.name} use ${nameOf(e.languageId)} for now`}>
+                <Sparkles className="w-3 h-3" /> {nameOf(e.languageId)} · {e.name}{left ? ` · ${left}` : ""}
+                {canCreate && (
+                  <button
+                    type="button"
+                    onClick={() => onUpdateCrawler(crawler.id, { languageEffects: effects.filter(x => x.id !== e.id) })}
+                    className="hover:text-destructive"
+                    aria-label={`End ${e.name}`}
+                    title="End the spell now"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </span>
+            );
+          })}
+          {itemOnly.map(id => (
+            <span key={id} className="flex items-center gap-1 px-2 py-0.5 text-xs rounded border border-accent/50 text-accent bg-accent/10" title="From an equipped item; lasts while it's worn">
+              <Sparkles className="w-3 h-3" /> {nameOf(id)} · from equipped item
+            </span>
+          ))}
         </div>
       )}
 

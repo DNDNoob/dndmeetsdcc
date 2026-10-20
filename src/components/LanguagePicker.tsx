@@ -49,10 +49,12 @@ interface LanguageSelectProps {
   /** Limit the choices (e.g. to languages the writer knows) */
   onlyIds?: string[];
   noneLabel?: string;
+  optionLabel?: (name: string) => string;
+  ariaLabel?: string;
 }
 
 /** One language for a piece of writing; "none" means anyone can read it. */
-export const LanguageSelect: React.FC<LanguageSelectProps> = ({ value, onChange, className, onlyIds, noneLabel = "Anyone can read it" }) => {
+export const LanguageSelect: React.FC<LanguageSelectProps> = ({ value, onChange, className, onlyIds, noneLabel = "Anyone can read it", optionLabel = (name) => `Written in ${name}`, ariaLabel = "Written in" }) => {
   const { languages } = useLanguages();
   const options = onlyIds ? languages.filter(l => onlyIds.includes(l.id)) : languages;
   return (
@@ -60,10 +62,10 @@ export const LanguageSelect: React.FC<LanguageSelectProps> = ({ value, onChange,
       value={value ?? ""}
       onChange={(e) => onChange(e.target.value || undefined)}
       className={className ?? "bg-muted border border-border px-2 py-1 text-xs"}
-      aria-label="Written in"
+      aria-label={ariaLabel}
     >
       <option value="">{noneLabel}</option>
-      {options.map(l => <option key={l.id} value={l.id}>Written in {l.name}</option>)}
+      {options.map(l => <option key={l.id} value={l.id}>{optionLabel(l.name)}</option>)}
     </select>
   );
 };

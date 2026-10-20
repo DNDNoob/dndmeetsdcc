@@ -1025,7 +1025,7 @@ NPCs remember the party. When a conversation with an NPC has been quiet for abou
 - **Characters** (like Grimble) keep their memory for the whole campaign, across maps and episodes.
 - **Creature copies** (like Goblin B) each remember their own conversations, but only for the episode they were made in.
 - Locked secrets never go into memory, since the AI doesn't know them.
-- Animals that speak **Beast** show body language to crawlers who don't know Beast, and **Silent** mobs never talk. See [Languages](/wiki/languages).
+- Animals that speak **Beast** and plants that speak **Plant** show body language to crawlers who don't know the language. Corpses that speak **Dead** only answer crawlers using Speak with Dead, and **Silent** mobs never talk. See [Languages](/wiki/languages).
 - NPCs only know what they could have heard: messages players sent while the NPC was within 20 ft, your narration (unless you @ someone else), and other NPCs talking close by on the same map. Each reply uses the last 25 messages the NPC heard, and nothing from other maps or out of earshot goes into its replies or its memory.
 
 DMs can see and change what an NPC remembers: open the Game Chat settings and tap the brain icon next to the NPC. The number on it is how many notes it has. Edit the notes (one per line) and tap **Save**, or tap **Forget everything** to wipe its memory and feelings.
@@ -1147,12 +1147,27 @@ Crawlers and mobs know languages. If someone talks in a language you don't know,
 | **Base64** | Machines and sentient robots |
 | **Kra Kow** | Usually goblins, orcs and trolls |
 | **Beast** | Animal sounds and body language. Give it to a crawler with Speak with Animals or a similar gift |
+| **Plant** | Rustling, creaking and slow movement. Speak with Plants grants it |
+| **Dead** | The voice of a corpse. Speak with Dead grants it |
 
 Each language looks different when you can't read it: Kra Kow is harsh grunts, Mewmew is mrrps, Ward sign is symbols, Mindspeech is waves. Base64 really is Base64, so a crawler with a decoder and some patience might work it out.
 
 ## What Your Crawler Knows
 
 Open a crawler's profile and look for the **Languages** box. The DM taps **Edit** to choose which languages a crawler knows and to turn on **Telepathic** (needed for Mindspeech).
+
+## Languages From Spells and Items
+
+A spell can grant a language for a while: give it a **Grants Language** in the spell editor (Speak with Animals grants Beast). When a crawler casts it, they know that language for the spell's duration:
+
+- **Noncombat turns** count down each time the DM starts a new noncombat turn.
+- **Combat turns** count down each new combat round. A spell timed only in combat turns ends when the next noncombat turn starts, since an hour has passed.
+- With no duration it lasts until someone ends it.
+- **Questions** (Speak with Dead: 5) limits how many lines the crawler can say in the language. Once they're used up the crawler can't speak it any more, but still understands the last answer until the spell ends.
+
+Casting it again starts it over. Spell languages show in the Languages box with the time or questions left. The crawler or the DM can tap the ✕ to end one early. They also show in the chat's language menu, like *Dead (Speak with Dead, 3 questions left)*.
+
+An item can grant a language while it's equipped: pick one under **While equipped, knows** when making the item (a druid's charm that grants Beast). It shows in the Languages box as *from equipped item*.
 
 ## Making Up a Language
 
@@ -1170,6 +1185,14 @@ When an NPC talks:
 ### Beasts
 
 Pick **Beast** for animals. A crawler who knows Beast reads what the animal means in plain words. Everyone else sees what it does instead, such as *squeaks twice and backs toward the hole*, so the party can still read its mood.
+
+### Plants
+
+Pick **Plant** for talking plants. It works like Beast: crawlers who know Plant read the words, everyone else sees what the plant does. Plants only know slow, local things like who walked past and where they went.
+
+### Corpses
+
+Pick **Dead** for a corpse. Any mob whose token drops to 0 HP also counts as a corpse automatically, and still remembers what it knew alive. A corpse stays silent until a crawler talks to it in Dead, usually by casting Speak with Dead. It only knows what it knew in life and answers briefly, often cryptically. Each casting gets as many questions as the spell allows; then the corpse falls silent again. Crawlers without Dead see what the corpse does, such as *its jaw creaks open and a dry whisper escapes*.
 
 ### Silent Mobs
 
@@ -1624,6 +1647,8 @@ Each spell has the following configurable properties:
 | **Hit Modifiers** | Stat bonuses applied to hit roll (STR/DEX/CON/INT/CHA) |
 | **Damage Modifiers** | Stat bonuses applied to damage roll |
 | **Duration** | Combat turns, noncombat turns, or a custom label |
+| **Grants Language** | Casting it lets the caster use a language for the spell's duration (see [Languages](/wiki/languages)) |
+| **Questions** | With Grants Language: how many lines the caster can say in it per casting (Speak with Dead: 5) |
 | **Saving Throw** | Which stat the target rolls to resist |
 | **Splash Damage** | Whether the spell can hit multiple targets |
 | **Special Effect** | Free-text description of any on-hit effects |
