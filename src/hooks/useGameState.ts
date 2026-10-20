@@ -24,6 +24,7 @@ import {
   WikiPage,
   Quest,
   AssignedQuest,
+  newQuestProgress,
   ChatMessage,
   NpcAiSettings,
   NpcAiStatus,
@@ -873,6 +874,7 @@ export const useGameState = () => {
   };
 
   const assignQuest = async (questId: string, crawlerIds: string[], episodeId?: string) => {
+    const quest = quests.find(q => q.id === questId);
     const allCrawlerIds = crawlers.filter(c => c.id !== 'dungeonai').map(c => c.id);
     const isPartyQuest = crawlerIds.length >= allCrawlerIds.length && allCrawlerIds.every(id => crawlerIds.includes(id));
     const assignment: AssignedQuest = {
@@ -882,6 +884,7 @@ export const useGameState = () => {
       isPartyQuest,
       episodeId,
       assignedAt: new Date().toISOString(),
+      ...(quest ? newQuestProgress(quest) : {}),
     };
     return addItem('assignedQuests', { ...assignment } as Record<string, unknown>);
   };

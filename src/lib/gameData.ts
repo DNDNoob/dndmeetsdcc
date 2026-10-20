@@ -1218,7 +1218,43 @@ export interface AssignedQuest {
   episodeId?: string; // optional episode link
   assignedAt: string;
   completedAt?: string;
+  // Progress for this handout. Older handouts lack these and fall back to the quest's own fields.
+  visibleActionIds?: string[];
+  completedActions?: Record<string, string[]>; // actionItemId -> crawlerIds
+  visibleRewardIds?: string[];
+  claimedRewards?: Record<string, string[]>; // rewardId -> crawlerIds
+  notes?: QuestNote[];
 }
+
+export interface QuestProgress {
+  visibleActionIds: string[];
+  completedActions: Record<string, string[]>;
+  visibleRewardIds: string[];
+  claimedRewards: Record<string, string[]>;
+  notes: QuestNote[];
+}
+
+/** Fresh progress for a new handout: the quest's show/hide settings are the starting point. */
+export const newQuestProgress = (quest: Quest): QuestProgress => ({
+  visibleActionIds: (quest.actionItems || []).filter(a => a.visible).map(a => a.id),
+  completedActions: {},
+  visibleRewardIds: (quest.rewards || []).filter(r => r.visible).map(r => r.id),
+  claimedRewards: {},
+  notes: [],
+});
+
+/** Progress for one handout, reading the quest's legacy fields for handouts made before progress moved. */
+export const getQuestProgress = (quest: Quest, assigned: AssignedQuest): QuestProgress => ({
+  visibleActionIds: assigned.visibleActionIds
+    ?? (quest.actionItems || []).filter(a => a.visible).map(a => a.id),
+  completedActions: assigned.completedActions
+    ?? Object.fromEntries((quest.actionItems || []).map(a => [a.id, a.completedBy || []])),
+  visibleRewardIds: assigned.visibleRewardIds
+    ?? (quest.rewards || []).filter(r => r.visible).map(r => r.id),
+  claimedRewards: assigned.claimedRewards
+    ?? Object.fromEntries((quest.rewards || []).map(r => [r.id, r.claimedBy || []])),
+  notes: assigned.notes ?? quest.notes ?? [],
+});
 
 export interface WikiPage {
   id: string;
