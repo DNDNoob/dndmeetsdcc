@@ -2,6 +2,7 @@
   {
     "date": "2026-10-18",
     "changes": [
+      "🔈 NPC voice clips are now saved as small MP3s in the game's database instead of file storage, whose free daily allowance was running out, so spoken lines reach every player again",
       "🐉 Creature sounds for NPC voices: Goblin, Tiny, Giant, Dragon and Ghost effects, picked from the NPC's notes or chosen in the chat settings",
       "🎭 NPCs can get an ElevenLabs character voice from your ElevenLabs account, and are then read by ElevenLabs first",
       "🔊 Gemini voices now get only a mood tag, like [annoyance], in front of the line, so they stop reading their directions aloud",

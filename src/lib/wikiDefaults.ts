@@ -1069,7 +1069,7 @@ NPCs can also say their lines out loud. Turn on **Spoken voices** in the Game Ch
 - Lines play by themselves. If a browser won't play sound until you've tapped the page, the line waits and plays on your first tap.
 - When every service is used up, voices are made by Kokoro, a free voice model that runs in the DM's browser. It sounds flatter, and the first time it's needed the browser downloads it (about 330 MB) and keeps it for next time.
 - Keep the DM tab open during the game, the same as for the Online brain. The keys are saved only in that browser.
-- Each line is saved as a short sound clip that players' devices play once. Clips are deleted again after about 15 minutes.
+- Each line is saved in the game's database as a small sound clip that players' devices play once. Clips are deleted again after about 15 minutes.
 - Lines in a language a player doesn't know are read to them as the scrambled words, so it sounds foreign. Players who know the language, and the DM, hear the real words. Lines in Mindspeech or Ward sign aren't read aloud, and players who don't know Beast hear nothing from a beast (they still see what it does).
 - Actions written between asterisks (the NPC grinning, wiping its hands) are skipped; only the words are spoken.
 

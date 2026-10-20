@@ -1,6 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { ref as storageRef, uploadBytes, getDownloadURL, listAll, deleteObject } from 'firebase/storage';
-import { storage } from '@/lib/firebase';
 import {
   baseMobId,
   withNpcPersonality,
@@ -14,6 +12,7 @@ import { TELEPATHIC_LANGUAGE_ID, crawlerUnderstands, scrambleText } from '@/lib/
 import { BEAST_LANGUAGE_ID } from '@/lib/languageList.mjs';
 import type { NpcOnlineKeys } from '@/lib/npc/onlineLlm.mjs';
 import { speechEngine } from '@/lib/npcSpeech/engine';
+import { saveClip, sweepClips } from '@/lib/npcSpeech/clipStore';
 import { reportVoiceProblem, speakLine } from '@/lib/npcSpeech/providers';
 import { voiceTraits } from '@/lib/npcSpeech/voices';
 
@@ -49,7 +48,7 @@ interface NpcSpeechMakerOptions {
 
 /**
  * Spoken voices, DM side: each new NPC line is read aloud by an online voice service (Gemini, then
- * Groq, then ElevenLabs, as each runs out) or by Kokoro in this browser, saved to Storage as a
+ * Groq, then ElevenLabs, as each runs out) or by Kokoro in this browser, saved in the database as a
  * short clip and linked on the chat line, so every player's device can play it.
  * Players who don't know the line's language get a clip of the scrambled words instead.
  */
@@ -63,7 +62,7 @@ export function useNpcSpeechMaker(opts: NpcSpeechMakerOptions) {
 
   // Only one tab per browser makes clips
   useEffect(() => {
-    if (!isDm || !enabled || !roomId || !storage) return;
+    if (!isDm || !enabled || !roomId) return;
     // Kokoro is the backup: download it up front only when there's no online voice key
     const keys = optsRef.current.keys;
     if (!keys.gemini?.trim() && !keys.groq?.trim() && !keys.elevenlabs?.trim()) speechEngine.load();
@@ -101,15 +100,10 @@ export function useNpcSpeechMaker(opts: NpcSpeechMakerOptions) {
 
   // Delete clips nobody will play any more
   useEffect(() => {
-    if (!active || !roomId || !storage) return;
-    const store = storage;
+    if (!active || !roomId) return;
     const sweep = async () => {
       try {
-        const { items } = await listAll(storageRef(store, `npcAudio/${roomId}`));
-        const cutoff = Date.now() - CLIP_LIFETIME_MS;
-        await Promise.all(items
-          .filter(item => Number(item.name.split('-')[0]) < cutoff)
-          .map(item => deleteObject(item).catch(() => {})));
+        await sweepClips(roomId, Date.now() - CLIP_LIFETIME_MS);
       } catch (err) {
         console.warn('[NpcSpeech] Could not clear old clips', err);
       }
@@ -121,8 +115,7 @@ export function useNpcSpeechMaker(opts: NpcSpeechMakerOptions) {
 
   // Read new NPC lines aloud
   useEffect(() => {
-    if (!active || !roomId || !storage) return;
-    const store = storage;
+    if (!active || !roomId) return;
     const now = Date.now();
     for (const m of messages) {
       if (m.authorType !== 'npc' || m.translationOf || m.audioUrl || started.current.has(m.id)) continue;
@@ -144,9 +137,7 @@ export function useNpcSpeechMaker(opts: NpcSpeechMakerOptions) {
 
       const clip = async (text: string, suffix: string) => {
         const clip = await speakLine({ text, traits, pick }, keys);
-        const fileRef = storageRef(store, `npcAudio/${roomId}/${at}-${m.id}${suffix}.${clip.ext}`);
-        await uploadBytes(fileRef, clip.blob, { contentType: clip.blob.type });
-        return getDownloadURL(fileRef);
+        return saveClip(roomId, `${m.id}${suffix}`, clip.blob, at);
       };
       void (async () => {
         try {
