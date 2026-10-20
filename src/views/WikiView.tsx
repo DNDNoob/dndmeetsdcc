@@ -18,7 +18,8 @@ const renderMarkdown = (text: string): string => {
   let html = text;
 
   // Escape HTML
-  html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
   // Headers
   html = html.replace(/^### (.+)$/gm, '<h3 class="text-lg font-display text-primary mt-6 mb-2">$1</h3>');
@@ -50,7 +51,12 @@ const renderMarkdown = (text: string): string => {
   html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
 
   // Markdown links [text](url)
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-primary underline hover:text-primary/80 transition-colors">$1</a>');
+  // Only web, mail and in-wiki targets become links; anything else (javascript:, data:) stays plain text
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, label: string, url: string) => {
+    const target = url.trim();
+    if (!/^(https?:\/\/|mailto:|\/wiki\/|#)/i.test(target)) return label;
+    return `<a href="${target}" class="text-primary underline hover:text-primary/80 transition-colors">${label}</a>`;
+  });
 
   // Inline code
   html = html.replace(/`([^`]+)`/g, '<code class="bg-muted px-1.5 py-0.5 rounded text-primary text-xs font-mono">$1</code>');

@@ -1372,7 +1372,7 @@ The wiki supports standard Markdown:
 - Lists: \`- item\` or \`1. item\`
 - Tables: Standard Markdown table syntax
 - Code: \`\\\`inline code\\\`\` or fenced code blocks
-- Links: \`[text](url)\`
+- Links: \`[text](url)\` (web links starting with https://, email links, or wiki links like \`/wiki/campaigns\`; other kinds show as plain text)
 
 ## Content Guidelines
 
@@ -1468,6 +1468,12 @@ Players join campaigns via **invite codes** or **invite links**.
 1. The DM shares the invite link (e.g., \`https://yoursite.com/join/abc123\`) or the invite code.
 2. Click the link, or go to the Campaign Selection screen and click **Join Campaign**, then paste the invite code.
 3. You'll be added to the campaign's member list.
+
+## Who Can See a Campaign
+
+Only the DM and the campaign's members can see or change its crawlers, maps, episodes, chat and everything else in it. Anyone else who signs in can't see the campaign at all unless they have its invite code.
+
+If you **regenerate** the invite code, the old link stops working for new players. People who already joined stay in.
 
 ## Player Limit
 
