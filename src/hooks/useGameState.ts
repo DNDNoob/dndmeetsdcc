@@ -69,8 +69,7 @@ import {
   rollD20,
   rollsWithDisadvantage,
   XP_REWARDS,
-  LEVEL_UP_HP,
-  LEVEL_UP_MANA,
+  getLevelUpIncrease,
   XP_LOG_LIMIT,
   getXPForLevel,
   getLevelForXP,
@@ -680,12 +679,19 @@ export const useGameState = () => {
           xpLog: [...[...entries].reverse(), ...(crawler.xpLog ?? [])].slice(0, XP_LOG_LIMIT),
         };
         if (gained > 0) {
+          // 5% of max HP and mana per level, rounded up; several levels at once compound
+          let maxHP = Number(crawler.maxHP) || 0;
+          let maxMana = Number(crawler.maxMana) || 0;
+          for (let l = 0; l < gained; l++) {
+            maxHP += getLevelUpIncrease(maxHP);
+            maxMana += getLevelUpIncrease(maxMana);
+          }
           Object.assign(data, {
             level: oldLevel + gained,
-            maxHP: (Number(crawler.maxHP) || 0) + LEVEL_UP_HP * gained,
-            hp: (Number(crawler.hp) || 0) + LEVEL_UP_HP * gained,
-            maxMana: (Number(crawler.maxMana) || 0) + LEVEL_UP_MANA * gained,
-            mana: (Number(crawler.mana) || 0) + LEVEL_UP_MANA * gained,
+            maxHP,
+            hp: (Number(crawler.hp) || 0) + maxHP - (Number(crawler.maxHP) || 0),
+            maxMana,
+            mana: (Number(crawler.mana) || 0) + maxMana - (Number(crawler.maxMana) || 0),
             skillPoints: (crawler.skillPoints ?? 0) + gained,
             abilityPoints: (crawler.abilityPoints ?? 0) + gained,
           });

@@ -90,7 +90,7 @@ Tap **New** next to the crawler picker on the Profiles page. The character creat
 4. **Languages**: everyone speaks Worldspeech, plus 2 more you pick. Mindspeech, Beast, Plant and Dead can't be picked at the start; they need a gift or a spell.
 5. **Review**, then **Create crawler**.
 
-Every new crawler starts as a **Human** with **no class**, at Level 1 with **25 HP**, **10 mana** and **0 gold**. Race and class change later, when the DM decides. Starting items are set up by the DM.
+Every new crawler starts as a **Human** with **no class**, at Level 1 with **25 HP**, **3 mana** and **0 gold**. Race and class change later, when the DM decides. Starting items are set up by the DM.
 
 Your answers appear in the **Backstory** section of your profile. Tap **Edit** to change them at any time; the DM may ask you to tone down an answer.
 
@@ -1064,7 +1064,7 @@ The XP bar under **LEVEL** on the Profile tab shows how close you are to the nex
 
 Level-ups happen automatically. Each level gives:
 
-- **+5 max HP and +3 max mana.** Your current HP and mana go up by the same amount.
+- **+5% max HP and +5% max mana**, rounded up (always at least +1). Your current HP and mana go up by the same amount. A 25 HP, 3 mana crawler reaching Level 2 gets +2 HP and +1 mana.
 - **1 skill point** to spend on a skill. See [Skills](/wiki/skills).
 - **1 ability point.** Each point is +1 to that ability's rolls. The 5-point limit from the character creator doesn't apply to level-up points.
 

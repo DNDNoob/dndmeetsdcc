@@ -73,7 +73,7 @@ export const ABILITY_POINTS_MAX = 5;                          // No ability can 
 export const abilityScoreFromPoints = (points: number): number => 10 + 2 * points;
 
 export const NEW_CRAWLER_HP = 25;
-export const NEW_CRAWLER_MANA = 10;
+export const NEW_CRAWLER_MANA = 3;
 
 // Abilities with 0 points roll with disadvantage (only for crawlers made with the character creator)
 export const rollsWithDisadvantage = (crawler: Pick<Crawler, 'usesAbilityPoints'> | null | undefined, effectiveScore: number): boolean =>
@@ -104,8 +104,9 @@ export const XP_REWARDS = {
   questDefault: 10,     // a quest with no XP set
   masteryLevelUp: 20,   // a spell mastery or Looting level up
 } as const;
-export const LEVEL_UP_HP = 5;
-export const LEVEL_UP_MANA = 3;
+// Each level adds 5% of max HP and max mana, rounded up (so always at least +1)
+export const LEVEL_UP_GROWTH = 0.05;
+export const getLevelUpIncrease = (max: number): number => Math.max(1, Math.ceil(Math.max(0, max) * LEVEL_UP_GROWTH));
 export const XP_LOG_LIMIT = 20;
 export const XP_SCALE_OPTIONS = [0.5, 0.75, 1, 1.5, 2] as const;
 
