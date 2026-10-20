@@ -13,7 +13,8 @@
       "✨ Spells can grant a language for their duration, like Speak with Animals (Beast) or Speak with Dead (Dead, with a limit of questions per casting). It counts down by noncombat turns and combat rounds and ends on its own",
       "💍 Items can grant a language while equipped, like a druid's charm that lets you speak Beast",
       "🔈 NPC voice clips are now saved as small MP3s in the game's database instead of file storage, whose free daily allowance was running out, so spoken lines reach every player again",
-      "🧠 A DM window without NPC keys no longer switches off NPC replies from another DM window that has them"
+      "🧠 A DM window without NPC keys no longer switches off NPC replies from another DM window that has them",
+      "🐛 The item library on the Inventory page saves again in a campaign that had no library yet. Before, Firebase refused the save, so new library items vanished and the library stayed empty"
     ]
   },
   {
