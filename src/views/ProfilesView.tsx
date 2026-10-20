@@ -11,7 +11,7 @@ import { BACKSTORY_QUESTIONS } from "@/lib/characterCreation";
 import { usableLanguageIds } from "@/lib/languages";
 import { HealthBar } from "@/components/ui/HealthBar";
 import { EquipmentSlot } from "@/components/ui/EquipmentSlot";
-import { Crawler, Mob, InventoryItem, getItemStackKey, stackItems, getLootingLevel, getLootsUntilNextLevel, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery, getInitialCrawlerId, rollD20, rollsWithDisadvantage, ABILITY_KEYS, baseItemName } from "@/lib/gameData";
+import { Crawler, getQuestProgress, Mob, InventoryItem, getItemStackKey, stackItems, getLootingLevel, getLootsUntilNextLevel, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery, getInitialCrawlerId, rollD20, rollsWithDisadvantage, ABILITY_KEYS, baseItemName } from "@/lib/gameData";
 import { ItemName } from "@/components/ItemName";
 import type { DiceRollEntry } from "@/hooks/useGameState";
 import UndoTurnButton, { canUndoCombatTurn } from "@/components/UndoTurnButton";
@@ -125,7 +125,7 @@ interface ProfilesViewProps {
   mobs?: Mob[];
   getCrawlerAssignedQuests?: (crawlerId: string) => import("@/lib/gameData").AssignedQuest[];
   quests?: import("@/lib/gameData").Quest[];
-  onUpdateQuest?: (id: string, updates: Partial<import("@/lib/gameData").Quest>) => void;
+  onUpdateAssignedQuest?: (id: string, updates: Partial<import("@/lib/gameData").AssignedQuest>) => void;
   spells?: Spell[];
   onCastSpell?: (crawlerId: string, spellId: string) => Promise<boolean>;
   onForgetSpell?: (crawlerId: string, spellId: string) => Promise<void>;
@@ -516,7 +516,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   mobs: mobsProp,
   getCrawlerAssignedQuests,
   quests: questsProp = [],
-  onUpdateQuest,
+  onUpdateAssignedQuest,
   spells: spellLibrary = [],
   onCastSpell,
   onForgetSpell,
@@ -2936,6 +2936,23 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                         const quest = questsProp.find(q => q.id === assigned.questId);
                         if (!quest) return null;
                         const isExpanded = questExpandedId === assigned.id;
+                        const progress = getQuestProgress(quest, assigned);
+                        const visibleActions = quest.actionItems.filter(ai => progress.visibleActionIds.includes(ai.id));
+                        const visibleRewards = quest.rewards.filter(r => progress.visibleRewardIds.includes(r.id));
+                        const addQuestNote = () => {
+                          if (!questNoteText.trim() || !onUpdateAssignedQuest) return;
+                          onUpdateAssignedQuest(assigned.id, {
+                            notes: [...progress.notes, {
+                              id: crypto.randomUUID(),
+                              crawlerId: selected.id,
+                              crawlerName: selected.name,
+                              text: questNoteText.trim(),
+                              createdAt: new Date().toISOString(),
+                              ...(questNoteLanguage ? { language: questNoteLanguage } : {}),
+                            }],
+                          });
+                          setQuestNoteText('');
+                        };
 
                         return (
                           <div key={assigned.id} className="border border-emerald-500/50 bg-muted/20 rounded-lg overflow-hidden">
@@ -2963,14 +2980,14 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                                 )}
 
                                 {/* Action Items - only show visible ones for non-DM */}
-                                {quest.actionItems.filter(ai => ai.visible).length > 0 && (
+                                {visibleActions.length > 0 && (
                                   <div>
                                     <h4 className="text-sm font-display text-emerald-400 mb-2 flex items-center gap-2">
                                       <CheckSquare className="w-4 h-4" /> Action Items
                                     </h4>
                                     <div className="space-y-1">
-                                      {quest.actionItems.filter(ai => ai.visible).map(ai => {
-                                        const isCompleted = ai.completedBy.includes(selected.id);
+                                      {visibleActions.map(ai => {
+                                        const isCompleted = (progress.completedActions[ai.id] || []).includes(selected.id);
                                         return (
                                           <div key={ai.id} className="flex items-center gap-2 text-sm">
                                             {isCompleted ? (
@@ -2989,9 +3006,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                                 )}
 
                                 {/* Rewards - only show visible ones */}
-                                {quest.rewards.filter(r => r.visible).length > 0 && (() => {
-                                  const visibleActions = quest.actionItems.filter(ai => ai.visible);
-                                  const allActionsComplete = visibleActions.length > 0 && visibleActions.every(ai => ai.completedBy.includes(selected.id));
+                                {visibleRewards.length > 0 && (() => {
+                                  const allActionsComplete = visibleActions.length > 0 && visibleActions.every(ai => (progress.completedActions[ai.id] || []).includes(selected.id));
 
                                   return (
                                     <div>
@@ -2999,9 +3015,10 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                                         <Package className="w-4 h-4" /> Rewards
                                       </h4>
                                       <div className="space-y-2">
-                                        {quest.rewards.filter(r => r.visible).map(reward => {
-                                          const alreadyClaimed = reward.claimedBy?.includes(selected.id) ?? false;
-                                          const canClaim = allActionsComplete && !alreadyClaimed && onUpdateQuest;
+                                        {visibleRewards.map(reward => {
+                                          const claimedBy = progress.claimedRewards[reward.id] || [];
+                                          const alreadyClaimed = claimedBy.includes(selected.id);
+                                          const canClaim = allActionsComplete && !alreadyClaimed && onUpdateAssignedQuest;
 
                                           return (
                                             <div key={reward.id} className="flex items-center gap-2 text-sm">
@@ -3024,12 +3041,9 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                                                     onUpdateCrawlerInventory(selected.id, [...currentItems, newItem]);
 
                                                     // Mark reward as claimed
-                                                    const updatedRewards = quest.rewards.map(r =>
-                                                      r.id === reward.id
-                                                        ? { ...r, claimedBy: [...(r.claimedBy || []), selected.id] }
-                                                        : r
-                                                    );
-                                                    onUpdateQuest!(quest.id, { rewards: updatedRewards });
+                                                    onUpdateAssignedQuest!(assigned.id, {
+                                                      claimedRewards: { ...progress.claimedRewards, [reward.id]: [...claimedBy, selected.id] },
+                                                    });
                                                   }}
                                                 >
                                                   <Plus className="w-3 h-3" /> Claim
@@ -3046,9 +3060,9 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                                 {/* Notes section */}
                                 <div>
                                   <h4 className="text-sm font-display text-primary mb-2">Quest Notes</h4>
-                                  {quest.notes && quest.notes.length > 0 && (
+                                  {progress.notes.length > 0 && (
                                     <div className="space-y-2 mb-3 max-h-48 overflow-y-auto">
-                                      {quest.notes.map(note => (
+                                      {progress.notes.map(note => (
                                         <div key={note.id} className="bg-muted/30 border border-border rounded p-2">
                                           <div className="flex items-center justify-between mb-1">
                                             <span className="text-xs font-semibold text-primary">{note.crawlerName}</span>
@@ -3072,41 +3086,14 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                                       placeholder="Add a note..."
                                       value={questNoteText}
                                       onChange={e => setQuestNoteText(e.target.value)}
-                                      onKeyDown={e => {
-                                        if (e.key === 'Enter' && questNoteText.trim() && onUpdateQuest) {
-                                          onUpdateQuest(quest.id, {
-                                            notes: [...(quest.notes || []), {
-                                              id: crypto.randomUUID(),
-                                              crawlerId: selected.id,
-                                              crawlerName: selected.name,
-                                              text: questNoteText.trim(),
-                                              createdAt: new Date().toISOString(),
-                                              ...(questNoteLanguage ? { language: questNoteLanguage } : {}),
-                                            }],
-                                          });
-                                          setQuestNoteText('');
-                                        }
-                                      }}
+                                      onKeyDown={e => { if (e.key === 'Enter') addQuestNote(); }}
                                       className="flex-1 bg-background border border-border rounded px-3 py-2 text-sm"
                                     />
                                     <DungeonButton
                                       variant="admin"
                                       size="sm"
-                                      disabled={!questNoteText.trim() || !onUpdateQuest}
-                                      onClick={() => {
-                                        if (!questNoteText.trim() || !onUpdateQuest) return;
-                                        onUpdateQuest(quest.id, {
-                                          notes: [...(quest.notes || []), {
-                                            id: crypto.randomUUID(),
-                                            crawlerId: selected.id,
-                                            crawlerName: selected.name,
-                                            text: questNoteText.trim(),
-                                            createdAt: new Date().toISOString(),
-                                            ...(questNoteLanguage ? { language: questNoteLanguage } : {}),
-                                          }],
-                                        });
-                                        setQuestNoteText('');
-                                      }}
+                                      disabled={!questNoteText.trim() || !onUpdateAssignedQuest}
+                                      onClick={addQuestNote}
                                     >
                                       <Send className="w-4 h-4" />
                                     </DungeonButton>

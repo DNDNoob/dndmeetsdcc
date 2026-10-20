@@ -809,22 +809,24 @@ Quests are objectives the DM creates and assigns to crawlers. They have action i
 2. Fill in the quest **name** and **description**
 3. Add **action items** — tasks for crawlers to complete (hidden from players by default)
 4. Add **item rewards** — search from the shared inventory library and assign a tier (Dirt/Copper/Silver/Gold)
-5. Rewards are also hidden from players by default — toggle visibility with the eye icon
+5. Rewards are also hidden from players by default. The eye icons here set what players see when the quest is first handed out
 6. Click **Create Quest** to save
 
 ## Linking Quests to Episodes
 
-When creating or editing an episode in the Episodes tab, you can select quests to include. This makes them available for assignment during Show Time.
+When creating or editing an episode in the Episodes tab, you can select quests to include. Linked quests are listed first in Show Time, but every quest in the campaign can be handed out from any map.
 
 ## Assigning Quests (DM)
 
-During Show Time, the Quest Panel appears in the map selector when the episode has quests linked:
+During Show Time, the Quest Panel appears in the map selector under the loot boxes:
 
 1. Select a quest to assign
-2. All crawlers are selected by default — deselect any who shouldn't receive it
+2. Every crawler in the campaign is listed and selected by default. Crawlers on this map come first, and the others are marked "not on map". Deselect any who shouldn't receive it
 3. Click **Assign** to give the quest to the selected crawlers
-4. If all crawlers participate, it becomes a **Party Quest**
-5. A notification appears in the dice roller and as a toast for players
+4. If every crawler in the campaign gets it, it becomes a **Party Quest**
+5. A notification appears in the dice roller and as a popup for the players who received it
+
+Each handout keeps its own progress. If the same quest goes to two groups, their checkmarks, revealed items, claimed rewards and notes stay separate.
 
 ## Managing Quests During Play (DM)
 
@@ -843,7 +845,7 @@ Players see their assigned quests on the **Quests** tab of their profile page:
 - Expandable quest cards showing name, description, and Party Quest badge
 - Visible action items with completion status (strikethrough when completed by the DM)
 - Visible rewards with tier color — when all visible action items are completed and a reward is revealed, a **Claim** button appears to add the reward item to the crawler's inventory
-- **Quest Notes**: A shared notepad where any crawler on the quest can add date-stamped text entries. Notes from other crawlers on the same quest are visible to everyone.
+- **Quest Notes**: A shared notepad where any crawler on the quest can add date-stamped text entries. Every crawler who received the same handout sees the others' notes.
 
 ## Notifications
 
