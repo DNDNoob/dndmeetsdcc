@@ -5,10 +5,12 @@ import { DungeonButton } from "@/components/ui/DungeonButton";
 import { ForeignText } from "@/components/ForeignText";
 import { LanguageSelect } from "@/components/LanguagePicker";
 import { CrawlerLanguagesCard } from "@/components/CrawlerLanguagesCard";
+import { CharacterCreator } from "@/components/CharacterCreator";
+import { BACKSTORY_QUESTIONS } from "@/lib/characterCreation";
 import { usableLanguageIds } from "@/lib/languages";
 import { HealthBar } from "@/components/ui/HealthBar";
 import { EquipmentSlot } from "@/components/ui/EquipmentSlot";
-import { Crawler, Mob, InventoryItem, getItemStackKey, stackItems, getLootingLevel, getLootsUntilNextLevel, createEmptyCrawler, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery, getInitialCrawlerId } from "@/lib/gameData";
+import { Crawler, Mob, InventoryItem, getItemStackKey, stackItems, getLootingLevel, getLootsUntilNextLevel, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery, getInitialCrawlerId, rollD20, rollsWithDisadvantage, ABILITY_KEYS } from "@/lib/gameData";
 import type { DiceRollEntry } from "@/hooks/useGameState";
 import UndoTurnButton, { canUndoCombatTurn } from "@/components/UndoTurnButton";
 import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Backpack, HardHat, Package, Lock, Unlock, ChevronDown, ChevronUp, Check, Search, Send, BookOpen, Filter, X, Gem, Footprints, Shirt, Hand, Target, Swords, RefreshCw, Timer, ScrollText, Eye, EyeOff, CheckSquare, Trophy, Skull, HeartCrack, Crown, Minus, Wand2, Star } from "lucide-react";
@@ -506,6 +508,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   // Players land on their own crawler; the DM (and spectators) start on the first one
   const [selectedId, setSelectedId] = useState(() => getInitialCrawlerId(crawlers, currentPlayerId));
   const [editMode, setEditMode] = useState(false);
+  const [showCreator, setShowCreator] = useState(false);
   const [editData, setEditData] = useState<Partial<Crawler>>({});
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
@@ -637,12 +640,11 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
     }
   };
 
-  const handleNewCrawler = () => {
-    const newCrawler = createEmptyCrawler();
+  const handleCreateCrawler = (newCrawler: Crawler) => {
     onAddCrawler(newCrawler);
     setSelectedId(newCrawler.id);
-    setEditData({ ...newCrawler });
-    setEditMode(true);
+    setEditMode(false);
+    setShowCreator(false);
   };
 
   const handleDelete = () => {
@@ -910,6 +912,13 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   const currentGold = editMode ? (editData.gold ?? selected.gold ?? 0) : (selected.gold ?? 0);
   const equippedMods = getEquippedModifiers(editMode ? { ...selected, ...editData } : selected, inventory);
 
+  // A weapon attack using a 0-point ability rolls with disadvantage; choosing advantage cancels it out to a normal roll
+  const applyZeroPointDisadvantage = (chosen: 'advantage' | 'disadvantage' | undefined, hitStats: StatModifiers | undefined) => {
+    const forced = ABILITY_KEYS.some(stat => hitStats?.[stat] && rollsWithDisadvantage(selected, selected[stat] + (equippedMods[stat] ?? 0)));
+    if (!forced) return chosen;
+    return chosen === 'advantage' ? undefined : 'disadvantage';
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -937,7 +946,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             ))}
           </select>
           
-          <DungeonButton variant="default" size="sm" onClick={handleNewCrawler}>
+          <DungeonButton variant="default" size="sm" onClick={() => setShowCreator(true)}>
             <Plus className="w-4 h-4 mr-1" /> New
           </DungeonButton>
         </div>
@@ -1249,7 +1258,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
               </div>
             ) : (
               <p className="text-muted-foreground text-sm break-words">
-                {selected.race} | {selected.job} | Level {selected.level}
+                {selected.race} | {selected.job || 'No class'} | Level {selected.level}
               </p>
             )}
 
@@ -1401,7 +1410,12 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                     className="flex items-center justify-between bg-muted/50 px-4 py-3 rounded hover:bg-primary/20 transition-colors cursor-pointer group text-left w-full"
                     title={`Roll d20 + ${label} modifier`}
                   >
-                    <span className="text-muted-foreground text-base group-hover:text-primary transition-colors">{label}</span>
+                    <span className="text-muted-foreground text-base group-hover:text-primary transition-colors">
+                      {label}
+                      {rollsWithDisadvantage(selected, base + mod) && (
+                        <span className="ml-2 text-xs text-destructive" title="0 ability points: rolls with disadvantage">DIS</span>
+                      )}
+                    </span>
                     {mod !== 0 ? (
                       <span className="font-bold text-lg">
                         <span className="text-foreground">{base}</span>
@@ -1437,6 +1451,37 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             )}
           </div>
         </div>
+
+        {/* Backstory from the character creator; anyone can edit it in edit mode */}
+        {(editMode || BACKSTORY_QUESTIONS.some(q => selected.backstory?.[q.key])) && (
+          <div className="mt-6">
+            <h3 className="font-display text-primary text-xl mb-4 flex items-center gap-2">
+              <ScrollText className="w-6 h-6 shrink-0" /> BACKSTORY
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {BACKSTORY_QUESTIONS.map(q => {
+                const value = (editMode ? editData.backstory : selected.backstory)?.[q.key] ?? '';
+                if (!editMode && !value) return null;
+                return (
+                  <div key={q.key} className="bg-muted/30 border border-border/50 rounded p-3">
+                    <p className="text-xs text-muted-foreground mb-1">{q.label}</p>
+                    {editMode ? (
+                      <input
+                        type="text"
+                        value={value}
+                        onChange={(e) => setEditData({ ...editData, backstory: { ...(editData.backstory ?? selected.backstory), [q.key]: e.target.value } })}
+                        placeholder={q.placeholder}
+                        className="w-full bg-muted border border-border px-2 py-1 text-sm"
+                      />
+                    ) : (
+                      <p className="text-foreground break-words">{value}</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Activity stats and DM trophies row */}
         {(() => {
@@ -2000,7 +2045,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 const baseStat = selected.dex;
                 const mod = equippedMods.dex ?? 0;
                 const modifier = Math.floor(((baseStat + mod) - 10) / 2);
-                const rawRoll = Math.floor(Math.random() * 20) + 1;
+                const { rawRoll, results, diceLabel } = rollD20(rollsWithDisadvantage(selected, baseStat + mod));
                 const total = rawRoll + modifier;
                 onRecordCombatInitiative?.(selected.id, total);
                 // Also add to dice history
@@ -2010,9 +2055,9 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                     crawlerName: selected.name,
                     crawlerId: selected.id,
                     timestamp: Date.now(),
-                    results: [{ dice: 'D20', result: rawRoll }],
+                    results,
                     total,
-                    statRoll: { stat: 'Initiative', modifier, rawRoll },
+                    statRoll: { stat: 'Initiative', modifier, rawRoll, diceLabel },
                   });
                 }
               };
@@ -2426,7 +2471,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 const mod = equippedMods[stat as keyof StatModifiers] ?? 0;
                 const total = baseStat + mod;
                 const modifier = Math.floor((total - 10) / 2);
-                const rawRoll = Math.floor(Math.random() * 20) + 1;
+                const { rawRoll, results, diceLabel } = rollD20(rollsWithDisadvantage(selected, total));
                 const rollTotal = rawRoll + modifier;
 
                 if (addDiceRoll) {
@@ -2435,9 +2480,9 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                     crawlerName: selected.name,
                     crawlerId: selected.id,
                     timestamp: Date.now(),
-                    results: [{ dice: 'D20', result: rawRoll }],
+                    results,
                     total: rollTotal,
-                    statRoll: { stat: actionName, modifier, rawRoll },
+                    statRoll: { stat: actionName, modifier, rawRoll, diceLabel },
                   });
                 }
               };
@@ -2510,7 +2555,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 const mod = equippedMods[stat as keyof StatModifiers] ?? 0;
                 const total = baseStat + mod;
                 const modifier = Math.floor((total - 10) / 2);
-                const rawRoll = Math.floor(Math.random() * 20) + 1;
+                const { rawRoll, results, diceLabel } = rollD20(rollsWithDisadvantage(selected, total));
                 const rollTotal = rawRoll + modifier;
 
                 if (addDiceRoll) {
@@ -2519,9 +2564,9 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                     crawlerName: selected.name,
                     crawlerId: selected.id,
                     timestamp: Date.now(),
-                    results: [{ dice: 'D20', result: rawRoll }],
+                    results,
                     total: rollTotal,
-                    statRoll: { stat: `${attackName} (Attack)`, modifier, rawRoll, rollType: 'Attack roll' },
+                    statRoll: { stat: `${attackName} (Attack)`, modifier, rawRoll, rollType: 'Attack roll', diceLabel },
                   });
                 }
 
@@ -2537,9 +2582,10 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 }
               };
 
-              const handleWeaponAttackRoll = (weapon: InventoryItem, advantage?: 'advantage' | 'disadvantage') => {
+              const handleWeaponAttackRoll = (weapon: InventoryItem, chosenAdvantage?: 'advantage' | 'disadvantage') => {
                 if (!canAttack || !weapon.weaponData) return;
                 const wd = weapon.weaponData;
+                const advantage = applyZeroPointDisadvantage(chosenAdvantage, wd.hitModifiers);
 
                 // Base d20 attack roll
                 const roll1 = Math.floor(Math.random() * 20) + 1;
@@ -2754,7 +2800,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 const mod = equippedMods[stat as keyof StatModifiers] ?? 0;
                 const total = baseStat + mod;
                 const modifier = Math.floor((total - 10) / 2);
-                const rawRoll = Math.floor(Math.random() * 20) + 1;
+                const { rawRoll, results, diceLabel } = rollD20(rollsWithDisadvantage(selected, total));
                 const rollTotal = rawRoll + modifier;
 
                 if (addDiceRoll) {
@@ -2763,9 +2809,9 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                     crawlerName: selected.name,
                     crawlerId: selected.id,
                     timestamp: Date.now(),
-                    results: [{ dice: 'D20', result: rawRoll }],
+                    results,
                     total: rollTotal,
-                    statRoll: { stat: `${actionName} (Bonus)`, modifier, rawRoll },
+                    statRoll: { stat: `${actionName} (Bonus)`, modifier, rawRoll, diceLabel },
                   });
                 }
                 if (isCombatPhaseLocal && isMyTurn) {
@@ -3213,14 +3259,17 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
       )}
 
       {/* Damage Target Modal */}
+      {showCreator && <CharacterCreator onCreate={handleCreateCrawler} onClose={() => setShowCreator(false)} />}
+
       {/* Advantage/Disadvantage context menu for weapon attacks */}
       {weaponAdvMenu && (() => {
         const weapon = inventory.find(i => i.id === weaponAdvMenu.weaponId);
         if (!weapon?.weaponData) return null;
 
         // Find the handleWeaponAttackRoll in scope - need reference from attacks tab
-        const doRoll = (adv?: 'advantage' | 'disadvantage') => {
+        const doRoll = (chosenAdv?: 'advantage' | 'disadvantage') => {
           const wd = weapon.weaponData!;
+          const adv = applyZeroPointDisadvantage(chosenAdv, wd.hitModifiers);
           const isCombatPhaseLocal = combatState?.active && combatState.phase === 'combat';
           const isMyTurn = isCombatPhaseLocal && combatState && combatState.combatants[combatState.currentTurnIndex]?.id === selected.id;
 
