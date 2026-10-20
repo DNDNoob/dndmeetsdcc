@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { MessageSquare, Mic, Send, Settings, X, Volume2, VolumeX, Lock, Unlock, Trash2, Sparkles, User, Wand2, Languages, Check, Pencil, Brain } from "lucide-react";
+import { MessageSquare, Mic, Send, Settings, X, Volume2, VolumeX, Lock, Unlock, Trash2, Sparkles, User, Wand2, Languages, Check, Pencil, Brain, Play, AudioLines } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
 import {
@@ -13,6 +13,7 @@ import {
   type NpcModelChoice,
   type NpcBrain,
   type NpcMemory,
+  type NpcSpeechVoice,
   type TranslateMode,
   isNpcAiOnline,
   npcFeelingWord,
@@ -22,6 +23,13 @@ import {
 } from "@/lib/gameData";
 import type { NpcOnlineKeys } from "@/lib/npc/onlineLlm.mjs";
 import type { ChatLineView, Language } from "@/lib/languages";
+import {
+  GEMINI_VOICES, GROQ_VOICES, KOKORO_VOICES, engineName, fitVoice, kokoroVoice, voiceLabel, voiceTraits,
+  CREATURE_SOUNDS, creatureSoundName,
+  type CatalogVoice, type VoiceEngine,
+} from "@/lib/npcSpeech/voices";
+import { useSpeechEngineState } from "@/lib/npcSpeech/engine";
+import { elevenLabsVoices, speakLine, useVoiceServiceState, voiceEnginesInOrder } from "@/lib/npcSpeech/providers";
 
 const OPEN_STORAGE_KEY = "dcc_chat_open";
 
@@ -63,7 +71,14 @@ interface NpcChatPanelProps {
   onClearChat?: () => void | Promise<void>;
   npcKeys?: NpcOnlineKeys;                        // DM only: free online model keys, saved in this browser
   onChangeNpcKeys?: (keys: NpcOnlineKeys) => void;
+  // Spoken voices: this viewer's sound settings
+  speechMuted?: boolean;
+  speechVolume?: number;
+  onSetSpeechPrefs?: (prefs: { muted?: boolean; volume?: number }) => void;
 }
+
+const SPEEDS = [["0.85", "Slow"], ["1", "Normal"], ["1.15", "Quick"]] as const;
+const PREVIEW_LINE = "Well met, crawler. What brings you down here?";
 
 const readOpen = (): boolean => {
   try { return localStorage.getItem(OPEN_STORAGE_KEY) === "1"; } catch { return false; }
@@ -80,9 +95,12 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
   messages, author, isAdmin, mobs, npcsOnMap, mentionables = [], aiSettings, aiStatus, secrets,
   onSend, onUpdateSettings, onSetSecretState, memories = {}, onSetMemory, onClearChat, npcKeys, onChangeNpcKeys,
   readLine, speakLanguages = [], translateMode = "off", onSetTranslateMode, onTranslate,
+  speechMuted = false, speechVolume = 0.9, onSetSpeechPrefs,
 }) => {
   const [open, setOpen] = useState(readOpen);
   const [showSettings, setShowSettings] = useState(false);
+  const [showSound, setShowSound] = useState(false);
+  const [previewing, setPreviewing] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [confirmClear, setConfirmClear] = useState(false);
   // DM memory editor: which speaker is open, and the notes being edited (one per line)
@@ -140,6 +158,52 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
   };
 
   const enabled = aiSettings?.enabled !== false;
+  const speechOn = !!aiSettings?.speech;
+  const voicePicks = aiSettings?.voices ?? {};
+  const engine = useSpeechEngineState();
+  const services = useVoiceServiceState();
+  // The voice service lines go to right now: the DM picks voices from its list
+  const voiceEngine: VoiceEngine = voiceEnginesInOrder(npcKeys ?? {})[0] ?? "kokoro";
+  const [elevenList, setElevenList] = useState<CatalogVoice[]>([]);
+  const elevenKey = npcKeys?.elevenlabs?.trim();
+  useEffect(() => {
+    if (!isAdmin || !speechOn || !elevenKey) { setElevenList([]); return; }
+    let live = true;
+    void elevenLabsVoices(elevenKey).then(list => { if (live) setElevenList(list); });
+    return () => { live = false; };
+  }, [isAdmin, speechOn, elevenKey]);
+  const catalog: CatalogVoice[] = voiceEngine === "gemini" ? GEMINI_VOICES
+    : voiceEngine === "groq" ? GROQ_VOICES
+      : voiceEngine === "elevenlabs" ? elevenList
+        : KOKORO_VOICES;
+  const pickField = voiceEngine === "kokoro" ? "voice" : voiceEngine;
+  const kokoroLabel = engine.status === "loading"
+    ? `Downloading the backup voices ${Math.round((engine.progress ?? 0) * 100)}%`
+    : engine.status === "error" ? `Backup voices failed to load: ${engine.error ?? "unknown error"}` : "";
+  const restingNotes = Object.values(services.rest).filter(r => r && r.restUntil > now).map(r => r!.why);
+  const engineLabel = [
+    `Using ${engineName(voiceEngine)}${voiceEngine === "kokoro" && engine.status === "ready" ? " (in this browser)" : ""}.`,
+    ...restingNotes.map(n => `${n}.`),
+    services.problem ? `${services.problem}.` : "",
+    kokoroLabel,
+  ].filter(Boolean).join(" ");
+  const preview = async (mob: Mob) => {
+    const pick = voicePicks[baseMobId(mob.id)];
+    const lastLine = [...messages].reverse().find(m => m.authorType === "npc" && m.authorId === mob.id)?.text;
+    setPreviewing(mob.id);
+    try {
+      const text = lastLine?.replace(/\*[^*]*\*/g, " ").trim() || PREVIEW_LINE;
+      const clip = await speakLine({ text, traits: voiceTraits(mob.id, mob, pick), pick }, npcKeys ?? {});
+      const url = URL.createObjectURL(clip.blob);
+      const audio = new Audio(url);
+      audio.onended = () => URL.revokeObjectURL(url);
+      await audio.play();
+    } catch (err) {
+      console.warn("[NpcSpeech] Preview failed", err);
+    } finally {
+      setPreviewing(null);
+    }
+  };
   const online = isNpcAiOnline(aiStatus, now);
   const model: NpcModelChoice = aiSettings?.model ?? "quality";
   const mutedIds = aiSettings?.mutedMobIds ?? [];
@@ -260,6 +324,17 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
                 <span className={`w-2 h-2 shrink-0 rounded-full ${statusColor}`} />
                 <span className="truncate">{statusLabel}</span>
               </span>
+              {speechOn && onSetSpeechPrefs && (
+                <button
+                  type="button"
+                  onClick={() => setShowSound(s => !s)}
+                  className={`p-1 hover:text-primary ${showSound ? "text-primary" : speechMuted ? "text-destructive" : "text-muted-foreground"}`}
+                  aria-label="NPC voice sound"
+                  data-testid="npc-sound-button"
+                >
+                  {speechMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                </button>
+              )}
               {isAdmin && (
                 <button
                   type="button"
@@ -274,6 +349,25 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
                 <X className="w-4 h-4" />
               </button>
             </div>
+
+            {speechOn && showSound && onSetSpeechPrefs && (
+              <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-border text-xs" data-testid="npc-sound">
+                <AudioLines className="w-3.5 h-3.5 text-primary shrink-0" />
+                <span className="shrink-0">Hear NPCs</span>
+                <Switch checked={!speechMuted} onCheckedChange={(v) => onSetSpeechPrefs({ muted: !v })} />
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={speechVolume}
+                  disabled={speechMuted}
+                  onChange={(e) => onSetSpeechPrefs({ volume: Number(e.target.value) })}
+                  className="flex-1 min-w-0 accent-primary"
+                  aria-label="NPC voice volume"
+                />
+              </div>
+            )}
 
             {online && enabled && aiStatus?.note && (
               <div className="px-3 py-1 text-[11px] text-accent border-b border-border">{aiStatus.note}</div>
@@ -335,13 +429,18 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
                     ))}
                   </div>
                 </div>
-                {brain === "online" && npcKeys && onChangeNpcKeys && (
+                {(brain === "online" || speechOn) && npcKeys && onChangeNpcKeys && (
                   <div className="space-y-1" data-testid="npc-keys">
                     <p className="text-muted-foreground">
-                      Free keys, saved only in this browser. Groq is used first, then Gemini when Groq's free limit runs out.
+                      Free keys, saved only in this browser. {brain === "online" && "NPC lines are written with Groq first, then Gemini when Groq's free limit runs out. "}
+                      {speechOn && "Voices use Gemini first, then Groq, then ElevenLabs. "}
                       Keep this page open during the game.
                     </p>
-                    {([["groq", "Groq key", "gsk_…"], ["gemini", "Gemini key", "AIza…"]] as const).map(([id, label, placeholder]) => (
+                    {([
+                      ["groq", "Groq key", "gsk_…"],
+                      ["gemini", "Gemini key", "AIza…"],
+                      ...(speechOn ? [["elevenlabs", "ElevenLabs", "sk_…"] as const] : []),
+                    ] as const).map(([id, label, placeholder]) => (
                       <label key={id} className="flex items-center gap-2">
                         <span className="w-20 shrink-0">{label}</span>
                         <input
@@ -382,6 +481,17 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
                   <span>Mute all NPCs</span>
                   <Switch checked={!!aiSettings?.mutedAll} onCheckedChange={(v) => onUpdateSettings?.({ mutedAll: v })} />
                 </label>
+                <label className="flex items-center justify-between gap-2">
+                  <span>Spoken voices</span>
+                  <Switch checked={speechOn} onCheckedChange={(v) => onUpdateSettings?.({ speech: v })} data-testid="npc-speech-switch" />
+                </label>
+                {speechOn && (
+                  <p className="text-muted-foreground" data-testid="npc-speech-status">
+                    NPC lines are read aloud on every player's device, using the keys above. When every service is used up,
+                    voices are made in this browser instead (about 330 MB to download the first time), so keep this tab open.{" "}
+                    <span className={engine.status === "error" ? "text-destructive" : "text-accent"}>{engineLabel}</span>
+                  </p>
+                )}
                 {aiStatus?.activeModel && online && (
                   <p className="text-muted-foreground">Running: {aiStatus.activeModel}</p>
                 )}
@@ -448,6 +558,83 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
                           </button>
                         )}
                       </div>
+                      {speechOn && (() => {
+                        const baseId = baseMobId(mob.id);
+                        const pick = voicePicks[baseId] ?? {};
+                        const traits = voiceTraits(mob.id, mob, pick);
+                        const autoTraits = voiceTraits(mob.id, mob, pick.speed === undefined ? undefined : { speed: pick.speed });
+                        const autoSound = voiceTraits(mob.id, mob).sound;
+                        const autoVoice = voiceEngine === "kokoro"
+                          ? KOKORO_VOICES.find(v => v.id === kokoroVoice(autoTraits))
+                          : fitVoice(catalog, autoTraits);
+                        const setPick = (next: NpcSpeechVoice) => {
+                          const merged: NpcSpeechVoice = { ...pick, ...next };
+                          for (const k of Object.keys(merged) as (keyof NpcSpeechVoice)[]) if (merged[k] === undefined) delete merged[k];
+                          const { [baseId]: _old, ...rest } = voicePicks;
+                          void onUpdateSettings?.({ voices: Object.keys(merged).length ? { ...rest, [baseId]: merged } : rest });
+                        };
+                        return (
+                          <>
+                          <div className="ml-2 mb-1 flex items-center gap-1" data-testid={`npc-voice-${mob.id}`}>
+                            <select
+                              value={pick[pickField] ?? ""}
+                              onChange={(e) => setPick({ [pickField]: e.target.value || undefined })}
+                              className="flex-1 min-w-0 bg-muted border border-border px-1 py-0.5 text-[11px]"
+                              aria-label={`${mob.name}'s voice`}
+                              title={`${engineName(voiceEngine)} voices`}
+                            >
+                              <option value="">Auto: {autoVoice ? voiceLabel(autoVoice) : "picked from notes"}</option>
+                              {catalog.map(v => <option key={v.id} value={v.id}>{voiceLabel(v)}</option>)}
+                            </select>
+                            <select
+                              value={pick.speed === undefined ? "" : String(pick.speed)}
+                              onChange={(e) => setPick({ speed: e.target.value ? Number(e.target.value) : undefined })}
+                              className="w-[72px] shrink-0 bg-muted border border-border px-1 py-0.5 text-[11px]"
+                              aria-label={`${mob.name}'s speaking speed`}
+                            >
+                              <option value="">Auto</option>
+                              {SPEEDS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => void preview(mob)}
+                              disabled={previewing !== null}
+                              className={`p-1 ${previewing === mob.id ? "text-accent animate-pulse" : "text-muted-foreground hover:text-primary"}`}
+                              aria-label={`Hear ${mob.name}'s voice`}
+                              title={`Hear ${mob.name} (speed ${traits.speed})`}
+                            >
+                              <Play className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                          <div className="ml-2 mb-1 flex items-center gap-1">
+                            <select
+                              value={pick.sound ?? ""}
+                              onChange={(e) => setPick({ sound: e.target.value || undefined })}
+                              className="flex-1 min-w-0 bg-muted border border-border px-1 py-0.5 text-[11px]"
+                              aria-label={`${mob.name}'s creature sound`}
+                              title="A sound effect put on the voice"
+                              data-testid={`npc-sound-${mob.id}`}
+                            >
+                              <option value="">Sound: Auto ({creatureSoundName(autoSound)})</option>
+                              <option value="none">Sound: None</option>
+                              {CREATURE_SOUNDS.map(c => <option key={c.id} value={c.id}>Sound: {c.name}</option>)}
+                            </select>
+                            {voiceEngine !== "elevenlabs" && elevenList.length > 0 && (
+                              <select
+                                value={pick.elevenlabs ?? ""}
+                                onChange={(e) => setPick({ elevenlabs: e.target.value || undefined })}
+                                className="flex-1 min-w-0 bg-muted border border-border px-1 py-0.5 text-[11px]"
+                                aria-label={`${mob.name}'s ElevenLabs character voice`}
+                                title="An ElevenLabs voice for this NPC. It's read by ElevenLabs first while your ElevenLabs credits last."
+                              >
+                                <option value="">ElevenLabs: none</option>
+                                {elevenList.map(v => <option key={v.id} value={v.id}>ElevenLabs: {voiceLabel(v)}</option>)}
+                              </select>
+                            )}
+                          </div>
+                          </>
+                        );
+                      })()}
                       {memoryOpen && onSetMemory && (
                         <div className="ml-2 mb-1 p-1.5 border border-border bg-muted/40 space-y-1" data-testid="npc-memory-editor">
                           <p className="text-muted-foreground">

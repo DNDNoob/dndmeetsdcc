@@ -255,7 +255,27 @@ export class NpcRoom {
     const muted = new Set(this.settings.mutedMobIds || []);
     return mapSpeakers([...episodePlacements, ...runtime], this.state.mobs, [...(ep.mobPlacements || []), ...runtime])
       .filter((s) => !s.mob.hidden && !s.mob.silent && !muted.has(s.id) && !muted.has(s.mob.id))
-      .map((s) => ({ ...s.placement, mobId: s.id, sourceMobId: s.mob.id, mob: this.speakerMob(s) }));
+      .map((s) => {
+        const mob = this.speakerMob(s);
+        // A token at 0 HP is a corpse: it speaks Dead, so it only answers someone using Speak with Dead
+        const dead = this.isDown(s.placement);
+        return { ...s.placement, mobId: s.id, sourceMobId: s.mob.id, dead, mob: dead ? { ...mob, languages: [DEAD_LANGUAGE_ID, ...mobLanguageIds(mob)] } : mob };
+      });
+  }
+
+  /** Whether a mob token is at 0 HP: its combat HP during a fight, else the HP saved on the token. */
+  isDown(placement) {
+    let hp = placement.currentHP;
+    const combat = this.state.combat;
+    if (combat?.active && combat.phase !== 'ended') {
+      // Same combat ids the app uses: "mobId:index" across all placements when there are several copies
+      const all = [...(this.state.episode?.mobPlacements || []), ...this.state.runtimeMobPlacements];
+      const copies = all.filter((p) => p.mobId === placement.mobId).length;
+      const combatId = copies > 1 ? `${placement.mobId}:${all.indexOf(placement)}` : placement.mobId;
+      const combatant = (combat.combatants || []).find((c) => c.id === combatId);
+      if (combatant?.currentHP !== undefined) hp = combatant.currentHP;
+    }
+    return typeof hp === 'number' && hp <= 0;
   }
 
   /** The speaker with the personality it talks with: the DM's card, else the generated one (may be empty until written). */
@@ -407,7 +427,7 @@ export class NpcRoom {
     return languageName(id, this.state.languages);
   }
 
-  /** Corpses (mobs that speak Dead) stay silent unless someone talks to them in Dead. */
+  /** Corpses (mobs that speak Dead, including any token at 0 HP) stay silent unless someone talks to them in Dead. */
   isCorpse(mob) {
     return !!mob && mobLanguageIds(mob).includes(DEAD_LANGUAGE_ID);
   }

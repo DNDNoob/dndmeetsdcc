@@ -21,7 +21,8 @@ import NpcChatPanel, { type NpcChatAuthor, type NpcChatMentionable } from "@/com
 import NpcSpeechBubbles from "@/components/ui/NpcSpeechBubbles";
 import type { NpcOnlineKeys } from "@/lib/npc/onlineLlm.mjs";
 import { useLanguages } from "@/contexts/LanguagesContext";
-import { readChatLine, usableLanguageIds, languageEffectLeft, DEFAULT_LANGUAGE_ID } from "@/lib/languages";
+import { readChatLine, usableLanguageIds, crawlerUnderstands, languageEffectLeft, DEFAULT_LANGUAGE_ID } from "@/lib/languages";
+import { useNpcSpeechPlayer } from "@/hooks/useNpcSpeechPlayer";
 import MerchantPanel, { MerchantHagglePrompts } from "@/components/MerchantPanel";
 import { isMerchant, getHaggleBlocker, MERCHANT_TRADE_RANGE_FEET, type MerchantState } from "@/lib/gameData";
 import { withNpcPersonality, speakerAsMob, mapSpeakers, baseMobId, isPlacementHostile, NPC_TALK_RANGE_FEET, type TranslateMode, type ChatMessage, type NpcAiSettings, type NpcAiStatus, type NpcSecretEntry, type NpcSecretState, type NpcGeneratedPersonality, type NpcMemory } from "@/lib/gameData";
@@ -2266,6 +2267,14 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     (m: ChatMessage) => readChatLine(m, chatTranslations.get(m.id) ?? [], { isAdmin, crawler: myChatCrawler, party: crawlers }, customLanguages),
     [chatTranslations, isAdmin, myChatCrawler, crawlers, customLanguages]
   );
+  // Spoken voices: NPC lines play on this device, scrambled if this viewer doesn't know the language
+  const understandsChatLine = useCallback(
+    (m: ChatMessage) => isAdmin || crawlerUnderstands(myChatCrawler, m.language),
+    [isAdmin, myChatCrawler]
+  );
+  const { speechMuted, speechVolume, setSpeechPrefs } = useNpcSpeechPlayer({
+    roomId, messages: episodeChatMessages, understands: understandsChatLine, mapId: currentMapId,
+  });
   // Speech bubbles show what this viewer can make out
   const bubbleMessages = useMemo(
     () => episodeChatMessages.map(m => (m.language ? { ...m, text: readChat(m).text } : m)),
@@ -4094,6 +4103,9 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
           onSetTranslateMode={myChatCrawler && onSetTranslateMode ? (mode) => onSetTranslateMode(myChatCrawler.id, mode) : undefined}
           onTranslate={myChatCrawler ? handleTranslate : undefined}
           onClearChat={onClearChat ? () => onClearChat(selectedEpisode.id) : undefined}
+          speechMuted={speechMuted}
+          speechVolume={speechVolume}
+          onSetSpeechPrefs={setSpeechPrefs}
         />
       )}
     </motion.div>

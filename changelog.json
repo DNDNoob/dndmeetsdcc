@@ -1,7 +1,25 @@
 [
   {
+    "date": "2026-10-20",
+    "changes": [
+      "🌿 New Plant language for talking plants: crawlers who know it read their words, everyone else sees what the plant does",
+      "💀 New Dead language for corpses: a corpse stays silent until someone talks to it in Dead, then answers briefly and cryptically from what it knew in life",
+      "🪦 A mob at 0 HP is now dead in Game Chat: it stops talking, and only Speak with Dead gets answers out of it",
+      "✨ Spells can grant a language for their duration, like Speak with Animals (Beast) or Speak with Dead (Dead, with a limit of questions per casting). It counts down by noncombat turns and combat rounds and ends on its own",
+      "💍 Items can grant a language while equipped, like a druid's charm that lets you speak Beast",
+      "🔈 NPC voice clips are now saved as small MP3s in the game's database instead of file storage, whose free daily allowance was running out, so spoken lines reach every player again",
+      "🧠 A DM window without NPC keys no longer switches off NPC replies from another DM window that has them"
+    ]
+  },
+  {
     "date": "2026-10-18",
     "changes": [
+      "🐉 Creature sounds for NPC voices: Goblin, Tiny, Giant, Dragon and Ghost effects, picked from the NPC's notes or chosen in the chat settings",
+      "🎭 NPCs can get an ElevenLabs character voice from your ElevenLabs account, and are then read by ElevenLabs first",
+      "🔊 Gemini voices now get only a mood tag, like [annoyance], in front of the line, so they stop reading their directions aloud",
+      "🩺 The Spoken voices settings now say why a line wasn't voiced for players, or if another game tab is making the voices",
+      "🔊 Spoken voices no longer read their directions out loud, only the NPC's line",
+      "▶️ NPC lines now play by themselves when the voice clip is ready, even if it takes a little longer, and a clip the browser holds back plays on your next tap",
       "💰 Mob loot: when a hostile mob goes down in combat, its gold and items are looted automatically and shared by every crawler in the fight",
       "🧪 Gold is split evenly. Items a mob has several copies of, like potions, are dealt out evenly, and anything left over goes to the party inventory",
       "🎒 New party inventory on the Profiles page holds unclaimed loot. Any crawler can Take what they need, and the DM can take for a crawler or discard items",
@@ -33,15 +51,18 @@
       "🐛 In Show Time, reaching for the red X or other map tools at the top right no longer pops open the top menu and shoves the tools panel down. The menu now opens only when you rest your mouse at the top-left edge for a moment",
       "🐛 If a profile can't be saved because you're not signed in with Google, the message now says so instead of just \"Failed to save profile\"",
       "🧠 Laptop NPC brain now always uses the local AI model on the DM's computer, never Groq or Gemini. Online stays the fast option that runs in the DM's tab",
-      "🌿 New Plant language for talking plants: crawlers who know it read their words, everyone else sees what the plant does",
-      "💀 New Dead language for corpses: a corpse stays silent until someone talks to it in Dead, then answers briefly and cryptically from what it knew in life",
-      "✨ Spells can grant a language for their duration, like Speak with Animals (Beast) or Speak with Dead (Dead, with a limit of questions per casting). It counts down by noncombat turns and combat rounds and ends on its own",
-      "💍 Items can grant a language while equipped, like a druid's charm that lets you speak Beast",
       "🐾 New Beast language for animals: crawlers who know Beast (Speak with Animals) read what the creature means, everyone else sees what it does, like *squeaks twice and backs toward the hole*",
       "🤐 Silent checkbox on mobs: oozes, constructs and the like never talk in Game Chat and can't be @ mentioned",
       "🧠 NPCs now remember conversations: once a chat with an NPC goes quiet, the AI saves a few notes and how the NPC feels about each crawler, and the NPC brings them up next time. Characters remember for the whole campaign; creature copies for their episode",
       "✏️ DMs can see, edit or wipe what each NPC remembers from the brain icon in the Game Chat settings",
-      "👂 NPCs now follow more of the conversation (the last 25 messages they heard, up from 10), but only what they could have heard: nothing from other maps or out of earshot, in replies or in memory"
+      "👂 NPCs now follow more of the conversation (the last 25 messages they heard, up from 10), but only what they could have heard: nothing from other maps or out of earshot, in replies or in memory",
+      "🔊 Spoken voices: NPCs can now say their lines out loud. Turn on Spoken voices in the Game Chat settings and every NPC line is read aloud on every player's device, in a voice picked from the NPC's Voice and manner notes",
+      "🎙️ DMs can pick each NPC's voice (28 American and British voices) and speed in the Game Chat settings, and tap ▶ to hear it",
+      "🗣️ If a player doesn't know the language an NPC is speaking, they hear the scrambled words, so it sounds foreign",
+      "🔈 Everyone can mute NPC voices or change their volume from the speaker icon in the Game Chat header",
+      "🎭 NPC voices sound much more natural: lines are now read by Gemini voices, told who the NPC is and how they talk, so a gruff dwarf sounds gruff. When Gemini's free use runs out, Groq takes over, then ElevenLabs, then the Kokoro voices in the DM's browser",
+      "🔑 Add an ElevenLabs key next to the Groq and Gemini keys in the Game Chat settings. The settings show which voice service is in use and when the others are back",
+      "🎚️ The Kokoro backup voices now use the full-quality model"
     ]
   },
   {
