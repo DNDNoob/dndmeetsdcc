@@ -1864,4 +1864,41 @@ When enabling public content, you will see a one-time warning:
 
 You must confirm before the toggle activates. This confirmation is recorded in your Decision History.`,
   },
+  {
+    id: 'pixel-icons',
+    slug: 'pixel-icons',
+    title: 'Pixel Icons & Mob Portraits',
+    category: 'Game Mechanics',
+    order: 13,
+    content: `# Pixel Icons & Mob Portraits
+
+Every new item in the **Item Library**, every new spell in the **Spell Library**, and every item you add to **My Content** gets a pixel-art icon automatically. You don't need to do anything.
+
+## How an Icon Is Picked
+
+1. **Generated** — the app sends the item or spell's name, description, slot, weapon type, damage type or spell school to an AI image generator and turns the picture into a small 48×48 pixel icon. This takes a few seconds; the icon appears once it's ready.
+2. **Matched from the icon library** — the generator is free but has a daily limit (it resets at midnight UTC). When it runs out, the app instead picks the closest icon from every icon made before, using descriptor tags. For example a new "Ember Katana" reuses the icon of a "Flaming Longsword" (sword + fire), and an "Elixir of Mending" reuses a "Healing Potion" icon.
+
+If nothing in the library is related, the item keeps its normal slot icon.
+
+## Mob Portraits (DMs)
+
+New mob types can get a 128×128 pixel-art portrait too, used as their map token and on the Mob Profiles page.
+
+- In the **DM Console → Mobs** tab, leave **Auto-generate pixel portrait** ticked and don't upload an image. When you click **Add Mob**, the app paints a portrait from the mob's name, description, strengths, weaknesses, level and boss setting.
+- To make a portrait for an existing mob, open it for editing and click **Generate**, then save.
+- An image you upload always wins and is never replaced.
+- Every copy of a creature on the map (Goblin A, B, C) shares the creature's portrait. A character linked to a creature, like Grimble the Goblin, gets his own portrait.
+- When the daily limit is used up, a character uses his creature's portrait, and anything else gets the closest earlier mob portrait (a new Hobgoblin reuses the Goblin portrait). If nothing fits, the mob is added without an image and you can click Generate the next day.
+
+## The Icon Library
+
+Every generated icon is saved to one shared icon library with tags such as *sword*, *fire*, *potion*, *healing*, *ice* or *death*. The library is shared across all campaigns, so the more icons people create, the better the matches get when the daily limit is reached.
+
+## Notes
+
+- Icons are generated only for players signed in with Google. Guests still get matched icons.
+- Copying an item or spell from public content or My Content keeps its icon.
+- Crawler copies of a library item show the library item's icon.`,
+  },
 ];

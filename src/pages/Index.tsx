@@ -24,6 +24,7 @@ import { useCampaigns } from "@/hooks/useCampaigns";
 import { useFriends } from "@/hooks/useFriends";
 import { usePublicContent } from "@/hooks/usePublicContent";
 import { useMyContent } from "@/hooks/useMyContent";
+import { useIconLibrary } from "@/hooks/useIconLibrary";
 import { useNpcBrain } from "@/hooks/useNpcBrain";
 import { useNpcSpeechMaker } from "@/hooks/useNpcSpeechMaker";
 import { toast } from "sonner";
@@ -291,8 +292,48 @@ const Index = () => {
   } = usePublicContent(showPublicContent);
 
   // Personal content: items and spells linked to the user's profile, not to a campaign
-  const { myItems, mySpells, saveMyItem, deleteMyItem, saveMySpell, deleteMySpell } =
+  const { myItems, mySpells, saveMyItem, deleteMyItem, saveMySpell, deleteMySpell, setMyContentIcon } =
     useMyContent(isAuthenticated ? user?.uid ?? null : null, userProfile?.username);
+
+  // Pixel-art icons: every new item or spell gets one generated (Cloudflare Workers AI), or, once
+  // the free daily quota is used up, the best-matching icon from the shared icon library.
+  const { iconImages, assignIcon, generateMobImage } = useIconLibrary(user, isAuthenticated);
+  // Icons arrive seconds after the save, so they're applied to the latest library state
+  const sharedInventoryRef = useRef({ getSharedInventory, updateSharedInventory });
+  sharedInventoryRef.current = { getSharedInventory, updateSharedInventory };
+
+  const handleUpdateSharedInventory = (items: InventoryItem[]) => {
+    const existingIds = new Set(getSharedInventory().map(i => i.id));
+    const newItems = items.filter(i => !existingIds.has(i.id) && !i.iconId);
+    const saved = updateSharedInventory(items);
+    for (const item of newItems) {
+      assignIcon({ kind: 'item', item }).then(iconId => {
+        if (!iconId) return;
+        const { getSharedInventory: getLatest, updateSharedInventory: save } = sharedInventoryRef.current;
+        const latest = getLatest();
+        if (!latest.some(i => i.id === item.id)) return;
+        save(latest.map(i => (i.id === item.id ? { ...i, iconId } : i))).catch(() => {});
+      }).catch(err => console.error('[Icons] item icon failed:', err));
+    }
+    return saved;
+  };
+
+  const handleAddSpell = async (spell: Spell) => {
+    await addSpell(spell);
+    if (spell.iconId) return;
+    assignIcon({ kind: 'spell', spell })
+      .then(iconId => iconId && updateSpell(spell.id, { iconId }))
+      .catch(err => console.error('[Icons] spell icon failed:', err));
+  };
+
+  const handleSaveMyItem = async (item: InventoryItem) => {
+    const isNew = !myItems.some(i => i.id === item.id);
+    await saveMyItem(item);
+    if (!isNew || item.iconId) return;
+    assignIcon({ kind: 'item', item })
+      .then(iconId => iconId && setMyContentIcon('items', item.id, iconId))
+      .catch(err => console.error('[Icons] item icon failed:', err));
+  };
   const handleSaveItemToMyContent = (item: InventoryItem) => {
     saveMyItem(item).then(() => toast.success(`Saved ${item.name} to My Content`)).catch(() => {});
   };
@@ -912,7 +953,7 @@ const Index = () => {
         onLogDecision={logDecision}
         myItems={myItems}
         mySpells={mySpells}
-        onSaveMyItem={saveMyItem}
+        onSaveMyItem={handleSaveMyItem}
         onDeleteMyItem={deleteMyItem}
         onDeleteMySpell={deleteMySpell}
       />
@@ -1047,7 +1088,7 @@ const Index = () => {
                 onUpdateInventory={updateCrawlerInventory}
                 onUpdateCrawler={updateCrawler}
                 getSharedInventory={getSharedInventory}
-                onUpdateSharedInventory={updateSharedInventory}
+                onUpdateSharedInventory={handleUpdateSharedInventory}
                 spells={spells}
                 onConsumeSpellTome={consumeSpellTome}
                 onPromoteSpellToLibrary={promoteSpellToLibrary}
@@ -1059,13 +1100,14 @@ const Index = () => {
                 myItems={myItems}
                 onSaveItemToMyContent={isAuthenticated ? handleSaveItemToMyContent : undefined}
                 showPublicContent={showPublicContent}
+                iconImages={iconImages}
               />
             )}
             {currentView === "spells" && (
               <SpellsView
                 crawlers={crawlers}
                 spells={spells}
-                onAddSpell={addSpell}
+                onAddSpell={handleAddSpell}
                 onUpdateSpell={updateSpell}
                 onDeleteSpell={deleteSpell}
                 onLearnSpell={learnSpell}
@@ -1080,6 +1122,7 @@ const Index = () => {
                 onSaveSpellToMyContent={isAuthenticated ? handleSaveSpellToMyContent : undefined}
                 onToggleSpellPublic={handleToggleSpellPublic}
                 showPublicContent={showPublicContent}
+                iconImages={iconImages}
                 currentPlayerId={currentPlayer?.id}
               />
             )}
@@ -1088,6 +1131,7 @@ const Index = () => {
               <DungeonAIView
                 mobs={mobs}
                 onUpdateMobs={setMobs}
+                onGenerateMobImage={(mob) => generateMobImage(mob, mobs)}
                 maps={maps}
                 onUpdateMaps={setMaps}
                 mapNames={mapNames}
