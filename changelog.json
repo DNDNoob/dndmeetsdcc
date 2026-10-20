@@ -2,6 +2,9 @@
   {
     "date": "2026-10-20",
     "changes": [
+      "🐛 Weapon attack and damage rolls now add the ability modifier (STR 14 adds +2) including gear bonuses, instead of the whole ability score",
+      "⚔️ Upgraded weapons show Upgraded once, in gold after the name, and only when you actually changed something",
+      "⚔️ The weapon upgrade window can now also change the weapon's description and its stat bonuses while equipped",
       "⚔️ Mobs can have attacks and spells: open Attacks & Spells in the mob creator to add claws, bites and other attacks with their own to-hit bonus and damage dice, and pick spells from the spell library",
       "🧌 In combat the DM gets a panel in the top left of the map with everything the current mob can do, including weapons it has equipped. Tap one to roll it, pick a target, and the damage comes off their health bar",
       "🎲 Mob rolls now show in the dice log under the mob's name in red, so every player sees them. Mobs the party hasn't met show as ???",

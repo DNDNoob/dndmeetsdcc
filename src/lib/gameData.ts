@@ -653,8 +653,14 @@ export const getItemStackKey = (item: InventoryItem): string => {
   const modifiersStr = item.statModifiers
     ? JSON.stringify(Object.entries(item.statModifiers).filter(([, v]) => v !== 0).sort())
     : '';
-  return `${item.name}|${item.description || ''}|${item.equipSlot || ''}|${item.goldValue ?? 0}|${modifiersStr}`;
+  // An upgraded copy never stacks with the plain item, or with copies upgraded differently
+  const upgradeStr = item.isUpgraded ? `|upgraded:${JSON.stringify(item.weaponData ?? null)}` : '';
+  return `${item.name}|${item.description || ''}|${item.equipSlot || ''}|${item.goldValue ?? 0}|${modifiersStr}${upgradeStr}`;
 };
+
+/** An upgraded item's name without the "Upgraded" suffix, which is drawn separately (older upgrades saved it in the name). */
+export const baseItemName = (item: Pick<InventoryItem, 'name' | 'isUpgraded'>): string =>
+  item.isUpgraded ? item.name.replace(/\s+upgraded$/i, '') : item.name;
 
 export interface ItemStack {
   key: string;

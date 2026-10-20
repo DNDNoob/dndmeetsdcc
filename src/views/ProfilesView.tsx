@@ -11,7 +11,8 @@ import { BACKSTORY_QUESTIONS } from "@/lib/characterCreation";
 import { usableLanguageIds } from "@/lib/languages";
 import { HealthBar } from "@/components/ui/HealthBar";
 import { EquipmentSlot } from "@/components/ui/EquipmentSlot";
-import { Crawler, getQuestProgress, Mob, InventoryItem, getItemStackKey, stackItems, getLootingLevel, getLootsUntilNextLevel, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery, getInitialCrawlerId, rollD20, rollsWithDisadvantage, ABILITY_KEYS } from "@/lib/gameData";
+import { Crawler, getQuestProgress, Mob, InventoryItem, getItemStackKey, stackItems, getLootingLevel, getLootsUntilNextLevel, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery, getInitialCrawlerId, rollD20, rollsWithDisadvantage, ABILITY_KEYS, baseItemName } from "@/lib/gameData";
+import { ItemName } from "@/components/ItemName";
 import type { DiceRollEntry } from "@/hooks/useGameState";
 import UndoTurnButton, { canUndoCombatTurn } from "@/components/UndoTurnButton";
 import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Backpack, HardHat, Package, Lock, Unlock, ChevronDown, ChevronUp, Check, Search, Send, BookOpen, Filter, X, Gem, Footprints, Shirt, Hand, Target, Swords, RefreshCw, Timer, ScrollText, Eye, EyeOff, CheckSquare, Trophy, Skull, HeartCrack, Crown, Minus, Wand2, Star } from "lucide-react";
@@ -47,6 +48,21 @@ const getEquipmentIcon = (slot?: string, className: string = "w-4 h-4 shrink-0")
       if (slot) return <HardHat className={`${className} text-accent`} />;
       return <Package className={`${className} text-muted-foreground`} />;
   }
+};
+
+// JSON with sorted keys, leaving out empty values (unset, 0, false, {}), so equal forms compare equal
+const stableJson = (value: unknown): string => {
+  const clean = (v: unknown): unknown => {
+    if (Array.isArray(v)) return v.map(clean);
+    if (v && typeof v === 'object') {
+      const entries = Object.entries(v as Record<string, unknown>).map(([k, x]) => [k, clean(x)] as const)
+        .filter(([, x]) => x !== undefined && x !== 0 && x !== false && x !== '' && !(typeof x === 'object' && x && !Array.isArray(x) && Object.keys(x).length === 0))
+        .sort(([a], [b]) => a.localeCompare(b));
+      return Object.fromEntries(entries);
+    }
+    return v;
+  };
+  return JSON.stringify(clean(value));
 };
 
 type ProfileTab = 'profile' | 'inventory' | 'actions' | 'spells' | 'reactions' | 'attacks' | 'bonus' | 'quests';
@@ -554,6 +570,15 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   const [upgradingWeapon, setUpgradingWeapon] = useState<InventoryItem | null>(null);
   const [upgradeForm, setUpgradeForm] = useState<WeaponData | null>(null);
   const [upgradeWeaponName, setUpgradeWeaponName] = useState('');
+  const [upgradeDescription, setUpgradeDescription] = useState('');
+  const [upgradeStatMods, setUpgradeStatMods] = useState<StatModifiers>({});
+  const openWeaponUpgrade = (item: InventoryItem) => {
+    setUpgradingWeapon(item);
+    setUpgradeForm({ ...item.weaponData! });
+    setUpgradeWeaponName(baseItemName(item));
+    setUpgradeDescription(item.description ?? '');
+    setUpgradeStatMods({ ...item.statModifiers });
+  };
 
   // Send items/gold modal state
   const [showSendModal, setShowSendModal] = useState(false);
@@ -919,6 +944,10 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
     if (!forced) return chosen;
     return chosen === 'advantage' ? undefined : 'disadvantage';
   };
+
+  // Weapon hit/damage bonus: the ability modifier (with gear bonuses) of each stat the weapon uses, like every other roll
+  const weaponStatMod = (mods: StatModifiers | undefined): number =>
+    ABILITY_KEYS.reduce((total, stat) => mods?.[stat] ? total + Math.floor((selected[stat] + (equippedMods[stat] ?? 0) - 10) / 2) : total, 0);
 
   return (
     <motion.div
@@ -1894,9 +1923,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                               onContextMenu={(e) => {
                                 if (isOwnProfile && item.weaponData) {
                                   e.preventDefault();
-                                  setUpgradingWeapon(item);
-                                  setUpgradeForm({ ...item.weaponData });
-                                  setUpgradeWeaponName(item.isUpgraded ? item.name : `${item.name} Upgraded`);
+                                  openWeaponUpgrade(item);
                                 }
                               }}
                               className={`bg-muted/50 p-3 rounded-lg border transition-colors select-none ${
@@ -1908,7 +1935,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                                 {getEquipmentIcon(item.equipSlot, "w-4 h-4 shrink-0 mt-0.5")}
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2">
-                                    <span className="font-semibold text-sm truncate">{item.name}</span>
+                                    <span className="font-semibold text-sm truncate"><ItemName item={item} /></span>
                                     {count > 1 && <span className="text-accent font-bold text-xs">x{count}</span>}
                                     {isExpanded ? <ChevronUp className="w-3 h-3 text-muted-foreground ml-auto shrink-0" /> : <ChevronDown className="w-3 h-3 text-muted-foreground ml-auto shrink-0" />}
                                   </div>
@@ -1953,7 +1980,6 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                                             <span className="px-1.5 py-0.5 bg-destructive/20 text-destructive rounded">{item.weaponData.weaponType}</span>
                                             <span className="px-1.5 py-0.5 bg-orange-500/20 text-orange-400 rounded">{item.weaponData.damageType}</span>
                                             <span className="px-1.5 py-0.5 bg-muted text-muted-foreground rounded">{item.weaponData.isRanged ? 'Ranged' : 'Melee'}</span>
-                                            {item.isUpgraded && <span className="px-1.5 py-0.5 bg-accent/20 text-accent rounded font-bold italic">Upgraded</span>}
                                           </div>
                                           <div>Damage: {item.weaponData.damageDice.map(d => `${d.count}d${d.sides}`).join(' + ')}</div>
                                           {item.weaponData.hitDie && <div>Hit Bonus: +{item.weaponData.hitDie.count}d{item.weaponData.hitDie.sides}</div>}
@@ -1969,9 +1995,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                                           <button
                                             onClick={(e) => {
                                               e.stopPropagation();
-                                              setUpgradingWeapon(item);
-                                              setUpgradeForm({ ...item.weaponData! });
-                                              setUpgradeWeaponName(item.isUpgraded ? item.name : `${item.name} Upgraded`);
+                                              openWeaponUpgrade(item);
                                             }}
                                             className="text-xs text-accent hover:underline flex items-center gap-0.5"
                                           >
@@ -2538,17 +2562,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
               };
 
               // Helper to calculate total modifier from weapon stat modifiers
-              const calcWeaponStatMod = (mods: StatModifiers | undefined): number => {
-                if (!mods) return 0;
-                let total = 0;
-                for (const [stat, val] of Object.entries(mods)) {
-                  if (val && ['str', 'dex', 'con', 'int', 'cha'].includes(stat)) {
-                    const baseStat = (selected as Record<string, unknown>)[stat] as number ?? 0;
-                    total += baseStat;
-                  }
-                }
-                return total;
-              };
+              const calcWeaponStatMod = weaponStatMod;
 
               const handleAttackRoll = (attackName: string, stat: 'str' | 'dex', damageDice: string, damageBonus: number) => {
                 if (!canAttack) return;
@@ -2733,8 +2747,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                           <div className="px-3 pt-3 pb-1 text-center">
                             <Sword className={`w-6 h-6 mx-auto mb-1 ${canAttack ? 'text-destructive' : 'text-muted-foreground'}`} />
                             <span className={`text-sm font-display block ${canAttack ? 'text-destructive' : 'text-muted-foreground'}`}>
-                              {item.name}
-                              {item.isUpgraded && <span className="text-accent font-bold italic ml-1 text-[10px]">Upgraded</span>}
+                              <ItemName item={item} />
                             </span>
                             <div className="text-[10px] text-muted-foreground space-y-0.5 mt-1">
                               <div>{wd.weaponType} · {wd.isRanged ? 'Ranged' : 'Melee'} · {wd.damageType}</div>
@@ -3172,7 +3185,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5">
                               {getEquipmentIcon(item.equipSlot, "w-3.5 h-3.5 shrink-0")}
-                              <span className="text-sm font-medium truncate">{item.name}</span>
+                              <span className="text-sm font-medium truncate"><ItemName item={item} /></span>
                               {count > 1 && <span className="text-xs text-accent font-bold">x{count}</span>}
                             </div>
                             {item.goldValue != null && item.goldValue > 0 && (
@@ -3273,17 +3286,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             }
           }
 
-          const calcMod = (mods: StatModifiers | undefined): number => {
-            if (!mods) return 0;
-            let total = 0;
-            for (const [stat, val] of Object.entries(mods)) {
-              if (val && ['str', 'dex', 'con', 'int', 'cha'].includes(stat)) {
-                const baseStat = (selected as Record<string, unknown>)[stat] as number ?? 0;
-                total += baseStat;
-              }
-            }
-            return total;
-          };
+          const calcMod = weaponStatMod;
 
           const hitStatMod = calcMod(wd.hitModifiers);
           const rollTotal = rawRoll + hitDieResult + hitStatMod;
@@ -3334,7 +3337,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
               style={{ left: weaponAdvMenu.x, top: weaponAdvMenu.y - 120 }}
               onClick={(e) => e.stopPropagation()}
             >
-              <p className="text-[10px] text-muted-foreground font-display px-2 pb-1 border-b border-border">{weapon.name}</p>
+              <p className="text-[10px] text-muted-foreground font-display px-2 pb-1 border-b border-border"><ItemName item={weapon} /></p>
               <button onClick={() => doRoll('advantage')}
                 className="w-full text-left px-3 py-1.5 text-xs hover:bg-green-500/20 text-green-400 rounded transition-colors">
                 Roll with Advantage (2d20, take highest)
@@ -3360,12 +3363,20 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
 
         const handleSaveUpgrade = () => {
           if (!upgradingWeapon || !upgradeForm) return;
-          const updatedItems = inventory.map(item => {
-            if (item.id !== upgradingWeapon.id) return item;
-            const newName = upgradeWeaponName.trim() || item.name;
-            return { ...item, name: newName, weaponData: upgradeForm, isUpgraded: true };
-          });
-          onUpdateCrawlerInventory(selected.id, updatedItems);
+          const statModifiers = Object.fromEntries(Object.entries(upgradeStatMods).filter(([, v]) => v)) as StatModifiers;
+          const upgraded: InventoryItem = {
+            ...upgradingWeapon,
+            name: upgradeWeaponName.trim() || baseItemName(upgradingWeapon),
+            description: upgradeDescription.trim() || undefined,
+            statModifiers: Object.keys(statModifiers).length > 0 ? statModifiers : undefined,
+            weaponData: upgradeForm,
+          };
+          // Only a real change counts as an upgrade; saving untouched leaves the weapon as it was
+          const comparable = (i: InventoryItem) => stableJson([baseItemName(i), i.description || '', i.statModifiers, i.weaponData]);
+          if (comparable(upgraded) !== comparable(upgradingWeapon)) {
+            const saved = { ...upgraded, isUpgraded: true };
+            onUpdateCrawlerInventory(selected.id, inventory.map(item => item.id === upgradingWeapon.id ? saved : item));
+          }
           setUpgradingWeapon(null);
           setUpgradeForm(null);
           setUpgradeWeaponName('');
@@ -3375,7 +3386,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
           <div className="fixed inset-0 bg-background/80 z-[80] flex items-center justify-center p-4" onMouseDown={closeOnBackdrop(() => { setUpgradingWeapon(null); setUpgradeForm(null); setUpgradeWeaponName(''); })}>
             <div className="bg-background border-2 border-accent rounded-lg p-6 max-w-lg w-full shadow-xl max-h-[80vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-display text-lg text-accent">Upgrade {upgradingWeapon.name}</h3>
+                <h3 className="font-display text-lg text-accent">Upgrade {baseItemName(upgradingWeapon)}</h3>
                 <button onClick={() => { setUpgradingWeapon(null); setUpgradeForm(null); setUpgradeWeaponName(''); }}>
                   <X className="w-5 h-5 text-muted-foreground hover:text-foreground" />
                 </button>
@@ -3390,8 +3401,29 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                     value={upgradeWeaponName}
                     onChange={(e) => setUpgradeWeaponName(e.target.value)}
                     className="bg-muted border border-border px-2 py-1 text-xs w-full"
-                    placeholder={upgradingWeapon.name}
+                    placeholder={baseItemName(upgradingWeapon)}
                   />
+                </div>
+                {/* Description */}
+                <div>
+                  <label className="text-[10px] text-muted-foreground block mb-0.5">Description</label>
+                  <textarea value={upgradeDescription}
+                    onChange={(e) => setUpgradeDescription(e.target.value)}
+                    className="w-full bg-muted border border-border px-2 py-1 text-xs resize-none h-12" />
+                </div>
+                {/* Gear bonuses while equipped */}
+                <div>
+                  <label className="text-[10px] text-muted-foreground block mb-0.5">Stat Bonuses (when equipped)</label>
+                  <div className="grid grid-cols-3 gap-1">
+                    {(['str', 'dex', 'con', 'int', 'cha', 'hp', 'maxHP', 'mana', 'maxMana', 'moveSpeed'] as const).map((stat) => (
+                      <div key={stat} className="flex items-center gap-1">
+                        <span className="text-[10px] text-muted-foreground w-12 uppercase">{stat === 'moveSpeed' ? 'spd ft' : stat}</span>
+                        <input type="number" value={upgradeStatMods[stat] ?? ""}
+                          onChange={(e) => setUpgradeStatMods(prev => ({ ...prev, [stat]: e.target.value ? parseInt(e.target.value) : undefined }))}
+                          placeholder="0" className="w-14 bg-muted border border-border px-1 py-0.5 text-xs text-center" />
+                      </div>
+                    ))}
+                  </div>
                 </div>
                 {/* Weapon Type & Damage Type */}
                 <div className="grid grid-cols-2 gap-2">
@@ -3467,7 +3499,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 {/* Hit Stat Modifiers */}
                 <div>
                   <label className="text-[10px] text-muted-foreground block mb-0.5">Hit Roll Stat Modifiers</label>
-                  <p className="text-[9px] text-muted-foreground/60 mb-1">Adds the crawler&apos;s base stat value to the hit roll</p>
+                  <p className="text-[9px] text-muted-foreground/60 mb-1">Adds the crawler&apos;s ability modifier (with gear) to the hit roll</p>
                   <div className="flex gap-3">
                     {(['str', 'dex', 'con', 'int', 'cha'] as const).map((stat) => (
                       <label key={stat} className="flex items-center gap-1 text-[10px] cursor-pointer">
@@ -3483,7 +3515,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 {/* Damage Stat Modifiers */}
                 <div>
                   <label className="text-[10px] text-muted-foreground block mb-0.5">Damage Stat Modifiers</label>
-                  <p className="text-[9px] text-muted-foreground/60 mb-1">Adds the crawler&apos;s base stat value to the damage roll</p>
+                  <p className="text-[9px] text-muted-foreground/60 mb-1">Adds the crawler&apos;s ability modifier (with gear) to the damage roll</p>
                   <div className="flex gap-3">
                     {(['str', 'dex', 'con', 'int', 'cha'] as const).map((stat) => (
                       <label key={stat} className="flex items-center gap-1 text-[10px] cursor-pointer">
