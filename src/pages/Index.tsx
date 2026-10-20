@@ -1130,6 +1130,7 @@ const Index = () => {
             {currentView === "dungeonai" && isAdmin && (
               <DungeonAIView
                 mobs={mobs}
+                spells={spells}
                 onUpdateMobs={setMobs}
                 onGenerateMobImage={(mob) => generateMobImage(mob, mobs)}
                 maps={maps}
@@ -1228,6 +1229,11 @@ const Index = () => {
                 onHaggleWithMerchant={haggleWithMerchant}
                 onRestockMerchant={isAdmin ? restockMerchant : undefined}
                 onResolveMerchantHaggle={isAdmin ? resolveMerchantHaggle : undefined}
+                spells={spells}
+                onApplyCombatDamageBatch={isAdmin ? applyCombatDamageBatch : undefined}
+                onRecordCombatAction={isAdmin ? recordCombatAction : undefined}
+                onOverrideMobHealth={isAdmin ? overrideMobHealth : undefined}
+                onHealCrawler={isAdmin ? healCrawler : undefined}
               />
             )}
             {currentView === "sounds" && <SoundEffectsView />}

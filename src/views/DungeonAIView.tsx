@@ -3,13 +3,14 @@ import { toast } from "sonner";
 import NpcPersonalityFields from "@/components/NpcPersonalityFields";
 import { LanguagePicker } from "@/components/LanguagePicker";
 import MerchantFields from "@/components/MerchantFields";
+import MobCombatFields from "@/components/MobCombatFields";
 import MobKindFields from "@/components/MobKindFields";
 import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import MapMobPlacementEditor from "@/components/ui/MapMobPlacementEditor";
 import MapDesignerPopout from "@/components/ui/MapDesignerPopout";
-import { Mob, Episode, stackItems, DEFAULT_LOOT_DESTRUCTION_CHANCE, getMobKind, isBossMob, mobSection, type MobSection, legacyMobType, EpisodeMobPlacement, Crawler, CrawlerPlacement, InventoryItem, LootBoxTemplate, LootBoxTier, getLootBoxTierColor, type EquipmentSlot, type EquippedItems, Quest, QuestReward, QuestActionItem, QuestRewardTier, type CampaignMapDoc, type PublicMap, type PublicMob, type PublicEpisode, isMerchant } from "@/lib/gameData";
+import { Mob, Episode, stackItems, DEFAULT_LOOT_DESTRUCTION_CHANCE, getMobKind, isBossMob, mobSection, type MobSection, legacyMobType, EpisodeMobPlacement, Crawler, CrawlerPlacement, InventoryItem, LootBoxTemplate, LootBoxTier, getLootBoxTierColor, type EquipmentSlot, type EquippedItems, Quest, QuestReward, QuestActionItem, QuestRewardTier, type CampaignMapDoc, type PublicMap, type PublicMob, type PublicEpisode, isMerchant, type Spell } from "@/lib/gameData";
 import { Brain, Sparkles, Upload, Plus, Trash2, Map, Skull, Image as ImageIcon, Save, Edit2, X, Layers, ChevronLeft, ChevronRight, User, Package, Search, Maximize2, Shield, ChevronDown as ChevronDownIcon, ScrollText, Eye, EyeOff, CheckSquare, GripVertical, Users, Globe } from "lucide-react";
 import { storage } from "@/lib/firebase";
 import { ShareToggle, ImportButton } from "@/components/ui/ShareToggle";
@@ -55,6 +56,8 @@ interface DungeonAIViewProps {
   onImportPublicMap?: (map: PublicMap) => Promise<void>;
   onImportPublicMob?: (mob: PublicMob) => Promise<void>;
   onImportPublicEpisode?: (episode: PublicEpisode) => Promise<void>;
+  /** Campaign spell library, for the spells a mob can cast */
+  spells?: Spell[];
 }
 
 /** Shown in place of a community list when the user hasn't opted in to public content. */
@@ -103,6 +106,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   onImportPublicMap,
   onImportPublicMob,
   onImportPublicEpisode,
+  spells = [],
 }) => {
   // Content without a creator was made here by the DM; imported content keeps its original creator
   const canShare = (createdBy?: string) => !!currentUserId && (!createdBy || createdBy === currentUserId);
@@ -237,6 +241,8 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
       ...(newMob.personality ? { personality: newMob.personality } : {}),
       ...(newMob.languages?.length ? { languages: newMob.languages } : {}),
       ...(newMob.merchant ? { merchant: newMob.merchant } : {}),
+      ...(newMob.attacks?.length ? { attacks: newMob.attacks } : {}),
+      ...(newMob.spellIds?.length ? { spellIds: newMob.spellIds } : {}),
     };
     if (!mob.image && autoGenerateMobImage && onGenerateMobImage) {
       setGeneratingMobImage('new');
@@ -252,7 +258,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
     } catch (err) {
       console.error('[DungeonAI] ❌ Failed to persist mob', err);
     }
-    setNewMob({ name: "", level: 1, type: "normal", kind: "creature", boss: false, speciesId: "", description: "", weaknesses: "", strengths: "", hitPoints: 50, personality: undefined, merchant: undefined, languages: undefined });
+    setNewMob({ name: "", level: 1, type: "normal", kind: "creature", boss: false, speciesId: "", description: "", weaknesses: "", strengths: "", hitPoints: 50, personality: undefined, merchant: undefined, languages: undefined, attacks: undefined, spellIds: undefined });
   };
 
   const handleDeleteMob = async (id: string) => {
@@ -902,6 +908,11 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                     onChange={(merchant) => setNewMob({ ...newMob, merchant })}
                     items={getSharedInventory?.() ?? []}
                   />
+                  <MobCombatFields
+                    value={newMob}
+                    onChange={(fields) => setNewMob({ ...newMob, ...fields })}
+                    spells={spells}
+                  />
                 </div>
                 <div className="flex flex-col items-center justify-center border border-dashed border-border p-4">
                   <label className="text-xs text-muted-foreground mb-2">Mob Image</label>
@@ -1126,6 +1137,14 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                             value={editedMob.merchant}
                             onChange={(merchant) => setEditedMobData(prev => prev ? { ...prev, merchant } : prev)}
                             items={getSharedInventory?.() ?? []}
+                          />
+                        </div>
+
+                        <div className="mt-3">
+                          <MobCombatFields
+                            value={editedMob}
+                            onChange={(fields) => setEditedMobData(prev => prev ? { ...prev, ...fields } : prev)}
+                            spells={spells}
                           />
                         </div>
 
