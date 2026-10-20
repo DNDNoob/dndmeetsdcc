@@ -1208,6 +1208,7 @@ const Index = () => {
           {isShowtimeActive && (
             <PingPanel
               isAdmin={isAdmin}
+              isNavVisible={isNavVisible}
               noncombatTurnState={noncombatTurnState}
               onStartNoncombatTurn={() => startNoncombatTurn()}
               isGameActive={isGameActive}

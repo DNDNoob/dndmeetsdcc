@@ -4,6 +4,7 @@ import { DungeonButton } from "@/components/ui/DungeonButton";
 import { Target, Square, ChevronDown, ChevronUp, Palette, User, Skull, Grid3x3, CloudFog, Eraser, Paintbrush, Layers, X, ChevronLeft, ChevronRight, Circle, Triangle, RectangleHorizontal, Ruler } from "lucide-react";
 import { Crawler, Mob } from "@/lib/gameData";
 import { ShapeType } from "@/components/ui/MapBox";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 interface MapToolsMenuProps {
   onPing: (color: string) => void;
@@ -266,34 +267,27 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
                 })()}
                 Shape
               </DungeonButton>
-              <DungeonButton
-                variant={isBoxMode ? "admin" : "default"}
-                size="sm"
-                onClick={() => setShowShapeDropdown(!showShapeDropdown)}
-                title="Select shape type"
-                className="rounded-l-none px-1"
-              >
-                <ChevronDown className="w-3 h-3" />
-              </DungeonButton>
-            </div>
-            {/* Shape dropdown */}
-            <AnimatePresence>
-              {showShapeDropdown && (
-                <motion.div
-                  initial={{ opacity: 0, y: -5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -5 }}
-                  className="absolute top-full left-0 mt-1 bg-background/95 backdrop-blur-sm border border-border rounded-lg shadow-lg z-50 min-w-[120px]"
-                >
+              {/* Shape picker opens in a portal so the menu's scroll box can't clip it */}
+              <DropdownMenu open={showShapeDropdown} onOpenChange={setShowShapeDropdown}>
+                <DropdownMenuTrigger asChild>
+                  <DungeonButton
+                    variant={isBoxMode ? "admin" : "default"}
+                    size="sm"
+                    title="Select shape type"
+                    className="rounded-l-none px-1"
+                  >
+                    <ChevronDown className="w-3 h-3" />
+                  </DungeonButton>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="z-[120] bg-background/95 backdrop-blur-sm border-border min-w-[120px]">
                   {SHAPE_OPTIONS.map((shape) => (
-                    <button
+                    <DropdownMenuItem
                       key={shape.type}
-                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted/50 transition-colors first:rounded-t-lg last:rounded-b-lg ${
+                      className={`flex items-center gap-2 px-3 py-2 text-sm cursor-pointer ${
                         selectedShape === shape.type ? "bg-primary/20 text-primary" : ""
                       }`}
-                      onClick={() => {
+                      onSelect={() => {
                         setSelectedShape?.(shape.type);
-                        setShowShapeDropdown(false);
                         if (!isBoxMode) {
                           handleBoxModeToggle();
                         }
@@ -301,11 +295,11 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
                     >
                       <shape.icon className="w-4 h-4" />
                       {shape.label}
-                    </button>
+                    </DropdownMenuItem>
                   ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
 
           {/* Add Crawler button - DM only */}

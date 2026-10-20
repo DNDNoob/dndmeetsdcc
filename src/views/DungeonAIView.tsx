@@ -8,7 +8,7 @@ import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import MapMobPlacementEditor from "@/components/ui/MapMobPlacementEditor";
 import MapDesignerPopout from "@/components/ui/MapDesignerPopout";
-import { Mob, Episode, stackItems, DEFAULT_LOOT_DESTRUCTION_CHANCE, getMobKind, isBossMob, legacyMobType, EpisodeMobPlacement, Crawler, CrawlerPlacement, InventoryItem, LootBoxTemplate, LootBoxTier, getLootBoxTierColor, type EquipmentSlot, type EquippedItems, Quest, QuestReward, QuestActionItem, QuestRewardTier, type CampaignMapDoc, type PublicMap, type PublicMob, type PublicEpisode, isMerchant } from "@/lib/gameData";
+import { Mob, Episode, stackItems, DEFAULT_LOOT_DESTRUCTION_CHANCE, getMobKind, isBossMob, mobSection, type MobSection, legacyMobType, EpisodeMobPlacement, Crawler, CrawlerPlacement, InventoryItem, LootBoxTemplate, LootBoxTier, getLootBoxTierColor, type EquipmentSlot, type EquippedItems, Quest, QuestReward, QuestActionItem, QuestRewardTier, type CampaignMapDoc, type PublicMap, type PublicMob, type PublicEpisode, isMerchant } from "@/lib/gameData";
 import { Brain, Upload, Plus, Trash2, Map, Skull, Image as ImageIcon, Save, Edit2, X, Layers, ChevronLeft, ChevronRight, User, Package, Search, Maximize2, Shield, ChevronDown as ChevronDownIcon, ScrollText, Eye, EyeOff, CheckSquare, GripVertical, Users, Globe } from "lucide-react";
 import { storage } from "@/lib/firebase";
 import { ShareToggle, ImportButton } from "@/components/ui/ShareToggle";
@@ -108,6 +108,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   const communityEpisodes = publicEpisodes.filter(e => e.sourceCampaignId !== currentCampaignId);
 
   const [activeTab, setActiveTab] = useState<"mobs" | "maps" | "episodes" | "lootboxes" | "quests">("mobs");
+  const [mobListTab, setMobListTab] = useState<MobSection>("boss");
   const [sharingAll, setSharingAll] = useState(false);
   const [newMob, setNewMob] = useState<Partial<Mob>>({
     name: "",
@@ -919,7 +920,24 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
             {/* Existing mobs list */}
             <div className="space-y-3">
               <h3 className="font-display text-primary text-lg">Existing Mobs</h3>
-              {mobs.map((mob) => {
+              <div className="grid grid-cols-3 gap-2" role="tablist">
+                {([["boss", "Bosses"], ["creature", "Mobs"], ["character", "Characters"]] as const).map(([section, label]) => (
+                  <DungeonButton
+                    key={section}
+                    role="tab"
+                    aria-selected={mobListTab === section}
+                    variant={mobListTab === section ? "admin" : "default"}
+                    size="sm"
+                    onClick={() => setMobListTab(section)}
+                  >
+                    {label} ({mobs.filter(m => mobSection(m) === section).length})
+                  </DungeonButton>
+                ))}
+              </div>
+              {mobs.filter(m => mobSection(m) === mobListTab || m.id === editingMobId).length === 0 && (
+                <p className="text-sm text-muted-foreground italic">None yet.</p>
+              )}
+              {mobs.filter(m => mobSection(m) === mobListTab || m.id === editingMobId).map((mob) => {
                 const isEditing = editingMobId === mob.id;
                 const editedMob = (isEditing && editedMobData) ? editedMobData : mob;
 

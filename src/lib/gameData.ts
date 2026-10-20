@@ -1,5 +1,6 @@
 import type { NpcSpeaker } from './npc/speakers.mjs';
 export { getMobKind, isBossMob, isPlacementHostile, baseMobId, mapSpeakers } from './npc/speakers.mjs';
+import { getMobKind as mobKindOf, isBossMob as mobIsBoss } from './npc/speakers.mjs';
 export type { NpcSpeaker } from './npc/speakers.mjs';
 
 export type EquipmentSlot = 'head' | 'chest' | 'legs' | 'feet' | 'leftHand' | 'rightHand' | 'ringFinger' | 'weapon';
@@ -729,6 +730,10 @@ export const withNpcPersonality = (mob: Mob, generated: Record<string, NpcGenera
   if (hasNpcPersonality(mob) || !generated[mob.id]) return mob;
   return { ...mob, personality: generated[mob.id], personalityGenerated: true };
 };
+
+/** Which Mobs subtab a mob is listed under: bosses first, then mobs (creatures) or characters. */
+export type MobSection = 'boss' | MobKind;
+export const mobSection = (mob: Mob): MobSection => (mobIsBoss(mob) ? 'boss' : mobKindOf(mob) as MobKind);
 
 /** The legacy type field that matches a kind and boss flag. */
 export const legacyMobType = (kind: MobKind, boss: boolean): Mob['type'] =>

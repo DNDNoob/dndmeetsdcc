@@ -1,3 +1,4 @@
+import { closeOnBackdrop } from "@/hooks/useClickAway";
 import { useState, useRef, useMemo } from "react";
 import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
@@ -1507,7 +1508,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             setTrophyDescription('');
           };
           return (
-            <div className="grid md:grid-cols-2 gap-8 mb-8">
+            <div className="grid md:grid-cols-2 gap-8 mt-10 mb-8">
               <div>
                 <div className="mb-4 flex items-center justify-between gap-2">
                   <h3 className="font-display text-primary text-xl flex items-center gap-2"><Target className="w-6 h-6 shrink-0" /> ACTIVITY</h3>
@@ -3123,7 +3124,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
 
       {/* Send Gold/Items Modal */}
       {showSendModal && (
-        <div className="fixed inset-0 bg-background/80 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-background/80 z-[80] flex items-center justify-center p-4" onMouseDown={closeOnBackdrop(() => { setShowSendModal(false); setSendTargetId(''); setSendGoldAmount(0); setSendQuantities({}); })}>
           <div className="bg-background border-2 border-primary rounded-lg p-6 max-w-md w-full shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-display text-lg text-primary">Send Gold/Items</h3>
@@ -3340,7 +3341,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
         };
 
         return (
-          <div className="fixed inset-0 z-50" onClick={() => setWeaponAdvMenu(null)}>
+          <div className="fixed inset-0 z-[80]" onClick={() => setWeaponAdvMenu(null)}>
             <div
               className="absolute bg-background border-2 border-destructive rounded-lg shadow-xl p-2 space-y-1"
               style={{ left: weaponAdvMenu.x, top: weaponAdvMenu.y - 120 }}
@@ -3384,7 +3385,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
         };
 
         return (
-          <div className="fixed inset-0 bg-background/80 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-background/80 z-[80] flex items-center justify-center p-4" onMouseDown={closeOnBackdrop(() => { setUpgradingWeapon(null); setUpgradeForm(null); setUpgradeWeaponName(''); })}>
             <div className="bg-background border-2 border-accent rounded-lg p-6 max-w-lg w-full shadow-xl max-h-[80vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-display text-lg text-accent">Upgrade {upgradingWeapon.name}</h3>
@@ -3598,7 +3599,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
           }
         };
         return (
-          <div className="fixed inset-0 bg-background/80 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-background/80 z-[80] flex items-center justify-center p-4" onMouseDown={closeOnBackdrop(closeHeal)}>
             <div className="bg-background border-2 border-green-500 rounded-lg p-6 max-w-md w-full shadow-xl max-h-[80vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-display text-lg text-green-400">
@@ -3681,7 +3682,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
         };
 
         return (
-        <div className="fixed inset-0 bg-background/80 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-background/80 z-[80] flex items-center justify-center p-4" onMouseDown={closeOnBackdrop(() => { setShowDamageTargetModal(false); setPendingDamageRoll(null); setDamageRollResult(null); setSplashTargetIds([]); setSplashDamageResults({}); })}>
           <div className="bg-background border-2 border-destructive rounded-lg p-6 max-w-md w-full shadow-xl max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-display text-lg text-destructive">

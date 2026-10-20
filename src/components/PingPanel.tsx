@@ -33,6 +33,8 @@ interface PingPanelProps {
   getCrawlerInventory?: (crawlerId: string) => InventoryItem[];
   currentPlayerId?: string;
   onUndoCombatTurn?: () => Promise<boolean>;
+  /** The top menu is showing, so the open panel stops below it instead of covering it */
+  isNavVisible?: boolean;
 }
 
 // Matches the DM Console toggle: encountered mobs are revealed, unencountered ones hidden
@@ -84,6 +86,7 @@ const PingPanel: React.FC<PingPanelProps> = ({
   getCrawlerInventory,
   currentPlayerId,
   onUndoCombatTurn,
+  isNavVisible = false,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showRestDropdown, setShowRestDropdown] = useState<'short' | 'long' | null>(null);
@@ -351,7 +354,9 @@ const PingPanel: React.FC<PingPanelProps> = ({
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            className="bg-background border-2 border-accent p-4 w-[calc(100vw-1rem)] sm:w-80 shadow-lg shadow-accent/20 mb-2 max-h-[calc(100vh-7rem)] overflow-y-auto hide-scrollbar"
+            className="bg-background border-2 border-accent p-4 w-[calc(100vw-1rem)] sm:w-80 shadow-lg shadow-accent/20 mb-2 overflow-y-auto hide-scrollbar"
+            // Leave the top menu (or its hover strip when hidden) uncovered
+            style={{ maxHeight: isNavVisible ? 'calc(100vh - 12rem)' : 'calc(100vh - 8.5rem)' }}
             ref={(el) => {
               if (el && !(el as HTMLElement & { _wheelAttached?: boolean })._wheelAttached) {
                 (el as HTMLElement & { _wheelAttached?: boolean })._wheelAttached = true;
