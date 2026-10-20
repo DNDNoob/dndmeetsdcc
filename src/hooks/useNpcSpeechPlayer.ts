@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ChatMessage } from '@/lib/gameData';
+import { clipSource } from '@/lib/npcSpeech/clipStore';
 
 const PREFS_KEY = 'dcc_npc_speech_audio';
 // A clip that shows up later than this after its line appeared isn't played (it would be out of step with the chat)
@@ -19,6 +20,7 @@ const readPrefs = (): SpeechPrefs => {
 };
 
 interface NpcSpeechPlayerOptions {
+  roomId: string | null | undefined;        // where the clips are saved
   messages: ChatMessage[];                  // this episode's chat lines
   understands: (m: ChatMessage) => boolean; // does this viewer know the line's language?
   mapId?: string | null;                    // only lines said on the map this viewer is looking at
@@ -28,19 +30,20 @@ interface NpcSpeechPlayerOptions {
  * Spoken voices, every device: plays each new NPC line's clip once, one at a time, at this
  * viewer's volume. Viewers who don't know the language hear the scrambled clip.
  */
-export function useNpcSpeechPlayer({ messages, understands, mapId }: NpcSpeechPlayerOptions) {
+export function useNpcSpeechPlayer({ roomId, messages, understands, mapId }: NpcSpeechPlayerOptions) {
   const [prefs, setPrefs] = useState<SpeechPrefs>(readPrefs);
   const prefsRef = useRef(prefs);
   prefsRef.current = prefs;
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const queue = useRef<{ url: string; at: number }[]>([]);
+  // Each clip starts loading as soon as it's queued, so it's ready when its turn comes
+  const queue = useRef<{ id: string; src: Promise<string>; at: number }[]>([]);
   const playing = useRef(false);
   const handled = useRef<Set<string> | null>(null);
   // When this device first saw each line: its clip arrives a little later
   const seenAt = useRef(new Map<string, number>());
   const blocked = useRef(false);
+  const unlocked = useRef(false);
   const [speakingId, setSpeakingId] = useState<string | null>(null);
-  const idByUrl = useRef(new Map<string, string>());
 
   const getAudio = () => {
     audioRef.current ??= new Audio();
@@ -54,7 +57,7 @@ export function useNpcSpeechPlayer({ messages, understands, mapId }: NpcSpeechPl
     if (!next) { setSpeakingId(null); return; }
     const a = getAudio();
     playing.current = true;
-    setSpeakingId(idByUrl.current.get(next.url) ?? null);
+    setSpeakingId(next.id);
     const item = next;
     const done = () => {
       a.onended = null;
@@ -64,9 +67,11 @@ export function useNpcSpeechPlayer({ messages, understands, mapId }: NpcSpeechPl
     };
     a.onended = done;
     a.onerror = done;
-    a.src = item.url;
-    a.volume = prefsRef.current.volume;
-    a.play().catch((err: unknown) => {
+    item.src.then((src) => {
+      a.src = src;
+      a.volume = prefsRef.current.volume;
+      return a.play();
+    }).catch((err: unknown) => {
       if ((err as { name?: string })?.name !== 'NotAllowedError') { done(); return; }
       // The browser wants a tap before sound: keep the clip and play it on the next tap
       a.onended = null;
@@ -82,17 +87,15 @@ export function useNpcSpeechPlayer({ messages, understands, mapId }: NpcSpeechPl
   useEffect(() => {
     const unlock = () => {
       if (blocked.current) { blocked.current = false; playNext(); return; }
-      if (playing.current || audioRef.current) return;
+      if (playing.current || unlocked.current) return;
       const a = getAudio();
       a.src = SILENCE;
-      a.play().catch(() => {});
+      a.play().then(() => { unlocked.current = true; }).catch(() => {});
     };
-    window.addEventListener('pointerdown', unlock);
-    window.addEventListener('keydown', unlock);
-    return () => {
-      window.removeEventListener('pointerdown', unlock);
-      window.removeEventListener('keydown', unlock);
-    };
+    // Phones count a tap when the finger lifts (click, touchend), computers on press
+    const events = ['pointerdown', 'click', 'touchend', 'keydown'];
+    for (const e of events) window.addEventListener(e, unlock);
+    return () => { for (const e of events) window.removeEventListener(e, unlock); };
   }, [playNext]);
 
   useEffect(() => {
@@ -104,7 +107,11 @@ export function useNpcSpeechPlayer({ messages, understands, mapId }: NpcSpeechPl
     const now = Date.now();
     for (const m of messages) {
       if (handled.current.has(m.id)) continue;
-      if (m.authorType !== 'npc') { handled.current.add(m.id); continue; }
+      // Not an NPC, or an old line showing up as the chat loads: nothing to play
+      if (m.authorType !== 'npc' || (!seenAt.current.has(m.id) && (m.createdAt ?? 0) < now - PLAY_WITHIN_MS)) {
+        handled.current.add(m.id);
+        continue;
+      }
       if (!seenAt.current.has(m.id)) seenAt.current.set(m.id, now);
       if (!m.audioUrl) continue;
       handled.current.add(m.id);
@@ -114,11 +121,12 @@ export function useNpcSpeechPlayer({ messages, understands, mapId }: NpcSpeechPl
       if (mapId && m.mapId && m.mapId !== mapId) continue;
       const url = understands(m) ? m.audioUrl : m.audioScrambledUrl;
       if (!url) continue;
-      idByUrl.current.set(url, m.id);
-      queue.current.push({ url, at: now });
+      const src = clipSource(roomId, url);
+      src.catch(() => {}); // a missing clip is skipped when its turn comes
+      queue.current.push({ id: m.id, src, at: now });
     }
     playNext();
-  }, [messages, understands, mapId, playNext]);
+  }, [messages, understands, mapId, playNext, roomId]);
 
   const update = useCallback((next: Partial<SpeechPrefs>) => {
     setPrefs(prev => {

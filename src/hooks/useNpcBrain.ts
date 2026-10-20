@@ -23,6 +23,9 @@ export function useNpcBrain(roomId: string | null | undefined, isDm: boolean) {
   const keysRef = useRef(keys);
   keysRef.current = keys;
   const roomRef = useRef<NpcRoom | null>(null);
+  // A DM window without keys can't write lines, so it doesn't run a brain at all: otherwise its
+  // "add a key" pause, saved for the whole room, would switch off a DM window that has keys
+  const hasKey = !!(keys.groq?.trim() || keys.gemini?.trim());
 
   const setKeys = useCallback((next: NpcOnlineKeys) => {
     setKeysState(next);
@@ -37,7 +40,7 @@ export function useNpcBrain(roomId: string | null | undefined, isDm: boolean) {
   }, []);
 
   useEffect(() => {
-    if (!isDm || !roomId || !db) return;
+    if (!isDm || !roomId || !db || !hasKey) return;
     let room: NpcRoom | null = null;
     let release: () => void = () => {};
     let cancelled = false;
@@ -76,7 +79,7 @@ export function useNpcBrain(roomId: string | null | undefined, isDm: boolean) {
       roomRef.current = null;
       release();
     };
-  }, [roomId, isDm]);
+  }, [roomId, isDm, hasKey]);
 
   return { npcKeys: keys, setNpcKeys: setKeys };
 }

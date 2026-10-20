@@ -1,5 +1,12 @@
 [
   {
+    "date": "2026-10-20",
+    "changes": [
+      "🔈 NPC voice clips are now saved as small MP3s in the game's database instead of file storage, whose free daily allowance was running out, so spoken lines reach every player again",
+      "🧠 A DM window without NPC keys no longer switches off NPC replies from another DM window that has them"
+    ]
+  },
+  {
     "date": "2026-10-18",
     "changes": [
       "🐉 Creature sounds for NPC voices: Goblin, Tiny, Giant, Dragon and Ghost effects, picked from the NPC's notes or chosen in the chat settings",

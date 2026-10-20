@@ -2273,7 +2273,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     [isAdmin, myChatCrawler]
   );
   const { speechMuted, speechVolume, setSpeechPrefs } = useNpcSpeechPlayer({
-    messages: episodeChatMessages, understands: understandsChatLine, mapId: currentMapId,
+    roomId, messages: episodeChatMessages, understands: understandsChatLine, mapId: currentMapId,
   });
   // Speech bubbles show what this viewer can make out
   const bubbleMessages = useMemo(
