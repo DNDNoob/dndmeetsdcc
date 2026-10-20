@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { DungeonButton } from '@/components/ui/DungeonButton';
 import { DungeonCard } from '@/components/ui/DungeonCard';
 import { Package, Wand2, Trash2, Edit2, Save, X, Plus, Coins } from 'lucide-react';
-import type { EquipmentSlot, InventoryItem, Spell } from '@/lib/gameData';
+import { ITEM_RARITIES, type EquipmentSlot, type InventoryItem, type ItemRarity, type Spell } from '@/lib/gameData';
+import { RarityBadge } from '@/components/ui/RarityBadge';
 
 const SLOT_LABELS: Record<EquipmentSlot, string> = {
   head: 'Head', chest: 'Chest', legs: 'Legs', feet: 'Feet',
@@ -17,7 +18,7 @@ interface MyContentPanelProps {
   onDeleteSpell: (id: string) => Promise<void>;
 }
 
-const emptyDraft = { name: '', description: '', equipSlot: '' as EquipmentSlot | '', goldValue: '' };
+const emptyDraft = { name: '', description: '', equipSlot: '' as EquipmentSlot | '', goldValue: '', rarity: '' as ItemRarity | '', effects: '' };
 
 /**
  * Personal items and spells, linked to the user's profile instead of a campaign.
@@ -36,6 +37,8 @@ const MyContentPanel: React.FC<MyContentPanelProps> = ({ myItems, mySpells, onSa
       description: item.description || '',
       equipSlot: item.equipSlot || '',
       goldValue: item.goldValue !== undefined ? String(item.goldValue) : '',
+      rarity: item.rarity || '',
+      effects: item.effects || '',
     });
     setShowForm(true);
   };
@@ -57,6 +60,8 @@ const MyContentPanel: React.FC<MyContentPanelProps> = ({ myItems, mySpells, onSa
       description: draft.description.trim(),
       equipSlot: draft.equipSlot || undefined,
       goldValue: Number.isFinite(gold) ? gold : undefined,
+      rarity: draft.rarity || undefined,
+      effects: draft.effects.trim() || undefined,
     });
     reset();
   };
@@ -96,7 +101,23 @@ const MyContentPanel: React.FC<MyContentPanelProps> = ({ myItems, mySpells, onSa
               rows={2}
               className="w-full bg-background border border-border px-3 py-2 text-sm"
             />
+            <textarea
+              value={draft.effects}
+              onChange={(e) => setDraft({ ...draft, effects: e.target.value })}
+              placeholder="Effects (what the item does)"
+              rows={2}
+              className="w-full bg-background border border-border px-3 py-2 text-sm"
+            />
             <div className="flex gap-2">
+              <select
+                value={draft.rarity}
+                onChange={(e) => setDraft({ ...draft, rarity: e.target.value as ItemRarity | '' })}
+                aria-label="Rarity"
+                className="w-32 bg-background border border-border px-2 py-2 text-sm"
+              >
+                <option value="">No rarity</option>
+                {ITEM_RARITIES.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
               <select
                 value={draft.equipSlot}
                 onChange={(e) => setDraft({ ...draft, equipSlot: e.target.value as EquipmentSlot | '' })}
@@ -135,6 +156,7 @@ const MyContentPanel: React.FC<MyContentPanelProps> = ({ myItems, mySpells, onSa
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1 flex-wrap">
                     <span className="text-foreground">{item.name}</span>
+                    <RarityBadge rarity={item.rarity} />
                     {item.equipSlot && (
                       <span className="text-xs bg-accent/20 text-accent px-1.5 py-0.5 rounded">{SLOT_LABELS[item.equipSlot]}</span>
                     )}
@@ -145,6 +167,7 @@ const MyContentPanel: React.FC<MyContentPanelProps> = ({ myItems, mySpells, onSa
                     )}
                   </div>
                   {item.description && <span className="text-muted-foreground text-xs block">{item.description}</span>}
+                  {item.effects && <span className="text-accent italic text-xs block">{item.effects}</span>}
                 </div>
                 <button onClick={() => startEdit(item)} className="text-muted-foreground hover:text-primary shrink-0" title="Edit">
                   <Edit2 className="w-3.5 h-3.5" />

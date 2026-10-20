@@ -52,6 +52,8 @@ import {
   type PublicEpisodeAssets,
   type CustomLanguage,
   type LanguageEffect,
+  type ActiveCondition,
+  type SpellEffect,
   type MerchantState,
   type MerchantStockEntry,
   type MerchantHaggle,
@@ -755,6 +757,7 @@ export const useGameState = () => {
         tier: template.tier,
         items: (template.items ?? []).map(item => ({ ...item, id: crypto.randomUUID() })),
         gold: template.gold,
+        achievement: template.achievement ?? undefined,
         locked: true,
         sentAt: new Date().toISOString(),
       } as Record<string, unknown>,
@@ -763,7 +766,14 @@ export const useGameState = () => {
   };
 
   const unlockLootBox = async (lootBoxId: string) => {
-    return updateItem('lootBoxes', lootBoxId, { locked: false, unlockedAt: new Date().toISOString() });
+    const box = lootBoxes.find(b => b.id === lootBoxId);
+    await updateItem('lootBoxes', lootBoxId, { locked: false, unlockedAt: new Date().toISOString() });
+    // A box's achievement lands on the crawler's profile the moment it's unlocked
+    if (box?.locked && box.achievement?.name) {
+      await awardTrophy(box.crawlerId, box.achievement.name, box.achievement.description);
+      // A box that held only an achievement has nothing left to claim
+      if (box.items.length === 0 && !box.gold) await deleteItem('lootBoxes', lootBoxId);
+    }
   };
 
   const claimLootBoxItems = async (lootBoxId: string, crawlerId: string, itemIds: string[], claimGold = false) => {
@@ -1233,7 +1243,8 @@ export const useGameState = () => {
   };
 
   // Checkpoint of the game at the start of a combat turn, so the player can undo that turn
-  const buildTurnSnapshot = (combatants: CombatantEntry[], turnIndex: number): CombatTurnSnapshot | undefined => {
+  // crawlerHP overrides HP written this same moment (e.g. damage over time at the start of the turn)
+  const buildTurnSnapshot = (combatants: CombatantEntry[], turnIndex: number, crawlerHP: Record<string, number> = {}): CombatTurnSnapshot | undefined => {
     const active = combatants[turnIndex];
     if (!active) return undefined;
     const snapCrawlers: CombatTurnSnapshot['crawlers'] = {};
@@ -1241,7 +1252,7 @@ export const useGameState = () => {
       if (c.type !== 'crawler') continue;
       const crawler = crawlers.find(cr => cr.id === c.id);
       if (!crawler) continue;
-      snapCrawlers[c.id] = { hp: crawler.hp ?? 0, mana: crawler.mana ?? 0, activityStats: crawler.activityStats };
+      snapCrawlers[c.id] = { hp: crawlerHP[c.id] ?? crawler.hp ?? 0, mana: crawler.mana ?? 0, activityStats: crawler.activityStats };
     }
     const activeCrawler = active.type === 'crawler' ? crawlers.find(cr => cr.id === active.id) : undefined;
     return {
@@ -1253,6 +1264,7 @@ export const useGameState = () => {
         hasUsedAction: c.hasUsedAction,
         hasUsedBonusAction: c.hasUsedBonusAction,
         feetMovedThisTurn: c.feetMovedThisTurn,
+        conditions: c.conditions ?? [],
       })),
       crawlers: snapCrawlers,
       knownSpells: activeCrawler?.knownSpells,
@@ -1279,23 +1291,132 @@ export const useGameState = () => {
     if (!combatState || combatState.combatants.length === 0) return;
     const nextIndex = combatState.currentTurnIndex + 1;
     const isNewRound = nextIndex >= combatState.combatants.length;
-    // Reset action flags for the combatant whose turn just ended
-    const resetCombatants = combatState.combatants.map((c, i) => {
+    // Reset action flags for the combatant whose turn just ended, and count down its spell effects
+    let resetCombatants = combatState.combatants.map((c, i) => {
       if (i === combatState.currentTurnIndex) {
-        return { ...c, hasUsedAction: false, hasUsedBonusAction: false, feetMovedThisTurn: 0 };
+        return { ...c, hasUsedAction: false, hasUsedBonusAction: false, feetMovedThisTurn: 0, conditions: tickConditions(c.conditions) };
       }
       return c;
     });
     const newIndex = isNewRound ? 0 : nextIndex;
     if (isNewRound) await tickLanguageEffects('combat');
+    // Damage or healing over time lands at the start of the next combatant's turn
+    const startResult = await applyStartOfTurnConditions(resetCombatants, newIndex);
+    resetCombatants = startResult.combatants;
     await updateItem('combatState', 'current', {
       combatants: resetCombatants,
       currentTurnIndex: newIndex,
       combatRound: isNewRound ? combatState.combatRound + 1 : combatState.combatRound,
       turnStartedAt: Date.now(),
       turnTimerPaused: false,
-      turnSnapshot: buildTurnSnapshot(resetCombatants, newIndex) ?? null,
+      turnSnapshot: buildTurnSnapshot(resetCombatants, newIndex, startResult.crawlerHP) ?? null,
     } as Record<string, unknown>);
+    if (startResult.killedMobIds.length > 0) await lootDefeatedMobs(startResult.killedMobIds);
+  };
+
+  // One turn of a combatant's spell effects has passed; effects with no turns left wear off
+  const tickConditions = (conditions?: ActiveCondition[]): ActiveCondition[] =>
+    (conditions ?? []).flatMap(cond => (cond.turnsLeft > 1 ? [{ ...cond, turnsLeft: cond.turnsLeft - 1 }] : []));
+
+  // Roll damage/healing-over-time effects for the combatant whose turn is starting.
+  // Crawler HP is written straight away; mob HP is returned in the combatants list.
+  const applyStartOfTurnConditions = async (combatants: CombatantEntry[], turnIndex: number) => {
+    const active = combatants[turnIndex];
+    const killedMobIds: string[] = [];
+    const crawlerHP: Record<string, number> = {};
+    const ticking = (active?.conditions ?? []).filter(c => c.perTurnType && (c.perTurnDice ?? []).some(d => d.count > 0));
+    if (!active || ticking.length === 0) return { combatants, killedMobIds, crawlerHP };
+
+    const crawler = active.type === 'crawler' ? crawlers.find(c => c.id === active.id) : undefined;
+    const mob = active.type === 'mob' ? mobs.find(m => m.id === (active.sourceId || active.id)) : undefined;
+    if (!crawler && !mob) return { combatants, killedMobIds, crawlerHP };
+    const maxHP = crawler
+      ? (crawler.maxHP || 0) + (getEquippedModifiers(crawler, getCrawlerInventory(crawler.id)).maxHP ?? 0)
+      : mob?.hitPoints ?? 0;
+    const startHP = crawler ? crawler.hp ?? 0 : active.currentHP ?? mob?.hitPoints ?? 0;
+    let hp = startHP;
+
+    for (const cond of ticking) {
+      const results: { dice: string; result: number }[] = [];
+      let total = 0;
+      for (const die of cond.perTurnDice ?? []) {
+        for (let i = 0; i < die.count; i++) {
+          const roll = Math.floor(Math.random() * die.sides) + 1;
+          results.push({ dice: `d${die.sides}`, result: roll });
+          total += roll;
+        }
+      }
+      const isHealing = cond.perTurnType === 'healing';
+      hp = isHealing ? Math.min(maxHP, hp + total) : Math.max(0, hp - total);
+      await addDiceRoll({
+        id: crypto.randomUUID(),
+        crawlerName: active.name,
+        crawlerId: active.id,
+        timestamp: Date.now(),
+        results,
+        total,
+        statRoll: {
+          stat: `${cond.name} from ${cond.source} (${isHealing ? 'Healing' : 'Damage'} → ${active.name})`,
+          modifier: 0,
+          rawRoll: total,
+          diceLabel: (cond.perTurnDice ?? []).filter(d => d.count > 0).map(d => `${d.count}d${d.sides}`).join(' + '),
+          rollType: isHealing ? 'Healing' : 'Damage',
+        },
+      });
+    }
+
+    if (crawler) {
+      if (hp !== startHP) {
+        crawlerHP[crawler.id] = hp;
+        await writeCrawler(crawler.id, {
+          hp,
+          activityStats: addActivityStats(crawler.activityStats, getCrawlerHPLossStats(crawler, startHP, hp)),
+        });
+      }
+      return { combatants, killedMobIds, crawlerHP };
+    }
+    if (startHP > 0 && hp === 0) killedMobIds.push(active.id);
+    return { combatants: combatants.map((c, i) => (i === turnIndex ? { ...c, currentHP: hp } : c)), killedMobIds, crawlerHP };
+  };
+
+  // Edit combatants against the latest saved combat state, so an effect applied right after
+  // damage doesn't overwrite the HP that damage just wrote
+  const updateCombatantsFresh = (edit: (combatants: CombatantEntry[]) => CombatantEntry[]) =>
+    transact([{ collection: 'combatState', id: 'current' }], ([combatDoc]) => {
+      const combatants = (combatDoc?.combatants as CombatantEntry[] | undefined) ?? [];
+      return [{ type: 'update', collection: 'combatState', id: 'current', data: { combatants: edit(combatants) } }];
+    });
+
+  // Put a spell's effect on each target. Recasting the same spell refreshes its effect instead of stacking.
+  const applyCombatConditions = async (targetIds: string[], effect: SpellEffect, spellName: string, casterName?: string) => {
+    if (!combatState?.active || targetIds.length === 0 || !effect.condition.trim()) return;
+    const targets = new Set(targetIds);
+    const name = effect.condition.trim();
+    await updateCombatantsFresh(combatants => combatants.map(c => {
+      if (!targets.has(c.id)) return c;
+      const others = (c.conditions ?? []).filter(cond => !(cond.source === spellName && cond.name === name));
+      const condition: ActiveCondition = {
+        id: crypto.randomUUID(),
+        name,
+        turnsLeft: Math.max(1, effect.turns || 1),
+        description: effect.description?.trim() || undefined,
+        source: spellName,
+        casterName,
+        perTurnDice: effect.perTurnType ? effect.perTurnDice : undefined,
+        perTurnType: effect.perTurnType,
+      };
+      return { ...c, conditions: [...others, condition] };
+    }));
+    const names = combatState.combatants.filter(c => targets.has(c.id)).map(c => c.name);
+    toast.success(`${names.join(', ')} ${names.length === 1 ? 'is' : 'are'} now ${name}`);
+  };
+
+  // DM removes an effect early (a passed saving throw, a dispel, etc.)
+  const removeCombatCondition = async (combatantId: string, conditionId: string) => {
+    if (!combatState) return;
+    await updateCombatantsFresh(combatants => combatants.map(c =>
+      c.id === combatantId ? { ...c, conditions: (c.conditions ?? []).filter(cond => cond.id !== conditionId) } : c
+    ));
   };
 
   // Undo the current combat turn: put the game back to the checkpoint taken when the turn
@@ -1320,6 +1441,7 @@ export const useGameState = () => {
         hasUsedAction: s.hasUsedAction,
         hasUsedBonusAction: s.hasUsedBonusAction,
         feetMovedThisTurn: s.feetMovedThisTurn ?? 0,
+        conditions: s.conditions ?? [],
       };
     });
 
@@ -2445,6 +2567,8 @@ export const useGameState = () => {
     recordCrawlerMove,
     undoCombatTurn,
     awardTrophy,
+    applyCombatConditions,
+    removeCombatCondition,
     applyNoChildLeftBehind,
     revokeTrophy,
     overrideMobHealth,

@@ -271,11 +271,25 @@ The DM creates items in the Item Library on the Inventory page. Library items se
 
 Each item can have:
 - **Name** and **Description**
+- **Rarity**: Common, Uncommon, Rare, Epic or Legendary, shown as a colored tag next to the item's name
+- **Effects**: what the item does, in plain words (for example "Glows near goblins"). It shows on the item when you expand it
 - **Equipment Slot** (if equippable)
 - **Gold Value**
 - **Stat Modifiers** (when equipped)
 - **Weapon Data** (for weapons)
 - **Tags** (for categorization)
+
+## Item Rarity
+
+| Rarity | Color |
+|--------|-------|
+| Common | Gray |
+| Uncommon | Green |
+| Rare | Blue |
+| Epic | Purple |
+| Legendary | Orange |
+
+The Item Library can be filtered by rarity with the **All Rarities** menu next to the slot filter. Rarity is optional; items without one show no tag. Rarity and effects can also be set on items in **My Content**.
 
 ## Managing Inventory
 
@@ -751,7 +765,7 @@ Loot boxes are reward packages that the DM sends to crawlers during gameplay.
 
 ## DM Workflow
 
-1. **Create Templates**: In the DM Console, create loot box templates with a name, tier, items, and optional gold
+1. **Create Templates**: In the DM Console, create loot box templates with a name, tier, items, optional gold, and an optional **Achievement**
 2. **Send to Crawlers**: During Show Time, select a template and choose which crawlers receive it
 3. **Unlock**: When ready, click "Unlock" on a sent loot box to let the crawler open it
 
@@ -761,6 +775,12 @@ Loot boxes are reward packages that the DM sends to crawlers during gameplay.
 2. **View**: Go to your profile page to see pending loot boxes
 3. **Claim**: Once the DM unlocks the box, click "Claim" to add the items and gold to your inventory
 4. **Claim All**: Use the "Claim All" button to instantly claim all unlocked loot boxes
+
+## Achievements in Loot Boxes
+
+A loot box can carry an achievement: give it a name (and an optional description) when creating the box. When the DM unlocks a crawler's box, the achievement is added to that crawler's trophies on their profile, the same as a trophy the DM awards by hand (see [Activity Stats & Trophies](/wiki/activity-trophies)). Getting the same achievement again counts it up.
+
+While the box is locked, players only see a 🏆 next to its item count. After it's unlocked, the box shows which achievement was added. A box that held only an achievement disappears once it's unlocked, since there's nothing left to claim.
 
 ## Loot Box History
 
@@ -1672,6 +1692,7 @@ Each spell has the following configurable properties:
 | **Saving Throw** | Which stat the target rolls to resist |
 | **Splash Damage** | Whether the spell can hit multiple targets |
 | **Special Effect** | Free-text description of any on-hit effects |
+| **Effect on Targets** | A condition (like Burning or Stunned) the spell puts on each target in combat, how many of the target's turns it lasts, what it does, and optional damage or healing dice rolled each turn (see [Spell Effects](/wiki/spell-effects)) |
 | **Can Target Self** | Whether the caster can target themselves |
 | **Reaction Trigger** | *(Reaction spells only)* What event triggers the reaction |
 
@@ -1689,6 +1710,44 @@ Fire, Cold, Lightning, Poison, Acid, Necrotic, Radiant, Psychic, Thunder, Force,
 | **Cone** | Fans out from the caster |
 | **Line** | Extends in a straight line from the caster |
 | **Cube** | Fills a cubic area |`,
+  },
+  {
+    id: 'spell-effects',
+    slug: 'spell-effects',
+    title: 'Spell Effects',
+    category: 'Spells',
+    order: 3.5,
+    content: `# Spell Effects
+
+A spell can leave an **effect** on the creatures it hits, like Burning, Poisoned, Stunned or Blessed. Effects work during combat, where they count down turn by turn.
+
+## Setting Up an Effect
+
+In the spell editor, tick **Puts an effect on targets**, then set:
+
+- **Condition**: pick a preset (Burning, Poisoned, Bleeding, Frozen, Stunned, Paralyzed, Blinded, Charmed, Frightened, Slowed, Restrained, Prone, Silenced, Blessed, Shielded, Hasted, Regenerating) or type your own
+- **Lasts**: how many of the target's turns it lasts
+- **What it does**: plain words shown on the badge, like "Disadvantage on attacks"
+- **Each turn** *(optional)*: damage or healing dice rolled automatically at the start of each of the target's turns, like 1d6 fire for Burning or 1d4 healing for Regenerating
+
+## How Effects Land
+
+- **Damage spells**: when you apply the damage, the effect goes on the same target (or every splash target)
+- **Healing spells**: the effect goes on each crawler you heal
+- **Effect-only spells** (no dice): casting opens a target picker; pick who it lands on and press Apply
+- **Self spells**: the effect goes straight onto the caster
+
+Casting the same spell on a target again refreshes its effect instead of stacking a second copy. Outside combat, spells roll as usual but don't leave effects.
+
+## During Combat
+
+- Effects show as small badges under each portrait in the combat order bar above the Show Time map, with the turns left. Hover a badge to see the spell, caster and what it does
+- Damage or healing over time rolls at the start of the affected creature's turn and posts to the dice history. A mob brought to 0 HP this way is looted like any other kill
+- At the end of the creature's turn its effects count down by one, and wear off at zero
+- The DM can remove an effect early (a passed saving throw, a dispel) with the ✕ on its badge
+- Effects end when combat ends, and **Undo Turn** puts them back the way they were at the start of the turn
+
+Effects don't change rolls or skip turns by themselves; the badge tells everyone what applies, and the DM rules on it.`,
   },
   {
     id: 'spell-tomes',

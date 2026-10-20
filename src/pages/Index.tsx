@@ -195,6 +195,8 @@ const Index = () => {
     recordCombatAction,
     applyCombatDamage,
     applyCombatDamageBatch,
+    applyCombatConditions,
+    removeCombatCondition,
     recordCrawlerMove,
     undoCombatTurn,
     awardTrophy,
@@ -1015,6 +1017,7 @@ const Index = () => {
                 onUndoCombatTurn={undoCombatTurn}
                 onApplyCombatDamage={applyCombatDamage}
                 onApplyCombatDamageBatch={applyCombatDamageBatch}
+                onApplyCombatConditions={applyCombatConditions}
                 isAdmin={isAdmin}
                 onAwardTrophy={awardTrophy}
                 onRevokeTrophy={revokeTrophy}
@@ -1154,6 +1157,7 @@ const Index = () => {
                 resetNoncombatTurns={resetNoncombatTurns}
                 combatState={activeCombatState}
                 onRemoveCombatant={removeCombatant}
+                onRemoveCombatCondition={removeCombatCondition}
                 roomId={roomId}
                 quests={quests}
                 assignedQuests={assignedQuests}

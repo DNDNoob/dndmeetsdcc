@@ -156,6 +156,12 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   const [lootBoxItemQuantity, setLootBoxItemQuantity] = useState(1);
   const [newLootBoxGold, setNewLootBoxGold] = useState(0);
   const [editingLootBoxId, setEditingLootBoxId] = useState<string | null>(null);
+  // Optional achievement awarded to the crawler when their copy of the box is unlocked
+  const [newLootBoxAchievementName, setNewLootBoxAchievementName] = useState("");
+  const [newLootBoxAchievementDesc, setNewLootBoxAchievementDesc] = useState("");
+  const lootBoxAchievement = () => newLootBoxAchievementName.trim()
+    ? { name: newLootBoxAchievementName.trim(), description: newLootBoxAchievementDesc.trim() || undefined }
+    : null;
 
   // Quest state for episode (selected quest IDs)
   const [selectedQuestIdsForEpisode, setSelectedQuestIdsForEpisode] = useState<string[]>([]);
@@ -2196,6 +2202,30 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                   </div>
                 </div>
 
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">🏆 Achievement (optional)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Goblin Bane"
+                      value={newLootBoxAchievementName}
+                      onChange={e => setNewLootBoxAchievementName(e.target.value)}
+                      className="w-full bg-background border border-border rounded px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Achievement description</label>
+                    <input
+                      type="text"
+                      placeholder="Shown on the crawler's profile"
+                      value={newLootBoxAchievementDesc}
+                      onChange={e => setNewLootBoxAchievementDesc(e.target.value)}
+                      disabled={!newLootBoxAchievementName.trim()}
+                      className="w-full bg-background border border-border rounded px-3 py-2 text-sm disabled:opacity-50"
+                    />
+                  </div>
+                </div>
+
                 {/* Item search with quantity */}
                 <div>
                   <label className="text-xs text-muted-foreground mb-1 block">Add Items from Shared Inventory</label>
@@ -2299,6 +2329,8 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                         setNewLootBoxTier("Copper");
                         setNewLootBoxItems([]);
                         setNewLootBoxGold(0);
+                        setNewLootBoxAchievementName("");
+                        setNewLootBoxAchievementDesc("");
                       }}
                       className="flex-1"
                     >
@@ -2307,15 +2339,16 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                   )}
                   <DungeonButton
                     variant="admin"
-                    disabled={!newLootBoxName.trim() || (newLootBoxItems.length === 0 && newLootBoxGold === 0) || !onAddLootBoxTemplate}
+                    disabled={!newLootBoxName.trim() || (newLootBoxItems.length === 0 && newLootBoxGold === 0 && !newLootBoxAchievementName.trim()) || !onAddLootBoxTemplate}
                     onClick={() => {
-                      if (!newLootBoxName.trim() || (newLootBoxItems.length === 0 && newLootBoxGold === 0)) return;
+                      if (!newLootBoxName.trim() || (newLootBoxItems.length === 0 && newLootBoxGold === 0 && !newLootBoxAchievementName.trim())) return;
                       if (editingLootBoxId && onUpdateLootBoxTemplate) {
                         onUpdateLootBoxTemplate(editingLootBoxId, {
                           name: newLootBoxName,
                           tier: newLootBoxTier,
                           items: newLootBoxItems,
                           gold: newLootBoxGold > 0 ? newLootBoxGold : undefined,
+                          achievement: lootBoxAchievement(),
                         });
                         setEditingLootBoxId(null);
                       } else if (onAddLootBoxTemplate) {
@@ -2325,12 +2358,15 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                           tier: newLootBoxTier,
                           items: newLootBoxItems,
                           gold: newLootBoxGold > 0 ? newLootBoxGold : undefined,
+                          achievement: lootBoxAchievement(),
                         });
                       }
                       setNewLootBoxName("");
                       setNewLootBoxTier("Copper");
                       setNewLootBoxItems([]);
                       setNewLootBoxGold(0);
+                      setNewLootBoxAchievementName("");
+                      setNewLootBoxAchievementDesc("");
                     }}
                     className="flex-1"
                   >
@@ -2366,7 +2402,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                           <div className="min-w-0">
                             <h4 className="font-semibold truncate">{template.name}</h4>
                             <p className="text-xs text-muted-foreground">
-                              {template.tier} · {template.items.length} item{template.items.length !== 1 ? 's' : ''}{template.gold ? ` · ${template.gold}g` : ''}
+                              {template.tier} · {template.items.length} item{template.items.length !== 1 ? 's' : ''}{template.gold ? ` · ${template.gold}g` : ''}{template.achievement ? ` · 🏆 ${template.achievement.name}` : ''}
                             </p>
                           </div>
                         </div>
@@ -2378,6 +2414,8 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                               setNewLootBoxTier(template.tier);
                               setNewLootBoxItems([...template.items]);
                               setNewLootBoxGold(template.gold ?? 0);
+                              setNewLootBoxAchievementName(template.achievement?.name ?? "");
+                              setNewLootBoxAchievementDesc(template.achievement?.description ?? "");
                               window.scrollTo({ top: 0, behavior: 'smooth' });
                             }}
                             className="p-1.5 hover:bg-muted rounded transition-colors"

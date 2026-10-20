@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
-import { Crawler, InventoryItem, getItemStackKey, stackItems, EquipmentSlot as SlotType, StatModifiers, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, Spell, SpellData } from "@/lib/gameData";
+import { Crawler, InventoryItem, getItemStackKey, stackItems, EquipmentSlot as SlotType, StatModifiers, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, Spell, SpellData, ITEM_RARITIES, ItemRarity, getItemRarityColor } from "@/lib/gameData";
+import { RarityBadge } from "@/components/ui/RarityBadge";
 import { Coins, Package, Sword, Shield, Plus, Trash2, Edit2, Save, HardHat, Search, BookOpen, Gem, Footprints, Shirt, Hand, Crosshair, ChevronDown, ChevronUp, Wand2, Globe, Lock, Users, Bookmark } from "lucide-react";
 import { SpellDataEditor } from "@/views/SpellsView";
 
@@ -135,6 +136,8 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     spellTomeData?: { entries: Array<{ spellId?: string; customSpell?: Spell }> };
     language?: string;
     grantsLanguage?: string;
+    rarity?: ItemRarity;
+    effects?: string;
   }>({
     name: "", description: "", equipSlot: undefined, goldValue: undefined, statModifiers: undefined, weaponData: undefined,
   });
@@ -151,6 +154,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   // Library search and filter state
   const [librarySearchQuery, setLibrarySearchQuery] = useState("");
   const [librarySlotFilter, setLibrarySlotFilter] = useState<string>("all");
+  const [libraryRarityFilter, setLibraryRarityFilter] = useState<string>("all");
 
   // Local gold state for immediate UI updates (avoids lag while typing)
   const [localGold, setLocalGold] = useState<Record<string, number>>({});
@@ -211,6 +215,8 @@ const InventoryView: React.FC<InventoryViewProps> = ({
       spellTomeData: item.spellTomeData,
       language: item.language,
       grantsLanguage: item.grantsLanguage,
+      rarity: item.rarity,
+      effects: item.effects,
     });
     setShowWeaponConfig(!!item.weaponData);
     setShowSpellTomeConfig(!!item.isSpellTome);
@@ -247,6 +253,8 @@ const InventoryView: React.FC<InventoryViewProps> = ({
               goldValue: newLibraryItem.goldValue,
               language: newLibraryItem.language,
               grantsLanguage: newLibraryItem.grantsLanguage,
+              rarity: newLibraryItem.rarity,
+              effects: newLibraryItem.effects?.trim() || undefined,
               ...(mods && Object.keys(mods).length > 0 ? { statModifiers: mods } : { statModifiers: undefined }),
               ...weaponFields,
               ...spellTomeFields,
@@ -275,6 +283,8 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 goldValue: newLibraryItem.goldValue,
                 language: newLibraryItem.language,
                 grantsLanguage: newLibraryItem.grantsLanguage,
+                rarity: newLibraryItem.rarity,
+                effects: newLibraryItem.effects?.trim() || undefined,
                 ...(mods && Object.keys(mods).length > 0 ? { statModifiers: mods } : { statModifiers: undefined }),
                 ...weaponFields,
                 ...spellTomeFields,
@@ -297,6 +307,8 @@ const InventoryView: React.FC<InventoryViewProps> = ({
         goldValue: newLibraryItem.goldValue,
         ...(newLibraryItem.language ? { language: newLibraryItem.language } : {}),
         ...(newLibraryItem.grantsLanguage ? { grantsLanguage: newLibraryItem.grantsLanguage } : {}),
+        ...(newLibraryItem.rarity ? { rarity: newLibraryItem.rarity } : {}),
+        ...(newLibraryItem.effects?.trim() ? { effects: newLibraryItem.effects.trim() } : {}),
         ...(mods && Object.keys(mods).length > 0 ? { statModifiers: mods } : {}),
         ...weaponFields,
         ...spellTomeFields,
@@ -338,6 +350,12 @@ const InventoryView: React.FC<InventoryViewProps> = ({
         <div>
           <span className="text-muted-foreground">Description: </span>
           <ForeignText text={item.description} language={item.language} className="text-foreground" />
+        </div>
+      )}
+      {item.effects && (
+        <div>
+          <span className="text-muted-foreground">Effects: </span>
+          <span className="text-accent italic whitespace-pre-wrap">{item.effects}</span>
         </div>
       )}
       {item.goldValue !== undefined && item.goldValue > 0 && (
@@ -438,6 +456,9 @@ const InventoryView: React.FC<InventoryViewProps> = ({
         items = items.filter(i => i.equipSlot === librarySlotFilter);
       }
     }
+    if (libraryRarityFilter !== "all") {
+      items = items.filter(i => (i.rarity ?? "none") === libraryRarityFilter);
+    }
     // Apply search - pull top 10 matching results to front
     if (librarySearchQuery.trim()) {
       const query = librarySearchQuery.toLowerCase();
@@ -450,7 +471,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
       items = [...matching.slice(0, 10), ...nonMatching];
     }
     return items;
-  }, [libraryItems, librarySearchQuery, librarySlotFilter]);
+  }, [libraryItems, librarySearchQuery, librarySlotFilter, libraryRarityFilter]);
 
   return (
     <motion.div
@@ -527,10 +548,20 @@ const InventoryView: React.FC<InventoryViewProps> = ({
               <option value="rightHand">Right Hand</option>
               <option value="ringFinger">Ring</option>
             </select>
+            <select
+              value={libraryRarityFilter}
+              onChange={(e) => setLibraryRarityFilter(e.target.value)}
+              className="bg-muted border border-border px-2 py-1 text-sm"
+              aria-label="Filter by rarity"
+            >
+              <option value="all">All Rarities</option>
+              <option value="none">No Rarity</option>
+              {ITEM_RARITIES.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
           </div>
           {filteredLibraryItems.length === 0 ? (
             <p className="text-muted-foreground text-sm italic mb-3">
-              {librarySearchQuery || librarySlotFilter !== "all" ? "No matching items" : "No items in library"}
+              {librarySearchQuery || librarySlotFilter !== "all" || libraryRarityFilter !== "all" ? "No matching items" : "No items in library"}
             </p>
           ) : (
             <div className="max-h-[28rem] overflow-y-auto pr-1 mb-3" style={{ scrollbarWidth: 'thin' }}>
@@ -557,12 +588,13 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                               className="text-foreground hover:text-primary transition-colors text-left flex items-center gap-1"
                             >
                               {item.name}
-                              {(item.description || item.statModifiers || item.weaponData || item.tags) && (
+                              {(item.description || item.effects || item.statModifiers || item.weaponData || item.tags) && (
                                 isExpanded
                                   ? <ChevronUp className="w-3 h-3 text-muted-foreground" />
                                   : <ChevronDown className="w-3 h-3 text-muted-foreground" />
                               )}
                             </button>
+                            <RarityBadge rarity={item.rarity} />
                             {item.equipSlot && (
                               <span className="text-xs bg-accent/20 text-accent px-1.5 py-0.5 rounded">
                                 {item.equipSlot === 'weapon' ? 'Weapon' :
@@ -666,6 +698,20 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 <input type="text" placeholder="Description" value={newLibraryItem.description}
                   onChange={(e) => setNewLibraryItem({ ...newLibraryItem, description: e.target.value })}
                   className="bg-muted border border-border px-2 py-1 text-sm flex-1" />
+              </div>
+              <div className="flex gap-2">
+                <select value={newLibraryItem.rarity || ""}
+                  onChange={(e) => setNewLibraryItem({ ...newLibraryItem, rarity: (e.target.value || undefined) as ItemRarity | undefined })}
+                  aria-label="Rarity"
+                  className="bg-muted border border-border px-2 py-1 text-sm w-32"
+                  style={newLibraryItem.rarity ? { color: getItemRarityColor(newLibraryItem.rarity) } : undefined}>
+                  <option value="">No Rarity</option>
+                  {ITEM_RARITIES.map(r => <option key={r} value={r} style={{ color: getItemRarityColor(r) }}>{r}</option>)}
+                </select>
+                <textarea placeholder="Effects (e.g. Glows near goblins. Once per day, reroll a failed save.)" value={newLibraryItem.effects ?? ""}
+                  onChange={(e) => setNewLibraryItem({ ...newLibraryItem, effects: e.target.value })}
+                  rows={2}
+                  className="bg-muted border border-border px-2 py-1 text-sm flex-1 resize-y" />
               </div>
               <LanguageSelect
                 value={newLibraryItem.language}
@@ -1157,6 +1203,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1 flex-wrap">
                         <span className="text-foreground">{item.name}</span>
+                        <RarityBadge rarity={item.rarity} />
                         {item.equipSlot && (
                           <span className="text-xs bg-accent/20 text-accent px-1.5 py-0.5 rounded">
                             {item.equipSlot === 'weapon' ? 'Weapon' :
@@ -1359,12 +1406,13 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                                       className="text-foreground hover:text-primary transition-colors text-left flex items-center gap-1"
                                     >
                                       {item.name}
-                                      {(item.description || item.statModifiers || item.weaponData || item.tags) && (
+                                      {(item.description || item.effects || item.statModifiers || item.weaponData || item.tags) && (
                                         expandedItems.has(`${crawler.id}:${item.id}`)
                                           ? <ChevronUp className="w-3 h-3 text-muted-foreground" />
                                           : <ChevronDown className="w-3 h-3 text-muted-foreground" />
                                       )}
                                     </button>
+                                    <RarityBadge rarity={item.rarity} />
                                     {item.equipSlot && (
                                       <span className="text-xs bg-accent/20 text-accent px-2 py-0.5 rounded">
                                         {item.equipSlot === 'weapon' ? 'Weapon' :

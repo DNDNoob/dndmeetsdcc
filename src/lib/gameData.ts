@@ -301,6 +301,40 @@ export interface SpellDuration {
   description?: string; // free-form label, e.g. "Until dispelled"
 }
 
+// Preset conditions a spell can put on its targets (the DM can also type a custom one)
+export const SPELL_CONDITIONS = [
+  'Burning', 'Poisoned', 'Bleeding', 'Frozen', 'Stunned', 'Paralyzed', 'Blinded', 'Charmed',
+  'Frightened', 'Slowed', 'Restrained', 'Prone', 'Silenced', 'Blessed', 'Shielded', 'Hasted', 'Regenerating',
+] as const;
+
+// What a spell leaves on each target it hits, lasting a number of the target's combat turns
+export interface SpellEffect {
+  condition: string;          // e.g. "Burning"
+  turns: number;              // how many of the target's turns it lasts
+  description?: string;       // what it does, in plain words, e.g. "Disadvantage on attacks"
+  perTurnDice?: WeaponDie[];  // rolled at the start of each of the target's turns
+  perTurnType?: 'damage' | 'healing';
+}
+
+// A spell effect currently on a combatant
+export interface ActiveCondition {
+  id: string;
+  name: string;
+  turnsLeft: number;
+  description?: string;
+  source: string;      // spell name
+  casterName?: string;
+  perTurnDice?: WeaponDie[];
+  perTurnType?: 'damage' | 'healing';
+}
+
+// Short label for a spell effect, e.g. "Burning for 3 turns (1d6 damage each turn)"
+export const describeSpellEffect = (effect: Pick<SpellEffect, 'condition' | 'perTurnDice' | 'perTurnType'> & { turns: number }): string => {
+  const dice = (effect.perTurnDice ?? []).filter(d => d.count > 0).map(d => `${d.count}d${d.sides}`).join(' + ');
+  const perTurn = effect.perTurnType && dice ? ` (${dice} ${effect.perTurnType} each turn)` : '';
+  return `${effect.condition} for ${effect.turns} turn${effect.turns === 1 ? '' : 's'}${perTurn}`;
+};
+
 export interface SpellData {
   manaCost: number;
   spellLevel: number; // 1–9 (D&D spell level)
@@ -318,6 +352,7 @@ export interface SpellData {
   duration?: SpellDuration;
   savingThrow?: string; // e.g. 'DEX', 'CON'
   specialEffect?: string;
+  effect?: SpellEffect; // condition put on each target the spell lands on (combat only)
   splashDamage?: boolean;
   reactionTrigger?: string; // For Reaction spells: describes what triggers the reaction (e.g. "when you are hit by an attack")
   grantsLanguage?: string;  // Casting it lets the caster know this language for the spell's duration (Speak with Animals → Beast)
@@ -369,10 +404,25 @@ export function getCastsUntilNextMastery(castCount: number): number {
   return nextThreshold - castCount;
 }
 
+export const ITEM_RARITIES = ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'] as const;
+export type ItemRarity = typeof ITEM_RARITIES[number];
+
+export const getItemRarityColor = (rarity: ItemRarity): string => {
+  switch (rarity) {
+    case 'Common': return '#9CA3AF';
+    case 'Uncommon': return '#22C55E';
+    case 'Rare': return '#3B82F6';
+    case 'Epic': return '#A855F7';
+    case 'Legendary': return '#F59E0B';
+  }
+};
+
 export interface InventoryItem {
   id: string;
   name: string;
   description: string;
+  rarity?: ItemRarity;
+  effects?: string; // What the item does, in plain words (shown on the item card)
   equipSlot?: EquipmentSlot; // Which slot this item can be equipped to
   goldValue?: number; // Value of the item in gold
   equipped?: boolean; // Deprecated - use equippedItems in Crawler instead
@@ -854,12 +904,19 @@ export interface MapSettings {
 // Loot Box Types
 export type LootBoxTier = 'Dirt' | 'Copper' | 'Silver' | 'Gold';
 
+// An achievement a loot box adds to the crawler's trophies when their box is unlocked
+export interface LootBoxAchievement {
+  name: string;
+  description?: string;
+}
+
 export interface LootBoxTemplate {
   id: string;
   name: string;
   tier: LootBoxTier;
   items: InventoryItem[];
   gold?: number;
+  achievement?: LootBoxAchievement | null; // null clears it on edit
 }
 
 export interface SentLootBox {
@@ -870,6 +927,7 @@ export interface SentLootBox {
   tier: LootBoxTier;
   items: InventoryItem[];
   gold?: number;
+  achievement?: LootBoxAchievement | null;
   locked: boolean;
   sentAt: string;
   unlockedAt?: string;
@@ -925,6 +983,7 @@ export interface CombatantEntry {
   currentHP?: number; // per-combatant HP tracking (used for mob instances)
   feetMovedThisTurn?: number; // crawler movement used this turn (reset when the turn ends)
   looted?: boolean; // mob only: its items and gold were already handed out when it went down
+  conditions?: ActiveCondition[]; // spell effects on this combatant; they tick down at the end of its turns
 }
 
 // Combat state - synced via Firebase (singleton doc, id = 'current')
@@ -956,6 +1015,7 @@ export interface CombatTurnSnapshot {
     hasUsedAction: boolean;
     hasUsedBonusAction: boolean;
     feetMovedThisTurn?: number;
+    conditions?: ActiveCondition[];
   }[];
   // HP, mana and activity stats of every crawler in the fight (damage and healing can hit anyone)
   crawlers: Record<string, { hp: number; mana: number; activityStats?: CrawlerActivityStats }>;
