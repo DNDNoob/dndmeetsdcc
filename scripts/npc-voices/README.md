@@ -11,7 +11,7 @@ Both brains share the same engine in `src/lib/npc/` (`engine.mjs` for when and w
 1. Install [Ollama](https://ollama.com) and pull the models:
    ```
    ollama pull qwen3:8b
-   ollama pull qwen3.5:4b
+   ollama pull qwen3:4b-instruct-2507-q4_K_M
    ```
 2. Install Node.js 18 or newer (`winget install OpenJS.NodeJS.LTS`).
 3. Clone this repo and put a `.env` at its root with the same `VITE_FIREBASE_*` values the web app uses.
@@ -36,7 +36,7 @@ npm run npc-voices
 ## How it behaves
 
 - Only runs model calls while the DM has an episode open in Show Time; otherwise it sleeps. It keeps the computer awake during a game.
-- **Best quality** uses `qwen3:8b`, **Fast** uses `qwen3.5:4b`, the quickest on the DM laptop (DM picks in the chat settings). If there isn't enough free memory for Best quality, or it fails to load, it uses Fast and says so in the chat.
+- **Best quality** uses `qwen3:8b`, **Fast** uses `qwen3:4b-instruct-2507-q4_K_M`, the quickest on the DM laptop (DM picks in the chat settings). If there isn't enough free memory for Best quality, or it fails to load, it uses Fast and says so in the chat.
 - Unloads the model after 15 minutes without activity.
 - Secrets are only added to the prompt after the DM unlocks them.
 - Remembers conversations: when a chat with an NPC has been quiet for 2 minutes, the model saves a few memory notes and how the NPC feels about each crawler (`npcAi/memories`), and they go into that NPC's prompt from then on.
@@ -49,7 +49,7 @@ npm run npc-voices
 | Variable | Default | Meaning |
 |----------|---------|---------|
 | `OLLAMA_URL` | `http://127.0.0.1:11434` | Ollama address |
-| `NPC_MODEL_QUALITY` / `NPC_MODEL_FAST` | `qwen3:8b` / `qwen3.5:4b` | Models to use |
+| `NPC_MODEL_QUALITY` / `NPC_MODEL_FAST` | `qwen3:8b` / `qwen3:4b-instruct-2507-q4_K_M` | Models to use |
 | `NPC_COOLDOWN_SECONDS` | `20` | Gap between lines from the same NPC |
 | `NPC_IDLE_SECONDS` | `60` | Silence before an NPC may mutter |
 | `NPC_NEAR_DISTANCE` | `12` | How close (map %) counts as "next to" an NPC |

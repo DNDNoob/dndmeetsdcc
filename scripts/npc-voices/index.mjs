@@ -50,8 +50,8 @@ const num = (v, d) => (v !== undefined && v !== '' && !Number.isNaN(Number(v)) ?
 
 const CONFIG = {
   ollamaUrl: (env.OLLAMA_URL || 'http://127.0.0.1:11434').replace(/\/$/, ''),
-  // qwen3.5:4b was the quickest on the DM laptop (about 29 tokens/s); qwen3:14b no longer fits in its free memory
-  models: { quality: env.NPC_MODEL_QUALITY || 'qwen3:8b', fast: env.NPC_MODEL_FAST || 'qwen3.5:4b' },
+  // The 4B instruct model was the quickest on the DM laptop (about 0.3 s a line, all on the GPU); qwen3:14b no longer fits in its free memory
+  models: { quality: env.NPC_MODEL_QUALITY || 'qwen3:8b', fast: env.NPC_MODEL_FAST || 'qwen3:4b-instruct-2507-q4_K_M' },
   // Free RAM needed before loading each model (GB). Bigger models split across GPU and RAM.
   minFreeGB: { quality: num(env.NPC_QUALITY_MIN_FREE_GB, 4), fast: num(env.NPC_FAST_MIN_FREE_GB, 2.5) },
 };

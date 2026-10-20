@@ -1070,7 +1070,7 @@ Open the Game Chat and tap the gear icon:
 - **Spoken voices**: read NPC lines aloud on every device, with a voice per NPC (see Spoken Voices above)
 - **Keys**: free Groq and Gemini keys (and an ElevenLabs key for voices), saved only in this browser
 - **NPC brain**: **Online** or **Laptop** (see below)
-- **Model**: **Best quality** (bigger, slower) or **Fast** (smaller, quicker). On the Laptop brain, Fast uses qwen3.5:4b, the quickest model on the DM laptop
+- **Model**: **Best quality** (bigger, slower) or **Fast** (smaller, quicker). On the Laptop brain, Fast uses qwen3:4b-instruct-2507, the quickest model on the DM laptop
 - **Mute all NPCs**, or mute one NPC
 - **Secret** lock/unlock per NPC
 - **Memory** per NPC (brain icon): see and edit what it remembers

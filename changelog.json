@@ -20,7 +20,7 @@
       "💀 The DM can @ a corpse and get an answer, without Speak with Dead",
       "🔇 Players can mute one NPC's voice by tapping the speaker next to its name in Game Chat",
       "✂️ The burst of static some voices left after the last word is now cut off",
-      "💻 The Laptop brain's Fast setting now uses qwen3.5:4b, the quickest model on the DM laptop, and Best quality uses qwen3:8b, falling back to Fast if it can't load"
+      "💻 The Laptop brain's Fast setting now uses qwen3:4b-instruct-2507, the quickest model on the DM laptop, and Best quality uses qwen3:8b, falling back to Fast if it can't load"
     ]
   },
   {
