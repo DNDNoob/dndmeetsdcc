@@ -921,11 +921,7 @@ Everything in Show Time syncs in real time:
 
 The chat button in the bottom right opens the **Game Chat** for the running episode. Players talk as their crawler and the DM talks as the DM. Hold the microphone button to speak instead of typing. Mobs with a personality answer in the chat and in speech bubbles over their heads. See [Talking NPCs](/wiki/talking-npcs).
 
-The chat tucks away when you click or tap anywhere outside it, and the dice roller does the same. The DM's game clock panel works the same way and also stops below the top menu instead of covering it.
-
-## Map Tools
-
-Everyone gets **Ping**, **Ruler** and **Shape** in the map tools at the top right. The small arrow next to Shape picks rectangle, square, circle or triangle.`,
+The chat tucks away when you click or tap anywhere outside it, and the dice roller does the same.`,
   },
   {
     id: 'merchants',
