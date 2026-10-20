@@ -158,7 +158,7 @@ const GESTURE_STYLES = {
  * System prompt for one NPC line. The secret is only included when the DM has unlocked it,
  * so the model can't leak what it hasn't been told.
  */
-export const buildSystemPrompt = ({ mob, secretUnlocked, scene, memory, speaking, knownLanguages, gesture }) => {
+export const buildSystemPrompt = ({ mob, secretUnlocked, scene, memory, speaking, knownLanguages, gesture, realLanguage }) => {
   const p = mob.personality || {};
   const style = gesture ? GESTURE_STYLES[gesture] : null;
   const lines = [
@@ -181,7 +181,10 @@ export const buildSystemPrompt = ({ mob, secretUnlocked, scene, memory, speaking
   if (style) {
     lines.push(style.intro);
   } else if (speaking) {
-    lines.push(`You are speaking ${speaking}${knownLanguages?.length > 1 ? ` (you know ${knownLanguages.join(', ')})` : ''}. Write your words in plain English; the game shows them in ${speaking}.`);
+    const knows = knownLanguages?.length > 1 ? ` (you know ${knownLanguages.join(', ')})` : '';
+    lines.push(realLanguage
+      ? `You are speaking ${speaking}${knows}. Write every word of your line in ${realLanguage}, never in English, even if the crawlers spoke English.`
+      : `You are speaking ${speaking}${knows}. Write your words in plain English; the game shows them in ${speaking}.`);
   }
   lines.push('');
   lines.push('The scene:');
@@ -256,6 +259,39 @@ export const cleanLine = (raw, name) => {
   text = text.replace(/^["“”'‘’]+|["“”'‘’]+$/g, '').trim();
   if (text.length > 220) text = text.slice(0, 217).replace(/\s+\S*$/, '') + '…';
   return text;
+};
+
+// ── Preset lines ──
+
+/**
+ * Lines for an NPC speaking a language nobody in the party knows. The players only see gibberish
+ * (or body language), so these stand in for a model call. The DM sees the words.
+ */
+const PRESET_LINES = {
+  any: [
+    'Go away. I have nothing for you.', 'What do you want? Speak properly!', 'Bah. Lost again, are you?',
+    'Leave me be, strangers.', 'You smell like trouble.', 'Not another one of you lot.',
+    'Keep walking, if you know what is good for you.', 'Hah! Look at the soft little crawlers.',
+  ],
+  spanish: [
+    '¿Qué quieres? No te entiendo.', '¡Vete de aquí, forastero!', 'Ay, otro aventurero perdido...',
+    'No tengo nada para ti.', '¡Cuidado con los túneles!', '¿Quién eres tú? Habla claro.',
+    'Déjame en paz, por favor.', 'Aquí abajo nadie sobrevive mucho tiempo.',
+  ],
+  'kra-kow': [
+    'Soft-skins! Go away or get smashed!', 'Me no talk to food.', 'Shinies or leave!',
+    'Boss say no strangers. Go!', 'You smell funny. Me like it.', 'Grr. Who let you in here?',
+  ],
+  base64: [
+    'Unit busy. Leave.', 'Query not recognized.', 'Organic detected. Stand back.',
+    'Processing. Please wait.', 'Access denied.', 'Error. Try again later.',
+  ],
+};
+
+/** A preset line in a language, picked by `random` (0..1). */
+export const presetLine = (languageId, random = Math.random()) => {
+  const list = PRESET_LINES[languageId] ?? PRESET_LINES.any;
+  return list[Math.floor(random * list.length) % list.length];
 };
 
 /** Languages that get the "meaning || what you do" format (see GESTURE_LANGUAGE_IDS). */

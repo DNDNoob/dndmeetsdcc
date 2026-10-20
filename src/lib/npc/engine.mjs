@@ -24,11 +24,11 @@ import { collection, doc, onSnapshot, setDoc, FieldPath } from 'firebase/firesto
 import {
   hasPersonality, distance, mentionsName, timeOfDay, hpWords,
   buildSystemPrompt, buildLinePrompt, buildShouldSpeakPrompt, buildSecretCheckPrompt,
-  formatTranscript, isYes, cleanLine, parseGestureLine, hasGestureStyle,
+  formatTranscript, isYes, cleanLine, parseGestureLine, hasGestureStyle, presetLine,
   rollPersonalityTraits, buildPersonalityPrompt, parsePersonality, defaultPersuasionDC, PERSONALITY_SYSTEM_PROMPT,
   MEMORY_SYSTEM_PROMPT, buildMemoryPrompt, parseMemory,
 } from './brain.mjs';
-import { mobLanguageIds, languageName, DEAD_LANGUAGE_ID } from '../languageList.mjs';
+import { mobLanguageIds, languageName, crawlerUnderstands, DEAD_LANGUAGE_ID, REAL_LANGUAGES } from '../languageList.mjs';
 import { mapSpeakers, getMobKind } from './speakers.mjs';
 
 export const DEFAULT_NPC_CONFIG = {
@@ -432,6 +432,22 @@ export class NpcRoom {
     return !!mob && mobLanguageIds(mob).includes(DEAD_LANGUAGE_ID);
   }
 
+  /** Whether any crawler in the campaign follows a language (their own, from a spell or an item). */
+  partyUnderstands(languageId) {
+    return this.state.crawlers.some((c) => crawlerUnderstands(c, languageId));
+  }
+
+  /**
+   * The language a speaker answers in: the one it was spoken to in (if it knows it), else the last one
+   * it was addressed in, else its native tongue. Corpses always answer in Dead.
+   */
+  replyLanguage(mob, heard) {
+    const known = mobLanguageIds(mob);
+    if (heard && known.includes(heard)) this.lastLanguageByMob.set(mob.id, heard);
+    const lastHeard = this.lastLanguageByMob.get(mob.id);
+    return this.isCorpse(mob) ? DEAD_LANGUAGE_ID : lastHeard && known.includes(lastHeard) ? lastHeard : known[0];
+  }
+
   mobKnows(mob, languageId) {
     return !languageId || mobLanguageIds(mob).includes(languageId);
   }
@@ -508,7 +524,7 @@ export class NpcRoom {
 
     if (named.length) {
       for (const mob of named.slice(0, 2)) {
-        this.enqueue({ kind: 'line', mobId: mob.id, direct: true, near: speakerSpot, ...this.hearing(mob, m, `${m.authorName} spoke to you`) });
+        this.enqueue({ kind: 'line', mobId: mob.id, direct: true, fromDm: m.authorType === 'dm', near: speakerSpot, ...this.hearing(mob, m, `${m.authorName} spoke to you`) });
       }
     } else if (nearSpeaker.length) {
       const n = nearSpeaker[0];
@@ -698,7 +714,8 @@ export class NpcRoom {
     job.createdAt = Date.now();
     if (job.kind === 'line') {
       const mob = this.npcPlacements().find((n) => n.mobId === job.mobId)?.mob;
-      if (this.isCorpse(mob) && job.heard !== DEAD_LANGUAGE_ID) return;
+      // The DM can always get a corpse to answer by tagging it
+      if (this.isCorpse(mob) && job.heard !== DEAD_LANGUAGE_ID && !(job.fromDm && job.direct)) return;
       const existing = this.queue.findIndex((j) => j.kind === 'line' && j.mobId === job.mobId);
       if (existing >= 0) {
         if (job.direct || !this.queue[existing].direct) this.queue[existing] = job;
@@ -849,6 +866,15 @@ export class NpcRoom {
 
     const placement = this.placementFor(job.mobId, job.near);
     if (!placement) return; // NPC left the map or was muted
+    // Nobody in the party knows the language it would answer in: they'd only see gibberish, so skip
+    // the model and use a preset line (the DM still gets real lines when they talk to it). Beast, Plant
+    // and Dead still ask the model, since everyone sees the body language it writes.
+    const language = this.replyLanguage(placement.mob, job.heard);
+    if (!job.fromDm && !hasGestureStyle(language) && !this.partyUnderstands(language)) {
+      if (job.gated && Math.random() > 0.3) return; // only mutter now and then
+      await this.postLine(placement.mob, placement, { text: presetLine(language), language, preset: true });
+      return;
+    }
     const tier = await this.prepare();
     if (!tier) return;
     const mob = await this.ensurePersonality(placement, tier);
@@ -862,12 +888,7 @@ export class NpcRoom {
 
     const mapId = this.currentMapId;
     await this.writeStatus({ thinking: { mobId: mob.id, mapId, x: placement.x, y: placement.y, since: Date.now() } });
-    // Answer in the language it was spoken to in (if it knows it); otherwise keep to the last one
-    // it was addressed in, else its native tongue
     const known = mobLanguageIds(mob);
-    if (job.heard && known.includes(job.heard)) this.lastLanguageByMob.set(mob.id, job.heard);
-    const lastHeard = this.lastLanguageByMob.get(mob.id);
-    const language = this.isCorpse(mob) ? DEAD_LANGUAGE_ID : lastHeard && known.includes(lastHeard) ? lastHeard : known[0];
     const gestureStyle = hasGestureStyle(language) ? language : undefined;
     let line = '';
     let gesture = '';
@@ -876,6 +897,7 @@ export class NpcRoom {
       const system = buildSystemPrompt({
         mob, secretUnlocked, scene: this.scene(placement), memory: this.memoryFor(mob),
         speaking: this.languageName(language), knownLanguages: known.map((id) => this.languageName(id)), gesture: gestureStyle,
+        realLanguage: REAL_LANGUAGES[language],
       });
       const raw = await this.ask(tier, system, buildLinePrompt({ mob, transcript, trigger: job.trigger }), { maxTokens: gestureStyle ? 110 : 80, temperature: 0.8 });
       if (gestureStyle) ({ text: line, gesture } = parseGestureLine(raw, mob.name));
@@ -883,8 +905,13 @@ export class NpcRoom {
     } finally {
       await this.writeStatus({ thinking: null });
     }
+    await this.postLine(mob, placement, { text: line, language, gesture, mapId });
+  }
+
+  /** Put an NPC line in the chat (unless NPCs were muted while it was being written). */
+  async postLine(mob, placement, { text, language, gesture, preset = false, mapId = this.currentMapId }) {
     const muted = this.settings.mutedMobIds || [];
-    if (!line || !this.live || !this.enabled || this.settings.mutedAll || muted.includes(mob.id) || muted.includes(mob.sourceMobId)) return;
+    if (!text || !this.live || !this.enabled || this.settings.mutedAll || muted.includes(mob.id) || muted.includes(mob.sourceMobId)) return;
 
     const id = `chat-${Date.now()}-${randomHex()}`;
     await setDoc(doc(this.db, `${this.path}/chatMessages/${id}`), {
@@ -892,9 +919,10 @@ export class NpcRoom {
       authorType: 'npc',
       authorId: mob.id,
       authorName: mob.name,
-      text: line,
+      text,
       language,
       ...(gesture ? { gesture } : {}),
+      ...(preset ? { preset: true } : {}),
       createdAt: Date.now(),
       episodeId: this.showtime?.episodeId,
       mapId,
@@ -904,7 +932,7 @@ export class NpcRoom {
     this.lastNpcLineAt = Date.now();
     this.lastLineByNpc.set(mob.id, Date.now());
     if (this.convos.has(mob.id)) this.noteConvo(mob);
-    this.log(`[${this.name}] ${mob.name} (${this.activeModel ?? this.role}): ${line}`);
+    this.log(`[${this.name}] ${mob.name} (${preset ? 'preset' : this.activeModel ?? this.role}): ${text}`);
   }
 
   // ── status for the app ──

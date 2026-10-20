@@ -5,6 +5,8 @@ import type { NpcSpeechVoice } from '@/lib/gameData';
 import type { NpcOnlineKeys } from '@/lib/npc/onlineLlm.mjs';
 import { speechEngine } from './engine';
 import { applyCreatureSound, hasCreatureSound } from './effects';
+import { trimTrailingNoise } from './trim';
+import { wavBytes } from './droid';
 import {
   GEMINI_VOICES, GROQ_VOICES, VOICE_ENGINES, fitVoice, kokoroVoice,
   type CatalogVoice, type VoiceEngine, type VoiceTraits,
@@ -17,6 +19,7 @@ const GROQ_MAX_CHARS = 200;
 const ELEVENLABS_MODEL = 'eleven_multilingual_v2';
 
 const MINUTE = 60_000;
+const TRIM_RATE = 24000;
 const HOUR = 60 * MINUTE;
 
 export interface SpokenClip {
@@ -273,12 +276,25 @@ async function kokoro(req: SpeakRequest): Promise<SpokenClip> {
 
 /** Read a line aloud with the first service that works, with the NPC's creature sound on it. Throws only if Kokoro fails too. */
 export async function speakLine(req: SpeakRequest, keys: NpcOnlineKeys): Promise<SpokenClip> {
-  const clip = await speakPlain(req, keys);
+  const clip = await trimClip(await speakPlain(req, keys));
   if (!hasCreatureSound(req.traits.sound)) return clip;
   try {
     return { ...clip, blob: await applyCreatureSound(clip.blob, req.traits.sound!), ext: 'wav' };
   } catch (err) {
     console.warn('[NpcSpeech] Creature sound failed, using the plain voice', err);
+    return clip;
+  }
+}
+
+/** The clip without the static some services leave after the last word. */
+async function trimClip(clip: SpokenClip): Promise<SpokenClip> {
+  try {
+    const ctx = new OfflineAudioContext(1, 1, TRIM_RATE);
+    const audio = await ctx.decodeAudioData(await clip.blob.arrayBuffer());
+    const samples = trimTrailingNoise(audio.getChannelData(0), audio.sampleRate);
+    return { ...clip, blob: new Blob([wavBytes(samples, audio.sampleRate)], { type: 'audio/wav' }), ext: 'wav' };
+  } catch (err) {
+    console.warn('[NpcSpeech] Could not trim the clip, using it as is', err);
     return clip;
   }
 }

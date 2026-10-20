@@ -1,6 +1,6 @@
 // App-side language rules: who understands what, scrambled text, and how a chat line reads
 // for each viewer (including party translators). Built-in languages are in languageList.mjs.
-import { BUILT_IN_LANGUAGES, GESTURE_LANGUAGE_IDS, DEFAULT_LANGUAGE_ID, TELEPATHIC_LANGUAGE_ID, languageName, type LanguageInfo } from './languageList.mjs';
+import { BUILT_IN_LANGUAGES, GESTURE_LANGUAGE_IDS, DEFAULT_LANGUAGE_ID, TELEPATHIC_LANGUAGE_ID, REAL_LANGUAGES, languageName, crawlerLanguageIds as knownLanguageIds, crawlerUnderstands as understandsLanguage, type LanguageInfo } from './languageList.mjs';
 import type { ChatMessage, Crawler, CustomLanguage, LanguageEffect } from './gameData';
 
 export { BUILT_IN_LANGUAGES, DEFAULT_LANGUAGE_ID, TELEPATHIC_LANGUAGE_ID, languageName, mobLanguageIds } from './languageList.mjs';
@@ -23,11 +23,7 @@ export const allLanguages = (custom: CustomLanguage[]): Language[] => [
 type KnowsLanguages = Pick<Crawler, 'languages' | 'languageEffects' | 'itemLanguages'>;
 
 /** The languages a crawler knows, including ones from spells and equipped items; none set = Worldspeech. */
-export const crawlerLanguageIds = (crawler: KnowsLanguages | null | undefined): string[] => {
-  const own = crawler?.languages ?? [DEFAULT_LANGUAGE_ID];
-  const granted = [...(crawler?.languageEffects ?? []).map(e => e.languageId), ...(crawler?.itemLanguages ?? [])];
-  return granted.length ? [...new Set([...own, ...granted])] : own;
-};
+export const crawlerLanguageIds = (crawler: KnowsLanguages | null | undefined): string[] => knownLanguageIds(crawler);
 
 /** Languages the crawler has only for now (spells and items), not the ones they really know. */
 export const borrowedLanguageIds = (crawler: KnowsLanguages | null | undefined): string[] => {
@@ -61,12 +57,8 @@ export const languageEffectLeft = (e: LanguageEffect): string => {
 };
 
 /** Mindspeech only works for telepathic crawlers. */
-export const crawlerUnderstands = (crawler: (KnowsLanguages & Pick<Crawler, 'telepathic'>) | null | undefined, languageId: string | undefined): boolean => {
-  if (!languageId) return true;
-  if (!crawler) return false;
-  if (languageId === TELEPATHIC_LANGUAGE_ID && !crawler.telepathic) return false;
-  return crawlerLanguageIds(crawler).includes(languageId);
-};
+export const crawlerUnderstands = (crawler: (KnowsLanguages & Pick<Crawler, 'telepathic'>) | null | undefined, languageId: string | undefined): boolean =>
+  understandsLanguage(crawler, languageId);
 
 /** The languages a crawler can speak in chat, in their own order. */
 export const usableLanguageIds = (crawler: (KnowsLanguages & Pick<Crawler, 'telepathic'>) | null | undefined): string[] =>
@@ -129,6 +121,8 @@ const toBase64 = (text: string): string => {
 /** What a line looks like to someone who doesn't know its language. Same input, same output. */
 export const scrambleText = (text: string, languageId: string): string => {
   if (!text) return text;
+  // Real languages (Spanish) are already foreign words to anyone who doesn't know them
+  if (languageId in REAL_LANGUAGES) return text;
   if (languageId === 'base64') return toBase64(text);
   const rand = seeded(hash(`${languageId}:${text}`));
   const pickFrom = <T,>(list: T[]) => list[Math.floor(rand() * list.length)];

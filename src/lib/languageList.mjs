@@ -19,6 +19,9 @@ export const DEAD_LANGUAGE_ID = 'dead';
 /** Languages with no words for outsiders: they see the speaker's body language (the line's gesture) instead. */
 export const GESTURE_LANGUAGE_IDS = [BEAST_LANGUAGE_ID, PLANT_LANGUAGE_ID, DEAD_LANGUAGE_ID];
 
+/** Real-world languages: NPCs write their lines in the language itself, and everyone sees those words. */
+export const REAL_LANGUAGES = { spanish: 'Spanish' };
+
 export const BUILT_IN_LANGUAGES = [
   { id: 'worldspeech', name: 'Worldspeech', description: 'Essentially the common tongue, spoken by most races.' },
   { id: 'dervish', name: 'Dervish', description: 'A common language of small creatures like gnomes, dwarves and goblins.' },
@@ -43,3 +46,18 @@ export const languageName = (id, custom = []) =>
   BUILT_IN_LANGUAGES.find((l) => l.id === id)?.name
   ?? custom.find((l) => l.id === id)?.name
   ?? 'an unknown tongue';
+
+/** The languages a crawler knows, including ones from spells and equipped items; none set = Worldspeech. */
+export const crawlerLanguageIds = (crawler) => {
+  const own = crawler?.languages ?? [DEFAULT_LANGUAGE_ID];
+  const granted = [...(crawler?.languageEffects ?? []).map((e) => e.languageId), ...(crawler?.itemLanguages ?? [])];
+  return granted.length ? [...new Set([...own, ...granted])] : own;
+};
+
+/** Whether a crawler follows a language. Mindspeech only works for telepathic crawlers. */
+export const crawlerUnderstands = (crawler, languageId) => {
+  if (!languageId) return true;
+  if (!crawler) return false;
+  if (languageId === TELEPATHIC_LANGUAGE_ID && !crawler.telepathic) return false;
+  return crawlerLanguageIds(crawler).includes(languageId);
+};
