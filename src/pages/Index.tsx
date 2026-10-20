@@ -253,6 +253,12 @@ const Index = () => {
     updateAssignedQuest,
     deleteAssignedQuest,
     getCrawlerAssignedQuests,
+    gameSettings,
+    setXPScale,
+    awardCrawlerXP,
+    spendSkillPoint,
+    spendAbilityPoint,
+    awardQuestXP,
     roomId,
     setRoomId,
     isLoaded
@@ -755,8 +761,9 @@ const Index = () => {
     navigate(restoredPlayer ? '/app/menu' : '/app');
   };
 
-  const handleStatRoll = (crawlerName: string, crawlerId: string, stat: string, totalStat: number) => {
-    const modifier = Math.floor((totalStat - 10) / 2);
+  // `bonus` adds to the ability modifier, e.g. a skill's rank
+  const handleStatRoll = (crawlerName: string, crawlerId: string, stat: string, totalStat: number, bonus = 0) => {
+    const modifier = Math.floor((totalStat - 10) / 2) + bonus;
     const { rawRoll, results, diceLabel } = rollD20(rollsWithDisadvantage(crawlers.find(c => c.id === crawlerId), totalStat));
     const total = rawRoll + modifier;
     const entry: DiceRollEntry = {
@@ -1061,6 +1068,11 @@ const Index = () => {
                 onApplyCombatConditions={applyCombatConditions}
                 isAdmin={isAdmin}
                 onAwardTrophy={awardTrophy}
+                xpScale={gameSettings?.xpScale ?? 1}
+                onAwardXP={awardCrawlerXP}
+                onSetXPScale={setXPScale}
+                onSpendSkillPoint={spendSkillPoint}
+                onSpendAbilityPoint={spendAbilityPoint}
                 onRevokeTrophy={revokeTrophy}
                 addDiceRoll={addDiceRoll}
                 mobs={mobs}
@@ -1208,6 +1220,7 @@ const Index = () => {
                 onAssignQuest={assignQuest}
                 onUpdateQuest={updateQuest}
                 onUpdateAssignedQuest={updateAssignedQuest}
+                onAwardQuestXP={awardQuestXP}
                 onDeleteAssignedQuest={deleteAssignedQuest}
                 currentPlayerId={currentPlayer?.id}
                 onRecordCrawlerMove={recordCrawlerMove}

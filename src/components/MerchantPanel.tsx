@@ -7,6 +7,8 @@ import {
   DEFAULT_HAGGLE_DC,
   MERCHANT_TRADE_RANGE_FEET,
   getEffectiveScrooge,
+  getSkillRank,
+  getBarterScroogeReduction,
   getMerchantBuyPrice,
   getMerchantSellPrice,
   merchantItemKey,
@@ -52,7 +54,8 @@ export const MerchantPanel: React.FC<MerchantPanelProps> = ({
   // Before anyone trades, show what the DM set up
   const stock: MerchantStockEntry[] = state?.stock ?? config.stock.filter(e => e.quantity > 0);
   const merchantGold = state?.gold ?? config.startingGold;
-  const scrooge = getEffectiveScrooge(config, state, crawler?.id);
+  const barter = isAdmin ? 0 : getSkillRank(crawler, "barter");
+  const scrooge = getEffectiveScrooge(config, state, crawler?.id, barter);
   const myGold = crawler?.gold ?? 0;
   const inRange = isAdmin || (distanceFeet !== null && distanceFeet <= MERCHANT_TRADE_RANGE_FEET);
   const canTrade = !isAdmin && !!crawler && inRange;
@@ -86,6 +89,7 @@ export const MerchantPanel: React.FC<MerchantPanelProps> = ({
               <p className="text-xs text-muted-foreground flex flex-wrap gap-x-3">
                 <span className="flex items-center gap-1"><Coins className="w-3 h-3 text-accent" />Merchant has {merchantGold} gold</span>
                 <span>Scrooge {scrooge}{scrooge !== config.scroogeFactor ? ` (was ${config.scroogeFactor})` : ""}</span>
+                {getBarterScroogeReduction(barter) > 0 && <span className="text-primary">Barter {barter}: -{getBarterScroogeReduction(barter)} Scrooge</span>}
                 {crawler && !isAdmin && <span className="flex items-center gap-1"><Coins className="w-3 h-3 text-accent" />You have {myGold} gold</span>}
               </p>
             </div>
@@ -133,7 +137,7 @@ export const MerchantPanel: React.FC<MerchantPanelProps> = ({
               {!haggle ? (
                 <>
                   <span className="flex-1 text-muted-foreground">
-                    Haggle: uses an action to roll Persuasion vs DC {haggleDC}. If you make it, the DM can lower your prices one level.
+                    Haggle: uses an action to roll Persuasion{barter > 0 ? ` + Barter ${barter}` : ""} vs DC {haggleDC}. If you make it, the DM can lower your prices one level.
                     {haggleBlocker && <span className="block text-destructive">{haggleBlocker}</span>}
                   </span>
                   <DungeonButton size="sm" disabled={busy || scrooge === 0 || !!haggleBlocker} onClick={() => run(onHaggle)}>

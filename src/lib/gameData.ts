@@ -46,6 +46,12 @@ export interface Crawler {
   itemLanguages?: string[]; // Worked out from equipped items when crawlers load; not something to save
   backstory?: CrawlerBackstory; // Answers from the character creator; editable on the profile
   usesAbilityPoints?: boolean;  // Made with the character creator: abilities at 0 points (score 10 or less) roll with disadvantage
+  xp?: number;                  // Total experience; missing = exactly what `level` needs (crawlers from before XP)
+  xpLog?: XPLogEntry[];         // Most recent grants first, capped at XP_LOG_LIMIT
+  skills?: Partial<Record<SkillId, number>>; // Ranks bought with skill points (Barter is use-based, see barterTrades)
+  skillPoints?: number;         // Unspent skill points from level-ups
+  abilityPoints?: number;       // Unspent ability points from level-ups
+  barterTrades?: number;        // Completed buys and sells with merchants; raises Barter
 }
 
 // ======== Character creation ========
@@ -85,6 +91,87 @@ export const rollD20 = (disadvantage = false): { rawRoll: number; results: { dic
     diceLabel: '2d20 low',
   };
 };
+
+// ======== Experience, levels and skills ========
+
+// Starting XP amounts; the DM scales all of them with the campaign's XP scale
+export const XP_REWARDS = {
+  damagePer2: 1,        // per 2 damage dealt to hostile mobs
+  killPerMobLevel: 5,   // killing blow: 5 × the mob's level
+  survived: 2,          // above 0 HP when combat ends
+  finisher: 10,         // took down the last mob standing
+  nearDeath: 5,         // HP dropped below 10% of max
+  questDefault: 10,     // a quest with no XP set
+  masteryLevelUp: 20,   // a spell mastery or Looting level up
+} as const;
+export const LEVEL_UP_HP = 5;
+export const LEVEL_UP_MANA = 3;
+export const XP_LOG_LIMIT = 20;
+export const XP_SCALE_OPTIONS = [0.5, 0.75, 1, 1.5, 2] as const;
+
+export interface XPLogEntry {
+  amount: number;
+  reason: string;
+  at: number; // epoch ms
+}
+
+/** Total XP needed to reach `level`: 50 × L × (L − 1), so each level costs 100 more than the last. No cap. */
+export const getXPForLevel = (level: number): number => {
+  const l = Math.max(1, Math.floor(level));
+  return 50 * l * (l - 1);
+};
+
+export const getLevelForXP = (xp: number): number => {
+  let level = 1;
+  while (getXPForLevel(level + 1) <= xp) level++;
+  return level;
+};
+
+/** A crawler's total XP; crawlers from before XP count as having exactly their level's XP. */
+export const getCrawlerXP = (crawler: Pick<Crawler, 'xp' | 'level'>): number =>
+  crawler.xp ?? getXPForLevel(crawler.level || 1);
+
+export type SkillId = 'barter' | 'athletics' | 'stealth' | 'perception' | 'medicine' | 'intimidation';
+
+export interface SkillDef {
+  id: SkillId;
+  name: string;
+  ability: AbilityKey;
+  description: string;
+  useBased?: boolean; // levels up by use instead of skill points
+}
+
+export const SKILLS: SkillDef[] = [
+  { id: 'barter', name: 'Barter', ability: 'cha', useBased: true, description: 'Every 2 ranks lower a merchant\'s Scrooge factor by 1 for you, and each rank adds +1 to haggle rolls. Levels up as you buy and sell.' },
+  { id: 'athletics', name: 'Athletics', ability: 'str', description: '+1 per rank to climb, jump and grapple checks. Every 3 ranks add +5 ft of movement.' },
+  { id: 'stealth', name: 'Stealth', ability: 'dex', description: '+1 per rank to sneak and hide checks.' },
+  { id: 'perception', name: 'Perception', ability: 'int', description: '+1 per rank to spot, search and sense-lies checks.' },
+  { id: 'medicine', name: 'Medicine', ability: 'int', description: '+1 HP per rank on every heal you give.' },
+  { id: 'intimidation', name: 'Intimidation', ability: 'cha', description: '+1 per rank to threaten checks.' },
+];
+export const MAX_SKILL_RANK = 10;
+
+// Use-based skills follow the Looting curve: rank N after 5·N·(N+1) uses (10, 30, 60, 100…)
+export const getUseSkillRank = (uses = 0): number => {
+  let rank = 0;
+  while (rank < MAX_SKILL_RANK && uses >= 5 * (rank + 1) * (rank + 2)) rank++;
+  return rank;
+};
+
+/** Uses left before the next rank of a use-based skill, or null at the max rank. */
+export const getUsesUntilNextRank = (uses = 0): number | null => {
+  const rank = getUseSkillRank(uses);
+  return rank >= MAX_SKILL_RANK ? null : 5 * (rank + 1) * (rank + 2) - uses;
+};
+
+export const getSkillRank = (crawler: Pick<Crawler, 'skills' | 'barterTrades'> | null | undefined, id: SkillId): number => {
+  if (!crawler) return 0;
+  if (id === 'barter') return getUseSkillRank(crawler.barterTrades ?? 0);
+  return Math.max(0, Math.min(MAX_SKILL_RANK, Math.floor(crawler.skills?.[id] ?? 0)));
+};
+
+/** Scrooge levels a crawler's Barter takes off: 1 per 2 ranks. */
+export const getBarterScroogeReduction = (barterRank: number): number => Math.floor(barterRank / 2);
 
 // ======== Languages ========
 
@@ -231,7 +318,8 @@ export type StatModifiers = Partial<Record<'str' | 'dex' | 'con' | 'int' | 'cha'
 // Effective movement speed: base speed (or the default) plus equipment modifiers
 export function getEffectiveMoveSpeed(crawler: Crawler, inventory: InventoryItem[]): number {
   const mods = getEquippedModifiers(crawler, inventory);
-  return Math.max(0, (crawler.moveSpeed ?? DEFAULT_MOVE_SPEED) + (mods.moveSpeed ?? 0));
+  const athletics = 5 * Math.floor(getSkillRank(crawler, 'athletics') / 3);
+  return Math.max(0, (crawler.moveSpeed ?? DEFAULT_MOVE_SPEED) + (mods.moveSpeed ?? 0) + athletics);
 }
 
 // Automatic achievement: when exactly one crawler is the slowest in the campaign, their
@@ -562,9 +650,9 @@ export const createMerchantState = (mobId: string, config: MerchantConfig): Merc
   restockedAt: Date.now(),
 });
 
-/** The Scrooge level a crawler trades at after any haggling discount. */
-export const getEffectiveScrooge = (config: MerchantConfig | undefined, state: MerchantState | undefined, crawlerId?: string): number =>
-  Math.max(0, Math.floor(config?.scroogeFactor ?? 0) - (crawlerId ? state?.discounts?.[crawlerId] ?? 0 : 0));
+/** The Scrooge level a crawler trades at after any haggling discount and their Barter rank. Never below 0. */
+export const getEffectiveScrooge = (config: MerchantConfig | undefined, state: MerchantState | undefined, crawlerId?: string, barterRank = 0): number =>
+  Math.max(0, Math.floor(config?.scroogeFactor ?? 0) - (crawlerId ? state?.discounts?.[crawlerId] ?? 0 : 0) - getBarterScroogeReduction(barterRank));
 
 // Worked in tenths so 100 gold at +10% is exactly 110, not 110.00000000000001 rounded up to 111
 export const getMerchantBuyPrice = (goldValue: number | undefined, scrooge: number): number =>
@@ -1166,8 +1254,16 @@ export interface Quest {
   rewards: QuestReward[];
   actionItems: QuestActionItem[];
   notes: QuestNote[];
+  xpReward?: number;      // XP each crawler gets for finishing every visible action item; missing = XP_REWARDS.questDefault
+  xpAwardedTo?: string[]; // crawlerIds already given this quest's XP, so un-ticking and re-ticking can't repeat it
   createdAt: string;
   updatedAt: string;
+}
+
+// Campaign-wide game settings (singleton doc, id = 'current')
+export interface GameSettings {
+  id: string;
+  xpScale?: number; // multiplies all automatic XP; 1 = 100%
 }
 
 export interface AssignedQuest {

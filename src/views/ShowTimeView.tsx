@@ -67,6 +67,7 @@ interface ShowTimeViewProps {
   onAssignQuest?: (questId: string, crawlerIds: string[], episodeId?: string) => Promise<void>;
   onUpdateQuest?: (id: string, updates: Partial<Quest>) => void;
   onUpdateAssignedQuest?: (id: string, updates: Partial<AssignedQuest>) => void;
+  onAwardQuestXP?: (questId: string, crawlerId: string) => Promise<void>;
   onDeleteAssignedQuest?: (id: string) => void;
   currentPlayerId?: string; // crawler id of the player at this screen (DMs may have none)
   onRecordCrawlerMove?: (crawlerId: string, feet: number, spendTurnMovement: boolean, from?: { episodeId: string; mapId: string; x: number; y: number }) => Promise<void>;
@@ -285,9 +286,10 @@ const QuestPanel: React.FC<{
   onAssignQuest: (questId: string, crawlerIds: string[], episodeId?: string) => Promise<void>;
   onUpdateQuest?: (id: string, updates: Partial<Quest>) => void;
   onUpdateAssignedQuest?: (id: string, updates: Partial<AssignedQuest>) => void;
+  onAwardQuestXP?: (questId: string, crawlerId: string) => Promise<void>;
   onDeleteAssignedQuest?: (id: string) => void;
   addDiceRoll?: (entry: import("@/hooks/useGameState").DiceRollEntry) => Promise<void>;
-}> = ({ episode, crawlers, quests, assignedQuests, onAssignQuest, onUpdateQuest, onUpdateAssignedQuest, onDeleteAssignedQuest, addDiceRoll }) => {
+}> = ({ episode, crawlers, quests, assignedQuests, onAssignQuest, onUpdateQuest, onUpdateAssignedQuest, onAwardQuestXP, onDeleteAssignedQuest, addDiceRoll }) => {
   const [selectedQuestId, setSelectedQuestId] = useState<string | null>(null);
   const [selectedCrawlerIds, setSelectedCrawlerIds] = useState<string[]>([]);
 
@@ -432,6 +434,12 @@ const QuestPanel: React.FC<{
         : ai
     );
     onUpdateQuest(questId, { actionItems: updatedItems });
+
+    // Ticking off a crawler's last visible action item finishes the quest for them: give its XP (once)
+    const visible = updatedItems.filter(ai => ai.visible);
+    if (!alreadyCompleted && visible.length > 0 && visible.every(ai => ai.completedBy.includes(crawlerId))) {
+      onAwardQuestXP?.(questId, crawlerId);
+    }
 
     // Send dice notification when completing an action item
     if (!alreadyCompleted && addDiceRoll) {
@@ -770,7 +778,7 @@ const InventoryPanel: React.FC<{
   );
 };
 
-const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock, noncombatTurnState, resetNoncombatTurns, combatState, onRemoveCombatant, onRemoveCombatCondition, onRuntimePlacementsChange, onGameActiveChange, onRegisterGameToggle, roomId, quests = [], assignedQuests = [], onAssignQuest, onUpdateQuest, onUpdateAssignedQuest, onDeleteAssignedQuest, currentPlayerId, onRecordCrawlerMove, onSetMobEncountered, chatMessages = [], npcAiSettings = null, npcAiStatus = null, npcSecrets = {}, npcPersonalities = NO_GENERATED_PERSONALITIES, npcMemories = NO_NPC_MEMORIES, onSetNpcMemory, onSendChatMessage, onClearChat, onUpdateNpcAiSettings, onSetNpcSecretState, npcKeys, onChangeNpcKeys, merchants = NO_MERCHANTS, onBuyFromMerchant, onSellToMerchant, onHaggleWithMerchant, onRestockMerchant, onResolveMerchantHaggle, onSetTranslateMode }) => {
+const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock, noncombatTurnState, resetNoncombatTurns, combatState, onRemoveCombatant, onRemoveCombatCondition, onRuntimePlacementsChange, onGameActiveChange, onRegisterGameToggle, roomId, quests = [], assignedQuests = [], onAssignQuest, onUpdateQuest, onUpdateAssignedQuest, onAwardQuestXP, onDeleteAssignedQuest, currentPlayerId, onRecordCrawlerMove, onSetMobEncountered, chatMessages = [], npcAiSettings = null, npcAiStatus = null, npcSecrets = {}, npcPersonalities = NO_GENERATED_PERSONALITIES, npcMemories = NO_NPC_MEMORIES, onSetNpcMemory, onSendChatMessage, onClearChat, onUpdateNpcAiSettings, onSetNpcSecretState, npcKeys, onChangeNpcKeys, merchants = NO_MERCHANTS, onBuyFromMerchant, onSellToMerchant, onHaggleWithMerchant, onRestockMerchant, onResolveMerchantHaggle, onSetTranslateMode }) => {
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
   const selectedEpisodeIdRef = useRef<string | null>(null);
   const [currentMapIndex, setCurrentMapIndex] = useState(0);
@@ -3029,6 +3037,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
                 onAssignQuest={onAssignQuest}
                 onUpdateQuest={onUpdateQuest}
                 onUpdateAssignedQuest={onUpdateAssignedQuest}
+                onAwardQuestXP={onAwardQuestXP}
                 onDeleteAssignedQuest={onDeleteAssignedQuest}
                 addDiceRoll={addDiceRoll}
               />

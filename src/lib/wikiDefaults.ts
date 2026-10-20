@@ -1009,11 +1009,104 @@ Haggling uses an action. In combat it takes your action, so you can only haggle 
 
 Each crawler gets one haggle per merchant until the merchant is restocked. Haggling only lowers prices for the crawler who rolled.
 
+## Barter
+
+Your **Barter** skill lowers prices on top of haggling. Every 2 Barter ranks take 1 off the Scrooge Factor you trade at, and each rank adds +1 to your haggle rolls. Prices never drop below an item's gold value, so you can't buy low and sell back to the same merchant for a profit. The trade window shows how much your Barter is taking off.
+
+Barter isn't bought with skill points. It ranks up as you use it: every buy or sell counts, and ranks come at 10, 30, 60 and 100 trades and so on, up to rank 10. See [Skills](/wiki/skills).
+
 ## Restocking (DM)
 
 Right-click a merchant's token in Show Time and choose **Open Merchant**. The DM sees the stock, the merchant's gold, and any haggles waiting for an answer (these also pop up in the bottom left of the map). **Restock** resets the stock, gold and haggling to the settings in the DM Console.
 
 Changes to stock and starting gold in the DM Console take effect at the next restock. Changes to the Scrooge Factor apply right away.`,
+  },
+  {
+    id: 'experience-levels',
+    slug: 'experience-levels',
+    title: 'Experience & Levels',
+    category: 'Game Mechanics',
+    order: 15.5,
+    content: `# Experience & Levels
+
+Crawlers earn **XP** automatically while they play, and the DM can hand out more. XP raises your level, and there's no level cap.
+
+## Where XP comes from
+
+| Event | XP | Who gets it |
+|-------|----|-------------|
+| Damage to a hostile mob | 1 per 2 damage | The attacker |
+| Killing blow | 5 × the mob's level | The attacker |
+| Fight finisher (last mob down) | 10 | The attacker |
+| Surviving a fight (above 0 HP when combat ends) | 2 | Every crawler in the fight |
+| Near death (HP drops below 10% of max) | 5 | That crawler |
+| Finishing a quest | Set on the quest (10 if left as is) | Each crawler who finishes every visible action item |
+| A spell mastery or Looting level up | 20 | That crawler |
+| DM award | Any amount | The crawlers the DM picks |
+
+Damage to friendly NPCs and to other crawlers earns no XP. Each grant shows in the dice history, and your last 20 show under **Recent XP** on your profile.
+
+## Levels
+
+Reaching level L takes 50 × L × (L − 1) total XP, so each level costs 100 XP more than the last:
+
+| Level | Total XP |
+|-------|----------|
+| 2 | 100 |
+| 3 | 300 |
+| 5 | 1,000 |
+| 10 | 4,500 |
+| 20 | 19,000 |
+
+The XP bar under **LEVEL** on the Profile tab shows how close you are to the next level.
+
+## Level-up rewards
+
+Level-ups happen automatically. Each level gives:
+
+- **+5 max HP and +3 max mana.** Your current HP and mana go up by the same amount.
+- **1 skill point** to spend on a skill. See [Skills](/wiki/skills).
+- **1 ability point.** Each point is +1 to that ability's rolls. The 5-point limit from the character creator doesn't apply to level-up points.
+
+When you have points to spend, a gold badge shows on your profile and on the Skills tab. Spend them on the **Skills** tab.
+
+## For the DM
+
+- **Award XP** is on each crawler's Profile tab, next to the trophies. Enter an amount and a reason, and tick one or more crawlers. DM awards are exactly what you type.
+- **Auto XP** next to it scales all automatic XP in the campaign, from 50% to 200%.
+- **Admin Override** can set a crawler's level or total XP by hand. Changing the level moves their XP to the start of that level.
+- Set a quest's XP in the quest editor in the DM Console.
+- Crawlers from before XP start with exactly the XP their level needs, so nobody loses a level.`,
+  },
+  {
+    id: 'skills',
+    slug: 'skills',
+    title: 'Skills',
+    category: 'Game Mechanics',
+    order: 15.6,
+    content: `# Skills
+
+Skills make a crawler better at one kind of thing. Each skill has ranks from 0 to 10, shown on the profile's **Skills** tab.
+
+| Skill | Ability | What each rank does |
+|-------|---------|---------------------|
+| Barter | CHA | Every 2 ranks lower a merchant's Scrooge Factor by 1 for you; +1 to haggle rolls |
+| Athletics | STR | +1 to climb, jump and grapple checks; every 3 ranks add +5 ft of movement |
+| Stealth | DEX | +1 to sneak and hide checks |
+| Perception | INT | +1 to spot, search and sense-lies checks |
+| Medicine | INT | +1 HP on every heal you give with a spell |
+| Intimidation | CHA | +1 to threaten checks |
+
+## Getting ranks
+
+- **Skill points:** you get one each level. Press **+** on a skill to spend one on a rank. Athletics, Stealth, Perception, Medicine and Intimidation are bought this way.
+- **By use:** Barter ranks up as you trade with merchants. Every buy or sell counts, and ranks come at 10, 30, 60 and 100 trades and so on, like Looting. See [Merchants](/wiki/merchants).
+
+## Skill checks
+
+Press **Roll** on a skill to roll d20 + the linked ability modifier + your rank. The roll goes to the dice history. A skill check uses an action like the Actions tab: in combat it takes your action on your turn, and between fights it uses one of your rolls for the turn.
+
+More skills will be added later.`,
   },
   {
     id: 'talking-npcs',

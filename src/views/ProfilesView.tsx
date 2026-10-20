@@ -10,10 +10,12 @@ import { CharacterCreator } from "@/components/CharacterCreator";
 import { BACKSTORY_QUESTIONS } from "@/lib/characterCreation";
 import { RarityBadge } from "@/components/ui/RarityBadge";
 import { ConditionBadges } from "@/components/ConditionBadges";
+import { ExperienceCard } from "@/components/ExperienceCard";
+import { SkillsPanel } from "@/components/SkillsPanel";
 import { usableLanguageIds } from "@/lib/languages";
 import { HealthBar } from "@/components/ui/HealthBar";
 import { EquipmentSlot } from "@/components/ui/EquipmentSlot";
-import { Crawler, Mob, InventoryItem, getItemStackKey, stackItems, getLootingLevel, getLootsUntilNextLevel, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery, getInitialCrawlerId, rollD20, rollsWithDisadvantage, ABILITY_KEYS, type SpellEffect, describeSpellEffect } from "@/lib/gameData";
+import { Crawler, Mob, InventoryItem, getItemStackKey, stackItems, getLootingLevel, getLootsUntilNextLevel, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery, getInitialCrawlerId, rollD20, rollsWithDisadvantage, ABILITY_KEYS, type SpellEffect, describeSpellEffect, getSkillRank, getCrawlerXP, type SkillId, type AbilityKey } from "@/lib/gameData";
 import type { DiceRollEntry } from "@/hooks/useGameState";
 import UndoTurnButton, { canUndoCombatTurn } from "@/components/UndoTurnButton";
 import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Backpack, HardHat, Package, Lock, Unlock, ChevronDown, ChevronUp, Check, Search, Send, BookOpen, Filter, X, Gem, Footprints, Shirt, Hand, Target, Swords, RefreshCw, Timer, ScrollText, Eye, EyeOff, CheckSquare, Trophy, Skull, HeartCrack, Crown, Minus, Wand2, Star } from "lucide-react";
@@ -51,7 +53,7 @@ const getEquipmentIcon = (slot?: string, className: string = "w-4 h-4 shrink-0")
   }
 };
 
-type ProfileTab = 'profile' | 'inventory' | 'actions' | 'spells' | 'reactions' | 'attacks' | 'bonus' | 'quests';
+type ProfileTab = 'profile' | 'inventory' | 'actions' | 'skills' | 'spells' | 'reactions' | 'attacks' | 'bonus' | 'quests';
 
 // Noncombat actions mapped to their associated ability score
 const NONCOMBAT_ACTIONS: { label: string; stat: 'str' | 'dex' | 'con' | 'int' | 'cha' }[] = [
@@ -87,7 +89,7 @@ interface ProfilesViewProps {
   getCrawlerInventory: (crawlerId: string) => InventoryItem[];
   onUpdateCrawlerInventory: (crawlerId: string, items: InventoryItem[]) => void;
   partyGold: number;
-  onStatRoll?: (crawlerName: string, crawlerId: string, stat: string, totalStat: number) => void;
+  onStatRoll?: (crawlerName: string, crawlerId: string, stat: string, totalStat: number, bonus?: number) => void;
   getCrawlerLootBoxes?: (crawlerId: string) => SentLootBox[];
   claimLootBoxItems?: (lootBoxId: string, crawlerId: string, itemIds: string[], claimGold?: boolean) => Promise<void>;
   getPartyInventory?: () => InventoryItem[];
@@ -107,6 +109,11 @@ interface ProfilesViewProps {
   onApplyCombatConditions?: (targetIds: string[], effect: SpellEffect, spellName: string, casterName?: string) => Promise<void>;
   isAdmin?: boolean;
   onAwardTrophy?: (crawlerId: string, name: string, description?: string) => Promise<void>;
+  xpScale?: number;
+  onAwardXP?: (crawlerIds: string[], amount: number, reason: string) => Promise<void>;
+  onSetXPScale?: (scale: number) => Promise<void>;
+  onSpendSkillPoint?: (crawlerId: string, skillId: SkillId) => Promise<boolean>;
+  onSpendAbilityPoint?: (crawlerId: string, ability: AbilityKey) => Promise<boolean>;
   onRevokeTrophy?: (crawlerId: string, trophyId: string) => Promise<void>;
   addDiceRoll?: (entry: DiceRollEntry) => Promise<void>;
   mobs?: Mob[];
@@ -506,6 +513,11 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   isAdmin = false,
   onAwardTrophy,
   onRevokeTrophy,
+  xpScale = 1,
+  onAwardXP,
+  onSetXPScale,
+  onSpendSkillPoint,
+  onSpendAbilityPoint,
   addDiceRoll,
   mobs: mobsProp,
   getCrawlerAssignedQuests,
@@ -1037,6 +1049,21 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
               <span className="hidden xl:inline text-sm font-medium">Actions</span>
             </button>
             <button
+              onClick={() => setActiveTab('skills')}
+              className={`p-3 rounded-l-lg transition-colors flex items-center gap-2 ${
+                activeTab === 'skills'
+                  ? 'bg-primary/20 text-primary border-r-2 border-primary'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              }`}
+              title="Skills"
+            >
+              <Sparkles className="w-5 h-5" />
+              <span className="hidden xl:inline text-sm font-medium">Skills</span>
+              {((selected?.skillPoints ?? 0) + (selected?.abilityPoints ?? 0)) > 0 && (
+                <span className="bg-accent/20 text-accent text-xs px-1.5 py-0.5 rounded-full">{(selected?.skillPoints ?? 0) + (selected?.abilityPoints ?? 0)}</span>
+              )}
+            </button>
+            <button
               onClick={() => setActiveTab('spells')}
               className={`p-3 rounded-l-lg transition-colors flex items-center gap-2 ${
                 activeTab === 'spells'
@@ -1269,6 +1296,18 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                   placeholder="Level"
                   className="bg-muted border border-border px-2 py-1 w-20 text-sm"
                 />
+                {isAdmin && (
+                  <input
+                    type="number"
+                    min={0}
+                    value={editData.xp ?? getCrawlerXP(selected)}
+                    onChange={(e) => setEditData({ ...editData, xp: Math.max(0, parseInt(e.target.value) || 0) })}
+                    placeholder="XP"
+                    aria-label="XP"
+                    title="Total XP (changing Level resets this to the start of that level)"
+                    className="bg-muted border border-border px-2 py-1 w-24 text-sm"
+                  />
+                )}
               </div>
             ) : (
               <p className="text-muted-foreground text-sm break-words">
@@ -1496,6 +1535,17 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             </div>
           </div>
         )}
+
+        <ExperienceCard
+          key={selected.id}
+          crawler={selected}
+          crawlers={crawlers}
+          isAdmin={isAdmin}
+          xpScale={xpScale}
+          onAwardXP={onAwardXP}
+          onSetXPScale={onSetXPScale}
+          onSpendPoints={() => setActiveTab('skills')}
+        />
 
         {/* Activity stats and DM trophies row */}
         {(() => {
@@ -2277,6 +2327,35 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
               );
             })()}
 
+            {activeTab === 'skills' && (() => {
+              const rollsRemaining = getNoncombatRollsRemaining?.(selected.id) ?? 0;
+              const hasActiveTurn = !!noncombatTurnState && isShowtimeActive;
+              const isCombatActive = combatState?.active && combatState.phase !== 'ended';
+              const isCombatPhase = combatState?.active && combatState.phase === 'combat';
+              const myCombatant = combatState?.combatants.find(c => c.id === selected.id);
+              const isMyTurn = isCombatPhase && combatState && combatState.combatants[combatState.currentTurnIndex]?.id === selected.id;
+              const isTestMode = !hasActiveTurn && !isCombatActive;
+              // Skill checks use an action like the Actions tab: your action on your combat turn, or a noncombat roll
+              const canRoll = isCombatActive ? !!isMyTurn && !(myCombatant?.hasUsedAction ?? false) : (isTestMode || rollsRemaining > 0);
+              return (
+                <SkillsPanel
+                  crawler={selected}
+                  equippedMods={equippedMods}
+                  canSpend={isAdmin || currentPlayerId === selected.id}
+                  canRoll={canRoll}
+                  rollBlockedReason={isCombatActive ? 'Not your turn, or your action is used' : 'No rolls remaining'}
+                  onSpendSkillPoint={onSpendSkillPoint}
+                  onSpendAbilityPoint={onSpendAbilityPoint}
+                  onRollSkill={(skill, abilityTotal, rank) => {
+                    if (!canRoll) return;
+                    onStatRoll?.(selected.name, selected.id, `${skill.name} check${rank ? ` (rank ${rank})` : ''}`, abilityTotal, rank);
+                    if (!isTestMode && !isCombatActive) recordNoncombatRoll?.(selected.id);
+                    if (isCombatActive && isMyTurn) onRecordCombatAction?.(selected.id, 'action');
+                  }}
+                />
+              );
+            })()}
+
             {/* Spells Tab */}
             {activeTab === 'spells' && (() => {
               const isAnyCombatActive = combatState?.active && combatState.phase !== 'ended';
@@ -2378,7 +2457,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 if (isHealing) {
                   if (isSelfSpell) {
                     const { results, total } = rollSpellDice(dice);
-                    const healed = Math.max(0, total + bonus);
+                    const healed = Math.max(0, total + bonus) + getSkillRank(selected, 'medicine');
                     await onHealCrawler?.(selected.id, healed);
                     if (effect) await onApplyCombatConditions?.([selected.id], effect, spell.name, selected.name);
                     addDiceRoll?.({
@@ -3611,7 +3690,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
               total += roll;
             }
           }
-          const healed = Math.max(0, total + pendingHeal.bonus);
+          const healed = Math.max(0, total + pendingHeal.bonus) + getSkillRank(selected, 'medicine');
           await onHealCrawler?.(target.id, healed);
           if (pendingHeal.effect && inCombat) await onApplyCombatConditions?.([target.id], pendingHeal.effect, pendingHeal.spellName, selected.name);
           addDiceRoll?.({

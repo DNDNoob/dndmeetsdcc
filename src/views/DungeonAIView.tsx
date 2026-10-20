@@ -9,7 +9,7 @@ import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import MapMobPlacementEditor from "@/components/ui/MapMobPlacementEditor";
 import MapDesignerPopout from "@/components/ui/MapDesignerPopout";
-import { Mob, Episode, stackItems, DEFAULT_LOOT_DESTRUCTION_CHANCE, getMobKind, isBossMob, mobSection, type MobSection, legacyMobType, EpisodeMobPlacement, Crawler, CrawlerPlacement, InventoryItem, LootBoxTemplate, LootBoxTier, getLootBoxTierColor, type EquipmentSlot, type EquippedItems, Quest, QuestReward, QuestActionItem, QuestRewardTier, type CampaignMapDoc, type PublicMap, type PublicMob, type PublicEpisode, isMerchant } from "@/lib/gameData";
+import { Mob, Episode, stackItems, DEFAULT_LOOT_DESTRUCTION_CHANCE, getMobKind, isBossMob, mobSection, type MobSection, legacyMobType, EpisodeMobPlacement, Crawler, CrawlerPlacement, InventoryItem, LootBoxTemplate, LootBoxTier, getLootBoxTierColor, type EquipmentSlot, type EquippedItems, Quest, QuestReward, QuestActionItem, QuestRewardTier, type CampaignMapDoc, type PublicMap, type PublicMob, type PublicEpisode, isMerchant, XP_REWARDS } from "@/lib/gameData";
 import { Brain, Sparkles, Upload, Plus, Trash2, Map, Skull, Image as ImageIcon, Save, Edit2, X, Layers, ChevronLeft, ChevronRight, User, Package, Search, Maximize2, Shield, ChevronDown as ChevronDownIcon, ScrollText, Eye, EyeOff, CheckSquare, GripVertical, Users, Globe } from "lucide-react";
 import { storage } from "@/lib/firebase";
 import { ShareToggle, ImportButton } from "@/components/ui/ShareToggle";
@@ -185,6 +185,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   const [questRewardTier, setQuestRewardTier] = useState<QuestRewardTier>("Copper");
   const [newActionItemText, setNewActionItemText] = useState("");
   const [editingQuestId, setEditingQuestId] = useState<string | null>(null);
+  const [newQuestXP, setNewQuestXP] = useState(String(XP_REWARDS.questDefault));
   const [dragActionIdx, setDragActionIdx] = useState<number | null>(null);
   const [dragRewardIdx, setDragRewardIdx] = useState<number | null>(null);
 
@@ -2558,6 +2559,19 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                   />
                 </div>
 
+                {/* XP for finishing it */}
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block" htmlFor="quest-xp">XP for each crawler who finishes it</label>
+                  <input
+                    id="quest-xp"
+                    type="number"
+                    min={0}
+                    value={newQuestXP}
+                    onChange={e => setNewQuestXP(e.target.value)}
+                    className="w-28 bg-background border border-border rounded px-3 py-2 text-sm"
+                  />
+                </div>
+
                 {/* Action Items */}
                 <div>
                   <label className="text-xs text-muted-foreground mb-1 block">Action Items</label>
@@ -2762,6 +2776,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                         setNewQuestDescription("");
                         setNewQuestRewards([]);
                         setNewQuestActionItems([]);
+                        setNewQuestXP(String(XP_REWARDS.questDefault));
                       }}
                       className="flex-1"
                     >
@@ -2780,6 +2795,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                           description: newQuestDescription,
                           rewards: newQuestRewards,
                           actionItems: newQuestActionItems,
+                          xpReward: Math.max(0, parseInt(newQuestXP, 10) || 0),
                         });
                         setEditingQuestId(null);
                       } else if (onAddQuest) {
@@ -2789,6 +2805,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                           description: newQuestDescription,
                           rewards: newQuestRewards,
                           actionItems: newQuestActionItems,
+                          xpReward: Math.max(0, parseInt(newQuestXP, 10) || 0),
                           notes: [],
                           createdAt: new Date().toISOString(),
                           updatedAt: new Date().toISOString(),
@@ -2798,6 +2815,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                       setNewQuestDescription("");
                       setNewQuestRewards([]);
                       setNewQuestActionItems([]);
+                      setNewQuestXP(String(XP_REWARDS.questDefault));
                     }}
                   >
                     <Plus className="w-4 h-4 mr-2" />
@@ -2829,6 +2847,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                               setNewQuestDescription(quest.description);
                               setNewQuestRewards([...quest.rewards]);
                               setNewQuestActionItems([...quest.actionItems]);
+                              setNewQuestXP(String(quest.xpReward ?? XP_REWARDS.questDefault));
                             }}
                             className="p-1 hover:bg-muted rounded"
                           >
@@ -2854,6 +2873,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                       <div className="flex gap-3 text-xs text-muted-foreground">
                         <span>{quest.actionItems.length} action item{quest.actionItems.length !== 1 ? 's' : ''}</span>
                         <span>{quest.rewards.length} reward{quest.rewards.length !== 1 ? 's' : ''}</span>
+                        <span>{quest.xpReward ?? XP_REWARDS.questDefault} XP</span>
                       </div>
                     </div>
                   ))}

@@ -2,6 +2,11 @@
   {
     "date": "2026-10-20",
     "changes": [
+      "⭐ Crawlers now earn XP: damage and killing blows on hostile mobs, finishing a fight, surviving it, coming back from near death, finishing quests, and spell mastery or Looting level-ups. Each grant shows in the dice history",
+      "📈 Levels come from XP with no cap. Each level gives +5 max HP, +3 max mana, a skill point and an ability point, and an XP bar on the profile shows how far you are from the next one",
+      "🎯 New Skills tab with six skills: Barter, Athletics, Stealth, Perception, Medicine and Intimidation. Spend skill points on ranks and roll skill checks, which use an action like other rolls",
+      "🪙 Barter ranks up as you trade with merchants. Every 2 ranks take 1 off a merchant's Scrooge Factor for you, and each rank adds +1 to haggle rolls",
+      "🎁 DMs can award XP to one or more crawlers from the profile, scale all automatic XP from 50% to 200%, and set how much XP each quest gives",
       "💎 Items can have a rarity (Common, Uncommon, Rare, Epic or Legendary), shown as a colored tag on the item, and the Item Library can be filtered by rarity",
       "📝 Every item now has an Effects field for what it does, shown when you expand the item",
       "🏆 Loot boxes can carry an achievement: when the DM unlocks the box, it's added to the crawler's trophies",
