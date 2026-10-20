@@ -2,6 +2,8 @@
   {
     "date": "2026-10-20",
     "changes": [
+      "🔒 Campaigns are now private: only the DM and players who joined can see or change a campaign's data. Before, anyone signed in with Google could edit any campaign",
+      "🔒 Wiki links now only work for web, email and wiki addresses, which closes a hole that let a wiki page run code in other players' browsers",
       "🧑 New character creator: tap New on the Profiles page to make a crawler step by step, with a name, a backstory, ability points and languages",
       "📜 Backstories have five parts: profession, an accomplishment, a hobby, where you were when the world ended, and the most important person, thing or animal to you. Pick a suggestion or write your own, and edit it later on your profile",
       "🎲 New crawlers spend 10 ability points (up to 5 in one ability). Each point is +1 to rolls, and abilities left at 0 roll with disadvantage",
