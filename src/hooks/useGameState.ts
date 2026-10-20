@@ -85,6 +85,7 @@ export interface DiceRollEntry {
   results: { dice: string; result: number }[];
   total: number;
   statRoll?: { stat: string; modifier: number; rawRoll: number; diceLabel?: string; rollType?: string };
+  mobRoll?: boolean; // rolled by the DM for a mob (crawlerId holds the mob's combatant id)
   // For loot box notifications
   lootBoxNotification?: {
     boxName: string;

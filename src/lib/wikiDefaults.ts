@@ -431,6 +431,18 @@ Combat proceeds in turn order (highest initiative first). On your turn:
 
 The DM advances turns with the "Next Turn" button.
 
+## Mob Turns (DM)
+
+During combat the DM sees a **mob actions panel** in the top left of the Show Time map. It follows the turn order: when a mob's turn comes up, the panel shows everything that mob can do:
+
+- **Attacks** set up for it in the mob creator (claws, bites, tail swipes)
+- **Weapons** it has equipped from its default inventory
+- **Spells** picked for it from the spell library
+
+Tap one to roll it. The to-hit roll (d20 plus the attack's bonus) goes to the dice log under the mob's name in red, so every player sees it. Mobs the party hasn't met show as **???**. Then pick the target (each crawler shows their HP and CON), tap **Roll damage**, and the target's health goes down on its own. Tap **Missed** if the attack didn't land. Splash weapons and area spells let you pick several targets. Healing spells skip the to-hit roll and heal the target instead.
+
+Mobs follow the same rules as crawlers: one action and one bonus action on their turn, and only reactions when it isn't their turn. The panel crosses out the action and bonus action once they're used. To use a mob's reaction on someone else's turn, pick the mob from the menu at the top of the panel. Tap the arrow to fold the panel out of the way.
+
 ## Undo Turn
 
 Moved your token by accident or clicked the wrong action? Press **Undo Turn** during your own turn. It shows at the top of your crawler profile and in the combat section of the game clock panel. Tap it, then tap **Tap again to undo** to confirm.
@@ -650,6 +662,17 @@ Each mob has:
 - **Default Inventory** (items the mob carries)
 - **Default Gold**
 - **Equipped Items** (items the mob has equipped, shown with a shield icon)
+- **Attacks & Spells**: what the DM rolls for it in combat (see below)
+
+## Attacks & Spells
+
+Open **Attacks & Spells** when adding or editing a mob in the DM Console:
+
+- **Add attack**: give it a name, whether it uses an Action, Bonus Action or Reaction, a to-hit bonus, damage dice plus a flat damage bonus, a damage type, a range (leave blank for melee) and optional notes. Mobs have no ability scores, so the bonuses are flat numbers
+- **Spells**: add any spell from the campaign's spell library. Mobs don't spend mana
+- **Weapons** the mob has equipped from its default inventory are added on their own
+
+In combat, the DM rolls all of these from the mob actions panel on the map. See [Combat System](/wiki/combat).
 
 ## Encountered Mobs
 
