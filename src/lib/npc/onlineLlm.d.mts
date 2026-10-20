@@ -4,6 +4,7 @@ import type { NpcLlmAdapter } from './engine.mjs';
 export interface NpcOnlineKeys {
   groq?: string;
   gemini?: string;
+  elevenlabs?: string; // spoken voices only
 }
 
 export const NPC_ONLINE_PROVIDERS: { id: keyof NpcOnlineKeys; name: string; url: string; models: { quality: string; fast: string } }[];

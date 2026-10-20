@@ -48,12 +48,119 @@ const describeCrawler = (c) => {
   return `${c.name}${bits ? ` (${bits}${c.level ? `, level ${c.level}` : ''}${hurt ? `, ${hurt}` : ''})` : hurt ? ` (${hurt})` : ''}`;
 };
 
+// ── Memory: what an NPC remembers from earlier conversations ──
+
+export const MEMORY_MAX_NOTES = 8;
+
+/** -3 (hates them) … +3 (fond of them) in words for the prompt and the DM. */
+export const feelingWord = (score) =>
+  score <= -3 ? 'hostile' : score === -2 ? 'dislikes them' : score === -1 ? 'wary'
+    : score === 0 ? 'neutral' : score === 1 ? 'warming to them' : score === 2 ? 'friendly' : 'fond of them';
+
+const clampScore = (n) => Math.max(-3, Math.min(3, Math.round(Number(n) || 0)));
+
+/** Prompt lines for what the NPC remembers and how it feels about each crawler. */
+export const describeMemory = (memory) => {
+  const lines = [];
+  const notes = (memory?.notes || []).filter(Boolean);
+  if (notes.length) {
+    lines.push('What you remember from earlier conversations:');
+    for (const n of notes) lines.push(`- ${n}`);
+  }
+  const feelings = Object.values(memory?.feelings || {}).filter((f) => f?.name);
+  if (feelings.length) {
+    lines.push(`How you feel about the crawlers: ${feelings.map((f) => `${f.name}: ${feelingWord(f.score)}`).join('; ')}. Let this show in how you treat them.`);
+  }
+  return lines;
+};
+
+export const MEMORY_SYSTEM_PROMPT = [
+  'You keep the memory notes for a character in a tabletop game.',
+  'Reply with only a JSON object, no other text.',
+].join('\n');
+
+/**
+ * Prompt to fold a finished conversation into an NPC's memory.
+ * @param {{ mob: object, memory?: object, transcript: string, crawlerNames: string[] }} opts
+ */
+export const buildMemoryPrompt = ({ mob, memory, transcript, crawlerNames }) => {
+  const notes = (memory?.notes || []).filter(Boolean);
+  const feelings = memory?.feelings || {};
+  const current = crawlerNames.map((name) => {
+    const f = Object.values(feelings).find((x) => x?.name === name);
+    return `${name}: ${f ? clampScore(f.score) : 0}`;
+  });
+  return [
+    `Character: ${mob.name}${mob.description ? ` (${mob.description.slice(0, 200)})` : ''}`,
+    mob.personality?.attitude ? `Their usual attitude: ${mob.personality.attitude}` : null,
+    '',
+    notes.length ? `What ${mob.name} already remembers:\n${notes.map((n) => `- ${n}`).join('\n')}` : `${mob.name} has no memories of the party yet.`,
+    '',
+    `The conversation that just ended:\n${transcript}`,
+    '',
+    `Update ${mob.name}'s memory. Keep what still matters, add what is new, merge repeats, drop trivia.`,
+    `- At most ${MEMORY_MAX_NOTES} notes, each under 20 words, written from ${mob.name}'s point of view, naming who did what.`,
+    '- Keep promises, deals, threats, insults, favours, lies they were told, names and plans they learned, and what they told the party.',
+    '- Only record what was actually said or done. Do not invent anything, and never record anything that was not said aloud.',
+    `- Feelings: a score from -3 (hostile) to 3 (fond) for each crawler, moved at most 1 or 2 points by this conversation. Current scores: ${current.join(', ') || 'none'}.`,
+    '',
+    'JSON shape: {"notes": ["..."], "feelings": {"<crawler name>": <score>}}',
+  ].filter((l) => l !== null).join('\n');
+};
+
+/**
+ * Read the model's memory update. Feelings are keyed by crawler id (names mapped through `crawlers`);
+ * crawlers it didn't mention keep their old score. Null if the reply isn't usable.
+ * @param {string} raw
+ * @param {{ id: string, name: string }[]} crawlers
+ * @param {object} [prev] the memory before this conversation
+ */
+export const parseMemory = (raw, crawlers, prev) => {
+  const text = stripThinking(raw);
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start < 0 || end <= start) return null;
+  let data;
+  try { data = JSON.parse(text.slice(start, end + 1)); } catch { return null; }
+  if (!Array.isArray(data?.notes)) return null;
+  const notes = data.notes
+    .filter((n) => typeof n === 'string' && n.trim())
+    .map((n) => n.trim().slice(0, 200))
+    .slice(0, MEMORY_MAX_NOTES);
+  const feelings = { ...(prev?.feelings || {}) };
+  for (const [name, score] of Object.entries(data.feelings || {})) {
+    const crawler = crawlers.find((c) => c.name?.toLowerCase() === name.trim().toLowerCase());
+    if (crawler && Number.isFinite(Number(score))) feelings[crawler.id] = { name: crawler.name, score: clampScore(score) };
+  }
+  return { notes, feelings };
+};
+
+/**
+ * Languages with no words for outsiders. Each line is "meaning || what you do": crawlers who know the
+ * language read the meaning, everyone else sees the body language.
+ */
+const GESTURE_STYLES = {
+  beast: {
+    intro: 'You are a creature that talks in animal sounds and body language (Beast). Only crawlers who can speak with animals understand your words; everyone else just sees what you do.',
+    example: 'Food first, then I show you the tunnel. || squeaks twice and backs toward the hole, eyeing your cheese',
+  },
+  plant: {
+    intro: 'You are a plant that talks in rustling, creaking and slow movement (Plant). Only crawlers who can speak with plants understand your words; everyone else just sees what you do. You only know slow, local things: who walked past, weather, water, light, what grows and rots around you. You think in seasons, not minutes.',
+    example: 'Heavy boots came at moonrise and crushed my roots. They went east. || its leaves shiver and a vine curls toward the east tunnel',
+  },
+  dead: {
+    intro: 'You are dead. A spell (Speak with Dead) gives your corpse a voice for a few questions (Dead). You only know what you knew in life, up to the moment you died; you learn nothing new and cannot see the present. Answer briefly, and often cryptically. You are not obliged to be truthful to those you hated in life.',
+    example: 'The one with the iron ring. He laughed as I fell. || its jaw creaks open and a dry whisper escapes',
+  },
+};
+
 /**
  * System prompt for one NPC line. The secret is only included when the DM has unlocked it,
  * so the model can't leak what it hasn't been told.
  */
-export const buildSystemPrompt = ({ mob, secretUnlocked, scene }) => {
+export const buildSystemPrompt = ({ mob, secretUnlocked, scene, memory, speaking, knownLanguages, gesture }) => {
   const p = mob.personality || {};
+  const style = gesture ? GESTURE_STYLES[gesture] : null;
   const lines = [
     `You are ${mob.name}, a character in a gritty, darkly funny dungeon-crawl tabletop game.`,
   ];
@@ -70,6 +177,12 @@ export const buildSystemPrompt = ({ mob, secretUnlocked, scene }) => {
       if (p.revealWhen) lines.push(`You would only open up if: ${p.revealWhen}.`);
     }
   }
+  lines.push(...describeMemory(memory));
+  if (style) {
+    lines.push(style.intro);
+  } else if (speaking) {
+    lines.push(`You are speaking ${speaking}${knownLanguages?.length > 1 ? ` (you know ${knownLanguages.join(', ')})` : ''}. Write your words in plain English; the game shows them in ${speaking}.`);
+  }
   lines.push('');
   lines.push('The scene:');
   if (scene.episodeName) lines.push(`- Location: ${scene.episodeName}${scene.episodeDescription ? ` (${scene.episodeDescription})` : ''}`);
@@ -78,14 +191,30 @@ export const buildSystemPrompt = ({ mob, secretUnlocked, scene }) => {
   if (scene.nearby.length) lines.push(`- Crawlers right next to you: ${scene.nearby.map(describeCrawler).join('; ')}`);
   if (scene.farther.length) lines.push(`- Crawlers farther away: ${scene.farther.map(describeCrawler).join('; ')}`);
   lines.push('');
-  lines.push('Rules: Reply with ONE line of spoken dialogue, 25 words or fewer. Stay in character.');
-  lines.push('No narration, no stage directions, no actions in asterisks, no quotation marks, no name prefix.');
+  if (style) {
+    lines.push('Rules: Reply with ONE line in this exact form: what you mean, in plain words (25 words or fewer) || what the crawlers see and hear you do (15 words or fewer, third person, no name).');
+    lines.push(`Example: ${style.example}`);
+    lines.push('Stay in character. No quotation marks, no name prefix.');
+  } else {
+    lines.push('Rules: Reply with ONE line of spoken dialogue, 25 words or fewer. Stay in character.');
+    lines.push('No narration, no stage directions, no actions in asterisks, no quotation marks, no name prefix.');
+  }
   lines.push('Never speak or decide for the players.');
   return lines.join('\n');
 };
 
-export const formatTranscript = (messages) =>
-  messages.map((m) => `${m.authorName}${m.authorType === 'dm' ? ' (narrator)' : ''}: ${m.text}`).join('\n');
+/**
+ * Chat lines as the model reads them. With `understands`, lines in a language the NPC doesn't
+ * know come through as just the language, not the words.
+ */
+export const formatTranscript = (messages, understands, nameOf) =>
+  messages.map((m) => {
+    const who = `${m.authorName}${m.authorType === 'dm' ? ' (narrator)' : ''}`;
+    if (understands && m.language && !understands(m.language)) {
+      return `${who}: (says something in ${nameOf ? nameOf(m.language) : 'a language'} you don't understand)`;
+    }
+    return `${who}: ${m.text}`;
+  }).join('\n');
 
 export const buildLinePrompt = ({ mob, transcript, trigger }) =>
   [
@@ -127,6 +256,23 @@ export const cleanLine = (raw, name) => {
   text = text.replace(/^["“”'‘’]+|["“”'‘’]+$/g, '').trim();
   if (text.length > 220) text = text.slice(0, 217).replace(/\s+\S*$/, '') + '…';
   return text;
+};
+
+/** Languages that get the "meaning || what you do" format (see GESTURE_LANGUAGE_IDS). */
+export const hasGestureStyle = (languageId) => Object.hasOwn(GESTURE_STYLES, languageId);
+
+/**
+ * Split a Beast, Plant or Dead reply ("words || body language") into the words (for those who
+ * understand) and what everyone else sees, as "*squeaks and backs away*". No body language → gesture is ''.
+ */
+export const parseGestureLine = (raw, name) => {
+  const text = stripThinking(raw).trim();
+  const firstLine = text.split(/\r?\n/).map((l) => l.trim()).find((l) => l.length > 0) || '';
+  const [words, ...rest] = firstLine.split('||');
+  let gesture = rest.join(' ').trim().replace(/^\*+|\*+$/g, '').trim();
+  if (name) gesture = gesture.replace(new RegExp(`^${escapeRegex(name)}\\s+`, 'i'), '');
+  if (gesture.length > 140) gesture = gesture.slice(0, 137).replace(/\s+\S*$/, '') + '…';
+  return { text: cleanLine(words, name), gesture: gesture ? `*${gesture}*` : '' };
 };
 
 // ── Auto-generated personalities ──

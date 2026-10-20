@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { MessageSquare, Mic, Send, Settings, X, Volume2, VolumeX, Lock, Unlock, Trash2, Sparkles, User, Wand2 } from "lucide-react";
+import { MessageSquare, Mic, Send, Settings, X, Volume2, VolumeX, Lock, Unlock, Trash2, Sparkles, User, Wand2, Languages, Check, Pencil, Brain, Play, AudioLines } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
 import {
@@ -12,11 +12,24 @@ import {
   type NpcSecretState,
   type NpcModelChoice,
   type NpcBrain,
+  type NpcMemory,
+  type NpcSpeechVoice,
+  type TranslateMode,
   isNpcAiOnline,
+  npcFeelingWord,
+  NPC_MEMORY_MAX_NOTES,
   baseMobId,
   NPC_TALK_RANGE_FEET,
 } from "@/lib/gameData";
 import type { NpcOnlineKeys } from "@/lib/npc/onlineLlm.mjs";
+import type { ChatLineView, Language } from "@/lib/languages";
+import {
+  GEMINI_VOICES, GROQ_VOICES, KOKORO_VOICES, engineName, fitVoice, kokoroVoice, voiceLabel, voiceTraits,
+  CREATURE_SOUNDS, creatureSoundName,
+  type CatalogVoice, type VoiceEngine,
+} from "@/lib/npcSpeech/voices";
+import { useSpeechEngineState } from "@/lib/npcSpeech/engine";
+import { elevenLabsVoices, speakLine, useVoiceServiceState, voiceEnginesInOrder } from "@/lib/npcSpeech/providers";
 
 const OPEN_STORAGE_KEY = "dcc_chat_open";
 
@@ -44,13 +57,28 @@ interface NpcChatPanelProps {
   aiSettings: NpcAiSettings | null;
   aiStatus: NpcAiStatus | null;
   secrets: Record<string, NpcSecretEntry>;
-  onSend: (text: string, viaVoice: boolean, toMobIds?: string[]) => void | Promise<void>;
+  onSend: (text: string, viaVoice: boolean, toMobIds?: string[], language?: string) => void | Promise<void>;
+  /** How each line reads for this viewer (languages and translators). Without it every line shows as written. */
+  readLine?: (m: ChatMessage) => ChatLineView;
+  speakLanguages?: Language[];          // languages the author can speak in (players)
+  translateMode?: TranslateMode;        // the author's translator setting (players)
+  onSetTranslateMode?: (mode: TranslateMode) => void | Promise<void>;
+  onTranslate?: (m: ChatMessage, text: string) => void | Promise<void>; // pass a line on to the party (maybe twisted)
   onUpdateSettings?: (updates: Partial<Omit<NpcAiSettings, "id">>) => void | Promise<void>;
   onSetSecretState?: (mobId: string, state: NpcSecretState) => void | Promise<void>;
+  memories?: Record<string, NpcMemory>;           // what each speaker remembers (DM view)
+  onSetMemory?: (speakerId: string, memory: NpcMemory) => void | Promise<void>;
   onClearChat?: () => void | Promise<void>;
   npcKeys?: NpcOnlineKeys;                        // DM only: free online model keys, saved in this browser
   onChangeNpcKeys?: (keys: NpcOnlineKeys) => void;
+  // Spoken voices: this viewer's sound settings
+  speechMuted?: boolean;
+  speechVolume?: number;
+  onSetSpeechPrefs?: (prefs: { muted?: boolean; volume?: number }) => void;
 }
+
+const SPEEDS = [["0.85", "Slow"], ["1", "Normal"], ["1.15", "Quick"]] as const;
+const PREVIEW_LINE = "Well met, crawler. What brings you down here?";
 
 const readOpen = (): boolean => {
   try { return localStorage.getItem(OPEN_STORAGE_KEY) === "1"; } catch { return false; }
@@ -65,12 +93,19 @@ const formatTime = (ms: number) =>
 /** Shared in-game chat for Show Time, with NPC voices status and DM controls. */
 export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
   messages, author, isAdmin, mobs, npcsOnMap, mentionables = [], aiSettings, aiStatus, secrets,
-  onSend, onUpdateSettings, onSetSecretState, onClearChat, npcKeys, onChangeNpcKeys,
+  onSend, onUpdateSettings, onSetSecretState, memories = {}, onSetMemory, onClearChat, npcKeys, onChangeNpcKeys,
+  readLine, speakLanguages = [], translateMode = "off", onSetTranslateMode, onTranslate,
+  speechMuted = false, speechVolume = 0.9, onSetSpeechPrefs,
 }) => {
   const [open, setOpen] = useState(readOpen);
   const [showSettings, setShowSettings] = useState(false);
+  const [showSound, setShowSound] = useState(false);
+  const [previewing, setPreviewing] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [confirmClear, setConfirmClear] = useState(false);
+  // DM memory editor: which speaker is open, and the notes being edited (one per line)
+  const [memoryOpenId, setMemoryOpenId] = useState<string | null>(null);
+  const [memoryDraft, setMemoryDraft] = useState("");
   const [now, setNow] = useState(() => Date.now());
   const listRef = useRef<HTMLDivElement>(null);
   const seenCountRef = useRef(messages.length);
@@ -82,6 +117,13 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
   const [pickedMobIds, setPickedMobIds] = useState<string[]>([]);
   // The mob this person is talking with: later messages go to it without another @
   const [talkingToId, setTalkingToId] = useState<string | null>(null);
+  // Language this person speaks in (players who know more than one)
+  const [speakId, setSpeakId] = useState<string | null>(null);
+  const speakLanguage = speakLanguages.find(l => l.id === speakId) ?? speakLanguages[0];
+  const speakRef = useRef(speakLanguage?.id);
+  speakRef.current = speakLanguage?.id;
+  // Translator rewriting a line before passing it on: message id → draft
+  const [twisting, setTwisting] = useState<{ id: string; text: string } | null>(null);
 
   const talkingTo = talkingToId ? mentionables.find(m => m.kind === "npc" && m.id === talkingToId) ?? null : null;
   const talkingToRef = useRef(talkingTo);
@@ -89,7 +131,7 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
 
   const speech = useSpeechToText((text) => {
     const target = talkingToRef.current;
-    void onSend(text, true, target ? [target.id] : []);
+    void onSend(text, true, target ? [target.id] : [], speakRef.current);
   });
 
   // Re-evaluate the online indicator as heartbeats age
@@ -116,6 +158,52 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
   };
 
   const enabled = aiSettings?.enabled !== false;
+  const speechOn = !!aiSettings?.speech;
+  const voicePicks = aiSettings?.voices ?? {};
+  const engine = useSpeechEngineState();
+  const services = useVoiceServiceState();
+  // The voice service lines go to right now: the DM picks voices from its list
+  const voiceEngine: VoiceEngine = voiceEnginesInOrder(npcKeys ?? {})[0] ?? "kokoro";
+  const [elevenList, setElevenList] = useState<CatalogVoice[]>([]);
+  const elevenKey = npcKeys?.elevenlabs?.trim();
+  useEffect(() => {
+    if (!isAdmin || !speechOn || !elevenKey) { setElevenList([]); return; }
+    let live = true;
+    void elevenLabsVoices(elevenKey).then(list => { if (live) setElevenList(list); });
+    return () => { live = false; };
+  }, [isAdmin, speechOn, elevenKey]);
+  const catalog: CatalogVoice[] = voiceEngine === "gemini" ? GEMINI_VOICES
+    : voiceEngine === "groq" ? GROQ_VOICES
+      : voiceEngine === "elevenlabs" ? elevenList
+        : KOKORO_VOICES;
+  const pickField = voiceEngine === "kokoro" ? "voice" : voiceEngine;
+  const kokoroLabel = engine.status === "loading"
+    ? `Downloading the backup voices ${Math.round((engine.progress ?? 0) * 100)}%`
+    : engine.status === "error" ? `Backup voices failed to load: ${engine.error ?? "unknown error"}` : "";
+  const restingNotes = Object.values(services.rest).filter(r => r && r.restUntil > now).map(r => r!.why);
+  const engineLabel = [
+    `Using ${engineName(voiceEngine)}${voiceEngine === "kokoro" && engine.status === "ready" ? " (in this browser)" : ""}.`,
+    ...restingNotes.map(n => `${n}.`),
+    services.problem ? `${services.problem}.` : "",
+    kokoroLabel,
+  ].filter(Boolean).join(" ");
+  const preview = async (mob: Mob) => {
+    const pick = voicePicks[baseMobId(mob.id)];
+    const lastLine = [...messages].reverse().find(m => m.authorType === "npc" && m.authorId === mob.id)?.text;
+    setPreviewing(mob.id);
+    try {
+      const text = lastLine?.replace(/\*[^*]*\*/g, " ").trim() || PREVIEW_LINE;
+      const clip = await speakLine({ text, traits: voiceTraits(mob.id, mob, pick), pick }, npcKeys ?? {});
+      const url = URL.createObjectURL(clip.blob);
+      const audio = new Audio(url);
+      audio.onended = () => URL.revokeObjectURL(url);
+      await audio.play();
+    } catch (err) {
+      console.warn("[NpcSpeech] Preview failed", err);
+    } finally {
+      setPreviewing(null);
+    }
+  };
   const online = isNpcAiOnline(aiStatus, now);
   const model: NpcModelChoice = aiSettings?.model ?? "quality";
   const mutedIds = aiSettings?.mutedMobIds ?? [];
@@ -210,7 +298,7 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
     setDraft("");
     setMention(null);
     setPickedMobIds([]);
-    void onSend(text, false, toMobIds);
+    void onSend(text, false, toMobIds, speakLanguage?.id);
   };
 
   // Speakers that left the map ("Goblin B") still show with their creature's picture
@@ -236,6 +324,17 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
                 <span className={`w-2 h-2 shrink-0 rounded-full ${statusColor}`} />
                 <span className="truncate">{statusLabel}</span>
               </span>
+              {speechOn && onSetSpeechPrefs && (
+                <button
+                  type="button"
+                  onClick={() => setShowSound(s => !s)}
+                  className={`p-1 hover:text-primary ${showSound ? "text-primary" : speechMuted ? "text-destructive" : "text-muted-foreground"}`}
+                  aria-label="NPC voice sound"
+                  data-testid="npc-sound-button"
+                >
+                  {speechMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                </button>
+              )}
               {isAdmin && (
                 <button
                   type="button"
@@ -250,6 +349,25 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
                 <X className="w-4 h-4" />
               </button>
             </div>
+
+            {speechOn && showSound && onSetSpeechPrefs && (
+              <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-border text-xs" data-testid="npc-sound">
+                <AudioLines className="w-3.5 h-3.5 text-primary shrink-0" />
+                <span className="shrink-0">Hear NPCs</span>
+                <Switch checked={!speechMuted} onCheckedChange={(v) => onSetSpeechPrefs({ muted: !v })} />
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={speechVolume}
+                  disabled={speechMuted}
+                  onChange={(e) => onSetSpeechPrefs({ volume: Number(e.target.value) })}
+                  className="flex-1 min-w-0 accent-primary"
+                  aria-label="NPC voice volume"
+                />
+              </div>
+            )}
 
             {online && enabled && aiStatus?.note && (
               <div className="px-3 py-1 text-[11px] text-accent border-b border-border">{aiStatus.note}</div>
@@ -311,13 +429,18 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
                     ))}
                   </div>
                 </div>
-                {brain === "online" && npcKeys && onChangeNpcKeys && (
+                {(brain === "online" || speechOn) && npcKeys && onChangeNpcKeys && (
                   <div className="space-y-1" data-testid="npc-keys">
                     <p className="text-muted-foreground">
-                      Free keys, saved only in this browser. Groq is used first, then Gemini when Groq's free limit runs out.
+                      Free keys, saved only in this browser. {brain === "online" && "NPC lines are written with Groq first, then Gemini when Groq's free limit runs out. "}
+                      {speechOn && "Voices use Gemini first, then Groq, then ElevenLabs. "}
                       Keep this page open during the game.
                     </p>
-                    {([["groq", "Groq key", "gsk_…"], ["gemini", "Gemini key", "AIza…"]] as const).map(([id, label, placeholder]) => (
+                    {([
+                      ["groq", "Groq key", "gsk_…"],
+                      ["gemini", "Gemini key", "AIza…"],
+                      ...(speechOn ? [["elevenlabs", "ElevenLabs", "sk_…"] as const] : []),
+                    ] as const).map(([id, label, placeholder]) => (
                       <label key={id} className="flex items-center gap-2">
                         <span className="w-20 shrink-0">{label}</span>
                         <input
@@ -334,7 +457,7 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
                   </div>
                 )}
                 {brain === "laptop" && (
-                  <p className="text-muted-foreground">Uses the NPC voices program on the DM computer.</p>
+                  <p className="text-muted-foreground">Uses only the local AI model in the NPC voices program on the DM computer. No Groq or Gemini.</p>
                 )}
                 {laptopCovering && (
                   <p className="text-accent">Free online limits used up for now: the laptop is covering.</p>
@@ -358,6 +481,17 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
                   <span>Mute all NPCs</span>
                   <Switch checked={!!aiSettings?.mutedAll} onCheckedChange={(v) => onUpdateSettings?.({ mutedAll: v })} />
                 </label>
+                <label className="flex items-center justify-between gap-2">
+                  <span>Spoken voices</span>
+                  <Switch checked={speechOn} onCheckedChange={(v) => onUpdateSettings?.({ speech: v })} data-testid="npc-speech-switch" />
+                </label>
+                {speechOn && (
+                  <p className="text-muted-foreground" data-testid="npc-speech-status">
+                    NPC lines are read aloud on every player's device, using the keys above. When every service is used up,
+                    voices are made in this browser instead (about 330 MB to download the first time), so keep this tab open.{" "}
+                    <span className={engine.status === "error" ? "text-destructive" : "text-accent"}>{engineLabel}</span>
+                  </p>
+                )}
                 {aiStatus?.activeModel && online && (
                   <p className="text-muted-foreground">Running: {aiStatus.activeModel}</p>
                 )}
@@ -375,8 +509,13 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
                     const card = mob.personality
                       ? [mob.personality.voice, mob.personality.attitude && `Attitude: ${mob.personality.attitude}`, mob.personality.secret && `Secret: ${mob.personality.secret}`].filter(Boolean).join("\n")
                       : "";
+                    const memory = memories[mob.id];
+                    const memoryCount = memory?.notes?.length ?? 0;
+                    const memoryOpen = memoryOpenId === mob.id;
+                    const feelings = Object.values(memory?.feelings ?? {}).filter(f => f?.name);
                     return (
-                      <div key={mob.id} className="flex items-center gap-2 py-0.5">
+                      <div key={mob.id}>
+                      <div className="flex items-center gap-2 py-0.5">
                         <span className="flex-1 min-w-0 truncate" title={card || undefined}>
                           {mob.name}
                           {generated && <span className="ml-1 text-[10px] text-accent" title={card}>(AI personality)</span>}
@@ -401,6 +540,143 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
                         >
                           {muted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
                         </button>
+                        {onSetMemory && (
+                          <button
+                            type="button"
+                            data-testid={`npc-memory-${mob.id}`}
+                            onClick={() => {
+                              if (memoryOpen) { setMemoryOpenId(null); return; }
+                              setMemoryOpenId(mob.id);
+                              setMemoryDraft((memory?.notes ?? []).join("\n"));
+                            }}
+                            className={`flex items-center gap-0.5 p-1 ${memoryOpen ? "text-primary" : memoryCount ? "text-accent hover:text-primary" : "text-muted-foreground hover:text-primary"}`}
+                            aria-label={`What ${mob.name} remembers`}
+                            title={memoryCount ? `${mob.name} remembers ${memoryCount} thing${memoryCount === 1 ? "" : "s"}` : `${mob.name} doesn't remember anything yet`}
+                          >
+                            <Brain className="w-3.5 h-3.5" />
+                            {memoryCount > 0 && <span className="text-[10px]">{memoryCount}</span>}
+                          </button>
+                        )}
+                      </div>
+                      {speechOn && (() => {
+                        const baseId = baseMobId(mob.id);
+                        const pick = voicePicks[baseId] ?? {};
+                        const traits = voiceTraits(mob.id, mob, pick);
+                        const autoTraits = voiceTraits(mob.id, mob, pick.speed === undefined ? undefined : { speed: pick.speed });
+                        const autoSound = voiceTraits(mob.id, mob).sound;
+                        const autoVoice = voiceEngine === "kokoro"
+                          ? KOKORO_VOICES.find(v => v.id === kokoroVoice(autoTraits))
+                          : fitVoice(catalog, autoTraits);
+                        const setPick = (next: NpcSpeechVoice) => {
+                          const merged: NpcSpeechVoice = { ...pick, ...next };
+                          for (const k of Object.keys(merged) as (keyof NpcSpeechVoice)[]) if (merged[k] === undefined) delete merged[k];
+                          const { [baseId]: _old, ...rest } = voicePicks;
+                          void onUpdateSettings?.({ voices: Object.keys(merged).length ? { ...rest, [baseId]: merged } : rest });
+                        };
+                        return (
+                          <>
+                          <div className="ml-2 mb-1 flex items-center gap-1" data-testid={`npc-voice-${mob.id}`}>
+                            <select
+                              value={pick[pickField] ?? ""}
+                              onChange={(e) => setPick({ [pickField]: e.target.value || undefined })}
+                              className="flex-1 min-w-0 bg-muted border border-border px-1 py-0.5 text-[11px]"
+                              aria-label={`${mob.name}'s voice`}
+                              title={`${engineName(voiceEngine)} voices`}
+                            >
+                              <option value="">Auto: {autoVoice ? voiceLabel(autoVoice) : "picked from notes"}</option>
+                              {catalog.map(v => <option key={v.id} value={v.id}>{voiceLabel(v)}</option>)}
+                            </select>
+                            <select
+                              value={pick.speed === undefined ? "" : String(pick.speed)}
+                              onChange={(e) => setPick({ speed: e.target.value ? Number(e.target.value) : undefined })}
+                              className="w-[72px] shrink-0 bg-muted border border-border px-1 py-0.5 text-[11px]"
+                              aria-label={`${mob.name}'s speaking speed`}
+                            >
+                              <option value="">Auto</option>
+                              {SPEEDS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => void preview(mob)}
+                              disabled={previewing !== null}
+                              className={`p-1 ${previewing === mob.id ? "text-accent animate-pulse" : "text-muted-foreground hover:text-primary"}`}
+                              aria-label={`Hear ${mob.name}'s voice`}
+                              title={`Hear ${mob.name} (speed ${traits.speed})`}
+                            >
+                              <Play className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                          <div className="ml-2 mb-1 flex items-center gap-1">
+                            <select
+                              value={pick.sound ?? ""}
+                              onChange={(e) => setPick({ sound: e.target.value || undefined })}
+                              className="flex-1 min-w-0 bg-muted border border-border px-1 py-0.5 text-[11px]"
+                              aria-label={`${mob.name}'s creature sound`}
+                              title="A sound effect put on the voice"
+                              data-testid={`npc-sound-${mob.id}`}
+                            >
+                              <option value="">Sound: Auto ({creatureSoundName(autoSound)})</option>
+                              <option value="none">Sound: None</option>
+                              {CREATURE_SOUNDS.map(c => <option key={c.id} value={c.id}>Sound: {c.name}</option>)}
+                            </select>
+                            {voiceEngine !== "elevenlabs" && elevenList.length > 0 && (
+                              <select
+                                value={pick.elevenlabs ?? ""}
+                                onChange={(e) => setPick({ elevenlabs: e.target.value || undefined })}
+                                className="flex-1 min-w-0 bg-muted border border-border px-1 py-0.5 text-[11px]"
+                                aria-label={`${mob.name}'s ElevenLabs character voice`}
+                                title="An ElevenLabs voice for this NPC. It's read by ElevenLabs first while your ElevenLabs credits last."
+                              >
+                                <option value="">ElevenLabs: none</option>
+                                {elevenList.map(v => <option key={v.id} value={v.id}>ElevenLabs: {voiceLabel(v)}</option>)}
+                              </select>
+                            )}
+                          </div>
+                          </>
+                        );
+                      })()}
+                      {memoryOpen && onSetMemory && (
+                        <div className="ml-2 mb-1 p-1.5 border border-border bg-muted/40 space-y-1" data-testid="npc-memory-editor">
+                          <p className="text-muted-foreground">
+                            What {mob.name} remembers, one note per line. Updated after each conversation goes quiet.
+                          </p>
+                          <textarea
+                            value={memoryDraft}
+                            onChange={(e) => setMemoryDraft(e.target.value)}
+                            rows={4}
+                            placeholder="Nothing yet"
+                            className="w-full bg-muted border border-border px-2 py-1 text-xs"
+                          />
+                          {feelings.length > 0 && (
+                            <p className="text-muted-foreground">
+                              Feels: {feelings.map(f => `${f.name} ${npcFeelingWord(f.score)}`).join(", ")}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-3">
+                            <button
+                              type="button"
+                              className="text-primary font-bold"
+                              onClick={() => {
+                                const notes = memoryDraft.split("\n").map(n => n.trim()).filter(Boolean).slice(0, NPC_MEMORY_MAX_NOTES);
+                                void onSetMemory(mob.id, { ...memory, notes, feelings: memory?.feelings ?? {} });
+                                setMemoryOpenId(null);
+                              }}
+                            >
+                              Save
+                            </button>
+                            <button
+                              type="button"
+                              className="text-muted-foreground hover:text-destructive"
+                              onClick={() => {
+                                void onSetMemory(mob.id, { ...memory, notes: [], feelings: {} });
+                                setMemoryOpenId(null);
+                              }}
+                            >
+                              Forget everything
+                            </button>
+                          </div>
+                        </div>
+                      )}
                       </div>
                     );
                   })}
@@ -432,6 +708,7 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
                 const mob = m.authorType === "npc" ? mobById(m.authorId) : undefined;
                 const mine = author && m.authorType === author.type && m.authorId === author.id;
                 const nameClass = m.authorType === "npc" ? "text-accent" : m.authorType === "dm" ? "text-destructive" : "text-primary";
+                const line: ChatLineView = readLine ? readLine(m) : { text: m.text, scrambled: false };
                 return (
                   <div key={m.id} className={`flex gap-2 ${mine ? "opacity-90" : ""}`}>
                     {m.authorType === "npc" && (
@@ -442,7 +719,77 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
                     <div className="min-w-0">
                       <span className={`font-bold text-xs ${nameClass}`}>{m.authorName}</span>
                       <span className="text-[10px] text-muted-foreground ml-1.5">{formatTime(m.createdAt)}{m.viaVoice ? " 🎙" : ""}</span>
-                      <p className={`break-words leading-snug ${m.authorType === "npc" ? "italic" : ""}`}>{m.text}</p>
+                      {line.languageName && (
+                        <span
+                          className="ml-1.5 inline-flex items-center gap-0.5 text-[10px] text-accent"
+                          title={line.scrambled ? `You don't know ${line.languageName}` : `Spoken in ${line.languageName}`}
+                        >
+                          <Languages className="w-2.5 h-2.5" />{line.languageName}
+                        </span>
+                      )}
+                      <p
+                        className={`leading-snug ${line.scrambled ? `${line.languageId === "beast" ? "break-words" : "break-all"} text-muted-foreground` : "break-words"} ${m.authorType === "npc" ? "italic" : ""}`}
+                        data-testid={line.scrambled ? "chat-line-scrambled" : undefined}
+                      >
+                        {line.text}
+                      </p>
+                      {line.via && <p className="text-[10px] text-primary">translated by {line.via}</p>}
+                      {line.translating && <p className="text-[10px] text-muted-foreground italic">{line.translating} is translating…</p>}
+                      {line.toldParty?.map((t, i) => (
+                        <p key={i} className="text-[10px] text-muted-foreground" data-testid="told-party">
+                          {t.twisted ? (
+                            <>
+                              {t.mine ? "You told the party" : `${t.by} told the party`}: <span className="italic">{t.text}</span>
+                              <span className="ml-1 px-1 border border-destructive text-destructive not-italic">twisted</span>
+                            </>
+                          ) : (
+                            <>{t.mine ? "You passed it on" : `${t.by} passed it on`}</>
+                          )}
+                        </p>
+                      ))}
+                      {line.canTranslate && onTranslate && (
+                        twisting?.id === m.id ? (
+                          <form
+                            className="flex items-center gap-1 mt-1"
+                            onSubmit={(e) => {
+                              e.preventDefault();
+                              if (!twisting.text.trim()) return;
+                              void onTranslate(m, twisting.text.trim());
+                              setTwisting(null);
+                            }}
+                          >
+                            <input
+                              autoFocus
+                              value={twisting.text}
+                              onChange={(e) => setTwisting({ id: m.id, text: e.target.value })}
+                              maxLength={500}
+                              className="flex-1 min-w-0 bg-muted border border-border px-1.5 py-0.5 text-xs"
+                              aria-label="What you tell the party"
+                            />
+                            <button type="submit" className="p-1 text-primary hover:bg-primary/20" aria-label="Tell the party"><Check className="w-3.5 h-3.5" /></button>
+                            <button type="button" onClick={() => setTwisting(null)} className="p-1 text-muted-foreground hover:text-primary" aria-label="Cancel"><X className="w-3.5 h-3.5" /></button>
+                          </form>
+                        ) : (
+                          <div className="flex gap-1.5 mt-1" data-testid="translate-actions">
+                            <button
+                              type="button"
+                              onClick={() => void onTranslate(m, m.text)}
+                              className="px-1.5 py-0.5 border border-primary text-primary hover:bg-primary/20 text-[10px] font-display uppercase"
+                              title="Tell the party exactly what was said"
+                            >
+                              Pass on
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setTwisting({ id: m.id, text: m.text })}
+                              className="flex items-center gap-0.5 px-1.5 py-0.5 border border-destructive text-destructive hover:bg-destructive/20 text-[10px] font-display uppercase"
+                              title="Tell the party something else. They won't know."
+                            >
+                              <Pencil className="w-2.5 h-2.5" /> Twist
+                            </button>
+                          </div>
+                        )
+                      )}
                     </div>
                   </div>
                 );
@@ -491,6 +838,35 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
                   >
                     <X className="w-3 h-3" />
                   </button>
+                </div>
+              )}
+              {author && speakLanguages.length > 1 && (
+                <div className="flex items-center gap-1.5 mb-1.5 text-[11px] text-muted-foreground" data-testid="chat-language-row">
+                  <Languages className="w-3 h-3 shrink-0" />
+                  {speakLanguages.length > 1 && (
+                    <select
+                      value={speakLanguage?.id ?? ""}
+                      onChange={(e) => setSpeakId(e.target.value)}
+                      className="min-w-0 bg-muted border border-border px-1 py-0.5"
+                      aria-label="Speak in"
+                      title="The language you speak in"
+                    >
+                      {speakLanguages.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                    </select>
+                  )}
+                  {onSetTranslateMode && (
+                    <select
+                      value={translateMode}
+                      onChange={(e) => void onSetTranslateMode(e.target.value as TranslateMode)}
+                      className="ml-auto min-w-0 bg-muted border border-border px-1 py-0.5"
+                      aria-label="Translate for party"
+                      title="Pass lines in your languages on to party members who don't know them"
+                    >
+                      <option value="off">Not translating</option>
+                      <option value="auto">Translating</option>
+                      <option value="review">Translating (check lines)</option>
+                    </select>
+                  )}
                 </div>
               )}
               {author ? (

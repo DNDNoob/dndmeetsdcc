@@ -38,6 +38,83 @@ export interface Crawler {
   moveSpeed?: number; // feet per combat turn; defaults to DEFAULT_MOVE_SPEED
   activityStats?: CrawlerActivityStats;
   trophies?: CrawlerTrophy[]; // DM-awarded recognition for things that can't be measured automatically
+  languages?: string[];   // Language ids this crawler knows; none set = Worldspeech only
+  telepathic?: boolean;   // Needed to use Mindspeech (DM sets it)
+  translateMode?: TranslateMode; // Translating chat lines for party members who don't know the language
+  languageEffects?: LanguageEffect[]; // Spells like Speak with Animals: languages known for a while
+  itemLanguages?: string[]; // Worked out from equipped items when crawlers load; not something to save
+  backstory?: CrawlerBackstory; // Answers from the character creator; editable on the profile
+  usesAbilityPoints?: boolean;  // Made with the character creator: abilities at 0 points (score 10 or less) roll with disadvantage
+}
+
+// ======== Character creation ========
+
+export interface CrawlerBackstory {
+  profession?: string;
+  accomplishment?: string;
+  hobby?: string;
+  whenWorldEnded?: string; // Where they were when the world ended
+  mostImportant?: string;  // The most important person, thing or animal in the world to them
+}
+
+export type AbilityKey = 'str' | 'dex' | 'con' | 'int' | 'cha';
+export const ABILITY_KEYS: AbilityKey[] = ['str', 'dex', 'con', 'int', 'cha'];
+export const ABILITY_POINTS_TOTAL = 2 * ABILITY_KEYS.length; // 2 points per ability
+export const ABILITY_POINTS_MAX = 5;                          // No ability can start above 5 points
+
+// Each ability point adds +1 to rolls: the score is 10 + 2 per point, so the usual (score - 10) / 2 modifier equals the points
+export const abilityScoreFromPoints = (points: number): number => 10 + 2 * points;
+
+export const NEW_CRAWLER_HP = 25;
+export const NEW_CRAWLER_MANA = 10;
+
+// Abilities with 0 points roll with disadvantage (only for crawlers made with the character creator)
+export const rollsWithDisadvantage = (crawler: Pick<Crawler, 'usesAbilityPoints'> | null | undefined, effectiveScore: number): boolean =>
+  !!crawler?.usesAbilityPoints && effectiveScore <= 10;
+
+// A d20 roll, or two taking the lower one with disadvantage. results and diceLabel are what the dice history shows.
+export const rollD20 = (disadvantage = false): { rawRoll: number; results: { dice: string; result: number }[]; diceLabel?: string } => {
+  const first = Math.floor(Math.random() * 20) + 1;
+  if (!disadvantage) return { rawRoll: first, results: [{ dice: 'D20', result: first }] };
+  const second = Math.floor(Math.random() * 20) + 1;
+  const low = Math.min(first, second);
+  return {
+    rawRoll: low,
+    results: [{ dice: 'D20 (Dis)', result: low }, { dice: 'D20 (other)', result: Math.max(first, second) }],
+    diceLabel: '2d20 low',
+  };
+};
+
+// ======== Languages ========
+
+/** off: not translating. auto: lines pass on to the party as said. review: the translator passes each line on (or twists it) first. */
+export type TranslateMode = 'off' | 'auto' | 'review';
+
+/**
+ * A language a crawler knows for a while, from casting a spell. It ends when a countdown it has
+ * reaches 0: noncombat turns tick at each new noncombat turn, combat rounds at each new round. A spell
+ * timed only in combat rounds also ends at the next noncombat turn (an hour passes). With neither, it
+ * lasts until the DM or the crawler ends it. questionsLeft (Speak with Dead) only limits speaking:
+ * at 0 the crawler can't talk in the language any more but still understands the last answer.
+ */
+export interface LanguageEffect {
+  id: string;
+  name: string;          // the spell, e.g. "Speak with Animals"
+  spellId?: string;
+  languageId: string;
+  noncombatTurnsLeft?: number;
+  combatRoundsLeft?: number;
+  questionsLeft?: number;
+}
+
+/** A language someone made up: rooms/{roomId}/languages/{id}. Built-in languages live in src/lib/languageList.mjs. */
+export interface CustomLanguage {
+  id: string;
+  name: string;
+  description?: string;
+  createdBy?: string;          // Firebase uid
+  createdByCrawlerId?: string; // the crawler who made it (they know it from the start)
+  createdAt?: number;
 }
 
 // A trophy the DM awards by hand. Awarding the same name again increments count.
@@ -106,6 +183,7 @@ export interface CrawlerActivityStats {
   lowHealthCount?: number; // times HP dropped below 10% of max HP
   killingBlows?: number; // mobs brought to 0 HP
   combatEndingBlows?: number; // killing blows that took down the last mob standing
+  mobsLooted?: number; // mobs whose loot this crawler shared in (raises their Looting level)
 }
 
 export type ActivityStatKey = keyof CrawlerActivityStats;
@@ -242,6 +320,8 @@ export interface SpellData {
   specialEffect?: string;
   splashDamage?: boolean;
   reactionTrigger?: string; // For Reaction spells: describes what triggers the reaction (e.g. "when you are hit by an attack")
+  grantsLanguage?: string;  // Casting it lets the caster know this language for the spell's duration (Speak with Animals → Beast)
+  questionLimit?: number;   // With grantsLanguage: lines the caster can say in it per casting (Speak with Dead: 5)
 }
 
 export interface Spell {
@@ -310,6 +390,8 @@ export interface InventoryItem {
   createdBy?: string;        // Firebase uid of creator
   createdByUsername?: string; // Denormalized for display
   isPublic?: boolean;        // Whether visible to players outside the campaign
+  language?: string;         // Written in this language: the description is scrambled for crawlers who don't know it
+  grantsLanguage?: string;   // While equipped, the crawler knows this language (a druid's charm grants Beast)
 }
 
 // Compute total stat modifiers from all equipped items on a crawler
@@ -349,11 +431,14 @@ export interface Mob {
   hideHitPoints?: boolean;
   defaultInventory?: InventoryItem[]; // Default items this mob type carries
   defaultGold?: number; // Default gold this mob type carries
+  lootDestructionChance?: number; // % chance each stackable item copy or coin is smashed when looted (default DEFAULT_LOOT_DESTRUCTION_CHANCE)
   equippedItems?: EquippedItems; // Equipment mapping (slot → item ID)
   createdBy?: string;        // Firebase uid of creator (absent = made in this campaign by its DM)
   createdByUsername?: string; // Denormalized for display
   isPublic?: boolean;        // Shared to the community (publicMobs)
   personality?: NpcPersonality; // DM-only: drives AI dialogue for talking NPCs
+  languages?: string[];      // Language ids it speaks, native first; none set = Worldspeech
+  silent?: boolean;          // Never talks in Game Chat (oozes, constructs...)
   merchant?: MerchantConfig;  // NPCs that buy and sell items with crawlers
 }
 
@@ -446,6 +531,137 @@ export const getHaggleBlocker = (
   return null;
 };
 
+// ======== Item stacks & mob loot ========
+
+/** Copies of the same item share this key and are shown as one stack. */
+export const getItemStackKey = (item: InventoryItem): string => {
+  const modifiersStr = item.statModifiers
+    ? JSON.stringify(Object.entries(item.statModifiers).filter(([, v]) => v !== 0).sort())
+    : '';
+  return `${item.name}|${item.description || ''}|${item.equipSlot || ''}|${item.goldValue ?? 0}|${modifiersStr}`;
+};
+
+export interface ItemStack {
+  key: string;
+  item: InventoryItem; // first copy, used for display
+  count: number;
+  ids: string[];
+}
+
+/** Groups copies of the same item, keeping the order each item first appears in. */
+export const stackItems = (items: InventoryItem[]): ItemStack[] => {
+  const stacks = new Map<string, ItemStack>();
+  for (const item of items) {
+    const key = getItemStackKey(item);
+    const stack = stacks.get(key);
+    if (stack) {
+      stack.count++;
+      stack.ids.push(item.id);
+    } else {
+      stacks.set(key, { key, item, count: 1, ids: [item.id] });
+    }
+  }
+  return Array.from(stacks.values());
+};
+
+/** Inventory document holding items looted by the party that nobody has taken yet. */
+// (Firestore reserves ids like __name__, so this one has no underscores)
+export const PARTY_INVENTORY_ID = 'party-loot';
+
+/** The campaign's item library is the inventory entry with this crawlerId. */
+export const SHARED_LIBRARY_ID = '__shared__';
+/** Document ID for a new item library (Firestore rejects SHARED_LIBRARY_ID itself as a document ID). */
+export const SHARED_LIBRARY_DOC_ID = 'shared-library';
+
+export interface MobLootSplit {
+  gold: Record<string, number>; // crawlerId → gold received
+  items: Record<string, InventoryItem[]>; // crawlerId → items received
+  party: InventoryItem[]; // items for the party inventory
+  destroyedGold: number;
+  destroyed: InventoryItem[]; // stackable copies smashed while looting
+}
+
+// ---- Looting skill ----
+// Like spell mastery: Looting level N is reached after 5·N·(N+1) mobs looted (10, 30, 60, 100…),
+// and each level cuts the crawler's chance of loot being smashed by a tenth, up to level 10.
+export const DEFAULT_LOOT_DESTRUCTION_CHANCE = 25;
+export const MAX_LOOTING_LEVEL = 10;
+
+export const getLootingLevel = (mobsLooted = 0): number => {
+  let level = 0;
+  while (level < MAX_LOOTING_LEVEL && mobsLooted >= 5 * (level + 1) * (level + 2)) level++;
+  return level;
+};
+
+/** Mobs left to loot before the next Looting level, or null at the max level. */
+export const getLootsUntilNextLevel = (mobsLooted = 0): number | null => {
+  const level = getLootingLevel(mobsLooted);
+  return level >= MAX_LOOTING_LEVEL ? null : 5 * (level + 1) * (level + 2) - mobsLooted;
+};
+
+/** % chance a crawler's loot is smashed, given the mob's base chance and their Looting level. */
+export const getLootDestructionChance = (baseChance: number, lootingLevel: number): number =>
+  Math.max(0, baseChance * (1 - Math.min(lootingLevel, MAX_LOOTING_LEVEL) / MAX_LOOTING_LEVEL));
+
+/**
+ * Splits a defeated mob's loot between the crawlers who fought it. Gold is split evenly, with
+ * leftover coins going one each in `crawlerIds` order. Items the mob carries several copies of
+ * are dealt out evenly and leftovers go to the party; single items go to the party.
+ * Each coin and each copy of a stackable item then rolls against `chanceFor(crawlerId)` (in %)
+ * to be smashed instead; party leftovers roll against the best (lowest) chance in the fight.
+ * Single items are never smashed. Every item gets a fresh id so copies never collide.
+ */
+export const splitMobLoot = (
+  items: InventoryItem[],
+  gold: number,
+  crawlerIds: string[],
+  chanceFor: (crawlerId: string) => number = () => 0,
+  random: () => number = Math.random,
+): MobLootSplit => {
+  const split: MobLootSplit = { gold: {}, items: {}, party: [], destroyedGold: 0, destroyed: [] };
+  const fresh = (item: InventoryItem): InventoryItem => {
+    const { equipped: _eq, ...rest } = item;
+    return { ...rest, id: `item-${crypto.randomUUID()}` };
+  };
+  const smashed = (chance: number) => chance > 0 && random() * 100 < chance;
+  const n = crawlerIds.length;
+  if (n === 0) {
+    split.party = items.map(fresh);
+    return split;
+  }
+  const partyChance = Math.min(...crawlerIds.map(chanceFor));
+  const coins = Math.max(0, Math.floor(gold || 0));
+  crawlerIds.forEach((id, i) => {
+    const dealt = Math.floor(coins / n) + (i < coins % n ? 1 : 0);
+    const chance = chanceFor(id);
+    let share = dealt;
+    for (let c = 0; c < dealt; c++) {
+      if (smashed(chance)) { share--; split.destroyedGold++; }
+    }
+    if (share > 0) split.gold[id] = share;
+  });
+  for (const stack of stackItems(items)) {
+    const copies = items.filter(i => getItemStackKey(i) === stack.key);
+    if (stack.count === 1) {
+      split.party.push(fresh(copies[0]));
+      continue;
+    }
+    const each = Math.floor(stack.count / n);
+    crawlerIds.forEach((id, i) => {
+      const chance = chanceFor(id);
+      for (const copy of copies.slice(i * each, (i + 1) * each)) {
+        if (smashed(chance)) split.destroyed.push(copy);
+        else split.items[id] = [...(split.items[id] ?? []), fresh(copy)];
+      }
+    });
+    for (const copy of copies.slice(each * n)) {
+      if (smashed(partyChance)) split.destroyed.push(copy);
+      else split.party.push(fresh(copy));
+    }
+  }
+  return split;
+};
+
 /** Two items count as the same stock line when everything but the id matches. */
 export const merchantItemKey = (item: InventoryItem): string => {
   const { id: _id, equipped: _eq, ...rest } = item;
@@ -496,6 +712,12 @@ export interface ChatMessage {
   viaVoice?: boolean;   // Sent with the hold-to-talk mic
   toMobIds?: string[];  // Mobs picked with @ in the chat box
   nearMobIds?: string[]; // Player messages: mobs within talking range of the crawler when sent
+  language?: string;     // Spoken in this language (none = everyone understands, e.g. the DM narrating)
+  translationOf?: string; // A translator's version of another line, shown to party members who can't read it
+  gesture?: string;      // Beast lines: the sounds and body language seen by those who don't know Beast
+  // NPC lines read aloud (made in the DM's browser, short-lived files in Storage npcAudio/)
+  audioUrl?: string;          // the real words
+  audioScrambledUrl?: string; // the scrambled words, for players who don't know the language
 }
 
 /** Players can only talk to mobs this close to their crawler. */
@@ -524,6 +746,25 @@ export const legacyMobType = (kind: MobKind, boss: boolean): Mob['type'] =>
 export const speakerAsMob = (speaker: NpcSpeaker, generated: Record<string, NpcGeneratedPersonality>): Mob & { personalityGenerated?: boolean } =>
   withNpcPersonality({ ...speaker.mob, id: speaker.id, name: speaker.name }, generated);
 
+/**
+ * What a speaker remembers from earlier conversations: rooms/{roomId}/npcAi/memories → { [speakerId]: NpcMemory }.
+ * Written by the NPC brain when a conversation goes quiet; the DM can edit or clear it.
+ */
+export interface NpcMemory {
+  notes: string[];
+  feelings?: Record<string, { name: string; score: number }>; // crawlerId → -3 (hostile) … 3 (fond)
+  name?: string;            // speaker name when it was written
+  episodeId?: string;       // creature copies: the episode this memory belongs to
+  updatedAt?: number;
+}
+
+export const NPC_MEMORY_MAX_NOTES = 8;
+
+/** A feeling score in words (same wording as feelingWord in src/lib/npc/brain.mjs). */
+export const npcFeelingWord = (score: number): string =>
+  score <= -3 ? 'hostile' : score === -2 ? 'dislikes them' : score === -1 ? 'wary'
+    : score === 0 ? 'neutral' : score === 1 ? 'warming to them' : score === 2 ? 'friendly' : 'fond of them';
+
 export type NpcModelChoice = 'quality' | 'fast';
 
 /** DM settings: rooms/{roomId}/npcAi/settings */
@@ -534,6 +775,18 @@ export interface NpcAiSettings {
   mutedAll?: boolean;
   mutedMobIds?: string[];
   brain?: NpcBrain;         // where NPC lines are written; default 'online'
+  speech?: boolean;         // Spoken voices: the DM's browser reads NPC lines aloud (default off)
+  voices?: Record<string, NpcSpeechVoice>; // DM's voice picks by mob id (creature copies share one)
+}
+
+/** The DM's voice picks for an NPC, one per voice service, and its speaking speed (1 = normal). */
+export interface NpcSpeechVoice {
+  voice?: string;      // Kokoro voice
+  gemini?: string;     // Gemini voice name
+  groq?: string;       // Groq (Orpheus) voice
+  elevenlabs?: string; // ElevenLabs voice id (an NPC with one is read by ElevenLabs first)
+  speed?: number;
+  sound?: string;      // creature sound effect id ('none' turns off the one picked from notes)
 }
 
 /** 'online': the DM's browser using free Groq/Gemini keys. 'laptop': the NPC script with Ollama. */
@@ -676,6 +929,7 @@ export interface CombatantEntry {
   avatar?: string; // Deprecated: no longer saved (images made combat docs too big); look up the crawler/mob instead
   currentHP?: number; // per-combatant HP tracking (used for mob instances)
   feetMovedThisTurn?: number; // crawler movement used this turn (reset when the turn ends)
+  looted?: boolean; // mob only: its items and gold were already handed out when it went down
 }
 
 // Combat state - synced via Firebase (singleton doc, id = 'current')
@@ -822,6 +1076,7 @@ export interface QuestNote {
   crawlerName: string;
   text: string;
   createdAt: string;
+  language?: string; // Written in this language: scrambled for crawlers who don't know it
 }
 
 export interface Quest {
@@ -954,25 +1209,6 @@ export const defaultCrawlers: Crawler[] = [
     gold: 52,
   },
 ];
-
-export const createEmptyCrawler = (): Crawler => ({
-  id: Date.now().toString(),
-  name: "New Crawler",
-  race: "Human",
-  job: "Adventurer",
-  level: 1,
-  hp: 50,
-  maxHP: 50,
-  mana: 25,
-  maxMana: 25,
-  str: 10,
-  dex: 10,
-  con: 10,
-  int: 10,
-  cha: 10,
-  achievements: "",
-  gold: 0,
-});
 
 export const defaultInventory: { crawlerId: string; items: InventoryItem[] }[] = [
   {

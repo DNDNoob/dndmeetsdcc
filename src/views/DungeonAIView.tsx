@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import NpcPersonalityFields from "@/components/NpcPersonalityFields";
+import { LanguagePicker } from "@/components/LanguagePicker";
 import MerchantFields from "@/components/MerchantFields";
 import MobKindFields from "@/components/MobKindFields";
 import { motion } from "framer-motion";
@@ -7,7 +8,7 @@ import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import MapMobPlacementEditor from "@/components/ui/MapMobPlacementEditor";
 import MapDesignerPopout from "@/components/ui/MapDesignerPopout";
-import { Mob, Episode, getMobKind, isBossMob, legacyMobType, EpisodeMobPlacement, Crawler, CrawlerPlacement, InventoryItem, LootBoxTemplate, LootBoxTier, getLootBoxTierColor, type EquipmentSlot, type EquippedItems, Quest, QuestReward, QuestActionItem, QuestRewardTier, type CampaignMapDoc, type PublicMap, type PublicMob, type PublicEpisode, isMerchant } from "@/lib/gameData";
+import { Mob, Episode, stackItems, DEFAULT_LOOT_DESTRUCTION_CHANCE, getMobKind, isBossMob, legacyMobType, EpisodeMobPlacement, Crawler, CrawlerPlacement, InventoryItem, LootBoxTemplate, LootBoxTier, getLootBoxTierColor, type EquipmentSlot, type EquippedItems, Quest, QuestReward, QuestActionItem, QuestRewardTier, type CampaignMapDoc, type PublicMap, type PublicMob, type PublicEpisode, isMerchant } from "@/lib/gameData";
 import { Brain, Upload, Plus, Trash2, Map, Skull, Image as ImageIcon, Save, Edit2, X, Layers, ChevronLeft, ChevronRight, User, Package, Search, Maximize2, Shield, ChevronDown as ChevronDownIcon, ScrollText, Eye, EyeOff, CheckSquare, GripVertical, Users, Globe } from "lucide-react";
 import { storage } from "@/lib/firebase";
 import { ShareToggle, ImportButton } from "@/components/ui/ShareToggle";
@@ -224,6 +225,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
       defaultInventory: newMob.defaultInventory,
       defaultGold: newMob.defaultGold,
       ...(newMob.personality ? { personality: newMob.personality } : {}),
+      ...(newMob.languages?.length ? { languages: newMob.languages } : {}),
       ...(newMob.merchant ? { merchant: newMob.merchant } : {}),
     };
     console.log('[DungeonAI] ➕ Add Mob clicked', mob);
@@ -233,7 +235,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
     } catch (err) {
       console.error('[DungeonAI] ❌ Failed to persist mob', err);
     }
-    setNewMob({ name: "", level: 1, type: "normal", kind: "creature", boss: false, speciesId: "", description: "", weaknesses: "", strengths: "", hitPoints: 50, personality: undefined, merchant: undefined });
+    setNewMob({ name: "", level: 1, type: "normal", kind: "creature", boss: false, speciesId: "", description: "", weaknesses: "", strengths: "", hitPoints: 50, personality: undefined, merchant: undefined, languages: undefined });
   };
 
   const handleDeleteMob = async (id: string) => {
@@ -858,6 +860,22 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                       className="w-full bg-muted border border-border px-3 py-2"
                     />
                   </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Languages</label>
+                    <LanguagePicker
+                      value={newMob.languages}
+                      onChange={(languages) => setNewMob({ ...newMob, languages })}
+                      hint="Tap the languages it speaks. The first one is its native tongue. Players who don't know the language it uses see gibberish. Pick Beast for animals or Plant for plants: players without it see what the creature does instead. Pick Dead for a corpse: it only answers crawlers using Speak with Dead."
+                    />
+                    <label className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
+                      <input
+                        type="checkbox"
+                        checked={!!newMob.silent}
+                        onChange={(e) => setNewMob({ ...newMob, silent: e.target.checked })}
+                      />
+                      Silent: never talks in Game Chat (oozes, constructs)
+                    </label>
+                  </div>
                   <NpcPersonalityFields
                     value={newMob.personality}
                     onChange={(personality) => setNewMob({ ...newMob, personality })}
@@ -1016,6 +1034,24 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                         </div>
 
                         <div className="mt-3">
+                          <label className="text-xs text-muted-foreground mb-1 block">Languages</label>
+                          <LanguagePicker
+                            value={editedMob.languages}
+                            onChange={(languages) => setEditedMobData(prev => prev ? { ...prev, languages } : prev)}
+                            hint="Tap the languages it speaks. The first one is its native tongue. Players who don't know the language it uses see gibberish. Pick Beast for animals or Plant for plants: players without it see what the creature does instead. Pick Dead for a corpse: it only answers crawlers using Speak with Dead."
+                          />
+                          <label className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
+                            <input
+                              type="checkbox"
+                              checked={!!editedMob.silent}
+                              onChange={(e) => setEditedMobData(prev => prev ? { ...prev, silent: e.target.checked } : prev)}
+                              data-testid="mob-silent"
+                            />
+                            Silent: never talks in Game Chat (oozes, constructs)
+                          </label>
+                        </div>
+
+                        <div className="mt-3">
                           <NpcPersonalityFields
                             value={editedMob.personality}
                             onChange={(personality) => setEditedMobData(prev => prev ? { ...prev, personality } : prev)}
@@ -1076,6 +1112,16 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                               onChange={(e) => setEditedMobData(prev => prev ? { ...prev, defaultGold: parseInt(e.target.value) || 0 } : prev)}
                               className="w-20 bg-muted border border-border px-2 py-0.5 text-sm text-center"
                             />
+                            <label className="text-xs text-muted-foreground ml-2" title="Chance that each coin and each copy of a stackable item is smashed when this mob is looted. Crawlers' Looting levels lower it.">Smash chance:</label>
+                            <input
+                              type="number"
+                              min={0}
+                              max={100}
+                              value={editedMob.lootDestructionChance ?? DEFAULT_LOOT_DESTRUCTION_CHANCE}
+                              onChange={(e) => setEditedMobData(prev => prev ? { ...prev, lootDestructionChance: Math.min(100, Math.max(0, parseInt(e.target.value) || 0)) } : prev)}
+                              className="w-16 bg-muted border border-border px-2 py-0.5 text-sm text-center"
+                            />
+                            <span className="text-xs text-muted-foreground">%</span>
                           </div>
                           {/* Search and add items from shared inventory */}
                           {(() => {
@@ -1343,11 +1389,13 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                           {((mob.defaultInventory && mob.defaultInventory.length > 0) || (mob.defaultGold && mob.defaultGold > 0)) && (
                             <div className="text-xs text-muted-foreground mt-1">
                               <span className="text-accent">Inventory:</span>{' '}
-                              {mob.defaultInventory?.map(i => {
+                              {stackItems(mob.defaultInventory ?? []).map(({ item: i, count }) => {
                                 const equipped = isMobItemEquipped(mob.equippedItems, i.id);
-                                return equipped ? `[E] ${i.name}` : i.name;
+                                const name = count > 1 ? `${i.name} ×${count}` : i.name;
+                                return equipped ? `[E] ${name}` : name;
                               }).join(', ')}
                               {mob.defaultGold ? ` · ${mob.defaultGold} gold` : ''}
+                              {` · ${mob.lootDestructionChance ?? DEFAULT_LOOT_DESTRUCTION_CHANCE}% smash chance`}
                             </div>
                           )}
                           {isMerchant(mob) && mob.merchant && (

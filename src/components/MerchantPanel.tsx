@@ -10,6 +10,7 @@ import {
   getMerchantBuyPrice,
   getMerchantSellPrice,
   merchantItemKey,
+  stackItems,
   type Crawler,
   type InventoryItem,
   type MerchantState,
@@ -197,20 +198,25 @@ export const MerchantPanel: React.FC<MerchantPanelProps> = ({
             {!isAdmin && tab === "sell" && (
               crawlerInventory.length === 0 ? (
                 <p className="text-xs text-muted-foreground italic">You have nothing to sell.</p>
-              ) : crawlerInventory.map(item => {
+              ) : stackItems(crawlerInventory).map(({ key, item: first, count, ids }) => {
+                // Sell an unequipped copy first
+                const equippedIds = new Set(Object.values(crawler?.equippedItems ?? {}));
+                const sellId = ids.find(id => !equippedIds.has(id)) ?? ids[0];
+                const item = crawlerInventory.find(i => i.id === sellId) ?? first;
                 const price = getMerchantSellPrice(item.goldValue, scrooge);
                 const offer = Math.min(price, merchantGold);
-                const equipped = !!crawler?.equippedItems && Object.values(crawler.equippedItems).includes(item.id);
+                const equipped = equippedIds.has(item.id);
                 let label = `Sell for ${price}`;
                 let note: string | null = null;
                 if (price <= 0) { label = "Sell"; note = "Worthless to this merchant"; }
                 else if (merchantGold <= 0) { label = "Sell"; note = `${mob.name} is out of gold`; }
                 else if (offer < price) { label = `Sell for ${offer}`; note = `Worth ${price}, but ${mob.name} only has ${merchantGold} gold`; }
                 return (
-                  <div key={item.id} className="flex items-center gap-2 border border-border bg-muted/20 px-2 py-1">
+                  <div key={key} className="flex items-center gap-2 border border-border bg-muted/20 px-2 py-1">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-primary truncate">
                         {item.name}
+                        {count > 1 && <span className="text-xs text-muted-foreground"> ×{count}</span>}
                         {equipped && <span className="text-[10px] text-accent ml-1">(equipped)</span>}
                       </p>
                       {note && <p className="text-[11px] text-muted-foreground">{note}</p>}

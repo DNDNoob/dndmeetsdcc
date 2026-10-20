@@ -25,10 +25,12 @@ import { useFriends } from "@/hooks/useFriends";
 import { usePublicContent } from "@/hooks/usePublicContent";
 import { useMyContent } from "@/hooks/useMyContent";
 import { useNpcBrain } from "@/hooks/useNpcBrain";
+import { useNpcSpeechMaker } from "@/hooks/useNpcSpeechMaker";
 import { toast } from "sonner";
-import { getNoChildLeftBehindBump } from "@/lib/gameData";
+import { getNoChildLeftBehindBump, rollD20, rollsWithDisadvantage } from "@/lib/gameData";
 import type { Episode, Campaign, CrawlerPlacement, EpisodeMobPlacement, Mob, PublicMap, PublicMob, PublicEpisode, InventoryItem, Spell } from "@/lib/gameData";
 import { publicDocId, buildEpisodeBundle } from "@/lib/publicContent";
+import { LanguagesProvider } from "@/contexts/LanguagesContext";
 
 type AppScreen = "splash" | "menu" | "game";
 type GameView = "profiles" | "maps" | "inventory" | "mobs" | "dungeonai" | "showtime" | "sounds" | "wiki" | "spells";
@@ -166,6 +168,9 @@ const Index = () => {
     claimLootBoxItems,
     deleteLootBox,
     getCrawlerLootBoxes,
+    getPartyInventory,
+    updatePartyInventory,
+    takeFromPartyInventory,
     lootBoxTemplates,
     addLootBoxTemplate,
     updateLootBoxTemplate,
@@ -210,8 +215,14 @@ const Index = () => {
     npcAiStatus,
     npcSecrets,
     npcPersonalities,
+    npcMemories,
+    setNpcMemory,
     sendChatMessage,
+    attachChatAudio,
     clearChat,
+    customLanguages,
+    createLanguage,
+    deleteLanguage,
     updateNpcAiSettings,
     setNpcSecretState,
     merchants,
@@ -255,6 +266,20 @@ const Index = () => {
 
   // Online NPC brain: runs in the DM's browser during a live game (keys stay in this browser)
   const { npcKeys, setNpcKeys } = useNpcBrain(roomId, isAdmin);
+
+  // Spoken voices: the DM's browser reads new NPC lines aloud and shares the clips with players
+  useNpcSpeechMaker({
+    roomId,
+    isDm: isAdmin,
+    enabled: !!npcAiSettings?.speech,
+    messages: chatMessages,
+    mobs,
+    crawlers,
+    personalities: npcPersonalities,
+    voicePicks: npcAiSettings?.voices,
+    keys: npcKeys,
+    onAttachAudio: attachChatAudio,
+  });
 
   // Public content (cross-campaign sharing)
   const showPublicContent = userProfile?.showPublicContent ?? false;
@@ -689,16 +714,16 @@ const Index = () => {
 
   const handleStatRoll = (crawlerName: string, crawlerId: string, stat: string, totalStat: number) => {
     const modifier = Math.floor((totalStat - 10) / 2);
-    const rawRoll = Math.floor(Math.random() * 20) + 1;
+    const { rawRoll, results, diceLabel } = rollD20(rollsWithDisadvantage(crawlers.find(c => c.id === crawlerId), totalStat));
     const total = rawRoll + modifier;
     const entry: DiceRollEntry = {
       id: crypto.randomUUID(),
       crawlerName,
       crawlerId,
       timestamp: Date.now(),
-      results: [{ dice: 'D20', result: rawRoll }],
+      results,
       total,
-      statRoll: { stat, modifier, rawRoll },
+      statRoll: { stat, modifier, rawRoll, diceLabel },
     };
     addDiceRoll(entry);
   };
@@ -841,6 +866,12 @@ const Index = () => {
     setGameActiveRef.current = fn;
   }, []);
 
+  // Whose languages decide what's readable: the DM reads everything
+  const languageReader = useMemo(
+    () => (isAdmin ? null : crawlers.find(c => c.id === currentPlayer?.id) ?? null),
+    [isAdmin, crawlers, currentPlayer?.id]
+  );
+
   // While auth is still loading, show a loading indicator to avoid flashing
   // the splash screen before we know if the user should be redirected to landing
   if (authLoading) {
@@ -899,6 +930,13 @@ const Index = () => {
   }
 
   return (
+    <LanguagesProvider
+      customLanguages={customLanguages}
+      isAdmin={isAdmin}
+      readerCrawler={languageReader}
+      createLanguage={createLanguage}
+      deleteLanguage={deleteLanguage}
+    >
     <div className="min-h-screen">
       <a href="#main-content" className="skip-nav">Skip to main content</a>
       <AnimatePresence mode="wait">
@@ -963,6 +1001,9 @@ const Index = () => {
                 onStatRoll={handleStatRoll}
                 getCrawlerLootBoxes={getCrawlerLootBoxes}
                 claimLootBoxItems={claimLootBoxItems}
+                getPartyInventory={getPartyInventory}
+                onTakeFromPartyInventory={takeFromPartyInventory}
+                onUpdatePartyInventory={updatePartyInventory}
                 noncombatTurnState={noncombatTurnState}
                 getNoncombatRollsRemaining={getNoncombatRollsRemaining}
                 recordNoncombatRoll={recordNoncombatRoll}
@@ -1128,12 +1169,15 @@ const Index = () => {
                 npcAiStatus={npcAiStatus}
                 npcSecrets={npcSecrets}
                 npcPersonalities={npcPersonalities}
+                npcMemories={npcMemories}
+                onSetNpcMemory={isAdmin ? setNpcMemory : undefined}
                 onSendChatMessage={sendChatMessage}
                 onClearChat={isAdmin ? clearChat : undefined}
                 onUpdateNpcAiSettings={isAdmin ? updateNpcAiSettings : undefined}
                 onSetNpcSecretState={isAdmin ? setNpcSecretState : undefined}
                 npcKeys={isAdmin ? npcKeys : undefined}
                 onChangeNpcKeys={isAdmin ? setNpcKeys : undefined}
+                onSetTranslateMode={async (crawlerId, mode) => { await updateCrawler(crawlerId, { translateMode: mode }); }}
                 merchants={merchants}
                 onBuyFromMerchant={buyFromMerchant}
                 onSellToMerchant={sellToMerchant}
@@ -1232,6 +1276,7 @@ const Index = () => {
         </>
       )}
     </div>
+    </LanguagesProvider>
   );
 };
 

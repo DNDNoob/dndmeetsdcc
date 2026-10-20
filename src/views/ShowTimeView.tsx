@@ -7,7 +7,7 @@ import { GridOverlay } from "@/components/ui/GridOverlay";
 import RulerOverlay from "@/components/ui/RulerOverlay";
 import { MobIcon } from "@/components/ui/MobIcon";
 import { FogOfWar } from "@/components/ui/FogOfWar";
-import { Episode, Mob, MapSettings, Crawler, CrawlerPlacement, EpisodeMobPlacement, SentLootBox, LootBoxTemplate, getLootBoxTierColor, InventoryItem, CombatState, getEquippedModifiers, getEffectiveMoveSpeed, getMapDistanceFeet, NONCOMBAT_MOVE_MULTIPLIER, Quest, AssignedQuest, QuestActionItem, LootBoxTier } from "@/lib/gameData";
+import { Episode, Mob, stackItems, MapSettings, Crawler, CrawlerPlacement, EpisodeMobPlacement, SentLootBox, LootBoxTemplate, getLootBoxTierColor, InventoryItem, CombatState, getEquippedModifiers, getEffectiveMoveSpeed, getMapDistanceFeet, NONCOMBAT_MOVE_MULTIPLIER, Quest, AssignedQuest, QuestActionItem, LootBoxTier } from "@/lib/gameData";
 import { Map as MapIcon, X, Eye, EyeOff, Layers, ChevronLeft, ChevronRight, PlayCircle, Grid3x3, CloudFog, Eraser, Trash2, Target, ZoomIn, ZoomOut, Package, Lock, Unlock, Search, Plus, Heart, ScrollText, CheckSquare, Check, Swords, Handshake, Store } from "lucide-react";
 import { PingEffect, Ping } from "@/components/ui/PingEffect";
 import { MapBox, MapBoxData, ShapeType } from "@/components/ui/MapBox";
@@ -20,11 +20,15 @@ import CombatTurnTimer from "@/components/CombatTurnTimer";
 import NpcChatPanel, { type NpcChatAuthor, type NpcChatMentionable } from "@/components/NpcChatPanel";
 import NpcSpeechBubbles from "@/components/ui/NpcSpeechBubbles";
 import type { NpcOnlineKeys } from "@/lib/npc/onlineLlm.mjs";
+import { useLanguages } from "@/contexts/LanguagesContext";
+import { readChatLine, usableLanguageIds, crawlerUnderstands, languageEffectLeft, DEFAULT_LANGUAGE_ID } from "@/lib/languages";
+import { useNpcSpeechPlayer } from "@/hooks/useNpcSpeechPlayer";
 import MerchantPanel, { MerchantHagglePrompts } from "@/components/MerchantPanel";
 import { isMerchant, getHaggleBlocker, MERCHANT_TRADE_RANGE_FEET, type MerchantState } from "@/lib/gameData";
-import { withNpcPersonality, speakerAsMob, mapSpeakers, baseMobId, isPlacementHostile, NPC_TALK_RANGE_FEET, type ChatMessage, type NpcAiSettings, type NpcAiStatus, type NpcSecretEntry, type NpcSecretState, type NpcGeneratedPersonality } from "@/lib/gameData";
+import { withNpcPersonality, speakerAsMob, mapSpeakers, baseMobId, isPlacementHostile, NPC_TALK_RANGE_FEET, type TranslateMode, type ChatMessage, type NpcAiSettings, type NpcAiStatus, type NpcSecretEntry, type NpcSecretState, type NpcGeneratedPersonality, type NpcMemory } from "@/lib/gameData";
 
 const NO_GENERATED_PERSONALITIES: Record<string, NpcGeneratedPersonality> = {};
+const NO_NPC_MEMORIES: Record<string, NpcMemory> = {};
 
 interface ShowTimeViewProps {
   maps: string[];
@@ -71,12 +75,15 @@ interface ShowTimeViewProps {
   npcAiStatus?: NpcAiStatus | null;
   npcSecrets?: Record<string, NpcSecretEntry>;
   npcPersonalities?: Record<string, NpcGeneratedPersonality>; // personalities the AI wrote for mobs without one
+  npcMemories?: Record<string, NpcMemory>; // what each speaker remembers from earlier conversations
+  onSetNpcMemory?: (speakerId: string, memory: NpcMemory) => Promise<void>;
   onSendChatMessage?: (message: Omit<ChatMessage, 'id' | 'createdAt'>) => Promise<void>;
   onClearChat?: (episodeId?: string) => Promise<void>;
   onUpdateNpcAiSettings?: (updates: Partial<Omit<NpcAiSettings, 'id'>>) => Promise<void>;
   onSetNpcSecretState?: (mobId: string, state: NpcSecretState) => Promise<void>;
   npcKeys?: NpcOnlineKeys;
   onChangeNpcKeys?: (keys: NpcOnlineKeys) => void;
+  onSetTranslateMode?: (crawlerId: string, mode: TranslateMode) => Promise<void>;
   // Merchants
   merchants?: MerchantState[];
   onBuyFromMerchant?: (mob: Mob, crawlerId: string, item: InventoryItem) => Promise<boolean>;
@@ -734,16 +741,19 @@ const InventoryPanel: React.FC<{
             {selectedCrawlerItems.length === 0 ? (
               <p className="text-xs text-muted-foreground italic">No items in inventory</p>
             ) : (
-              selectedCrawlerItems.map(item => (
-                <div key={item.id} className="flex items-center justify-between bg-muted/30 border border-border rounded px-2 py-1.5">
+              stackItems(selectedCrawlerItems).map(({ key, item, count, ids }) => (
+                <div key={key} className="flex items-center justify-between bg-muted/30 border border-border rounded px-2 py-1.5">
                   <div className="min-w-0">
-                    <span className="text-xs font-display text-primary block truncate">{item.name}</span>
+                    <span className="text-xs font-display text-primary block truncate">
+                      {item.name}{count > 1 && <span className="text-accent font-bold"> ×{count}</span>}
+                    </span>
                     {item.description && (
                       <span className="text-[10px] text-muted-foreground block truncate">{item.description}</span>
                     )}
                   </div>
                   <button
-                    onClick={() => handleRemoveItem(item.id)}
+                    onClick={() => handleRemoveItem(ids[ids.length - 1])}
+                    title={count > 1 ? 'Remove one' : 'Remove'}
                     className="p-0.5 hover:bg-destructive/10 rounded flex-shrink-0 ml-2"
                   >
                     <Trash2 className="w-3 h-3 text-destructive" />
@@ -758,7 +768,7 @@ const InventoryPanel: React.FC<{
   );
 };
 
-const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock, noncombatTurnState, resetNoncombatTurns, combatState, onRemoveCombatant, onRuntimePlacementsChange, onGameActiveChange, onRegisterGameToggle, roomId, quests = [], assignedQuests = [], onAssignQuest, onUpdateQuest, onUpdateAssignedQuest, onDeleteAssignedQuest, currentPlayerId, onRecordCrawlerMove, onSetMobEncountered, chatMessages = [], npcAiSettings = null, npcAiStatus = null, npcSecrets = {}, npcPersonalities = NO_GENERATED_PERSONALITIES, onSendChatMessage, onClearChat, onUpdateNpcAiSettings, onSetNpcSecretState, npcKeys, onChangeNpcKeys, merchants = NO_MERCHANTS, onBuyFromMerchant, onSellToMerchant, onHaggleWithMerchant, onRestockMerchant, onResolveMerchantHaggle }) => {
+const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock, noncombatTurnState, resetNoncombatTurns, combatState, onRemoveCombatant, onRuntimePlacementsChange, onGameActiveChange, onRegisterGameToggle, roomId, quests = [], assignedQuests = [], onAssignQuest, onUpdateQuest, onUpdateAssignedQuest, onDeleteAssignedQuest, currentPlayerId, onRecordCrawlerMove, onSetMobEncountered, chatMessages = [], npcAiSettings = null, npcAiStatus = null, npcSecrets = {}, npcPersonalities = NO_GENERATED_PERSONALITIES, npcMemories = NO_NPC_MEMORIES, onSetNpcMemory, onSendChatMessage, onClearChat, onUpdateNpcAiSettings, onSetNpcSecretState, npcKeys, onChangeNpcKeys, merchants = NO_MERCHANTS, onBuyFromMerchant, onSellToMerchant, onHaggleWithMerchant, onRestockMerchant, onResolveMerchantHaggle, onSetTranslateMode }) => {
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
   const selectedEpisodeIdRef = useRef<string | null>(null);
   const [currentMapIndex, setCurrentMapIndex] = useState(0);
@@ -2232,10 +2242,59 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   }, [selectedEpisode, currentMapId]);
 
   // ======== In-game chat & talking NPCs ========
-  const episodeChatMessages = useMemo(
+  const episodeChatLines = useMemo(
     () => selectedEpisode ? chatMessages.filter(m => !m.episodeId || m.episodeId === selectedEpisode.id) : [],
     [chatMessages, selectedEpisode]
   );
+  // Translators' versions of lines are kept apart and shown in place of the line they translate
+  const episodeChatMessages = useMemo(() => episodeChatLines.filter(m => !m.translationOf), [episodeChatLines]);
+  const chatTranslations = useMemo(() => {
+    const byLine = new Map<string, ChatMessage[]>();
+    for (const m of episodeChatLines) {
+      if (!m.translationOf) continue;
+      byLine.set(m.translationOf, [...(byLine.get(m.translationOf) ?? []), m]);
+    }
+    return byLine;
+  }, [episodeChatLines]);
+
+  // Languages: what each line looks like to this viewer
+  const { languages: allLanguageList, customLanguages } = useLanguages();
+  const myChatCrawler = useMemo(
+    () => (!isAdmin && currentPlayerId ? crawlers.find(c => c.id === currentPlayerId) ?? null : null),
+    [isAdmin, currentPlayerId, crawlers]
+  );
+  const readChat = useCallback(
+    (m: ChatMessage) => readChatLine(m, chatTranslations.get(m.id) ?? [], { isAdmin, crawler: myChatCrawler, party: crawlers }, customLanguages),
+    [chatTranslations, isAdmin, myChatCrawler, crawlers, customLanguages]
+  );
+  // Spoken voices: NPC lines play on this device, scrambled if this viewer doesn't know the language
+  const understandsChatLine = useCallback(
+    (m: ChatMessage) => isAdmin || crawlerUnderstands(myChatCrawler, m.language),
+    [isAdmin, myChatCrawler]
+  );
+  const { speechMuted, speechVolume, setSpeechPrefs } = useNpcSpeechPlayer({
+    roomId, messages: episodeChatMessages, understands: understandsChatLine, mapId: currentMapId,
+  });
+  // Speech bubbles show what this viewer can make out
+  const bubbleMessages = useMemo(
+    () => episodeChatMessages.map(m => (m.language ? { ...m, text: readChat(m).text } : m)),
+    [episodeChatMessages, readChat]
+  );
+  const mySpeakLanguages = useMemo(() => {
+    if (!myChatCrawler) return [];
+    const ids = usableLanguageIds(myChatCrawler);
+    // Worldspeech first when they know it, so it's the default
+    const ordered = ids.includes(DEFAULT_LANGUAGE_ID) ? [DEFAULT_LANGUAGE_ID, ...ids.filter(id => id !== DEFAULT_LANGUAGE_ID)] : ids;
+    // Spell languages say how long they have left: "Dead (Speak with Dead, 3 questions left)"
+    const effects = myChatCrawler.languageEffects ?? [];
+    return ordered.map(id => {
+      const l = allLanguageList.find(x => x.id === id);
+      const effect = effects.find(e => e.languageId === id);
+      if (!l || !effect || myChatCrawler.languages?.includes(id)) return l;
+      const left = languageEffectLeft(effect);
+      return { ...l, name: `${l.name} (${effect.name}${left ? `, ${left}` : ''})` };
+    }).filter((l): l is NonNullable<typeof l> => !!l);
+  }, [myChatCrawler, allLanguageList]);
 
   // Mob tokens on the current map (episode + runtime placements)
   const mobPlacementsOnMap = useMemo(
@@ -2243,11 +2302,11 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     [currentMapMobPlacements, runtimeMobPlacements, currentMapId]
   );
 
-  // Every token that can talk (hidden mobs stay quiet). Characters speak as one; each creature
+  // Every token that can talk (hidden and silent mobs stay quiet). Characters speak as one; each creature
   // copy is its own speaker ("Goblin B") with its own personality.
   const npcSpeakers = useMemo(
     () => mapSpeakers(mobPlacementsOnMap, mobs, [...(selectedEpisode?.mobPlacements ?? []), ...runtimeMobPlacements])
-      .filter(s => !s.mob.hidden),
+      .filter(s => !s.mob.hidden && !s.mob.silent),
     [mobPlacementsOnMap, mobs, selectedEpisode?.mobPlacements, runtimeMobPlacements]
   );
 
@@ -2257,6 +2316,15 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     for (const s of npcSpeakers) if (!byId.has(s.id)) byId.set(s.id, speakerAsMob(s, npcPersonalities));
     return [...byId.values()];
   }, [npcSpeakers, npcPersonalities]);
+
+  // What speakers remember; a creature copy's memory only counts in the episode it was made in
+  const episodeNpcMemories = useMemo(() => {
+    const out: Record<string, NpcMemory> = {};
+    for (const [id, m] of Object.entries(npcMemories)) {
+      if (!m.episodeId || m.episodeId === selectedEpisode?.id) out[id] = m;
+    }
+    return out;
+  }, [npcMemories, selectedEpisode?.id]);
 
   // Everything the chat may need to show by id: campaign mobs plus the speakers on this map
   const talkingMobs = useMemo(() => {
@@ -2338,7 +2406,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     return crawler ? { type: 'crawler', id: crawler.id, name: crawler.name } : null;
   }, [isAdmin, currentPlayerId, crawlers]);
 
-  const handleSendChat = useCallback(async (text: string, viaVoice: boolean, toMobIds: string[] = []) => {
+  const handleSendChat = useCallback(async (text: string, viaVoice: boolean, toMobIds: string[] = [], language?: string) => {
     if (!chatAuthor || !onSendChatMessage) return;
     // Players: note which mobs are in talking range, so only those answer
     const nearMobIds = chatAuthor.type === 'crawler'
@@ -2353,8 +2421,22 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       ...(viaVoice ? { viaVoice: true } : {}),
       ...(toMobIds.length ? { toMobIds } : {}),
       ...(nearMobIds ? { nearMobIds } : {}),
+      ...(chatAuthor.type === 'crawler' && language ? { language } : {}),
     });
   }, [chatAuthor, onSendChatMessage, selectedEpisode, chatMentionables]);
+
+  // A translator passes a line on to the party, as said or twisted
+  const handleTranslate = useCallback(async (m: ChatMessage, text: string) => {
+    if (!myChatCrawler || !onSendChatMessage) return;
+    await onSendChatMessage({
+      authorType: 'crawler',
+      authorId: myChatCrawler.id,
+      authorName: myChatCrawler.name,
+      text,
+      translationOf: m.id,
+      ...(m.episodeId ? { episodeId: m.episodeId } : {}),
+    });
+  }, [myChatCrawler, onSendChatMessage]);
 
   // Get the current map URL
   const currentMapUrl = useMemo(() => {
@@ -3759,7 +3841,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
           {/* NPC speech bubbles over their tokens */}
           <NpcSpeechBubbles
-            messages={episodeChatMessages}
+            messages={bubbleMessages}
             thinking={npcAiStatus?.thinking ?? null}
             mapId={currentMapId}
             counterScale={iconCounterScale}
@@ -4011,9 +4093,19 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
           onSend={handleSendChat}
           onUpdateSettings={onUpdateNpcAiSettings}
           onSetSecretState={onSetNpcSecretState}
+          memories={episodeNpcMemories}
+          onSetMemory={onSetNpcMemory}
           npcKeys={npcKeys}
           onChangeNpcKeys={onChangeNpcKeys}
+          readLine={readChat}
+          speakLanguages={mySpeakLanguages}
+          translateMode={myChatCrawler?.translateMode ?? 'off'}
+          onSetTranslateMode={myChatCrawler && onSetTranslateMode ? (mode) => onSetTranslateMode(myChatCrawler.id, mode) : undefined}
+          onTranslate={myChatCrawler ? handleTranslate : undefined}
           onClearChat={onClearChat ? () => onClearChat(selectedEpisode.id) : undefined}
+          speechMuted={speechMuted}
+          speechVolume={speechVolume}
+          onSetSpeechPrefs={setSpeechPrefs}
         />
       )}
     </motion.div>

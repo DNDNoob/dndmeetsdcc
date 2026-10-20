@@ -200,7 +200,7 @@ export function useCampaigns(userId: string | null) {
       await writeInvite(newCampaign.inviteCode, newId);
 
       // Copy room-scoped collections (except transient state)
-      const collectionsToCopy = ['mobs', 'maps', 'episodes', 'lootBoxTemplates', 'wiki', 'quests'];
+      const collectionsToCopy = ['mobs', 'maps', 'episodes', 'lootBoxTemplates', 'wiki', 'quests', 'languages'];
 
       for (const collName of collectionsToCopy) {
         const sourceCol = collection(db, `rooms/${sourceCampaignId}/${collName}`);

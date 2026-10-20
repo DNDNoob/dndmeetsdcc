@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
-import { Crawler, InventoryItem, EquipmentSlot as SlotType, StatModifiers, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, Spell, SpellData } from "@/lib/gameData";
+import { Crawler, InventoryItem, getItemStackKey, stackItems, EquipmentSlot as SlotType, StatModifiers, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, Spell, SpellData } from "@/lib/gameData";
 import { Coins, Package, Sword, Shield, Plus, Trash2, Edit2, Save, HardHat, Search, BookOpen, Gem, Footprints, Shirt, Hand, Crosshair, ChevronDown, ChevronUp, Wand2, Globe, Lock, Users, Bookmark } from "lucide-react";
 import { SpellDataEditor } from "@/views/SpellsView";
 
@@ -38,6 +38,8 @@ const getEquipmentIcon = (slot?: string, className: string = "w-4 h-4 shrink-0")
 };
 import { toast } from "sonner";
 import { useDebouncedCallback } from "@/hooks/useDebounce";
+import { ForeignText } from "@/components/ForeignText";
+import { LanguageSelect } from "@/components/LanguagePicker";
 
 interface InventoryViewProps {
   crawlers: Crawler[];
@@ -60,35 +62,16 @@ interface InventoryViewProps {
   showPublicContent?: boolean;
 }
 
-// Helper to create item signature for grouping
-const getItemSignature = (item: InventoryItem): string => {
-  const modifiersStr = item.statModifiers
-    ? JSON.stringify(Object.entries(item.statModifiers).filter(([, v]) => v !== 0).sort())
-    : '';
-  return `${item.name}|${item.description || ''}|${item.equipSlot || ''}|${item.goldValue ?? 0}|${modifiersStr}`;
-};
+// Copies of the same item are grouped into one stack
+const getItemSignature = getItemStackKey;
 
-// Consolidate items by signature
 interface ConsolidatedItem {
   item: InventoryItem;
   count: number;
   ids: string[];
 }
 
-const consolidateItems = (items: InventoryItem[]): ConsolidatedItem[] => {
-  const groups = new Map<string, ConsolidatedItem>();
-  for (const item of items) {
-    const sig = getItemSignature(item);
-    const existing = groups.get(sig);
-    if (existing) {
-      existing.count++;
-      existing.ids.push(item.id);
-    } else {
-      groups.set(sig, { item, count: 1, ids: [item.id] });
-    }
-  }
-  return Array.from(groups.values());
-};
+const consolidateItems = (items: InventoryItem[]): ConsolidatedItem[] => stackItems(items);
 
 const InventoryView: React.FC<InventoryViewProps> = ({
   crawlers,
@@ -124,17 +107,17 @@ const InventoryView: React.FC<InventoryViewProps> = ({
 
   // Individual item editing state
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
-  const [editingItemData, setEditingItemData] = useState<{ name: string; description: string }>({ name: '', description: '' });
+  const [editingItemData, setEditingItemData] = useState<{ name: string; description: string; language?: string }>({ name: '', description: '' });
 
   const handleStartEditItem = (crawlerId: string, item: InventoryItem) => {
     setEditingItemId(`${crawlerId}:${item.id}`);
-    setEditingItemData({ name: item.name, description: item.description });
+    setEditingItemData({ name: item.name, description: item.description, language: item.language });
   };
 
   const handleSaveEditItem = (crawlerId: string, itemId: string) => {
     const items = getCrawlerInventory(crawlerId);
     const updatedItems = items.map(item =>
-      item.id === itemId ? { ...item, name: editingItemData.name.trim() || item.name, description: editingItemData.description } : item
+      item.id === itemId ? { ...item, name: editingItemData.name.trim() || item.name, description: editingItemData.description, language: editingItemData.language } : item
     );
     onUpdateInventory(crawlerId, updatedItems);
     setEditingItemId(null);
@@ -150,6 +133,8 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     weaponData?: WeaponData;
     isSpellTome?: boolean;
     spellTomeData?: { entries: Array<{ spellId?: string; customSpell?: Spell }> };
+    language?: string;
+    grantsLanguage?: string;
   }>({
     name: "", description: "", equipSlot: undefined, goldValue: undefined, statModifiers: undefined, weaponData: undefined,
   });
@@ -224,6 +209,8 @@ const InventoryView: React.FC<InventoryViewProps> = ({
       weaponData: item.weaponData,
       isSpellTome: item.isSpellTome,
       spellTomeData: item.spellTomeData,
+      language: item.language,
+      grantsLanguage: item.grantsLanguage,
     });
     setShowWeaponConfig(!!item.weaponData);
     setShowSpellTomeConfig(!!item.isSpellTome);
@@ -258,6 +245,8 @@ const InventoryView: React.FC<InventoryViewProps> = ({
               description: newLibraryItem.description,
               equipSlot: newLibraryItem.equipSlot,
               goldValue: newLibraryItem.goldValue,
+              language: newLibraryItem.language,
+              grantsLanguage: newLibraryItem.grantsLanguage,
               ...(mods && Object.keys(mods).length > 0 ? { statModifiers: mods } : { statModifiers: undefined }),
               ...weaponFields,
               ...spellTomeFields,
@@ -284,6 +273,8 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 description: newLibraryItem.description,
                 equipSlot: newLibraryItem.equipSlot,
                 goldValue: newLibraryItem.goldValue,
+                language: newLibraryItem.language,
+                grantsLanguage: newLibraryItem.grantsLanguage,
                 ...(mods && Object.keys(mods).length > 0 ? { statModifiers: mods } : { statModifiers: undefined }),
                 ...weaponFields,
                 ...spellTomeFields,
@@ -304,6 +295,8 @@ const InventoryView: React.FC<InventoryViewProps> = ({
         description: newLibraryItem.description,
         equipSlot: newLibraryItem.equipSlot,
         goldValue: newLibraryItem.goldValue,
+        ...(newLibraryItem.language ? { language: newLibraryItem.language } : {}),
+        ...(newLibraryItem.grantsLanguage ? { grantsLanguage: newLibraryItem.grantsLanguage } : {}),
         ...(mods && Object.keys(mods).length > 0 ? { statModifiers: mods } : {}),
         ...weaponFields,
         ...spellTomeFields,
@@ -344,7 +337,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
       {item.description && (
         <div>
           <span className="text-muted-foreground">Description: </span>
-          <span className="text-foreground">{item.description}</span>
+          <ForeignText text={item.description} language={item.language} className="text-foreground" />
         </div>
       )}
       {item.goldValue !== undefined && item.goldValue > 0 && (
@@ -586,7 +579,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                             )}
                           </div>
                           {!isExpanded && item.description && (
-                            <span className="text-muted-foreground text-xs block">({item.description})</span>
+                            <ForeignText text={`(${item.description})`} language={item.language} className="text-muted-foreground text-xs block" />
                           )}
                           {!isExpanded && item.statModifiers && Object.keys(item.statModifiers).length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-1">
@@ -674,6 +667,20 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                   onChange={(e) => setNewLibraryItem({ ...newLibraryItem, description: e.target.value })}
                   className="bg-muted border border-border px-2 py-1 text-sm flex-1" />
               </div>
+              <LanguageSelect
+                value={newLibraryItem.language}
+                onChange={(language) => setNewLibraryItem({ ...newLibraryItem, language })}
+                noneLabel="Description readable by anyone"
+                className="bg-muted border border-border px-2 py-1 text-sm w-full"
+              />
+              <LanguageSelect
+                value={newLibraryItem.grantsLanguage}
+                onChange={(grantsLanguage) => setNewLibraryItem({ ...newLibraryItem, grantsLanguage })}
+                noneLabel="Grants no language"
+                optionLabel={(name) => `While equipped, knows ${name}`}
+                ariaLabel="Grants language while equipped"
+                className="bg-muted border border-border px-2 py-1 text-sm w-full"
+              />
               <div className="flex gap-2">
                 <select value={newLibraryItem.equipSlot || ""}
                   onChange={(e) => setNewLibraryItem({ ...newLibraryItem, equipSlot: e.target.value as SlotType || undefined })}
@@ -1113,7 +1120,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                   <div className="flex-1 min-w-0">
                     <span className="text-foreground">{item.name}</span>
                     {item.description && (
-                      <span className="text-muted-foreground text-xs block">({item.description})</span>
+                      <ForeignText text={`(${item.description})`} language={item.language} className="text-muted-foreground text-xs block" />
                     )}
                   </div>
                   <button
@@ -1166,7 +1173,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                         )}
                       </div>
                       {item.description && (
-                        <span className="text-muted-foreground text-xs block">({item.description})</span>
+                        <ForeignText text={`(${item.description})`} language={item.language} className="text-muted-foreground text-xs block" />
                       )}
                       {item.createdByUsername && (
                         <span className="text-[10px] text-primary/60 flex items-center gap-0.5 mt-0.5">
@@ -1319,6 +1326,11 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                                     className="bg-muted border border-border px-2 py-1 text-xs w-full"
                                     placeholder="Description"
                                   />
+                                  <LanguageSelect
+                                    value={editingItemData.language}
+                                    onChange={(language) => setEditingItemData(prev => ({ ...prev, language }))}
+                                    noneLabel="Description readable by anyone"
+                                  />
                                   <div className="flex gap-1">
                                     <button
                                       onClick={() => handleSaveEditItem(crawler.id, item.id)}
@@ -1374,7 +1386,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                                     )}
                                   </div>
                                   {!expandedItems.has(`${crawler.id}:${item.id}`) && item.description && (
-                                    <span className="text-muted-foreground text-xs">({item.description})</span>
+                                    <ForeignText text={`(${item.description})`} language={item.language} className="text-muted-foreground text-xs" />
                                   )}
                                   {expandedItems.has(`${crawler.id}:${item.id}`) && renderExpandedItemDetails(item)}
                                 </div>

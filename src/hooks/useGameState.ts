@@ -10,6 +10,16 @@ import {
   GameClockState,
   CombatState,
   CombatantEntry,
+  isPlacementHostile,
+  splitMobLoot,
+  getLootingLevel,
+  getLootDestructionChance,
+  DEFAULT_LOOT_DESTRUCTION_CHANCE,
+  type MobLootSplit,
+  stackItems,
+  PARTY_INVENTORY_ID,
+  SHARED_LIBRARY_ID,
+  SHARED_LIBRARY_DOC_ID,
   CombatTurnSnapshot,
   WikiPage,
   Quest,
@@ -19,6 +29,7 @@ import {
   NpcAiStatus,
   NpcSecretEntry,
   NpcGeneratedPersonality,
+  NpcMemory,
   NpcSecretState,
   Spell,
   KnownSpell,
@@ -41,6 +52,8 @@ import {
   type PublicMob,
   type PublicEpisode,
   type PublicEpisodeAssets,
+  type CustomLanguage,
+  type LanguageEffect,
   type MerchantState,
   type MerchantStockEntry,
   type MerchantHaggle,
@@ -51,8 +64,11 @@ import {
   merchantItemKey,
   DEFAULT_HAGGLE_DC,
   getHaggleBlocker,
+  rollD20,
+  rollsWithDisadvantage,
 } from "@/lib/gameData";
 import { useGame } from "@/contexts/GameContext";
+import { DEFAULT_LANGUAGE_ID, questionEffectFor } from "@/lib/languages";
 import type { BatchOperation } from "@/hooks/useFirebaseStore";
 import { db, storage } from "@/lib/firebase";
 import { doc, getDoc, setDoc, deleteDoc, updateDoc, serverTimestamp } from "firebase/firestore";
@@ -81,6 +97,14 @@ export interface DiceRollEntry {
     type: 'assigned' | 'action_revealed' | 'action_completed' | 'reward_revealed';
     recipientNames: string[];
     detail?: string; // action item text or reward name
+  };
+  // For a defeated mob's loot being handed out
+  mobLootNotification?: {
+    mobNames: string[];
+    gold: number; // total gold handed out
+    shares: string[]; // one line per crawler, e.g. "Vex: 5 gold, Health Potion ×2"
+    partyItems: string[]; // what went to the party inventory
+    destroyed?: string[]; // what got smashed while looting
   };
   // For a player undoing their combat turn
   turnResetNotification?: {
@@ -139,17 +163,24 @@ export const useGameState = () => {
   };
 
   // Get collections with defaults - using stable references
-  const crawlers = useMemo(() => {
-    const stored = getStableCollection<Crawler>('crawlers');
-    if (!isLoaded || stored.length === 0) return defaultCrawlers;
-    return stored;
-  }, [getCollection, isLoaded]);
-
   const inventory = useMemo(() => {
     const stored = getStableCollection<InventoryEntry>('inventory');
     if (!isLoaded || stored.length === 0) return defaultInventory;
     return stored;
   }, [getCollection, isLoaded]);
+
+  // Crawlers, with itemLanguages worked out from what they have equipped (a druid's charm grants Beast)
+  const crawlers = useMemo(() => {
+    const stored = getStableCollection<Crawler>('crawlers');
+    if (!isLoaded || stored.length === 0) return defaultCrawlers;
+    return stored.map(c => {
+      const equippedIds = Object.values(c.equippedItems ?? {});
+      const items = equippedIds.length ? (inventory.find(e => e.crawlerId === c.id)?.items ?? []) : [];
+      const itemLanguages = [...new Set(items.filter(i => equippedIds.includes(i.id) && i.grantsLanguage).map(i => i.grantsLanguage as string))];
+      if (itemLanguages.length) return { ...c, itemLanguages };
+      return c.itemLanguages ? { ...c, itemLanguages: undefined } : c;
+    });
+  }, [getCollection, isLoaded, inventory]);
 
   const mobs = useMemo(() => {
     const stored = getStableCollection<Mob>('mobs');
@@ -636,19 +667,20 @@ export const useGameState = () => {
   };
 
   const getSharedInventory = () => {
-    return inventory.find((i) => i.crawlerId === '__shared__')?.items || [];
+    return inventory.find((i) => i.crawlerId === SHARED_LIBRARY_ID)?.items || [];
   };
 
   const updateSharedInventory = async (items: InventoryItem[]) => {
-    return updateCrawlerInventory('__shared__', items);
+    return updateCrawlerInventory(SHARED_LIBRARY_ID, items);
   };
 
   // Only the change from what this client showed is saved, so two people editing the same
   // inventory (e.g. the shared item library) at once don't overwrite each other's items.
   const updateCrawlerInventory = async (crawlerId: string, items: InventoryItem[]) => {
     const existing = inventory.find((i) => i.crawlerId === crawlerId) as InventoryEntry | undefined;
-    // Use the existing document ID; new entries use crawlerId as the document ID per convention
-    const docId = existing?.id || crawlerId;
+    // Use the existing document ID; new entries use crawlerId as the document ID per convention,
+    // except the item library, whose crawlerId Firestore won't accept as a document ID
+    const docId = existing?.id || (crawlerId === SHARED_LIBRARY_ID ? SHARED_LIBRARY_DOC_ID : crawlerId);
     return mergeArrayById(
       'inventory',
       docId,
@@ -656,6 +688,36 @@ export const useGameState = () => {
       (existing?.items || []) as unknown as Record<string, unknown>[],
       items as unknown as Record<string, unknown>[],
       { crawlerId },
+    );
+  };
+
+  // Party inventory: looted items nobody has claimed yet (see lootDefeatedMobs)
+  const getPartyInventory = () => getCrawlerInventory(PARTY_INVENTORY_ID);
+
+  const updatePartyInventory = async (items: InventoryItem[]) => updateCrawlerInventory(PARTY_INVENTORY_ID, items);
+
+  /** Moves items from the party inventory into a crawler's own, so two players can't take the same one. */
+  const takeFromPartyInventory = async (crawlerId: string, itemIds: string[]) => {
+    if (itemIds.length === 0) return false;
+    const invDocIdOf = (ownerId: string) =>
+      (inventory.find(i => i.crawlerId === ownerId) as { id?: string } | undefined)?.id || ownerId;
+    const partyDocId = invDocIdOf(PARTY_INVENTORY_ID);
+    const crawlerDocId = invDocIdOf(crawlerId);
+    return transact(
+      [{ collection: 'inventory', id: partyDocId }, { collection: 'inventory', id: crawlerDocId }],
+      ([partyDoc, crawlerDoc]) => {
+        const partyItems = (partyDoc?.items as InventoryItem[]) ?? [];
+        const wanted = new Set(itemIds);
+        const taken = partyItems.filter(i => wanted.has(i.id));
+        if (taken.length === 0) throw new Error('Someone else already took that item.');
+        const items = [...((crawlerDoc?.items as InventoryItem[]) ?? []), ...taken];
+        return [
+          { type: 'update', collection: 'inventory', id: partyDocId, data: { items: partyItems.filter(i => !wanted.has(i.id)) } },
+          crawlerDoc
+            ? { type: 'update', collection: 'inventory', id: crawlerDocId, data: { items } }
+            : { type: 'add', collection: 'inventory', id: crawlerDocId, data: { crawlerId, items } },
+        ];
+      },
     );
   };
 
@@ -879,6 +941,8 @@ export const useGameState = () => {
     if (current && gameClockState) {
       await advanceGameClock(1);
     }
+
+    if (current) await tickLanguageEffects('noncombat');
 
     const turnData = {
       turnNumber: (current?.turnNumber ?? 0) + 1,
@@ -1130,24 +1194,27 @@ export const useGameState = () => {
     const rolls: DiceRollEntry[] = [];
     const updatedCombatants = combatState.combatants.map(c => {
       if (c.hasRolledInitiative) return c;
-      const rawRoll = Math.floor(Math.random() * 20) + 1;
       let modifier = 0;
+      let disadvantage = false;
       if (c.type === 'crawler') {
         const crawler = crawlers.find(cr => cr.id === c.id);
         if (crawler) {
           const mods = getEquippedModifiers(crawler, getCrawlerInventory(crawler.id));
-          modifier = Math.floor(((crawler.dex + (mods.dex ?? 0)) - 10) / 2);
+          const dex = crawler.dex + (mods.dex ?? 0);
+          modifier = Math.floor((dex - 10) / 2);
+          disadvantage = rollsWithDisadvantage(crawler, dex);
         }
       }
+      const { rawRoll, results, diceLabel } = rollD20(disadvantage);
       const total = rawRoll + modifier;
       rolls.push({
         id: crypto.randomUUID(),
         crawlerName: c.name,
         crawlerId: c.id,
         timestamp: Date.now(),
-        results: [{ dice: 'D20', result: rawRoll }],
+        results,
         total,
-        statRoll: { stat: 'Initiative', modifier, rawRoll },
+        statRoll: { stat: 'Initiative', modifier, rawRoll, diceLabel },
       });
       return { ...c, initiative: total, hasRolledInitiative: true };
     });
@@ -1223,6 +1290,7 @@ export const useGameState = () => {
       return c;
     });
     const newIndex = isNewRound ? 0 : nextIndex;
+    if (isNewRound) await tickLanguageEffects('combat');
     await updateItem('combatState', 'current', {
       combatants: resetCombatants,
       currentTurnIndex: newIndex,
@@ -1348,6 +1416,143 @@ export const useGameState = () => {
     await updateItem('combatState', 'current', { combatants: updatedCombatants } as Record<string, unknown>);
   };
 
+  // --- Mob loot ---
+  // A hostile mob that goes down in combat drops its items and gold to the crawlers in the fight
+  // (see splitMobLoot). Combat state, crawlers and inventories are read and written in one
+  // transaction, and the combatant is marked looted, so a mob never drops its loot twice.
+  const lootDefeatedMobs = async (combatIds: string[]) => {
+    if (!combatState || combatIds.length === 0) return;
+    const episode = combatState.episodeId ? episodes.find(e => e.id === combatState.episodeId) : undefined;
+    const placementIndexFor = (combatId: string, mobId: string) => {
+      if (!episode) return -1;
+      const colonIdx = combatId.indexOf(':');
+      if (colonIdx > 0) {
+        const idx = parseInt(combatId.substring(colonIdx + 1), 10);
+        return !isNaN(idx) && idx < episode.mobPlacements.length && episode.mobPlacements[idx].mobId === mobId ? idx : -1;
+      }
+      return episode.mobPlacements.findIndex(p => p.mobId === mobId);
+    };
+
+    const drops = combatIds.flatMap(combatId => {
+      const combatant = combatState.combatants.find(c => c.id === combatId && c.type === 'mob');
+      if (!combatant) return [];
+      const mob = mobs.find(m => m.id === (combatant.sourceId || combatant.id));
+      if (!mob) return [];
+      const placementIdx = placementIndexFor(combatId, mob.id);
+      const placement = placementIdx >= 0 ? episode!.mobPlacements[placementIdx] : undefined;
+      // Only crawlers are on the other side of a hostile mob; a friendly NPC keeps its things
+      if (!isPlacementHostile(placement, mob)) return [];
+      const items = placement?.inventoryOverride ?? mob.defaultInventory ?? [];
+      const gold = placement?.goldOverride ?? mob.defaultGold ?? 0;
+      if (items.length === 0 && gold <= 0) return [];
+      const destructionChance = mob.lootDestructionChance ?? DEFAULT_LOOT_DESTRUCTION_CHANCE;
+      return [{ combatId, name: combatant.name, items, gold, placementIdx, destructionChance }];
+    });
+    if (drops.length === 0) return;
+
+    const recipientIds = combatState.combatants.filter(c => c.type === 'crawler').map(c => c.id);
+    const invDocIdOf = (ownerId: string) =>
+      (inventory.find(i => i.crawlerId === ownerId) as { id?: string } | undefined)?.id || ownerId;
+    const owners = [...recipientIds, PARTY_INVENTORY_ID];
+    const reads = [
+      { collection: 'combatState' as const, id: 'current' },
+      ...recipientIds.map(id => ({ collection: 'crawlers' as const, id })),
+      ...owners.map(id => ({ collection: 'inventory' as const, id: invDocIdOf(id) })),
+    ];
+
+    let looted: typeof drops = [];
+    type LootSummary = Omit<MobLootSplit, 'gold'> & { gold: Record<string, number>; levelUps: { id: string; level: number }[] };
+    const emptySummary = (): LootSummary => ({ gold: {}, items: {}, party: [], destroyedGold: 0, destroyed: [], levelUps: [] });
+    let summary = emptySummary();
+    const ok = await transact(reads, (docs) => {
+      const [combatDoc, ...rest] = docs;
+      const crawlerDocs = rest.slice(0, recipientIds.length);
+      const invDocs = rest.slice(recipientIds.length);
+      const combatants = ((combatDoc?.combatants as CombatantEntry[]) ?? []);
+      looted = drops.filter(d => {
+        const c = combatants.find(x => x.id === d.combatId);
+        return c && !c.looted && (c.currentHP ?? 1) <= 0;
+      });
+      summary = emptySummary();
+      if (looted.length === 0) return [];
+      // Each crawler's Looting level lowers the chance their share gets smashed
+      const lootedBefore = recipientIds.map((_, i) =>
+        Number((crawlerDocs[i]?.activityStats as CrawlerActivityStats | undefined)?.mobsLooted) || 0);
+      const levelOf = new Map(recipientIds.map((id, i) => [id, getLootingLevel(lootedBefore[i])]));
+      for (const drop of looted) {
+        const split = splitMobLoot(drop.items, drop.gold, recipientIds,
+          id => getLootDestructionChance(drop.destructionChance, levelOf.get(id) ?? 0));
+        for (const [id, g] of Object.entries(split.gold)) summary.gold[id] = (summary.gold[id] ?? 0) + g;
+        for (const [id, list] of Object.entries(split.items)) summary.items[id] = [...(summary.items[id] ?? []), ...list];
+        summary.party.push(...split.party);
+        summary.destroyed.push(...split.destroyed);
+        summary.destroyedGold += split.destroyedGold;
+      }
+      const lootedIds = new Set(looted.map(d => d.combatId));
+      const ops: BatchOperation[] = [{
+        type: 'update',
+        collection: 'combatState',
+        id: 'current',
+        data: { combatants: combatants.map(c => (lootedIds.has(c.id) ? { ...c, looted: true } : c)) },
+      }];
+      recipientIds.forEach((id, i) => {
+        const crawlerDoc = crawlerDocs[i];
+        if (!crawlerDoc) return;
+        const activityStats = addActivityStats(crawlerDoc.activityStats as CrawlerActivityStats | undefined, { mobsLooted: looted.length });
+        const data: Record<string, unknown> = { activityStats };
+        if (summary.gold[id]) data.gold = (Number(crawlerDoc.gold) || 0) + summary.gold[id];
+        const newLevel = getLootingLevel(activityStats.mobsLooted);
+        if (newLevel > getLootingLevel(lootedBefore[i])) summary.levelUps.push({ id, level: newLevel });
+        ops.push({ type: 'update', collection: 'crawlers', id, data });
+      });
+      owners.forEach((ownerId, i) => {
+        const added = ownerId === PARTY_INVENTORY_ID ? summary.party : summary.items[ownerId];
+        if (!added?.length) return;
+        const invDoc = invDocs[i];
+        const items = [...((invDoc?.items as InventoryItem[]) ?? []), ...added];
+        ops.push(invDoc
+          ? { type: 'update', collection: 'inventory', id: invDocIdOf(ownerId), data: { items } }
+          : { type: 'add', collection: 'inventory', id: invDocIdOf(ownerId), data: { crawlerId: ownerId, items } });
+      });
+      return ops;
+    });
+    if (!ok || looted.length === 0) return;
+
+    // The body is empty now, so a later fight in this episode doesn't drop the same loot again
+    if (episode && looted.some(d => d.placementIdx >= 0)) {
+      const fresh = episodes.find(e => e.id === episode.id) ?? episode;
+      const emptied = new Set(looted.map(d => d.placementIdx).filter(i => i >= 0));
+      const mobPlacements = fresh.mobPlacements.map((p, i) =>
+        emptied.has(i) ? { ...p, inventoryOverride: [], goldOverride: 0 } : p);
+      await updateItem('episodes', episode.id, { mobPlacements, updatedAt: new Date().toISOString() } as Record<string, unknown>);
+    }
+
+    const nameOf = (id: string) => crawlers.find(c => c.id === id)?.name ?? 'Unknown';
+    const totalGold = Object.values(summary.gold).reduce((a, b) => a + b, 0);
+    const describe = (list: InventoryItem[]) =>
+      stackItems(list).map(s => (s.count > 1 ? `${s.item.name} ×${s.count}` : s.item.name));
+    const shares = recipientIds
+      .filter(id => summary.gold[id] || summary.items[id]?.length)
+      .map(id => [nameOf(id), [summary.gold[id] ? `${summary.gold[id]} gold` : '', ...describe(summary.items[id] ?? [])].filter(Boolean).join(', ')].join(': '));
+    await addDiceRoll({
+      id: crypto.randomUUID(),
+      crawlerName: 'System',
+      crawlerId: '__system__',
+      timestamp: Date.now(),
+      results: [],
+      total: 0,
+      mobLootNotification: {
+        mobNames: looted.map(d => d.name),
+        gold: totalGold,
+        shares,
+        partyItems: describe(summary.party),
+        destroyed: [summary.destroyedGold ? `${summary.destroyedGold} gold` : '', ...describe(summary.destroyed)].filter(Boolean),
+      },
+    });
+    toast.success(`Looted ${looted.map(d => d.name).join(', ')}`);
+    for (const { id, level } of summary.levelUps) toast.success(`${nameOf(id)} reached Looting level ${level}!`, { icon: '💰' });
+  };
+
   // Apply damage to one or more combat targets in a single pass, so splash hits don't
   // overwrite each other, and credit the attacking crawler's activity stats.
   const applyCombatDamageBatch = async (
@@ -1362,6 +1567,7 @@ export const useGameState = () => {
       statDeltas.set(crawlerId, addActivityStats(statDeltas.get(crawlerId), deltas));
     };
     let killingBlows = 0;
+    const killedMobIds: string[] = [];
 
     for (const { targetId, targetType, damage } of hits) {
       let dealt = 0;
@@ -1388,7 +1594,10 @@ export const useGameState = () => {
           combatantsChanged = true;
         }
         dealt = hpBefore - newHP;
-        if (hpBefore > 0 && newHP === 0) killingBlows++;
+        if (hpBefore > 0 && newHP === 0) {
+          killingBlows++;
+          killedMobIds.push(targetId);
+        }
         logger.log('[GameState] ⚔️ Damage applied to mob', combatant?.name ?? mob.name, ':', damage, '→ HP:', newHP);
       }
       if (attackerId && dealt > 0) addDeltas(attackerId, { damageDealt: dealt });
@@ -1410,6 +1619,7 @@ export const useGameState = () => {
     if (combatantsChanged) {
       await updateItem('combatState', 'current', { combatants } as Record<string, unknown>);
     }
+    if (killedMobIds.length > 0) await lootDefeatedMobs(killedMobIds);
     const crawlerIds = new Set([...crawlerHP.keys(), ...statDeltas.keys()]);
     for (const id of crawlerIds) {
       const crawler = crawlers.find(c => c.id === id);
@@ -1531,10 +1741,12 @@ export const useGameState = () => {
   const overrideMobHealth = async (combatantId: string, newHP: number) => {
     // Update per-combatant HP in combat state (independent per instance)
     if (combatState) {
+      const before = combatState.combatants.find(c => c.id === combatantId);
       const updatedCombatants = combatState.combatants.map(c =>
         c.id === combatantId ? { ...c, currentHP: newHP } : c
       );
       await updateItem('combatState', 'current', { combatants: updatedCombatants } as Record<string, unknown>);
+      if (before?.type === 'mob' && (before.currentHP ?? 1) > 0 && newHP <= 0) await lootDefeatedMobs([combatantId]);
       // Do NOT update the shared mob document — each combatant instance tracks HP independently
     } else {
       // Fallback when not in combat: direct mob document update
@@ -1659,6 +1871,33 @@ export const useGameState = () => {
     logger.log('[GameState] ➕ Added', toAdd.length, 'combatant(s) to active combat');
   };
 
+  // ======== Languages ========
+  // Built-in languages live in code; this collection holds the ones people make up
+  const customLanguages = useMemo(() => getStableCollection<CustomLanguage>('languages'), [getCollection, isLoaded]);
+
+  /** Make up a language. When a crawler makes it, they know it straight away. */
+  const createLanguage = async (name: string, description: string, crawlerId?: string) => {
+    const trimmed = name.trim().slice(0, 40);
+    if (!trimmed) return;
+    const language: CustomLanguage = {
+      id: `lang-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      name: trimmed,
+      ...(description.trim() ? { description: description.trim().slice(0, 300) } : {}),
+      ...(crawlerId ? { createdByCrawlerId: crawlerId } : {}),
+      createdAt: Date.now(),
+    };
+    await addItem('languages', language as unknown as Record<string, unknown>);
+    const crawler = crawlerId ? crawlers.find(c => c.id === crawlerId) : undefined;
+    if (crawler) {
+      const known = crawler.languages ?? [DEFAULT_LANGUAGE_ID];
+      await updateCrawler(crawler.id, { languages: [...known, language.id] });
+    }
+  };
+
+  const deleteLanguage = async (id: string) => {
+    await deleteItem('languages', id);
+  };
+
   // ======== Spells ========
   const spells = useMemo(() => {
     return getStableCollection<Spell>('spells');
@@ -1724,11 +1963,51 @@ export const useGameState = () => {
     const newCastCount = prev.castCount + 1;
     const newMastery = getSpellMasteryLevel(newCastCount);
     knownSpells[idx] = { ...prev, castCount: newCastCount };
-    await updateCrawler(crawlerId, { knownSpells, mana: currentMana - cost });
+    // Spells like Speak with Animals: know the language for the spell's duration (casting again restarts it)
+    const grants = spell?.spellData.grantsLanguage;
+    let languageEffects: LanguageEffect[] | undefined;
+    if (spell && grants) {
+      const d = spell.spellData.duration;
+      const effect: LanguageEffect = {
+        id: `${spellId}-${Date.now()}`,
+        name: prev.spellName,
+        spellId,
+        languageId: grants,
+        ...(d?.noncombatTurns ? { noncombatTurnsLeft: d.noncombatTurns } : {}),
+        ...(d?.combatTurns ? { combatRoundsLeft: d.combatTurns } : {}),
+        ...(spell.spellData.questionLimit ? { questionsLeft: spell.spellData.questionLimit } : {}),
+      };
+      languageEffects = [...(crawler.languageEffects ?? []).filter(e => e.spellId !== spellId), effect];
+    }
+    await updateCrawler(crawlerId, { knownSpells, mana: currentMana - cost, ...(languageEffects ? { languageEffects } : {}) });
     if (newMastery > prevMastery) {
       toast.success(`${crawler.name} leveled up ${prev.spellName} to mastery level ${newMastery}!`);
     }
     return true;
+  };
+
+  // Count down spell languages at a new noncombat turn or combat round and drop the ones that run out.
+  // Spells timed only in combat rounds end when a noncombat turn starts (an hour passes), and Speak with
+  // Dead style spells with no questions left end at the next tick.
+  const tickLanguageEffects = async (kind: 'noncombat' | 'combat') => {
+    const ops: BatchOperation[] = [];
+    for (const c of crawlers) {
+      const effects = c.languageEffects;
+      if (!effects?.length) continue;
+      const next = effects.flatMap((e): LanguageEffect[] => {
+        if (e.questionsLeft !== undefined && e.questionsLeft <= 0) return [];
+        if (kind === 'noncombat') {
+          if (e.noncombatTurnsLeft === undefined) return e.combatRoundsLeft === undefined ? [e] : [];
+          return e.noncombatTurnsLeft > 1 ? [{ ...e, noncombatTurnsLeft: e.noncombatTurnsLeft - 1 }] : [];
+        }
+        if (e.combatRoundsLeft === undefined) return [e];
+        return e.combatRoundsLeft > 1 ? [{ ...e, combatRoundsLeft: e.combatRoundsLeft - 1 }] : [];
+      });
+      if (JSON.stringify(next) !== JSON.stringify(effects)) {
+        ops.push({ type: 'update', collection: 'crawlers', id: c.id, data: { languageEffects: next } });
+      }
+    }
+    if (ops.length > 0) await batchWrite(ops);
   };
 
   // Restore HP to a crawler, capped at their effective max HP (equipment included)
@@ -1865,6 +2144,12 @@ export const useGameState = () => {
     const { id: _id, ...entries } = docData;
     return entries as Record<string, NpcGeneratedPersonality>;
   }, [npcAiDocs]);
+  const npcMemories = useMemo((): Record<string, NpcMemory> => {
+    const docData = npcAiDocs.find(d => d.id === 'memories');
+    if (!docData) return {};
+    const { id: _id, ...entries } = docData;
+    return entries as Record<string, NpcMemory>;
+  }, [npcAiDocs]);
 
   // --- Merchants ---
   // Live stock and gold live in merchants/{mobId}. Every trade reads that doc, the crawler and
@@ -1984,7 +2269,7 @@ export const useGameState = () => {
     }
     const cha = crawler.cha + (getEquippedModifiers(crawler, getCrawlerInventory(crawler.id)).cha ?? 0);
     const modifier = Math.floor((cha - 10) / 2);
-    const rawRoll = Math.floor(Math.random() * 20) + 1;
+    const { rawRoll, results, diceLabel } = rollD20(rollsWithDisadvantage(crawler, cha));
     const total = rawRoll + modifier;
     const dc = config.haggleDC ?? DEFAULT_HAGGLE_DC;
     const entry: MerchantHaggle = { state: total >= dc ? 'pending' : 'failed', crawlerName: crawler.name, total, dc, at: Date.now() };
@@ -2002,9 +2287,9 @@ export const useGameState = () => {
       crawlerName: crawler.name,
       crawlerId: crawler.id,
       timestamp: Date.now(),
-      results: [{ dice: 'D20', result: rawRoll }],
+      results,
       total,
-      statRoll: { stat: `Haggle with ${mob.name} (Persuasion)`, modifier, rawRoll },
+      statRoll: { stat: `Haggle with ${mob.name} (Persuasion)`, modifier, rawRoll, diceLabel },
     });
     return entry;
   };
@@ -2034,6 +2319,21 @@ export const useGameState = () => {
       createdAt: Date.now(),
     };
     await addItem('chatMessages', entry as unknown as Record<string, unknown>);
+    // Speak with Dead style spells: each line in the language uses up a question
+    if (entry.authorType === 'crawler' && !entry.translationOf) {
+      const crawler = crawlers.find(c => c.id === entry.authorId);
+      const effect = questionEffectFor(crawler, entry.language);
+      if (crawler && effect) {
+        await updateCrawler(crawler.id, {
+          languageEffects: (crawler.languageEffects ?? []).map(e => (e.id === effect.id ? { ...e, questionsLeft: (e.questionsLeft ?? 1) - 1 } : e)),
+        });
+      }
+    }
+  };
+
+  // Spoken voices: link the clips the DM's browser made for an NPC line
+  const attachChatAudio = async (messageId: string, audio: Pick<ChatMessage, 'audioUrl' | 'audioScrambledUrl'>) => {
+    await updateItem('chatMessages', messageId, audio as unknown as Record<string, unknown>);
   };
 
   // Deletes chat lines (all of them, or one episode's). Batches are capped well under Firestore's 500.
@@ -2050,7 +2350,7 @@ export const useGameState = () => {
   };
 
   // Singleton docs in npcAi: create on first write, merge afterwards
-  const writeNpcAiDoc = async (docId: 'settings' | 'secrets', data: Record<string, unknown>) => {
+  const writeNpcAiDoc = async (docId: 'settings' | 'secrets' | 'memories', data: Record<string, unknown>) => {
     if (npcAiDocs.some(d => d.id === docId)) {
       await updateItem('npcAi', docId, data);
     } else {
@@ -2060,6 +2360,11 @@ export const useGameState = () => {
 
   const updateNpcAiSettings = async (updates: Partial<Omit<NpcAiSettings, 'id'>>) => {
     await writeNpcAiDoc('settings', updates as Record<string, unknown>);
+  };
+
+  // DM edits to what a speaker remembers (an empty note list with no feelings clears it)
+  const setNpcMemory = async (speakerId: string, memory: NpcMemory) => {
+    await writeNpcAiDoc('memories', { [speakerId]: { ...memory, updatedAt: Date.now() } });
   };
 
   const setNpcSecretState = async (mobId: string, state: NpcSecretState) => {
@@ -2075,6 +2380,9 @@ export const useGameState = () => {
     inventory,
     getCrawlerInventory,
     updateCrawlerInventory,
+    getPartyInventory,
+    updatePartyInventory,
+    takeFromPartyInventory,
     getSharedInventory,
     updateSharedInventory,
     mobs,
@@ -2157,8 +2465,14 @@ export const useGameState = () => {
     npcAiStatus,
     npcSecrets,
     npcPersonalities,
+    npcMemories,
+    setNpcMemory,
     sendChatMessage,
+    attachChatAudio,
     clearChat,
+    customLanguages,
+    createLanguage,
+    deleteLanguage,
     updateNpcAiSettings,
     setNpcSecretState,
     merchants,

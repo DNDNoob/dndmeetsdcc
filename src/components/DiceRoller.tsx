@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DungeonButton } from "./ui/DungeonButton";
-import { Dices, ChevronUp, ChevronDown, Plus, X, Package, ScrollText, Undo2 } from "lucide-react";
+import { Dices, ChevronUp, ChevronDown, Plus, X, Package, ScrollText, Undo2, Coins } from "lucide-react";
 import { getLootBoxTierColor } from "@/lib/gameData";
 import { DiceRollEntry } from "@/hooks/useGameState";
 
@@ -212,6 +212,30 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
                               <span className="text-muted-foreground"> sent to </span>
                             )}
                             <span className="text-primary">{entry.lootBoxNotification.recipientNames.join(', ')}</span>
+                          </div>
+                          <span className="text-[10px] text-muted-foreground/60 ml-auto">{formatTimestamp(entry.timestamp)}</span>
+                        </div>
+                      ) : entry.mobLootNotification ? (
+                        // A defeated mob's loot was handed out
+                        <div className="flex items-start gap-2">
+                          <Coins className="w-4 h-4 flex-shrink-0 text-accent mt-0.5" />
+                          <div className="min-w-0">
+                            <span className="font-display text-accent">Looted {entry.mobLootNotification.mobNames.join(', ')}</span>
+                            {entry.mobLootNotification.shares.map(line => (
+                              <span key={line} className="block text-foreground">{line}</span>
+                            ))}
+                            {(entry.mobLootNotification.destroyed?.length ?? 0) > 0 && (
+                              <span className="block">
+                                <span className="text-muted-foreground">Smashed: </span>
+                                <span className="text-destructive">{entry.mobLootNotification.destroyed!.join(', ')}</span>
+                              </span>
+                            )}
+                            {entry.mobLootNotification.partyItems.length > 0 && (
+                              <span className="block">
+                                <span className="text-muted-foreground">Party inventory: </span>
+                                <span className="text-primary">{entry.mobLootNotification.partyItems.join(', ')}</span>
+                              </span>
+                            )}
                           </div>
                           <span className="text-[10px] text-muted-foreground/60 ml-auto">{formatTimestamp(entry.timestamp)}</span>
                         </div>
