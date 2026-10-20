@@ -243,13 +243,17 @@ Each weapon has the following configurable properties:
 1. **Attack Roll**: Roll d20 (plus any hit die bonus and stat modifiers) to determine if the attack connects
 2. **Damage Roll**: If the attack hits, roll the weapon's damage dice plus stat modifiers
 
+A stat the weapon uses adds that ability's modifier, counting gear bonuses, the same as any other roll. For example, a sword that uses STR adds +2 for a crawler with STR 14.
+
 ## Advantage and Disadvantage
 
 Right-click an equipped weapon to roll with advantage (2d20, take highest) or disadvantage (2d20, take lowest). This affects only the attack roll, not damage.
 
 ## Weapon Upgrades
 
-Right-click a weapon in your inventory to upgrade it. Upgrades let you modify the weapon's stats, dice, and name. Upgraded weapons are marked with a special label and are not affected by changes to the original item in the DM's library.
+Right-click a weapon in your inventory (or expand it and tap **Upgrade**) to upgrade it. The upgrade window edits everything about the weapon: its name, description, stat bonuses while equipped, dice, damage and weapon type, range, splash and special effects. Only that crawler's copy changes.
+
+When you save a change, the weapon gets **Upgraded** after its name in gold. Saving without changing anything leaves the weapon as it was. Upgraded weapons don't stack with plain copies and are not affected by changes to the original item in the DM's library.
 
 ## Unarmed Strike
 
