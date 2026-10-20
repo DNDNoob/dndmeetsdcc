@@ -27,7 +27,7 @@ import { useMyContent } from "@/hooks/useMyContent";
 import { useNpcBrain } from "@/hooks/useNpcBrain";
 import { useNpcSpeechMaker } from "@/hooks/useNpcSpeechMaker";
 import { toast } from "sonner";
-import { getNoChildLeftBehindBump } from "@/lib/gameData";
+import { getNoChildLeftBehindBump, rollD20, rollsWithDisadvantage } from "@/lib/gameData";
 import type { Episode, Campaign, CrawlerPlacement, EpisodeMobPlacement, Mob, PublicMap, PublicMob, PublicEpisode, InventoryItem, Spell } from "@/lib/gameData";
 import { publicDocId, buildEpisodeBundle } from "@/lib/publicContent";
 import { LanguagesProvider } from "@/contexts/LanguagesContext";
@@ -714,16 +714,16 @@ const Index = () => {
 
   const handleStatRoll = (crawlerName: string, crawlerId: string, stat: string, totalStat: number) => {
     const modifier = Math.floor((totalStat - 10) / 2);
-    const rawRoll = Math.floor(Math.random() * 20) + 1;
+    const { rawRoll, results, diceLabel } = rollD20(rollsWithDisadvantage(crawlers.find(c => c.id === crawlerId), totalStat));
     const total = rawRoll + modifier;
     const entry: DiceRollEntry = {
       id: crypto.randomUUID(),
       crawlerName,
       crawlerId,
       timestamp: Date.now(),
-      results: [{ dice: 'D20', result: rawRoll }],
+      results,
       total,
-      statRoll: { stat, modifier, rawRoll },
+      statRoll: { stat, modifier, rawRoll, diceLabel },
     };
     addDiceRoll(entry);
   };

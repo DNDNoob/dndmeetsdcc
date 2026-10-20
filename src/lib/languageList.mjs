@@ -28,6 +28,7 @@ export const BUILT_IN_LANGUAGES = [
   { id: 'mewmew', name: 'Mewmew', description: 'Spoken by the Felinus races.' },
   { id: 'base64', name: 'Base64', description: 'A numerical language, often used by machines and sentient robots.' },
   { id: 'kra-kow', name: 'Kra Kow', description: 'Usually spoken by goblins, orcs and trolls.' },
+  { id: 'spanish', name: 'Spanish', description: 'Spanish, carried down into the dungeon from the world above.' },
   { id: 'beast', name: 'Beast', description: 'Animal sounds and body language. Crawlers need Speak with Animals (or a similar gift) to understand the words; everyone else sees what the creature does.' },
   { id: 'plant', name: 'Plant', description: 'Rustling, creaking and slow movement. Crawlers need Speak with Plants (or a similar gift) to understand the words; everyone else sees what the plant does.' },
   { id: 'dead', name: 'Dead', description: 'The voice of a corpse. A corpse only answers crawlers who speak to it in Dead, usually through Speak with Dead.' },

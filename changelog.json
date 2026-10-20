@@ -2,6 +2,11 @@
   {
     "date": "2026-10-20",
     "changes": [
+      "🧑 New character creator: tap New on the Profiles page to make a crawler step by step, with a name, a backstory, ability points and languages",
+      "📜 Backstories have five parts: profession, an accomplishment, a hobby, where you were when the world ended, and the most important person, thing or animal to you. Pick a suggestion or write your own, and edit it later on your profile",
+      "🎲 New crawlers spend 10 ability points (up to 5 in one ability). Each point is +1 to rolls, and abilities left at 0 roll with disadvantage",
+      "🧍 New crawlers start as a classless Human at Level 1 with 25 HP, 10 mana and no gold",
+      "🗣️ New crawlers speak Worldspeech plus two languages of their choice, and Spanish is now a language",
       "🌿 New Plant language for talking plants: crawlers who know it read their words, everyone else sees what the plant does",
       "💀 New Dead language for corpses: a corpse stays silent until someone talks to it in Dead, then answers briefly and cryptically from what it knew in life",
       "🪦 A mob at 0 HP is now dead in Game Chat: it stops talking, and only Speak with Dead gets answers out of it",

@@ -43,7 +43,47 @@ export interface Crawler {
   translateMode?: TranslateMode; // Translating chat lines for party members who don't know the language
   languageEffects?: LanguageEffect[]; // Spells like Speak with Animals: languages known for a while
   itemLanguages?: string[]; // Worked out from equipped items when crawlers load; not something to save
+  backstory?: CrawlerBackstory; // Answers from the character creator; editable on the profile
+  usesAbilityPoints?: boolean;  // Made with the character creator: abilities at 0 points (score 10 or less) roll with disadvantage
 }
+
+// ======== Character creation ========
+
+export interface CrawlerBackstory {
+  profession?: string;
+  accomplishment?: string;
+  hobby?: string;
+  whenWorldEnded?: string; // Where they were when the world ended
+  mostImportant?: string;  // The most important person, thing or animal in the world to them
+}
+
+export type AbilityKey = 'str' | 'dex' | 'con' | 'int' | 'cha';
+export const ABILITY_KEYS: AbilityKey[] = ['str', 'dex', 'con', 'int', 'cha'];
+export const ABILITY_POINTS_TOTAL = 2 * ABILITY_KEYS.length; // 2 points per ability
+export const ABILITY_POINTS_MAX = 5;                          // No ability can start above 5 points
+
+// Each ability point adds +1 to rolls: the score is 10 + 2 per point, so the usual (score - 10) / 2 modifier equals the points
+export const abilityScoreFromPoints = (points: number): number => 10 + 2 * points;
+
+export const NEW_CRAWLER_HP = 25;
+export const NEW_CRAWLER_MANA = 10;
+
+// Abilities with 0 points roll with disadvantage (only for crawlers made with the character creator)
+export const rollsWithDisadvantage = (crawler: Pick<Crawler, 'usesAbilityPoints'> | null | undefined, effectiveScore: number): boolean =>
+  !!crawler?.usesAbilityPoints && effectiveScore <= 10;
+
+// A d20 roll, or two taking the lower one with disadvantage. results and diceLabel are what the dice history shows.
+export const rollD20 = (disadvantage = false): { rawRoll: number; results: { dice: string; result: number }[]; diceLabel?: string } => {
+  const first = Math.floor(Math.random() * 20) + 1;
+  if (!disadvantage) return { rawRoll: first, results: [{ dice: 'D20', result: first }] };
+  const second = Math.floor(Math.random() * 20) + 1;
+  const low = Math.min(first, second);
+  return {
+    rawRoll: low,
+    results: [{ dice: 'D20 (Dis)', result: low }, { dice: 'D20 (other)', result: Math.max(first, second) }],
+    diceLabel: '2d20 low',
+  };
+};
 
 // ======== Languages ========
 
@@ -1163,25 +1203,6 @@ export const defaultCrawlers: Crawler[] = [
     gold: 52,
   },
 ];
-
-export const createEmptyCrawler = (): Crawler => ({
-  id: Date.now().toString(),
-  name: "New Crawler",
-  race: "Human",
-  job: "Adventurer",
-  level: 1,
-  hp: 50,
-  maxHP: 50,
-  mana: 25,
-  maxMana: 25,
-  str: 10,
-  dex: 10,
-  con: 10,
-  int: 10,
-  cha: 10,
-  achievements: "",
-  gold: 0,
-});
 
 export const defaultInventory: { crawlerId: string; items: InventoryItem[] }[] = [
   {

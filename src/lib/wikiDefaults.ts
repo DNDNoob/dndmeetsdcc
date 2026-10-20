@@ -73,7 +73,26 @@ Use the **Campaigns** button to return to the campaign list at any time.`,
     order: 1,
     content: `# Crawlers (Player Characters)
 
-Crawlers are the player characters in the game. Each crawler has a name, race, job, level, and a set of core stats.
+Crawlers are the player characters in the game. Each crawler has a name, race, job (class), level, and a set of core stats.
+
+## Creating a Crawler
+
+Tap **New** next to the crawler picker on the Profiles page. The character creator walks you through it one step at a time:
+
+1. **Name**
+2. **Backstory**, five questions. Pick one of the suggestions or write your own answer:
+   - **Profession**: what you did for a living (bug exterminator, used car salesman)
+   - **Accomplishment**: something small and real. "3rd place at state in the 400m" is fine, "Olympic gold" is not
+   - **Hobby**: what you did for fun
+   - **Where you were when the world ended**
+   - **The most important person, thing or animal in the world to you**
+3. **Ability points**: spend 10 points (2 per ability) however you like, up to 5 in one ability. Each point adds +1 to that ability's rolls. An ability left at **0 points rolls with disadvantage** (two d20s, take the lower), and shows **DIS** next to it on your profile.
+4. **Languages**: everyone speaks Worldspeech, plus 2 more you pick. Mindspeech, Beast, Plant and Dead can't be picked at the start; they need a gift or a spell.
+5. **Review**, then **Create crawler**.
+
+Every new crawler starts as a **Human** with **no class**, at Level 1 with **25 HP**, **10 mana** and **0 gold**. Race and class change later, when the DM decides. Starting items are set up by the DM.
+
+Your answers appear in the **Backstory** section of your profile. Tap **Edit** to change them at any time; the DM may ask you to tone down an answer.
 
 > **New campaigns:** until you create or save a crawler, a brand-new campaign shows the sample crawlers (Carl and Princess Donut). Editing and saving a sample crawler saves it to your campaign as a real crawler.
 
@@ -89,7 +108,7 @@ Every crawler has these core attributes:
 | Intelligence | INT | Knowledge, magic power |
 | Charisma | CHA | Social skills, some special abilities |
 
-Stats start at a base value and can be modified by equipped items. The modifier for any stat is calculated as: **(stat - 10) / 2**, rounded down. For example, a STR of 14 gives a +2 modifier.
+Stats start at a base value and can be modified by equipped items. For crawlers made with the character creator, each ability point is worth 2 stat points (0 points = 10, 5 points = 20), so the modifier equals the points. The modifier for any stat is calculated as: **(stat - 10) / 2**, rounded down. For example, a STR of 14 gives a +2 modifier.
 
 ## Health and Mana
 
@@ -1146,6 +1165,7 @@ Crawlers and mobs know languages. If someone talks in a language you don't know,
 | **Mewmew** | The Felinus races |
 | **Base64** | Machines and sentient robots |
 | **Kra Kow** | Usually goblins, orcs and trolls |
+| **Spanish** | Spanish, carried down into the dungeon from the world above |
 | **Beast** | Animal sounds and body language. Give it to a crawler with Speak with Animals or a similar gift |
 | **Plant** | Rustling, creaking and slow movement. Speak with Plants grants it |
 | **Dead** | The voice of a corpse. Speak with Dead grants it |

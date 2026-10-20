@@ -62,6 +62,8 @@ import {
   merchantItemKey,
   DEFAULT_HAGGLE_DC,
   getHaggleBlocker,
+  rollD20,
+  rollsWithDisadvantage,
 } from "@/lib/gameData";
 import { useGame } from "@/contexts/GameContext";
 import { DEFAULT_LANGUAGE_ID, questionEffectFor } from "@/lib/languages";
@@ -1189,24 +1191,27 @@ export const useGameState = () => {
     const rolls: DiceRollEntry[] = [];
     const updatedCombatants = combatState.combatants.map(c => {
       if (c.hasRolledInitiative) return c;
-      const rawRoll = Math.floor(Math.random() * 20) + 1;
       let modifier = 0;
+      let disadvantage = false;
       if (c.type === 'crawler') {
         const crawler = crawlers.find(cr => cr.id === c.id);
         if (crawler) {
           const mods = getEquippedModifiers(crawler, getCrawlerInventory(crawler.id));
-          modifier = Math.floor(((crawler.dex + (mods.dex ?? 0)) - 10) / 2);
+          const dex = crawler.dex + (mods.dex ?? 0);
+          modifier = Math.floor((dex - 10) / 2);
+          disadvantage = rollsWithDisadvantage(crawler, dex);
         }
       }
+      const { rawRoll, results, diceLabel } = rollD20(disadvantage);
       const total = rawRoll + modifier;
       rolls.push({
         id: crypto.randomUUID(),
         crawlerName: c.name,
         crawlerId: c.id,
         timestamp: Date.now(),
-        results: [{ dice: 'D20', result: rawRoll }],
+        results,
         total,
-        statRoll: { stat: 'Initiative', modifier, rawRoll },
+        statRoll: { stat: 'Initiative', modifier, rawRoll, diceLabel },
       });
       return { ...c, initiative: total, hasRolledInitiative: true };
     });
@@ -2261,7 +2266,7 @@ export const useGameState = () => {
     }
     const cha = crawler.cha + (getEquippedModifiers(crawler, getCrawlerInventory(crawler.id)).cha ?? 0);
     const modifier = Math.floor((cha - 10) / 2);
-    const rawRoll = Math.floor(Math.random() * 20) + 1;
+    const { rawRoll, results, diceLabel } = rollD20(rollsWithDisadvantage(crawler, cha));
     const total = rawRoll + modifier;
     const dc = config.haggleDC ?? DEFAULT_HAGGLE_DC;
     const entry: MerchantHaggle = { state: total >= dc ? 'pending' : 'failed', crawlerName: crawler.name, total, dc, at: Date.now() };
@@ -2279,9 +2284,9 @@ export const useGameState = () => {
       crawlerName: crawler.name,
       crawlerId: crawler.id,
       timestamp: Date.now(),
-      results: [{ dice: 'D20', result: rawRoll }],
+      results,
       total,
-      statRoll: { stat: `Haggle with ${mob.name} (Persuasion)`, modifier, rawRoll },
+      statRoll: { stat: `Haggle with ${mob.name} (Persuasion)`, modifier, rawRoll, diceLabel },
     });
     return entry;
   };
