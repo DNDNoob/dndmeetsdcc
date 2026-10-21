@@ -36,7 +36,9 @@ export function useIconLibrary(user: User | null, canGenerate: boolean) {
   const generateEntry = useCallback(async (subject: IconSubject, size?: number): Promise<IconLibraryEntry | null> => {
     if (!canGenerate || !user || !db) return null;
     const prompt = buildIconPrompt(subject);
-    const image = await generateIconImage(prompt, await user.getIdToken(), size);
+    // Item and spell icons lose their background so they sit on the page like the line icons;
+    // mob portraits keep theirs
+    const image = await generateIconImage(prompt, await user.getIdToken(), size, subject.kind !== 'mob');
     if (!image) return null;
     const entry: IconLibraryEntry = {
       id: crypto.randomUUID(),
