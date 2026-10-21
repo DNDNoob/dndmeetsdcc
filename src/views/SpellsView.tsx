@@ -8,6 +8,7 @@ import { Plus, Trash2, ChevronDown, ChevronUp, BookOpen, Zap, Star, Wand2, X, Ch
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { LanguageSelect } from "@/components/LanguagePicker";
+import { UpgradeXpEditor } from "@/components/UpgradeXpEditor";
 import {
   Crawler,
   getInitialCrawlerId,
@@ -994,6 +995,12 @@ function SpellEditorModal({
             </div>
             <SpellDataEditor spellData={draft.spellData} onChange={updateSpellData} />
           </div>
+
+          <UpgradeXpEditor
+            kind="spell"
+            value={draft.upgradeXp}
+            onChange={(upgradeXp) => setDraft(prev => ({ ...prev, upgradeXp }))}
+          />
 
           <div className="flex gap-2 pt-2">
             <DungeonButton

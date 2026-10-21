@@ -301,9 +301,53 @@ Right-click a weapon in your inventory (or expand it and tap **Upgrade**) to upg
 
 When you save a change, the weapon gets **Upgraded** after its name in gold. Saving without changing anything leaves the weapon as it was. Upgraded weapons don't stack with plain copies and are not affected by changes to the original item in the DM's library.
 
+Weapons also earn **upgrade XP** as you fight with them, shown as a gold bar on the item. See [Item & Spell Upgrade XP](/wiki/upgrade-xp).
+
 ## Unarmed Strike
 
 Every crawler can perform an unarmed strike (STR check, d4 damage) without needing a weapon equipped.`,
+  },
+  {
+    id: 'upgrade-xp',
+    slug: 'upgrade-xp',
+    title: 'Item & Spell Upgrade XP',
+    category: 'Game Mechanics',
+    order: 11.5,
+    content: `# Item & Spell Upgrade XP
+
+Weapons, armor, other gear and spells earn **upgrade XP** from the way you use them. Each crawler's copy earns its own XP.
+
+## Progress bars
+
+A gold bar under each item and spell on your profile shows its **Tier** and how much XP it needs for the next one. Tap the bar to see where the XP came from. Equipped items also show a thin gold bar along the bottom of their equipment slot.
+
+## How each kind earns XP
+
+These are the recommended amounts. The DM can change them for any item or spell.
+
+| Kind | Earns XP from |
+|------|---------------|
+| Weapons | 1 per point of damage, 10 per kill, 25 per boss kill |
+| Spells | 5 per cast, 1 per point of damage or healing, 5 per effect left on a target, 10 per kill, 25 per boss kill |
+| Armor (head, chest, legs, feet) | 1 per point of damage absorbed, 5 per attack deflected |
+| Other gear (rings, hand slots) | 5 per roll that uses a stat the item raises |
+
+Only hostile kills count. Damage to friendly crawlers or neutral mobs earns nothing. Armor can't earn XP yet: absorbed and deflected damage start counting once armor blocks damage in combat.
+
+## Tiers
+
+By default an item or spell reaches Tier 1 at 50 XP, then Tier 2 at 150, Tier 3 at 300, Tier 4 at 500 and Tier 5 at 750. Reaching a tier doesn't change the item yet: picking upgrades at each tier is coming next.
+
+## Setting XP for an item or spell (DM)
+
+When creating or editing an item in the Item Library, or a spell in Vernon's Library, open **Upgrade XP**:
+
+- **Can upgrade**: untick it for items that should never upgrade.
+- **Milestones**: the total XP needed for each tier, separated by commas.
+- **XP earned**: how much XP each action is worth.
+- **Reset to recommended values** puts everything back to the defaults above.
+
+Items without an equipment slot (potions, keys, junk) don't earn upgrade XP.`,
   },
   {
     id: 'inventory',

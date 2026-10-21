@@ -10,6 +10,7 @@ interface EquipmentSlotProps {
   onDrop: (slot: SlotType, itemId: string) => void;
   onUnequip: (slot: SlotType) => void;
   disabled?: boolean;
+  upgradePercent?: number; // the equipped item's progress toward its next upgrade tier, 0-100
 }
 
 export const EquipmentSlot: React.FC<EquipmentSlotProps> = ({
@@ -19,6 +20,7 @@ export const EquipmentSlot: React.FC<EquipmentSlotProps> = ({
   onDrop,
   onUnequip,
   disabled = false,
+  upgradePercent,
 }) => {
   const [isDragOver, setIsDragOver] = React.useState(false);
 
@@ -79,6 +81,11 @@ export const EquipmentSlot: React.FC<EquipmentSlotProps> = ({
           <div className="text-center px-1 w-full" title={equippedItem.name}>
             <p className="text-xs font-bold text-primary line-clamp-2 break-words"><ItemName item={equippedItem} /></p>
           </div>
+          {upgradePercent !== undefined && (
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-muted" title="Upgrade XP">
+              <div className="h-full bg-accent" style={{ width: `${Math.max(0, Math.min(100, upgradePercent))}%` }} />
+            </div>
+          )}
           {!disabled && (
             <button
               onClick={() => onUnequip(slot)}
