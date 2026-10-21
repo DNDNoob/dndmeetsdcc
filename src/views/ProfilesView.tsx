@@ -12,11 +12,11 @@ import { BACKSTORY_QUESTIONS } from "@/lib/characterCreation";
 import { RarityBadge } from "@/components/ui/RarityBadge";
 import { ConditionBadges } from "@/components/ConditionBadges";
 import { ExperienceCard } from "@/components/ExperienceCard";
-import { SkillsPanel } from "@/components/SkillsPanel";
+import { SkillsPanel, CheckDifficultyPicker } from "@/components/SkillsPanel";
 import { usableLanguageIds } from "@/lib/languages";
 import { HealthBar } from "@/components/ui/HealthBar";
 import { EquipmentSlot } from "@/components/ui/EquipmentSlot";
-import { Crawler, getQuestProgress, Mob, InventoryItem, getItemStackKey, stackItems, getLootingLevel, getLootsUntilNextLevel, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery, getInitialCrawlerId, rollD20, rollsWithDisadvantage, ABILITY_KEYS, baseItemName, type SpellEffect, describeSpellEffect, getSkillRank, getCrawlerXP, type SkillId, type AbilityKey, getCrawlerStatValue, getHighlightStats, type StatSource, type CrawlerStats, type CrawlerStatsById } from "@/lib/gameData";
+import { Crawler, getQuestProgress, Mob, InventoryItem, getItemStackKey, stackItems, getLootingLevel, getLootsUntilNextLevel, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery, getInitialCrawlerId, rollD20, rollsWithDisadvantage, ABILITY_KEYS, baseItemName, type SpellEffect, describeSpellEffect, getSkillRank, getSkillXPToSpend, getCheckDC, SKILLS, type SkillDef, type CheckDifficultyId, getCrawlerXP, type SkillId, type AbilityKey, getCrawlerStatValue, getHighlightStats, type StatSource, type CrawlerStats, type CrawlerStatsById } from "@/lib/gameData";
 import { ItemName } from "@/components/ItemName";
 import type { DiceRollEntry } from "@/hooks/useGameState";
 import UndoTurnButton, { canUndoCombatTurn } from "@/components/UndoTurnButton";
@@ -82,29 +82,9 @@ const stableJson = (value: unknown): string => {
 
 type ProfileTab = 'profile' | 'inventory' | 'actions' | 'skills' | 'spells' | 'reactions' | 'attacks' | 'bonus' | 'quests' | 'stats';
 
-// Noncombat actions mapped to their associated ability score
-const NONCOMBAT_ACTIONS: { label: string; stat: 'str' | 'dex' | 'con' | 'int' | 'cha' }[] = [
-  { label: 'Acrobatics', stat: 'dex' },
-  { label: 'Animal Handling', stat: 'cha' },
-  { label: 'Athletics', stat: 'str' },
-  { label: 'Deception', stat: 'cha' },
-  { label: 'Intimidation', stat: 'cha' },
-  { label: 'Medicine', stat: 'int' },
-  { label: 'Performance', stat: 'cha' },
-  { label: 'Persuasion', stat: 'cha' },
-  { label: 'Sleight of Hand', stat: 'dex' },
-  { label: 'Stealth', stat: 'dex' },
-  { label: 'Survival', stat: 'con' },
-  { label: 'Arcana', stat: 'int' },
-];
-
-const INTELLIGENCE_ACTIONS: { label: string; stat: 'int' }[] = [
-  { label: 'Religion', stat: 'int' },
-  { label: 'Nature', stat: 'int' },
-  { label: 'Investigation', stat: 'int' },
-  { label: 'History', stat: 'int' },
-  { label: 'Memory', stat: 'int' },
-];
+// Actions tab buttons: the roll skills, then the INT knowledge skills (Barter is used by trading)
+const ROLL_SKILLS = SKILLS.filter(sk => sk.kind === 'roll');
+const KNOWLEDGE_SKILLS = SKILLS.filter(sk => sk.kind === 'knowledge');
 
 const INITIATIVE_ACTION = { label: 'Initiative', stat: 'dex' as const };
 
@@ -142,7 +122,7 @@ interface ProfilesViewProps {
   onSetXPScale?: (scale: number) => Promise<void>;
   dungeonFloor?: number;
   onSetDungeonFloor?: (floor: number) => Promise<void>;
-  onSpendSkillPoint?: (crawlerId: string, skillId: SkillId) => Promise<boolean>;
+  onSpendSkillXP?: (crawlerId: string, skillId: SkillId, amount: number) => Promise<boolean>;
   onSpendAbilityPoint?: (crawlerId: string, ability: AbilityKey) => Promise<boolean>;
   onRevokeTrophy?: (crawlerId: string, trophyId: string) => Promise<void>;
   addDiceRoll?: (entry: DiceRollEntry) => Promise<void>;
@@ -549,7 +529,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   onSetXPScale,
   dungeonFloor = 1,
   onSetDungeonFloor,
-  onSpendSkillPoint,
+  onSpendSkillXP,
   onSpendAbilityPoint,
   addDiceRoll,
   mobs: mobsProp,
@@ -563,6 +543,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
 }) => {
   // Players land on their own crawler; the DM (and spectators) start on the first one
   const [selectedId, setSelectedId] = useState(() => getInitialCrawlerId(crawlers, currentPlayerId));
+  // Check difficulty for skill rolls, shared by the Actions and Skills tabs
+  const [checkDifficulty, setCheckDifficulty] = useState<CheckDifficultyId>('medium');
   const [editMode, setEditMode] = useState(false);
   const [showCreator, setShowCreator] = useState(false);
   const [editData, setEditData] = useState<Partial<Crawler>>({});
@@ -1106,8 +1088,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             >
               <Sparkles className="w-5 h-5" />
               <span className="hidden xl:inline text-sm font-medium">Skills</span>
-              {((selected?.skillPoints ?? 0) + (selected?.abilityPoints ?? 0)) > 0 && (
-                <span className="bg-accent/20 text-accent text-xs px-1.5 py-0.5 rounded-full">{(selected?.skillPoints ?? 0) + (selected?.abilityPoints ?? 0)}</span>
+              {(getSkillXPToSpend(selected) > 0 || (selected?.abilityPoints ?? 0) > 0) && (
+                <span className="bg-accent/20 text-accent text-xs px-1.5 py-0.5 rounded-full" title="Skill XP or ability points to spend">!</span>
               )}
             </button>
             <button
@@ -2136,9 +2118,10 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 ? (isMyTurn && !hasUsedAction)
                 : canRoll;
 
-              const handleActionRoll = (actionLabel: string, stat: string, total: number) => {
+              const checkDC = getCheckDC(checkDifficulty, dungeonFloor);
+              const handleActionRoll = (skill: SkillDef, total: number, rank: number) => {
                 if (!canUseActions) return;
-                onStatRoll?.(selected.name, selected.id, actionLabel, total);
+                onStatRoll?.(selected.name, selected.id, `${skill.name} check${rank ? ` (rank ${rank})` : ''}`, total, rank, checkDC);
                 if (!isTestMode && !isCombatActive) {
                   recordNoncombatRoll?.(selected.id);
                 }
@@ -2237,71 +2220,40 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                   </div>
                 ))}
 
-                {/* General Actions */}
-                <div>
-                  <h3 className="font-display text-base text-accent mb-3">Actions</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                    {NONCOMBAT_ACTIONS.map(action => {
-                      const baseStat = (selected as Record<string, unknown>)[action.stat] as number;
-                      const mod = equippedMods[action.stat as keyof StatModifiers] ?? 0;
-                      const total = baseStat + mod;
-                      const disabled = !canUseActions;
-                      return (
-                        <button
-                          key={action.label}
-                          onClick={() => handleActionRoll(action.label, action.stat, total)}
-                          disabled={disabled}
-                          className={`flex flex-col items-center gap-1 p-3 border rounded-lg transition-colors text-left group ${
-                            !disabled
-                              ? 'bg-muted/50 border-border hover:bg-primary/20 hover:border-primary'
-                              : 'bg-muted/20 border-border/50 opacity-50 cursor-not-allowed'
-                          }`}
-                          title={!disabled ? `Roll d20 + ${action.stat.toUpperCase()} (${total})` : isCombatActive ? 'Not your turn' : 'No rolls remaining'}
-                        >
-                          <span className={`text-sm font-semibold transition-colors ${!disabled ? 'text-foreground group-hover:text-primary' : 'text-muted-foreground'}`}>{action.label}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {action.stat.toUpperCase()} {mod !== 0 ? (
-                              <span>
-                                <span>{baseStat}</span>
-                                <span className={mod > 0 ? 'text-green-400' : 'text-red-400'}>{mod > 0 ? `+${mod}` : mod}</span>
-                                <span className="text-orange-400"> = {total}</span>
-                              </span>
-                            ) : (
-                              <span className="font-bold">{total}</span>
-                            )}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                <CheckDifficultyPicker difficulty={checkDifficulty} onChange={setCheckDifficulty} dungeonFloor={dungeonFloor} />
 
-                {/* Intelligence Based Actions */}
-                <div>
-                  <h3 className="font-display text-base text-accent mb-3 flex items-center gap-2">
-                    <Brain className="w-4 h-4" /> Intelligence Based
+                {([
+                  { title: 'Actions', note: 'Pass a check to earn skill XP.', skills: ROLL_SKILLS, cols: 'lg:grid-cols-4' },
+                  { title: 'Intelligence Based', note: 'Knowledge grows from skill XP you spend.', skills: KNOWLEDGE_SKILLS, cols: 'lg:grid-cols-3' },
+                ]).map(group => (
+                <div key={group.title}>
+                  <h3 className="font-display text-base text-accent mb-3 flex flex-wrap items-baseline gap-2">
+                    {group.skills === KNOWLEDGE_SKILLS && <Brain className="w-4 h-4 self-center" />} {group.title}
+                    <span className="text-xs text-muted-foreground font-sans">{group.note}</span>
                   </h3>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
-                    {INTELLIGENCE_ACTIONS.map(action => {
-                      const baseStat = selected.int;
-                      const mod = equippedMods.int ?? 0;
+                  <div className={`grid grid-cols-2 md:grid-cols-3 ${group.cols} gap-2`}>
+                    {group.skills.map(skill => {
+                      const baseStat = selected[skill.ability];
+                      const mod = equippedMods[skill.ability] ?? 0;
                       const total = baseStat + mod;
+                      const rank = getSkillRank(selected, skill.id);
+                      const bonus = Math.floor((total - 10) / 2) + rank;
                       const disabled = !canUseActions;
                       return (
                         <button
-                          key={action.label}
-                          onClick={() => handleActionRoll(action.label, action.stat, total)}
+                          key={skill.id}
+                          onClick={() => handleActionRoll(skill, total, rank)}
                           disabled={disabled}
                           className={`flex flex-col items-center gap-1 p-3 border rounded-lg transition-colors text-left group ${
                             !disabled
                               ? 'bg-muted/50 border-border hover:bg-primary/20 hover:border-primary'
                               : 'bg-muted/20 border-border/50 opacity-50 cursor-not-allowed'
                           }`}
-                          title={!disabled ? `Roll d20 + INT (${total})` : isCombatActive ? 'Not your turn' : 'No rolls remaining'}
+                          title={!disabled ? `Roll d20 ${bonus >= 0 ? '+' : ''}${bonus} vs DC ${checkDC}` : isCombatActive ? 'Not your turn' : 'No rolls remaining'}
                         >
-                          <span className={`text-sm font-semibold transition-colors ${!disabled ? 'text-foreground group-hover:text-primary' : 'text-muted-foreground'}`}>{action.label}</span>
+                          <span className={`text-sm font-semibold transition-colors ${!disabled ? 'text-foreground group-hover:text-primary' : 'text-muted-foreground'}`}>{skill.name}</span>
                           <span className="text-xs text-muted-foreground">
-                            INT {mod !== 0 ? (
+                            {skill.ability.toUpperCase()} {mod !== 0 ? (
                               <span>
                                 <span>{baseStat}</span>
                                 <span className={mod > 0 ? 'text-green-400' : 'text-red-400'}>{mod > 0 ? `+${mod}` : mod}</span>
@@ -2310,12 +2262,15 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                             ) : (
                               <span className="font-bold">{total}</span>
                             )}
+                            {rank > 0 && <span className="text-accent"> · Rank {rank}</span>}
                           </span>
+                          <span className="text-xs font-display text-primary">{bonus >= 0 ? '+' : ''}{bonus} vs DC {checkDC}</span>
                         </button>
                       );
                     })}
                   </div>
                 </div>
+                ))}
 
                 {/* Initiative - always visible but context-aware */}
                 {!isInitiativePhase && (
@@ -2384,7 +2339,9 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                   canSpend={isAdmin || currentPlayerId === selected.id}
                   canRoll={canRoll}
                   rollBlockedReason={isCombatActive ? 'Not your turn, or your action is used' : 'No rolls remaining'}
-                  onSpendSkillPoint={onSpendSkillPoint}
+                  onSpendSkillXP={onSpendSkillXP}
+                  difficulty={checkDifficulty}
+                  onDifficultyChange={setCheckDifficulty}
                   onSpendAbilityPoint={onSpendAbilityPoint}
                   dungeonFloor={dungeonFloor}
                   onRollSkill={(skill, abilityTotal, rank, dc) => {

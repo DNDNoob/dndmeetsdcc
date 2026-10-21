@@ -4,6 +4,7 @@ import { DungeonButton } from "@/components/ui/DungeonButton";
 import {
   getCrawlerXP,
   getXPForLevel,
+  getSkillXPToSpend,
   XP_SCALE_OPTIONS,
   type Crawler,
 } from "@/lib/gameData";
@@ -35,7 +36,12 @@ export const ExperienceCard: React.FC<ExperienceCardProps> = ({
   const next = getXPForLevel(level + 1);
   // A level set by hand above the XP shows an empty bar until the XP catches up
   const pct = Math.max(0, Math.min(100, ((xp - start) / (next - start)) * 100));
-  const unspent = (crawler.skillPoints ?? 0) + (crawler.abilityPoints ?? 0);
+  const skillXPToSpend = getSkillXPToSpend(crawler);
+  const abilityPoints = crawler.abilityPoints ?? 0;
+  const unspent = [
+    skillXPToSpend > 0 ? `${skillXPToSpend} skill XP` : "",
+    abilityPoints > 0 ? `${abilityPoints} ability point${abilityPoints === 1 ? "" : "s"}` : "",
+  ].filter(Boolean).join(" + ");
   const log = crawler.xpLog ?? [];
   const realCrawlers = crawlers.filter(c => c.id !== "dungeonai");
 
@@ -61,12 +67,12 @@ export const ExperienceCard: React.FC<ExperienceCardProps> = ({
         <h3 className="font-display text-accent text-xl flex items-center gap-2 text-glow-gold">
           <Star className="w-6 h-6 shrink-0" /> LEVEL {level}
         </h3>
-        {unspent > 0 && (
+        {unspent && (
           <button
             onClick={onSpendPoints}
             className="text-xs font-display bg-accent/20 text-accent border border-accent/50 rounded-full px-3 py-1 hover:bg-accent/30"
           >
-            {unspent} point{unspent === 1 ? "" : "s"} to spend
+            {unspent} to spend
           </button>
         )}
       </div>
