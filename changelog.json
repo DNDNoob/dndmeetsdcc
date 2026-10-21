@@ -2,6 +2,18 @@
   {
     "date": "2026-10-21",
     "changes": [
+      "🎲 Skill checks roll against Easy, Medium or Hard DCs that rise 2 per dungeon floor, which the DM sets. A natural 1 always fails and a natural 20 always succeeds, haggling included",
+      "⭐ Crawlers now earn XP: damage and killing blows on hostile mobs, finishing a fight, surviving it, coming back from near death, finishing quests, and spell mastery or Looting level-ups. Each grant shows in the dice history",
+      "📈 Levels come from XP with no cap. Each level gives 5% more max HP and max mana (rounded up), a skill point and an ability point, and an XP bar on the profile shows how far you are from the next one",
+      "🎯 New Skills tab with six skills: Barter, Athletics, Stealth, Perception, Medicine and Intimidation. Spend skill points on ranks and roll skill checks, which use an action like other rolls",
+      "🪙 Barter ranks up as you trade with merchants. Every 2 ranks take 1 off a merchant's Scrooge Factor for you, and each rank adds +1 to haggle rolls",
+      "🎁 DMs can award XP to one or more crawlers from the profile, scale all automatic XP from 50% to 200%, and set how much XP each quest gives",
+      "💎 Items can have a rarity (Common, Uncommon, Rare, Epic or Legendary), shown as a colored tag on the item, and the Item Library can be filtered by rarity",
+      "📝 Every item now has an Effects field for what it does, shown when you expand the item",
+      "🏆 Loot boxes can carry an achievement: when the DM unlocks the box, it's added to the crawler's trophies",
+      "🔥 Spells can leave effects on their targets in combat, like Burning, Stunned or Blessed, lasting a set number of the target's turns",
+      "🩸 Spell effects can deal damage or heal at the start of each of the target's turns, rolled automatically and posted to the dice history",
+      "🎯 Effect-only spells open a target picker when cast in combat, and effects show as badges under each portrait in the combat order bar. The DM can remove one early with its ✕",
       "🎨 Pixel-art icons and mob portraits are now switched on: the free image generator is live, so new items, spells and mobs get their own pictures"
     ]
   },
@@ -21,7 +33,7 @@
       "🧑 New character creator: tap New on the Profiles page to make a crawler step by step, with a name, a backstory, ability points and languages",
       "📜 Backstories have five parts: profession, an accomplishment, a hobby, where you were when the world ended, and the most important person, thing or animal to you. Pick a suggestion or write your own, and edit it later on your profile",
       "🎲 New crawlers spend 10 ability points (up to 5 in one ability). Each point is +1 to rolls, and abilities left at 0 roll with disadvantage",
-      "🧍 New crawlers start as a classless Human at Level 1 with 25 HP, 10 mana and no gold",
+      "🧍 New crawlers start as a classless Human at Level 1 with 25 HP, 3 mana and no gold",
       "🗣️ New crawlers speak Worldspeech plus two languages of their choice, and Spanish is now a language",
       "🌿 New Plant language for talking plants: crawlers who know it read their words, everyone else sees what the plant does",
       "💀 New Dead language for corpses: a corpse stays silent until someone talks to it in Dead, then answers briefly and cryptically from what it knew in life",

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DungeonButton } from "./ui/DungeonButton";
-import { Dices, ChevronUp, ChevronDown, Plus, X, Package, ScrollText, Undo2, Coins } from "lucide-react";
+import { Dices, ChevronUp, ChevronDown, Plus, X, Package, ScrollText, Undo2, Coins, Star } from "lucide-react";
 import { getLootBoxTierColor } from "@/lib/gameData";
 import { DiceRollEntry } from "@/hooks/useGameState";
 import { useClickAway } from "@/hooks/useClickAway";
@@ -244,6 +244,20 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
                           </div>
                           <span className="text-[10px] text-muted-foreground/60 ml-auto">{formatTimestamp(entry.timestamp)}</span>
                         </div>
+                      ) : entry.xpNotification ? (
+                        // XP handed out (and any level-ups)
+                        <div className="flex items-start gap-2">
+                          <Star className="w-4 h-4 flex-shrink-0 text-accent mt-0.5" />
+                          <div className="min-w-0">
+                            {entry.xpNotification.levelUps.map(line => (
+                              <span key={line} className="block font-display text-accent text-glow-gold">{line}</span>
+                            ))}
+                            {entry.xpNotification.lines.map(line => (
+                              <span key={line} className="block text-foreground">{line}</span>
+                            ))}
+                          </div>
+                          <span className="text-[10px] text-muted-foreground/60 ml-auto">{formatTimestamp(entry.timestamp)}</span>
+                        </div>
                       ) : entry.turnResetNotification ? (
                         // A player undid their combat turn
                         <div className="flex items-center gap-2">
@@ -338,6 +352,11 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
                           )}
                           {entry.results.length === 1 && entry.results[0].dice === "D20" && entry.results[0].result === 1 && (
                             <span className="text-destructive text-xs font-display">CRITICAL FAIL!</span>
+                          )}
+                          {entry.statRoll?.dc !== undefined && (
+                            <span className={`text-xs font-display mr-2 ${entry.statRoll.success ? 'text-primary' : 'text-destructive'}`}>
+                              vs DC {entry.statRoll.dc}: {entry.statRoll.success ? 'SUCCESS' : 'FAIL'}
+                            </span>
                           )}
                           {entry.statRoll && entry.statRoll.rawRoll === 20 && (
                             <span className="text-accent text-xs font-display">NAT 20!</span>

@@ -28,7 +28,7 @@ import { useIconLibrary } from "@/hooks/useIconLibrary";
 import { useNpcBrain } from "@/hooks/useNpcBrain";
 import { useNpcSpeechMaker } from "@/hooks/useNpcSpeechMaker";
 import { toast } from "sonner";
-import { getNoChildLeftBehindBump, rollD20, rollsWithDisadvantage } from "@/lib/gameData";
+import { getNoChildLeftBehindBump, rollD20, rollsWithDisadvantage, isCheckSuccess } from "@/lib/gameData";
 import type { Episode, Campaign, CrawlerPlacement, EpisodeMobPlacement, Mob, PublicMap, PublicMob, PublicEpisode, InventoryItem, Spell } from "@/lib/gameData";
 import { publicDocId, buildEpisodeBundle } from "@/lib/publicContent";
 import { LanguagesProvider } from "@/contexts/LanguagesContext";
@@ -196,6 +196,8 @@ const Index = () => {
     recordCombatAction,
     applyCombatDamage,
     applyCombatDamageBatch,
+    applyCombatConditions,
+    removeCombatCondition,
     recordCrawlerMove,
     undoCombatTurn,
     awardTrophy,
@@ -251,6 +253,13 @@ const Index = () => {
     updateAssignedQuest,
     deleteAssignedQuest,
     getCrawlerAssignedQuests,
+    gameSettings,
+    setXPScale,
+    setDungeonFloor,
+    awardCrawlerXP,
+    spendSkillPoint,
+    spendAbilityPoint,
+    awardQuestXP,
     roomId,
     setRoomId,
     isLoaded
@@ -753,8 +762,9 @@ const Index = () => {
     navigate(restoredPlayer ? '/app/menu' : '/app');
   };
 
-  const handleStatRoll = (crawlerName: string, crawlerId: string, stat: string, totalStat: number) => {
-    const modifier = Math.floor((totalStat - 10) / 2);
+  // `bonus` adds to the ability modifier, e.g. a skill's rank. With a `dc` the roll is marked a success or failure.
+  const handleStatRoll = (crawlerName: string, crawlerId: string, stat: string, totalStat: number, bonus = 0, dc?: number) => {
+    const modifier = Math.floor((totalStat - 10) / 2) + bonus;
     const { rawRoll, results, diceLabel } = rollD20(rollsWithDisadvantage(crawlers.find(c => c.id === crawlerId), totalStat));
     const total = rawRoll + modifier;
     const entry: DiceRollEntry = {
@@ -764,7 +774,7 @@ const Index = () => {
       timestamp: Date.now(),
       results,
       total,
-      statRoll: { stat, modifier, rawRoll, diceLabel },
+      statRoll: { stat, modifier, rawRoll, diceLabel, ...(dc !== undefined ? { dc, success: isCheckSuccess(rawRoll, total, dc) } : {}) },
     };
     addDiceRoll(entry);
   };
@@ -1053,8 +1063,16 @@ const Index = () => {
                 onUndoCombatTurn={undoCombatTurn}
                 onApplyCombatDamage={applyCombatDamage}
                 onApplyCombatDamageBatch={applyCombatDamageBatch}
+                onApplyCombatConditions={applyCombatConditions}
                 isAdmin={isAdmin}
                 onAwardTrophy={awardTrophy}
+                xpScale={gameSettings?.xpScale ?? 1}
+                onAwardXP={awardCrawlerXP}
+                onSetXPScale={setXPScale}
+                dungeonFloor={gameSettings?.dungeonFloor ?? 1}
+                onSetDungeonFloor={setDungeonFloor}
+                onSpendSkillPoint={spendSkillPoint}
+                onSpendAbilityPoint={spendAbilityPoint}
                 onRevokeTrophy={revokeTrophy}
                 addDiceRoll={addDiceRoll}
                 mobs={mobs}
@@ -1196,12 +1214,14 @@ const Index = () => {
                 resetNoncombatTurns={resetNoncombatTurns}
                 combatState={activeCombatState}
                 onRemoveCombatant={removeCombatant}
+                onRemoveCombatCondition={removeCombatCondition}
                 roomId={roomId}
                 quests={quests}
                 assignedQuests={assignedQuests}
                 onAssignQuest={assignQuest}
                 onUpdateQuest={updateQuest}
                 onUpdateAssignedQuest={updateAssignedQuest}
+                onAwardQuestXP={awardQuestXP}
                 onDeleteAssignedQuest={deleteAssignedQuest}
                 currentPlayerId={currentPlayer?.id}
                 onRecordCrawlerMove={recordCrawlerMove}

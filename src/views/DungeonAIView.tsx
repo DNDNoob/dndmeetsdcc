@@ -10,7 +10,7 @@ import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import MapMobPlacementEditor from "@/components/ui/MapMobPlacementEditor";
 import MapDesignerPopout from "@/components/ui/MapDesignerPopout";
-import { Mob, Episode, stackItems, DEFAULT_LOOT_DESTRUCTION_CHANCE, getMobKind, isBossMob, mobSection, type MobSection, legacyMobType, EpisodeMobPlacement, Crawler, CrawlerPlacement, InventoryItem, LootBoxTemplate, LootBoxTier, getLootBoxTierColor, type EquipmentSlot, type EquippedItems, Quest, QuestReward, QuestActionItem, QuestRewardTier, type CampaignMapDoc, type PublicMap, type PublicMob, type PublicEpisode, isMerchant, type Spell } from "@/lib/gameData";
+import { Mob, Episode, stackItems, DEFAULT_LOOT_DESTRUCTION_CHANCE, getMobKind, isBossMob, mobSection, type MobSection, legacyMobType, EpisodeMobPlacement, Crawler, CrawlerPlacement, InventoryItem, LootBoxTemplate, LootBoxTier, getLootBoxTierColor, type EquipmentSlot, type EquippedItems, Quest, QuestReward, QuestActionItem, QuestRewardTier, type CampaignMapDoc, type PublicMap, type PublicMob, type PublicEpisode, isMerchant, type Spell, XP_REWARDS } from "@/lib/gameData";
 import { Brain, Sparkles, Upload, Plus, Trash2, Map, Skull, Image as ImageIcon, Save, Edit2, X, Layers, ChevronLeft, ChevronRight, User, Package, Search, Maximize2, Shield, ChevronDown as ChevronDownIcon, ScrollText, Eye, EyeOff, CheckSquare, GripVertical, Users, Globe } from "lucide-react";
 import { storage } from "@/lib/firebase";
 import { ShareToggle, ImportButton } from "@/components/ui/ShareToggle";
@@ -170,6 +170,12 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   const [lootBoxItemQuantity, setLootBoxItemQuantity] = useState(1);
   const [newLootBoxGold, setNewLootBoxGold] = useState(0);
   const [editingLootBoxId, setEditingLootBoxId] = useState<string | null>(null);
+  // Optional achievement awarded to the crawler when their copy of the box is unlocked
+  const [newLootBoxAchievementName, setNewLootBoxAchievementName] = useState("");
+  const [newLootBoxAchievementDesc, setNewLootBoxAchievementDesc] = useState("");
+  const lootBoxAchievement = () => newLootBoxAchievementName.trim()
+    ? { name: newLootBoxAchievementName.trim(), description: newLootBoxAchievementDesc.trim() || undefined }
+    : null;
 
   // Quest state for episode (selected quest IDs)
   const [selectedQuestIdsForEpisode, setSelectedQuestIdsForEpisode] = useState<string[]>([]);
@@ -183,6 +189,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   const [questRewardTier, setQuestRewardTier] = useState<QuestRewardTier>("Copper");
   const [newActionItemText, setNewActionItemText] = useState("");
   const [editingQuestId, setEditingQuestId] = useState<string | null>(null);
+  const [newQuestXP, setNewQuestXP] = useState(String(XP_REWARDS.questDefault));
   const [dragActionIdx, setDragActionIdx] = useState<number | null>(null);
   const [dragRewardIdx, setDragRewardIdx] = useState<number | null>(null);
 
@@ -2278,6 +2285,30 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                   </div>
                 </div>
 
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">🏆 Achievement (optional)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Goblin Bane"
+                      value={newLootBoxAchievementName}
+                      onChange={e => setNewLootBoxAchievementName(e.target.value)}
+                      className="w-full bg-background border border-border rounded px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">Achievement description</label>
+                    <input
+                      type="text"
+                      placeholder="Shown on the crawler's profile"
+                      value={newLootBoxAchievementDesc}
+                      onChange={e => setNewLootBoxAchievementDesc(e.target.value)}
+                      disabled={!newLootBoxAchievementName.trim()}
+                      className="w-full bg-background border border-border rounded px-3 py-2 text-sm disabled:opacity-50"
+                    />
+                  </div>
+                </div>
+
                 {/* Item search with quantity */}
                 <div>
                   <label className="text-xs text-muted-foreground mb-1 block">Add Items from Shared Inventory</label>
@@ -2381,6 +2412,8 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                         setNewLootBoxTier("Copper");
                         setNewLootBoxItems([]);
                         setNewLootBoxGold(0);
+                        setNewLootBoxAchievementName("");
+                        setNewLootBoxAchievementDesc("");
                       }}
                       className="flex-1"
                     >
@@ -2389,15 +2422,16 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                   )}
                   <DungeonButton
                     variant="admin"
-                    disabled={!newLootBoxName.trim() || (newLootBoxItems.length === 0 && newLootBoxGold === 0) || !onAddLootBoxTemplate}
+                    disabled={!newLootBoxName.trim() || (newLootBoxItems.length === 0 && newLootBoxGold === 0 && !newLootBoxAchievementName.trim()) || !onAddLootBoxTemplate}
                     onClick={() => {
-                      if (!newLootBoxName.trim() || (newLootBoxItems.length === 0 && newLootBoxGold === 0)) return;
+                      if (!newLootBoxName.trim() || (newLootBoxItems.length === 0 && newLootBoxGold === 0 && !newLootBoxAchievementName.trim())) return;
                       if (editingLootBoxId && onUpdateLootBoxTemplate) {
                         onUpdateLootBoxTemplate(editingLootBoxId, {
                           name: newLootBoxName,
                           tier: newLootBoxTier,
                           items: newLootBoxItems,
                           gold: newLootBoxGold > 0 ? newLootBoxGold : undefined,
+                          achievement: lootBoxAchievement(),
                         });
                         setEditingLootBoxId(null);
                       } else if (onAddLootBoxTemplate) {
@@ -2407,12 +2441,15 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                           tier: newLootBoxTier,
                           items: newLootBoxItems,
                           gold: newLootBoxGold > 0 ? newLootBoxGold : undefined,
+                          achievement: lootBoxAchievement(),
                         });
                       }
                       setNewLootBoxName("");
                       setNewLootBoxTier("Copper");
                       setNewLootBoxItems([]);
                       setNewLootBoxGold(0);
+                      setNewLootBoxAchievementName("");
+                      setNewLootBoxAchievementDesc("");
                     }}
                     className="flex-1"
                   >
@@ -2448,7 +2485,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                           <div className="min-w-0">
                             <h4 className="font-semibold truncate">{template.name}</h4>
                             <p className="text-xs text-muted-foreground">
-                              {template.tier} · {template.items.length} item{template.items.length !== 1 ? 's' : ''}{template.gold ? ` · ${template.gold}g` : ''}
+                              {template.tier} · {template.items.length} item{template.items.length !== 1 ? 's' : ''}{template.gold ? ` · ${template.gold}g` : ''}{template.achievement ? ` · 🏆 ${template.achievement.name}` : ''}
                             </p>
                           </div>
                         </div>
@@ -2460,6 +2497,8 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                               setNewLootBoxTier(template.tier);
                               setNewLootBoxItems([...template.items]);
                               setNewLootBoxGold(template.gold ?? 0);
+                              setNewLootBoxAchievementName(template.achievement?.name ?? "");
+                              setNewLootBoxAchievementDesc(template.achievement?.description ?? "");
                               window.scrollTo({ top: 0, behavior: 'smooth' });
                             }}
                             className="p-1.5 hover:bg-muted rounded transition-colors"
@@ -2536,6 +2575,19 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                     value={newQuestDescription}
                     onChange={e => setNewQuestDescription(e.target.value)}
                     className="w-full bg-background border border-border rounded px-3 py-2 text-sm min-h-[80px] resize-y"
+                  />
+                </div>
+
+                {/* XP for finishing it */}
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block" htmlFor="quest-xp">XP for each crawler who finishes it</label>
+                  <input
+                    id="quest-xp"
+                    type="number"
+                    min={0}
+                    value={newQuestXP}
+                    onChange={e => setNewQuestXP(e.target.value)}
+                    className="w-28 bg-background border border-border rounded px-3 py-2 text-sm"
                   />
                 </div>
 
@@ -2743,6 +2795,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                         setNewQuestDescription("");
                         setNewQuestRewards([]);
                         setNewQuestActionItems([]);
+                        setNewQuestXP(String(XP_REWARDS.questDefault));
                       }}
                       className="flex-1"
                     >
@@ -2761,6 +2814,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                           description: newQuestDescription,
                           rewards: newQuestRewards,
                           actionItems: newQuestActionItems,
+                          xpReward: Math.max(0, parseInt(newQuestXP, 10) || 0),
                         });
                         setEditingQuestId(null);
                       } else if (onAddQuest) {
@@ -2770,6 +2824,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                           description: newQuestDescription,
                           rewards: newQuestRewards,
                           actionItems: newQuestActionItems,
+                          xpReward: Math.max(0, parseInt(newQuestXP, 10) || 0),
                           notes: [],
                           createdAt: new Date().toISOString(),
                           updatedAt: new Date().toISOString(),
@@ -2779,6 +2834,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                       setNewQuestDescription("");
                       setNewQuestRewards([]);
                       setNewQuestActionItems([]);
+                      setNewQuestXP(String(XP_REWARDS.questDefault));
                     }}
                   >
                     <Plus className="w-4 h-4 mr-2" />
@@ -2810,6 +2866,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                               setNewQuestDescription(quest.description);
                               setNewQuestRewards([...quest.rewards]);
                               setNewQuestActionItems([...quest.actionItems]);
+                              setNewQuestXP(String(quest.xpReward ?? XP_REWARDS.questDefault));
                             }}
                             className="p-1 hover:bg-muted rounded"
                           >
@@ -2835,6 +2892,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                       <div className="flex gap-3 text-xs text-muted-foreground">
                         <span>{quest.actionItems.length} action item{quest.actionItems.length !== 1 ? 's' : ''}</span>
                         <span>{quest.rewards.length} reward{quest.rewards.length !== 1 ? 's' : ''}</span>
+                        <span>{quest.xpReward ?? XP_REWARDS.questDefault} XP</span>
                       </div>
                     </div>
                   ))}

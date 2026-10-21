@@ -90,7 +90,7 @@ Tap **New** next to the crawler picker on the Profiles page. The character creat
 4. **Languages**: everyone speaks Worldspeech, plus 2 more you pick. Mindspeech, Beast, Plant and Dead can't be picked at the start; they need a gift or a spell.
 5. **Review**, then **Create crawler**.
 
-Every new crawler starts as a **Human** with **no class**, at Level 1 with **25 HP**, **10 mana** and **0 gold**. Race and class change later, when the DM decides. Starting items are set up by the DM.
+Every new crawler starts as a **Human** with **no class**, at Level 1 with **25 HP**, **3 mana** and **0 gold**. Race and class change later, when the DM decides. Starting items are set up by the DM.
 
 Your answers appear in the **Backstory** section of your profile. Tap **Edit** to change them at any time; the DM may ask you to tone down an answer.
 
@@ -275,11 +275,25 @@ The DM creates items in the Item Library on the Inventory page. Library items se
 
 Each item can have:
 - **Name** and **Description**
+- **Rarity**: Common, Uncommon, Rare, Epic or Legendary, shown as a colored tag next to the item's name
+- **Effects**: what the item does, in plain words (for example "Glows near goblins"). It shows on the item when you expand it
 - **Equipment Slot** (if equippable)
 - **Gold Value**
 - **Stat Modifiers** (when equipped)
 - **Weapon Data** (for weapons)
 - **Tags** (for categorization)
+
+## Item Rarity
+
+| Rarity | Color |
+|--------|-------|
+| Common | Gray |
+| Uncommon | Green |
+| Rare | Blue |
+| Epic | Purple |
+| Legendary | Orange |
+
+The Item Library can be filtered by rarity with the **All Rarities** menu next to the slot filter. Rarity is optional; items without one show no tag. Rarity and effects can also be set on items in **My Content**.
 
 ## Managing Inventory
 
@@ -778,7 +792,7 @@ Loot boxes are reward packages that the DM sends to crawlers during gameplay.
 
 ## DM Workflow
 
-1. **Create Templates**: In the DM Console, create loot box templates with a name, tier, items, and optional gold
+1. **Create Templates**: In the DM Console, create loot box templates with a name, tier, items, optional gold, and an optional **Achievement**
 2. **Send to Crawlers**: During Show Time, select a template and choose which crawlers receive it
 3. **Unlock**: When ready, click "Unlock" on a sent loot box to let the crawler open it
 
@@ -788,6 +802,12 @@ Loot boxes are reward packages that the DM sends to crawlers during gameplay.
 2. **View**: Go to your profile page to see pending loot boxes
 3. **Claim**: Once the DM unlocks the box, click "Claim" to add the items and gold to your inventory
 4. **Claim All**: Use the "Claim All" button to instantly claim all unlocked loot boxes
+
+## Achievements in Loot Boxes
+
+A loot box can carry an achievement: give it a name (and an optional description) when creating the box. When the DM unlocks a crawler's box, the achievement is added to that crawler's trophies on their profile, the same as a trophy the DM awards by hand (see [Activity Stats & Trophies](/wiki/activity-trophies)). Getting the same achievement again counts it up.
+
+While the box is locked, players only see a 🏆 next to its item count. After it's unlocked, the box shows which achievement was added. A box that held only an achievement disappears once it's unlocked, since there's nothing left to claim.
 
 ## Loot Box History
 
@@ -1018,11 +1038,116 @@ Haggling uses an action. In combat it takes your action, so you can only haggle 
 
 Each crawler gets one haggle per merchant until the merchant is restocked. Haggling only lowers prices for the crawler who rolled.
 
+## Barter
+
+Your **Barter** skill lowers prices on top of haggling. Every 2 Barter ranks take 1 off the Scrooge Factor you trade at, and each rank adds +1 to your haggle rolls. Prices never drop below an item's gold value, so you can't buy low and sell back to the same merchant for a profit. The trade window shows how much your Barter is taking off.
+
+Barter isn't bought with skill points. It ranks up as you use it: every buy or sell counts, and ranks come at 10, 30, 60 and 100 trades and so on, up to rank 10. See [Skills](/wiki/skills).
+
 ## Restocking (DM)
 
 Right-click a merchant's token in Show Time and choose **Open Merchant**. The DM sees the stock, the merchant's gold, and any haggles waiting for an answer (these also pop up in the bottom left of the map). **Restock** resets the stock, gold and haggling to the settings in the DM Console.
 
 Changes to stock and starting gold in the DM Console take effect at the next restock. Changes to the Scrooge Factor apply right away.`,
+  },
+  {
+    id: 'experience-levels',
+    slug: 'experience-levels',
+    title: 'Experience & Levels',
+    category: 'Game Mechanics',
+    order: 15.5,
+    content: `# Experience & Levels
+
+Crawlers earn **XP** automatically while they play, and the DM can hand out more. XP raises your level, and there's no level cap.
+
+## Where XP comes from
+
+| Event | XP | Who gets it |
+|-------|----|-------------|
+| Damage to a hostile mob | 1 per 2 damage | The attacker |
+| Killing blow | 5 × the mob's level | The attacker |
+| Fight finisher (last mob down) | 10 | The attacker |
+| Surviving a fight (above 0 HP when combat ends) | 2 | Every crawler in the fight |
+| Near death (HP drops below 10% of max) | 5 | That crawler |
+| Finishing a quest | Set on the quest (10 if left as is) | Each crawler who finishes every visible action item |
+| A spell mastery or Looting level up | 20 | That crawler |
+| DM award | Any amount | The crawlers the DM picks |
+
+Damage to friendly NPCs and to other crawlers earns no XP. Each grant shows in the dice history, and your last 20 show under **Recent XP** on your profile.
+
+## Levels
+
+Reaching level L takes 50 × L × (L − 1) total XP, so each level costs 100 XP more than the last:
+
+| Level | Total XP |
+|-------|----------|
+| 2 | 100 |
+| 3 | 300 |
+| 5 | 1,000 |
+| 10 | 4,500 |
+| 20 | 19,000 |
+
+The XP bar under **LEVEL** on the Profile tab shows how close you are to the next level.
+
+## Level-up rewards
+
+Level-ups happen automatically. Each level gives:
+
+- **+5% max HP and +5% max mana**, rounded up (always at least +1). Your current HP and mana go up by the same amount. A 25 HP, 3 mana crawler reaching Level 2 gets +2 HP and +1 mana.
+- **1 skill point** to spend on a skill. See [Skills](/wiki/skills).
+- **1 ability point.** Each point is +1 to that ability's rolls. The 5-point limit from the character creator doesn't apply to level-up points.
+
+When you have points to spend, a gold badge shows on your profile and on the Skills tab. Spend them on the **Skills** tab.
+
+## For the DM
+
+- **Award XP** is on each crawler's Profile tab, next to the trophies. Enter an amount and a reason, and tick one or more crawlers. DM awards are exactly what you type.
+- **Auto XP** next to it scales all automatic XP in the campaign, from 50% to 200%.
+- **Admin Override** can set a crawler's level or total XP by hand. Changing the level moves their XP to the start of that level.
+- Set a quest's XP in the quest editor in the DM Console.
+- Crawlers from before XP start with exactly the XP their level needs, so nobody loses a level.`,
+  },
+  {
+    id: 'skills',
+    slug: 'skills',
+    title: 'Skills',
+    category: 'Game Mechanics',
+    order: 15.6,
+    content: `# Skills
+
+Skills make a crawler better at one kind of thing. Each skill has ranks from 0 to 10, shown on the profile's **Skills** tab.
+
+| Skill | Ability | What each rank does |
+|-------|---------|---------------------|
+| Barter | CHA | Every 2 ranks lower a merchant's Scrooge Factor by 1 for you; +1 to haggle rolls |
+| Athletics | STR | +1 to climb, jump and grapple checks; every 3 ranks add +5 ft of movement |
+| Stealth | DEX | +1 to sneak and hide checks |
+| Perception | INT | +1 to spot, search and sense-lies checks |
+| Medicine | INT | +1 HP on every heal you give with a spell |
+| Intimidation | CHA | +1 to threaten checks |
+
+## Getting ranks
+
+- **Skill points:** you get one each level. Press **+** on a skill to spend one on a rank. Athletics, Stealth, Perception, Medicine and Intimidation are bought this way.
+- **By use:** Barter ranks up as you trade with merchants. Every buy or sell counts, and ranks come at 10, 30, 60 and 100 trades and so on, like Looting. See [Merchants](/wiki/merchants).
+
+## Skill checks
+
+Press **Roll** on a skill to roll d20 + the linked ability modifier + your rank. The roll goes to the dice history. A skill check uses an action like the Actions tab: in combat it takes your action on your turn, and between fights it uses one of your rolls for the turn.
+
+Pick the check's difficulty above the skills before you roll. The dice history shows whether you beat it.
+
+| Difficulty | DC on Floor 1 | Each floor deeper |
+|------------|---------------|-------------------|
+| Easy | 10 | +2 |
+| Medium | 15 | +2 |
+| Hard | 20 | +2 |
+
+A natural 1 always fails and a natural 20 always succeeds, however big your bonus is. Haggle rolls follow the same rule. Bonuses keep growing as you level, and DCs grow as the party goes deeper, so the d20 still matters on every floor.
+
+The DM sets the party's current floor next to **Auto XP** on any crawler's Profile tab.
+
+More skills will be added later.`,
   },
   {
     id: 'talking-npcs',
@@ -1718,6 +1843,7 @@ Each spell has the following configurable properties:
 | **Saving Throw** | Which stat the target rolls to resist |
 | **Splash Damage** | Whether the spell can hit multiple targets |
 | **Special Effect** | Free-text description of any on-hit effects |
+| **Effect on Targets** | A condition (like Burning or Stunned) the spell puts on each target in combat, how many of the target's turns it lasts, what it does, and optional damage or healing dice rolled each turn (see [Spell Effects](/wiki/spell-effects)) |
 | **Can Target Self** | Whether the caster can target themselves |
 | **Reaction Trigger** | *(Reaction spells only)* What event triggers the reaction |
 
@@ -1735,6 +1861,44 @@ Fire, Cold, Lightning, Poison, Acid, Necrotic, Radiant, Psychic, Thunder, Force,
 | **Cone** | Fans out from the caster |
 | **Line** | Extends in a straight line from the caster |
 | **Cube** | Fills a cubic area |`,
+  },
+  {
+    id: 'spell-effects',
+    slug: 'spell-effects',
+    title: 'Spell Effects',
+    category: 'Spells',
+    order: 3.5,
+    content: `# Spell Effects
+
+A spell can leave an **effect** on the creatures it hits, like Burning, Poisoned, Stunned or Blessed. Effects work during combat, where they count down turn by turn.
+
+## Setting Up an Effect
+
+In the spell editor, tick **Puts an effect on targets**, then set:
+
+- **Condition**: pick a preset (Burning, Poisoned, Bleeding, Frozen, Stunned, Paralyzed, Blinded, Charmed, Frightened, Slowed, Restrained, Prone, Silenced, Blessed, Shielded, Hasted, Regenerating) or type your own
+- **Lasts**: how many of the target's turns it lasts
+- **What it does**: plain words shown on the badge, like "Disadvantage on attacks"
+- **Each turn** *(optional)*: damage or healing dice rolled automatically at the start of each of the target's turns, like 1d6 fire for Burning or 1d4 healing for Regenerating
+
+## How Effects Land
+
+- **Damage spells**: when you apply the damage, the effect goes on the same target (or every splash target)
+- **Healing spells**: the effect goes on each crawler you heal
+- **Effect-only spells** (no dice): casting opens a target picker; pick who it lands on and press Apply
+- **Self spells**: the effect goes straight onto the caster
+
+Casting the same spell on a target again refreshes its effect instead of stacking a second copy. Outside combat, spells roll as usual but don't leave effects.
+
+## During Combat
+
+- Effects show as small badges under each portrait in the combat order bar above the Show Time map, with the turns left. Hover a badge to see the spell, caster and what it does
+- Damage or healing over time rolls at the start of the affected creature's turn and posts to the dice history. A mob brought to 0 HP this way is looted like any other kill
+- At the end of the creature's turn its effects count down by one, and wear off at zero
+- The DM can remove an effect early (a passed saving throw, a dispel) with the ✕ on its badge
+- Effects end when combat ends, and **Undo Turn** puts them back the way they were at the start of the turn
+
+Effects don't change rolls or skip turns by themselves; the badge tells everyone what applies, and the DM rules on it.`,
   },
   {
     id: 'spell-tomes',

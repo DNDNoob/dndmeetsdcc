@@ -90,7 +90,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
   };
 
   // Collections to sync
-  const collections: CollectionName[] = ['crawlers', 'mobs', 'maps', 'inventory', 'episodes', 'soundEffects', 'diceRolls', 'lootBoxes', 'lootBoxTemplates', 'noncombatTurns', 'gameClock', 'combatState', 'wiki', 'quests', 'assignedQuests', 'spells', 'chatMessages', 'npcAi', 'merchants', 'languages'];
+  const collections: CollectionName[] = ['crawlers', 'mobs', 'maps', 'inventory', 'episodes', 'soundEffects', 'diceRolls', 'lootBoxes', 'lootBoxTemplates', 'noncombatTurns', 'gameClock', 'combatState', 'wiki', 'quests', 'assignedQuests', 'spells', 'chatMessages', 'npcAi', 'merchants', 'languages', 'gameSettings'];
 
   // Load and subscribe to real-time updates
   useEffect(() => {

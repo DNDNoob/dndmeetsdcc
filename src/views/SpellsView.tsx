@@ -19,6 +19,9 @@ import {
   SPELL_SCHOOLS,
   SPELL_ACTION_TYPES,
   SPELL_DAMAGE_TYPES,
+  SPELL_CONDITIONS,
+  type SpellEffect,
+  describeSpellEffect,
   DAMAGE_TYPES,
   WeaponDie,
   StatModifiers,
@@ -453,6 +456,101 @@ function SpellDataEditor({ spellData, onChange }: SpellDataEditorProps) {
           rows={2}
         />
       </div>
+
+      <SpellEffectEditor effect={sd.effect} onChange={(effect) => onChange({ effect })} />
+    </div>
+  );
+}
+
+// Condition a spell leaves on its targets in combat (counts down on the target's turns)
+function SpellEffectEditor({ effect, onChange }: { effect?: SpellEffect; onChange: (effect: SpellEffect | undefined) => void }) {
+  const update = (patch: Partial<SpellEffect>) => onChange({ condition: '', turns: 1, ...effect, ...patch });
+  const perTurnDie = effect?.perTurnDice?.[0] ?? { count: 1, sides: 6 };
+  return (
+    <div className="border border-primary/20 bg-primary/5 p-2 space-y-2">
+      <label className="flex items-center gap-2 text-xs cursor-pointer">
+        <input
+          type="checkbox"
+          checked={!!effect}
+          onChange={(e) => onChange(e.target.checked ? { condition: 'Burning', turns: 2 } : undefined)}
+          className="w-3.5 h-3.5"
+        />
+        <span className="text-primary font-display text-[10px] tracking-wider">PUTS AN EFFECT ON TARGETS</span>
+      </label>
+      {effect && (
+        <>
+          <div className="grid grid-cols-3 gap-2">
+            <div className="col-span-2">
+              <label className="text-[10px] text-muted-foreground block mb-0.5">Condition</label>
+              <input
+                type="text"
+                list="spell-condition-presets"
+                value={effect.condition}
+                onChange={(e) => update({ condition: e.target.value })}
+                placeholder="Pick or type, e.g. Burning"
+                className="bg-muted border border-border px-2 py-1 text-xs w-full"
+              />
+              <datalist id="spell-condition-presets">
+                {SPELL_CONDITIONS.map(c => <option key={c} value={c} />)}
+              </datalist>
+            </div>
+            <div>
+              <label className="text-[10px] text-muted-foreground block mb-0.5">Lasts (target's turns)</label>
+              <input
+                type="number" min={1} max={20} value={effect.turns}
+                onChange={(e) => update({ turns: Math.max(1, parseInt(e.target.value) || 1) })}
+                className="bg-muted border border-border px-2 py-1 text-xs w-full"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="text-[10px] text-muted-foreground block mb-0.5">What it does</label>
+            <input
+              type="text"
+              value={effect.description ?? ''}
+              onChange={(e) => update({ description: e.target.value || undefined })}
+              placeholder="e.g. Can't take reactions; disadvantage on attacks"
+              className="bg-muted border border-border px-2 py-1 text-xs w-full"
+            />
+          </div>
+          <div className="flex items-center gap-1 flex-wrap">
+            <label className="text-[10px] text-muted-foreground mr-1">Each turn</label>
+            <select
+              value={effect.perTurnType ?? ''}
+              onChange={(e) => {
+                const perTurnType = (e.target.value || undefined) as SpellEffect['perTurnType'];
+                update({ perTurnType, perTurnDice: perTurnType ? [perTurnDie] : undefined });
+              }}
+              aria-label="Damage or healing each turn"
+              className="bg-muted border border-border px-1 py-0.5 text-xs"
+            >
+              <option value="">Nothing rolled</option>
+              <option value="damage">Deal damage</option>
+              <option value="healing">Heal</option>
+            </select>
+            {effect.perTurnType && (
+              <>
+                <input
+                  type="number" min={1} max={20} value={perTurnDie.count}
+                  onChange={(e) => update({ perTurnDice: [{ ...perTurnDie, count: parseInt(e.target.value) || 1 }] })}
+                  aria-label="Dice count"
+                  className="w-12 bg-muted border border-border px-1 py-0.5 text-xs text-center"
+                />
+                <span className="text-xs text-muted-foreground">d</span>
+                <select
+                  value={perTurnDie.sides}
+                  onChange={(e) => update({ perTurnDice: [{ ...perTurnDie, sides: parseInt(e.target.value) }] })}
+                  aria-label="Dice sides"
+                  className="bg-muted border border-border px-1 py-0.5 text-xs"
+                >
+                  {[4, 6, 8, 10, 12, 20].map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <span className="text-[10px] text-muted-foreground">at the start of the target's turn</span>
+              </>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -537,6 +635,12 @@ function SpellCard({
           {sd.specialEffect && (
             <div className="text-accent italic text-[11px]">
               <span className="text-muted-foreground not-italic">Special: </span>{sd.specialEffect}
+            </div>
+          )}
+          {sd.effect?.condition && (
+            <div className="text-primary text-[11px]">
+              <span className="text-muted-foreground">Effect: </span>{describeSpellEffect(sd.effect)}
+              {sd.effect.description && <span className="text-muted-foreground italic"> · {sd.effect.description}</span>}
             </div>
           )}
           {(spell.tags ?? []).length > 0 && (

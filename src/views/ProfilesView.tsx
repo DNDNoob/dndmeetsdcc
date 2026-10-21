@@ -8,10 +8,14 @@ import { LanguageSelect } from "@/components/LanguagePicker";
 import { CrawlerLanguagesCard } from "@/components/CrawlerLanguagesCard";
 import { CharacterCreator } from "@/components/CharacterCreator";
 import { BACKSTORY_QUESTIONS } from "@/lib/characterCreation";
+import { RarityBadge } from "@/components/ui/RarityBadge";
+import { ConditionBadges } from "@/components/ConditionBadges";
+import { ExperienceCard } from "@/components/ExperienceCard";
+import { SkillsPanel } from "@/components/SkillsPanel";
 import { usableLanguageIds } from "@/lib/languages";
 import { HealthBar } from "@/components/ui/HealthBar";
 import { EquipmentSlot } from "@/components/ui/EquipmentSlot";
-import { Crawler, getQuestProgress, Mob, InventoryItem, getItemStackKey, stackItems, getLootingLevel, getLootsUntilNextLevel, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery, getInitialCrawlerId, rollD20, rollsWithDisadvantage, ABILITY_KEYS, baseItemName } from "@/lib/gameData";
+import { Crawler, getQuestProgress, Mob, InventoryItem, getItemStackKey, stackItems, getLootingLevel, getLootsUntilNextLevel, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery, getInitialCrawlerId, rollD20, rollsWithDisadvantage, ABILITY_KEYS, baseItemName, type SpellEffect, describeSpellEffect, getSkillRank, getCrawlerXP, type SkillId, type AbilityKey } from "@/lib/gameData";
 import { ItemName } from "@/components/ItemName";
 import type { DiceRollEntry } from "@/hooks/useGameState";
 import UndoTurnButton, { canUndoCombatTurn } from "@/components/UndoTurnButton";
@@ -65,7 +69,7 @@ const stableJson = (value: unknown): string => {
   return JSON.stringify(clean(value));
 };
 
-type ProfileTab = 'profile' | 'inventory' | 'actions' | 'spells' | 'reactions' | 'attacks' | 'bonus' | 'quests';
+type ProfileTab = 'profile' | 'inventory' | 'actions' | 'skills' | 'spells' | 'reactions' | 'attacks' | 'bonus' | 'quests';
 
 // Noncombat actions mapped to their associated ability score
 const NONCOMBAT_ACTIONS: { label: string; stat: 'str' | 'dex' | 'con' | 'int' | 'cha' }[] = [
@@ -101,7 +105,7 @@ interface ProfilesViewProps {
   getCrawlerInventory: (crawlerId: string) => InventoryItem[];
   onUpdateCrawlerInventory: (crawlerId: string, items: InventoryItem[]) => void;
   partyGold: number;
-  onStatRoll?: (crawlerName: string, crawlerId: string, stat: string, totalStat: number) => void;
+  onStatRoll?: (crawlerName: string, crawlerId: string, stat: string, totalStat: number, bonus?: number, dc?: number) => void;
   getCrawlerLootBoxes?: (crawlerId: string) => SentLootBox[];
   claimLootBoxItems?: (lootBoxId: string, crawlerId: string, itemIds: string[], claimGold?: boolean) => Promise<void>;
   getPartyInventory?: () => InventoryItem[];
@@ -118,8 +122,16 @@ interface ProfilesViewProps {
   onUndoCombatTurn?: () => Promise<boolean>;
   onApplyCombatDamage?: (targetId: string, targetType: 'crawler' | 'mob', damage: number, attackerId?: string) => Promise<void>;
   onApplyCombatDamageBatch?: (hits: { targetId: string; targetType: 'crawler' | 'mob'; damage: number }[], attackerId?: string) => Promise<void>;
+  onApplyCombatConditions?: (targetIds: string[], effect: SpellEffect, spellName: string, casterName?: string) => Promise<void>;
   isAdmin?: boolean;
   onAwardTrophy?: (crawlerId: string, name: string, description?: string) => Promise<void>;
+  xpScale?: number;
+  onAwardXP?: (crawlerIds: string[], amount: number, reason: string) => Promise<void>;
+  onSetXPScale?: (scale: number) => Promise<void>;
+  dungeonFloor?: number;
+  onSetDungeonFloor?: (floor: number) => Promise<void>;
+  onSpendSkillPoint?: (crawlerId: string, skillId: SkillId) => Promise<boolean>;
+  onSpendAbilityPoint?: (crawlerId: string, ability: AbilityKey) => Promise<boolean>;
   onRevokeTrophy?: (crawlerId: string, trophyId: string) => Promise<void>;
   addDiceRoll?: (entry: DiceRollEntry) => Promise<void>;
   mobs?: Mob[];
@@ -407,7 +419,7 @@ const LootBoxSection: React.FC<{
                     <Unlock className="w-4 h-4 text-green-500" />
                   )}
                   <span className="text-xs text-muted-foreground">
-                    {box.items.length} items{box.gold ? (box.locked ? ' · ?g' : ` · ${box.gold}g`) : ''}
+                    {box.items.length} items{box.gold ? (box.locked ? ' · ?g' : ` · ${box.gold}g`) : ''}{box.achievement?.name ? ' · 🏆' : ''}
                   </span>
                   {!box.locked && (isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)}
                 </div>
@@ -424,6 +436,12 @@ const LootBoxSection: React.FC<{
               {/* Unlocked expanded state */}
               {!box.locked && isExpanded && (
                 <div className="px-3 pb-3 space-y-2">
+                  {box.achievement?.name && (
+                    <div className="flex items-center gap-2 p-2 rounded border border-accent/30 bg-accent/10">
+                      <Trophy className="w-4 h-4 text-accent shrink-0" />
+                      <span className="text-sm"><span className="font-semibold text-accent">{box.achievement.name}</span> <span className="text-xs text-muted-foreground">was added to your achievements</span></span>
+                    </div>
+                  )}
                   {/* Gold display */}
                   {box.gold && box.gold > 0 && (
                     <div className="flex items-center gap-2 p-2 rounded border border-amber-500/30 bg-amber-500/10">
@@ -451,7 +469,7 @@ const LootBoxSection: React.FC<{
                         {isSelected && <Check className="w-3 h-3 text-primary-foreground" />}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold">{item.name}{count > 1 && <span className="text-accent"> ×{count}</span>}</p>
+                        <p className="text-sm font-semibold flex items-center gap-1.5 flex-wrap">{item.name}{count > 1 && <span className="text-accent"> ×{count}</span>}<RarityBadge rarity={item.rarity} /></p>
                         {item.description && <ForeignText text={item.description} language={item.language} className="block text-xs text-muted-foreground" />}
                       </div>
                     </div>
@@ -509,9 +527,17 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   onUndoCombatTurn,
   onApplyCombatDamage,
   onApplyCombatDamageBatch,
+  onApplyCombatConditions,
   isAdmin = false,
   onAwardTrophy,
   onRevokeTrophy,
+  xpScale = 1,
+  onAwardXP,
+  onSetXPScale,
+  dungeonFloor = 1,
+  onSetDungeonFloor,
+  onSpendSkillPoint,
+  onSpendAbilityPoint,
   addDiceRoll,
   mobs: mobsProp,
   getCrawlerAssignedQuests,
@@ -548,7 +574,10 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
 
   // Combat targeting state
   const [showDamageTargetModal, setShowDamageTargetModal] = useState(false);
-  const [pendingDamageRoll, setPendingDamageRoll] = useState<{ dice: string; bonus: number; actionName: string; isSplash?: boolean } | null>(null);
+  const [pendingDamageRoll, setPendingDamageRoll] = useState<{ dice: string; bonus: number; actionName: string; isSplash?: boolean; effect?: SpellEffect } | null>(null);
+  // A spell whose only job is putting an effect on targets (no dice): pick who it lands on
+  const [pendingEffect, setPendingEffect] = useState<{ spellName: string; effect: SpellEffect; canTargetSelf: boolean; multiTarget: boolean } | null>(null);
+  const [effectTargetIds, setEffectTargetIds] = useState<string[]>([]);
   const [damageTargetId, setDamageTargetId] = useState<string>('');
   const [damageTargetType, setDamageTargetType] = useState<'crawler' | 'mob'>('mob');
   const [damageRollResult, setDamageRollResult] = useState<number | null>(null);
@@ -556,7 +585,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   const [splashDamageResults, setSplashDamageResults] = useState<Record<string, number>>({});
 
   // Healing spell targeting state
-  const [pendingHeal, setPendingHeal] = useState<{ spellName: string; dice: WeaponDie[]; bonus: number; canTargetSelf: boolean; multiTarget: boolean } | null>(null);
+  const [pendingHeal, setPendingHeal] = useState<{ spellName: string; dice: WeaponDie[]; bonus: number; canTargetSelf: boolean; multiTarget: boolean; effect?: SpellEffect } | null>(null);
   const [healedTargets, setHealedTargets] = useState<Record<string, number>>({});
 
   // Weapon advantage/disadvantage menu
@@ -1053,6 +1082,21 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
               <span className="hidden xl:inline text-sm font-medium">Actions</span>
             </button>
             <button
+              onClick={() => setActiveTab('skills')}
+              className={`p-3 rounded-l-lg transition-colors flex items-center gap-2 ${
+                activeTab === 'skills'
+                  ? 'bg-primary/20 text-primary border-r-2 border-primary'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              }`}
+              title="Skills"
+            >
+              <Sparkles className="w-5 h-5" />
+              <span className="hidden xl:inline text-sm font-medium">Skills</span>
+              {((selected?.skillPoints ?? 0) + (selected?.abilityPoints ?? 0)) > 0 && (
+                <span className="bg-accent/20 text-accent text-xs px-1.5 py-0.5 rounded-full">{(selected?.skillPoints ?? 0) + (selected?.abilityPoints ?? 0)}</span>
+              )}
+            </button>
+            <button
               onClick={() => setActiveTab('spells')}
               className={`p-3 rounded-l-lg transition-colors flex items-center gap-2 ${
                 activeTab === 'spells'
@@ -1285,6 +1329,18 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                   placeholder="Level"
                   className="bg-muted border border-border px-2 py-1 w-20 text-sm"
                 />
+                {isAdmin && (
+                  <input
+                    type="number"
+                    min={0}
+                    value={editData.xp ?? getCrawlerXP(selected)}
+                    onChange={(e) => setEditData({ ...editData, xp: Math.max(0, parseInt(e.target.value) || 0) })}
+                    placeholder="XP"
+                    aria-label="XP"
+                    title="Total XP (changing Level resets this to the start of that level)"
+                    className="bg-muted border border-border px-2 py-1 w-24 text-sm"
+                  />
+                )}
               </div>
             ) : (
               <p className="text-muted-foreground text-sm break-words">
@@ -1512,6 +1568,19 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             </div>
           </div>
         )}
+
+        <ExperienceCard
+          key={selected.id}
+          crawler={selected}
+          crawlers={crawlers}
+          isAdmin={isAdmin}
+          xpScale={xpScale}
+          onAwardXP={onAwardXP}
+          onSetXPScale={onSetXPScale}
+          dungeonFloor={dungeonFloor}
+          onSetDungeonFloor={onSetDungeonFloor}
+          onSpendPoints={() => setActiveTab('skills')}
+        />
 
         {/* Activity stats and DM trophies row */}
         {(() => {
@@ -1940,6 +2009,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                                     {isExpanded ? <ChevronUp className="w-3 h-3 text-muted-foreground ml-auto shrink-0" /> : <ChevronDown className="w-3 h-3 text-muted-foreground ml-auto shrink-0" />}
                                   </div>
                                   <div className="flex flex-wrap gap-1 mt-1">
+                                    <RarityBadge rarity={item.rarity} />
                                     {isEquipped && <span className="text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded">Equipped</span>}
                                     {item.equipSlot && !isEquipped && (
                                       <span className="text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded">{item.equipSlot}</span>
@@ -1956,6 +2026,9 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                                     <div className="mt-2 pt-2 border-t border-border/50 space-y-1.5">
                                       {item.description && (
                                         <ForeignText text={item.description} language={item.language} className="block text-xs text-muted-foreground" />
+                                      )}
+                                      {item.effects && (
+                                        <p className="text-xs text-accent italic whitespace-pre-wrap"><span className="not-italic text-muted-foreground">Effects: </span>{item.effects}</p>
                                       )}
                                       {item.statModifiers && Object.entries(item.statModifiers).some(([, v]) => v !== 0) && (
                                         <div className="flex flex-wrap gap-1">
@@ -2284,6 +2357,36 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
               );
             })()}
 
+            {activeTab === 'skills' && (() => {
+              const rollsRemaining = getNoncombatRollsRemaining?.(selected.id) ?? 0;
+              const hasActiveTurn = !!noncombatTurnState && isShowtimeActive;
+              const isCombatActive = combatState?.active && combatState.phase !== 'ended';
+              const isCombatPhase = combatState?.active && combatState.phase === 'combat';
+              const myCombatant = combatState?.combatants.find(c => c.id === selected.id);
+              const isMyTurn = isCombatPhase && combatState && combatState.combatants[combatState.currentTurnIndex]?.id === selected.id;
+              const isTestMode = !hasActiveTurn && !isCombatActive;
+              // Skill checks use an action like the Actions tab: your action on your combat turn, or a noncombat roll
+              const canRoll = isCombatActive ? !!isMyTurn && !(myCombatant?.hasUsedAction ?? false) : (isTestMode || rollsRemaining > 0);
+              return (
+                <SkillsPanel
+                  crawler={selected}
+                  equippedMods={equippedMods}
+                  canSpend={isAdmin || currentPlayerId === selected.id}
+                  canRoll={canRoll}
+                  rollBlockedReason={isCombatActive ? 'Not your turn, or your action is used' : 'No rolls remaining'}
+                  onSpendSkillPoint={onSpendSkillPoint}
+                  onSpendAbilityPoint={onSpendAbilityPoint}
+                  dungeonFloor={dungeonFloor}
+                  onRollSkill={(skill, abilityTotal, rank, dc) => {
+                    if (!canRoll) return;
+                    onStatRoll?.(selected.name, selected.id, `${skill.name} check${rank ? ` (rank ${rank})` : ''}`, abilityTotal, rank, dc);
+                    if (!isTestMode && !isCombatActive) recordNoncombatRoll?.(selected.id);
+                    if (isCombatActive && isMyTurn) onRecordCombatAction?.(selected.id, 'action');
+                  }}
+                />
+              );
+            })()}
+
             {/* Spells Tab */}
             {activeTab === 'spells' && (() => {
               const isAnyCombatActive = combatState?.active && combatState.phase !== 'ended';
@@ -2347,6 +2450,9 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
 
                 const dice = (sd.damageDice ?? []).filter(d => d.count > 0);
                 const isHealing = sd.damageType === 'Healing';
+                // Effects only land in combat, where their turns can count down
+                const effect = isCombatPhaseLocal && sd.effect?.condition?.trim() ? sd.effect : undefined;
+                const isSelfSpell = sd.target === 'Self' || sd.range === 'Self';
 
                 // Damage spells without a saving throw make a spell attack roll
                 if (dice.length > 0 && !isHealing && !sd.savingThrow && addDiceRoll) {
@@ -2366,15 +2472,25 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                   });
                 }
 
-                if (dice.length === 0) return;
-                const bonus = sumStatMods(sd.damageModifiers);
                 const multiTarget = !!sd.splashDamage || sd.target === 'Area' || sd.target === 'Multiple';
+                if (dice.length === 0) {
+                  if (!effect) return;
+                  if (isSelfSpell) {
+                    await onApplyCombatConditions?.([selected.id], effect, spell.name, selected.name);
+                  } else {
+                    setEffectTargetIds([]);
+                    setPendingEffect({ spellName: spell.name, effect, canTargetSelf: sd.canTargetSelf, multiTarget });
+                  }
+                  return;
+                }
+                const bonus = sumStatMods(sd.damageModifiers);
 
                 if (isHealing) {
-                  if (sd.target === 'Self' || sd.range === 'Self') {
+                  if (isSelfSpell) {
                     const { results, total } = rollSpellDice(dice);
-                    const healed = Math.max(0, total + bonus);
+                    const healed = Math.max(0, total + bonus) + getSkillRank(selected, 'medicine');
                     await onHealCrawler?.(selected.id, healed);
+                    if (effect) await onApplyCombatConditions?.([selected.id], effect, spell.name, selected.name);
                     addDiceRoll?.({
                       id: crypto.randomUUID(),
                       crawlerName: selected.name,
@@ -2387,12 +2503,12 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                     return;
                   }
                   setHealedTargets({});
-                  setPendingHeal({ spellName: spell.name, dice, bonus, canTargetSelf: sd.canTargetSelf, multiTarget });
+                  setPendingHeal({ spellName: spell.name, dice, bonus, canTargetSelf: sd.canTargetSelf, multiTarget, effect });
                   return;
                 }
 
                 if (isCombatPhaseLocal && combatTargets.length > 0) {
-                  setPendingDamageRoll({ dice: formatSpellDice(dice), bonus, actionName: spell.name, isSplash: multiTarget });
+                  setPendingDamageRoll({ dice: formatSpellDice(dice), bonus, actionName: spell.name, isSplash: multiTarget, effect });
                   setShowDamageTargetModal(true);
                   setDamageRollResult(null);
                   setDamageTargetId('');
@@ -3600,8 +3716,9 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
               total += roll;
             }
           }
-          const healed = Math.max(0, total + pendingHeal.bonus);
+          const healed = Math.max(0, total + pendingHeal.bonus) + getSkillRank(selected, 'medicine');
           await onHealCrawler?.(target.id, healed);
+          if (pendingHeal.effect && inCombat) await onApplyCombatConditions?.([target.id], pendingHeal.effect, pendingHeal.spellName, selected.name);
           addDiceRoll?.({
             id: crypto.randomUUID(),
             crawlerName: selected.name,
@@ -3668,6 +3785,58 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
         );
       })()}
 
+      {pendingEffect && combatState && (() => {
+        const closeEffect = () => { setPendingEffect(null); setEffectTargetIds([]); };
+        const targets = combatState.combatants.filter(c => pendingEffect.canTargetSelf || c.id !== selected.id);
+        const toggle = (id: string) => setEffectTargetIds(prev =>
+          pendingEffect.multiTarget ? (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]) : [id]
+        );
+        return (
+          <div className="fixed inset-0 bg-background/80 z-50 flex items-center justify-center p-4">
+            <div className="bg-background border-2 border-primary rounded-lg p-6 max-w-md w-full shadow-xl max-h-[80vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-display text-lg text-primary">
+                  {pendingEffect.spellName} — {pendingEffect.multiTarget ? 'Pick Targets' : 'Pick Target'}
+                </h3>
+                <button onClick={closeEffect}>
+                  <X className="w-5 h-5 text-muted-foreground hover:text-foreground" />
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground mb-3">
+                Leaves {describeSpellEffect(pendingEffect.effect)}{pendingEffect.effect.description ? `: ${pendingEffect.effect.description}` : ''}.
+              </p>
+              <div className="space-y-1">
+                {targets.map(c => {
+                  const isSelected = effectTargetIds.includes(c.id);
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => toggle(c.id)}
+                      className={`w-full text-left px-3 py-2 border rounded text-sm transition-colors ${
+                        isSelected ? 'bg-primary/20 border-primary' : 'bg-muted/30 border-border hover:border-primary/50'
+                      }`}
+                    >
+                      <span className={c.type === 'crawler' ? 'text-primary' : 'text-destructive'}>{c.name}</span>
+                      <ConditionBadges conditions={c.conditions} className="mt-1" />
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                disabled={effectTargetIds.length === 0}
+                onClick={async () => {
+                  await onApplyCombatConditions?.(effectTargetIds, pendingEffect.effect, pendingEffect.spellName, selected.name);
+                  closeEffect();
+                }}
+                className="w-full mt-4 py-2 bg-primary text-primary-foreground font-display text-sm rounded hover:bg-primary/90 transition-colors disabled:opacity-50"
+              >
+                APPLY {pendingEffect.effect.condition.toUpperCase()}
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
       {showDamageTargetModal && pendingDamageRoll && combatState && (() => {
         const isSplash = pendingDamageRoll.isSplash ?? false;
         const hasTargets = isSplash ? splashTargetIds.length > 0 : !!damageTargetId;
@@ -3714,6 +3883,9 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
 
             {isSplash && (
               <p className="text-xs text-accent mb-2">Splash damage — select targets, then roll damage for each</p>
+            )}
+            {pendingDamageRoll.effect && (
+              <p className="text-xs text-primary mb-2">Also leaves {isSplash ? 'each target' : 'the target'} {describeSpellEffect(pendingDamageRoll.effect)}</p>
             )}
 
             <div className="space-y-3">
@@ -3770,6 +3942,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                         {splashDmg !== undefined && (
                           <span className="text-accent font-display ml-2">→ {splashDmg} dmg</span>
                         )}
+                        <ConditionBadges conditions={c.conditions} className="mt-1" />
                       </button>
                     );
                   })}
@@ -3809,6 +3982,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                       <button
                         onClick={async () => {
                           await onApplyCombatDamage?.(damageTargetId, damageTargetType, damageRollResult, selected.id);
+                          if (pendingDamageRoll.effect) await onApplyCombatConditions?.([damageTargetId], pendingDamageRoll.effect, pendingDamageRoll.actionName, selected.name);
                           setShowDamageTargetModal(false);
                           setPendingDamageRoll(null);
                           setDamageRollResult(null);
@@ -3889,6 +4063,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                           } else {
                             for (const hit of hits) await onApplyCombatDamage?.(hit.targetId, hit.targetType, hit.damage, selected.id);
                           }
+                          if (pendingDamageRoll.effect) await onApplyCombatConditions?.(hits.map(h => h.targetId), pendingDamageRoll.effect, pendingDamageRoll.actionName, selected.name);
                           setShowDamageTargetModal(false);
                           setPendingDamageRoll(null);
                           setDamageRollResult(null);

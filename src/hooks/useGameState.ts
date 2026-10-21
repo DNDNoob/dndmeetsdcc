@@ -55,6 +55,8 @@ import {
   type PublicEpisodeAssets,
   type CustomLanguage,
   type LanguageEffect,
+  type ActiveCondition,
+  type SpellEffect,
   type MerchantState,
   type MerchantStockEntry,
   type MerchantHaggle,
@@ -67,6 +69,21 @@ import {
   getHaggleBlocker,
   rollD20,
   rollsWithDisadvantage,
+  isCheckSuccess,
+  XP_REWARDS,
+  getLevelUpIncrease,
+  XP_LOG_LIMIT,
+  getXPForLevel,
+  getLevelForXP,
+  getCrawlerXP,
+  getSkillRank,
+  getUseSkillRank,
+  MAX_SKILL_RANK,
+  SKILLS,
+  type SkillId,
+  type AbilityKey,
+  type XPLogEntry,
+  type GameSettings,
 } from "@/lib/gameData";
 import { useGame } from "@/contexts/GameContext";
 import { DEFAULT_LANGUAGE_ID, questionEffectFor } from "@/lib/languages";
@@ -85,7 +102,7 @@ export interface DiceRollEntry {
   timestamp: number;
   results: { dice: string; result: number }[];
   total: number;
-  statRoll?: { stat: string; modifier: number; rawRoll: number; diceLabel?: string; rollType?: string };
+  statRoll?: { stat: string; modifier: number; rawRoll: number; diceLabel?: string; rollType?: string; dc?: number; success?: boolean };
   mobRoll?: boolean; // rolled by the DM for a mob (crawlerId holds the mob's combatant id)
   // For loot box notifications
   lootBoxNotification?: {
@@ -111,6 +128,11 @@ export interface DiceRollEntry {
   // For a player undoing their combat turn
   turnResetNotification?: {
     round: number;
+  };
+  // For XP being handed out
+  xpNotification?: {
+    lines: string[];    // one per crawler, e.g. "Vex: +18 XP (Killing blow on Goblin)"
+    levelUps: string[]; // e.g. "Vex reached Level 4!"
   };
 }
 
@@ -613,6 +635,154 @@ export const useGameState = () => {
     return plan.episode;
   };
 
+  // --- Experience and levels ---
+  const gameSettings = useMemo((): GameSettings | null => {
+    const stored = getStableCollection<GameSettings>('gameSettings');
+    return stored.find(s => s.id === 'current') ?? null;
+  }, [getCollection, isLoaded]);
+
+  const setXPScale = async (xpScale: number) => {
+    if (gameSettings) await updateItem('gameSettings', 'current', { xpScale } as Record<string, unknown>);
+    else await addItem('gameSettings', { id: 'current', xpScale } as Record<string, unknown>);
+  };
+
+  const setDungeonFloor = async (dungeonFloor: number) => {
+    const floor = Math.max(1, Math.floor(dungeonFloor) || 1);
+    if (gameSettings) await updateItem('gameSettings', 'current', { dungeonFloor: floor } as Record<string, unknown>);
+    else await addItem('gameSettings', { id: 'current', dungeonFloor: floor } as Record<string, unknown>);
+  };
+
+  /**
+   * Adds XP to crawlers in one transaction, so grants landing at the same moment never lose each
+   * other. Automatic grants are multiplied by the campaign's XP scale; DM awards (scaled = false)
+   * are exact. Each level gained adds max HP and mana (current HP and mana rise by the same),
+   * a skill point and an ability point. Posts one line per crawler to the dice history.
+   */
+  const awardXP = async (grants: { crawlerId: string; amount: number; reason: string }[], scaled = true) => {
+    const scale = scaled ? gameSettings?.xpScale ?? 1 : 1;
+    const at = Date.now();
+    const byCrawler = new Map<string, XPLogEntry[]>();
+    for (const g of grants) {
+      const amount = Math.round(g.amount * scale);
+      if (amount <= 0) continue;
+      byCrawler.set(g.crawlerId, [...(byCrawler.get(g.crawlerId) ?? []), { amount, reason: g.reason, at }]);
+    }
+    // Default crawlers that were never saved have no document to add XP to
+    const saved = getCollection<Crawler>('crawlers');
+    const ids = [...byCrawler.keys()].filter(id => saved.some(c => c.id === id));
+    if (ids.length === 0) return;
+    let levelUps: { id: string; level: number }[] = [];
+    const ok = await transact(ids.map(id => ({ collection: 'crawlers' as const, id })), (docs) => {
+      levelUps = [];
+      const ops: BatchOperation[] = [];
+      docs.forEach((doc, i) => {
+        if (!doc) return;
+        const id = ids[i];
+        const crawler = doc as unknown as Crawler;
+        const entries = byCrawler.get(id) ?? [];
+        const xp = getCrawlerXP(crawler) + entries.reduce((sum, e) => sum + e.amount, 0);
+        const oldLevel = Math.max(1, Number(crawler.level) || 1);
+        const gained = Math.max(0, getLevelForXP(xp) - oldLevel);
+        const data: Record<string, unknown> = {
+          xp,
+          xpLog: [...[...entries].reverse(), ...(crawler.xpLog ?? [])].slice(0, XP_LOG_LIMIT),
+        };
+        if (gained > 0) {
+          // 5% of max HP and mana per level, rounded up; several levels at once compound
+          let maxHP = Number(crawler.maxHP) || 0;
+          let maxMana = Number(crawler.maxMana) || 0;
+          for (let l = 0; l < gained; l++) {
+            maxHP += getLevelUpIncrease(maxHP);
+            maxMana += getLevelUpIncrease(maxMana);
+          }
+          Object.assign(data, {
+            level: oldLevel + gained,
+            maxHP,
+            hp: (Number(crawler.hp) || 0) + maxHP - (Number(crawler.maxHP) || 0),
+            maxMana,
+            mana: (Number(crawler.mana) || 0) + maxMana - (Number(crawler.maxMana) || 0),
+            skillPoints: (crawler.skillPoints ?? 0) + gained,
+            abilityPoints: (crawler.abilityPoints ?? 0) + gained,
+          });
+          levelUps.push({ id, level: oldLevel + gained });
+        }
+        ops.push({ type: 'update', collection: 'crawlers', id, data });
+      });
+      return ops;
+    });
+    if (!ok) return;
+    const nameOf = (id: string) => crawlers.find(c => c.id === id)?.name ?? 'Unknown';
+    const lines = ids.map(id => {
+      const entries = byCrawler.get(id) ?? [];
+      const total = entries.reduce((sum, e) => sum + e.amount, 0);
+      return `${nameOf(id)}: +${total} XP (${entries.map(e => e.reason).join(', ')})`;
+    });
+    await addDiceRoll({
+      id: crypto.randomUUID(),
+      crawlerName: 'System',
+      crawlerId: '__system__',
+      timestamp: Date.now(),
+      results: [],
+      total: 0,
+      xpNotification: { lines, levelUps: levelUps.map(l => `${nameOf(l.id)} reached Level ${l.level}!`) },
+    });
+    for (const { id, level } of levelUps) toast.success(`${nameOf(id)} reached Level ${level}!`, { icon: '⭐' });
+  };
+
+  /** DM: give the same XP to one or more crawlers, exactly as typed (not scaled). */
+  const awardCrawlerXP = async (crawlerIds: string[], amount: number, reason: string) => {
+    const xp = Math.floor(amount);
+    if (xp <= 0 || crawlerIds.length === 0) return;
+    await awardXP(crawlerIds.map(crawlerId => ({ crawlerId, amount: xp, reason: reason.trim() || 'DM award' })), false);
+  };
+
+  /** Spends one skill point on a rank of a point-bought skill. */
+  const spendSkillPoint = async (crawlerId: string, skillId: SkillId) => {
+    const def = SKILLS.find(s => s.id === skillId);
+    if (!def || def.useBased) return false;
+    return transact([{ collection: 'crawlers', id: crawlerId }], ([doc]) => {
+      const crawler = doc as unknown as Crawler | null;
+      if (!crawler) throw new Error('Crawler not found.');
+      if ((crawler.skillPoints ?? 0) <= 0) throw new Error('No skill points to spend.');
+      const rank = getSkillRank(crawler, skillId);
+      if (rank >= MAX_SKILL_RANK) throw new Error(`${def.name} is already at rank ${MAX_SKILL_RANK}.`);
+      return [{
+        type: 'update', collection: 'crawlers', id: crawlerId,
+        data: { skills: { ...(crawler.skills ?? {}), [skillId]: rank + 1 }, skillPoints: (crawler.skillPoints ?? 0) - 1 },
+      }];
+    });
+  };
+
+  /** Spends one ability point: +1 to that ability's rolls (+2 to the score). No 5-point limit after creation. */
+  const spendAbilityPoint = async (crawlerId: string, ability: AbilityKey) => {
+    return transact([{ collection: 'crawlers', id: crawlerId }], ([doc]) => {
+      const crawler = doc as unknown as Crawler | null;
+      if (!crawler) throw new Error('Crawler not found.');
+      if ((crawler.abilityPoints ?? 0) <= 0) throw new Error('No ability points to spend.');
+      return [{
+        type: 'update', collection: 'crawlers', id: crawlerId,
+        data: { [ability]: (Number(crawler[ability]) || 10) + 2, abilityPoints: (crawler.abilityPoints ?? 0) - 1 },
+      }];
+    });
+  };
+
+  /** A crawler finished every visible action item of a quest handout: give the quest's XP once per handout. */
+  const awardQuestXP = async (assignedQuestId: string, crawlerId: string) => {
+    let amount = 0;
+    let questName = '';
+    const ok = await transact([{ collection: 'assignedQuests', id: assignedQuestId }], ([doc]) => {
+      amount = 0;
+      const assigned = doc as unknown as AssignedQuest | null;
+      if (!assigned || (assigned.xpAwardedTo ?? []).includes(crawlerId)) return [];
+      const quest = getCollection<Quest>('quests').find(q => q.id === assigned.questId);
+      if (!quest) return [];
+      amount = quest.xpReward ?? XP_REWARDS.questDefault;
+      questName = quest.name;
+      return [{ type: 'update', collection: 'assignedQuests', id: assignedQuestId, data: { xpAwardedTo: [...(assigned.xpAwardedTo ?? []), crawlerId] } }];
+    });
+    if (ok && amount > 0) await awardXP([{ crawlerId, amount, reason: `Quest: ${questName}` }]);
+  };
+
   // Persist crawler changes as-is (no activity stat bookkeeping)
   const writeCrawler = async (id: string, updates: Partial<Crawler>) => {
     // New campaigns display the built-in defaultCrawlers until one is saved. Those
@@ -640,14 +810,29 @@ export const useGameState = () => {
     logger.log('[GameState] 📝 Updating crawler:', { id, updates });
     const current = crawlers.find((c) => c.id === id);
     // Activity stats and trophies are only changed by their own helpers, never by a full-profile save
-    const { activityStats: _stats, trophies: _trophies, ...rest } = updates;
-    void _stats; void _trophies;
+    const { activityStats: _stats, trophies: _trophies, xpLog: _xpLog, barterTrades: _trades, ...rest } = updates;
+    void _stats; void _trophies; void _xpLog; void _trades;
     const finalUpdates: Partial<Crawler> = rest;
+    // A profile save carries the XP and points it was opened with; only send them when edited,
+    // so XP earned while the form was open isn't overwritten
+    if (current) {
+      for (const key of ['xp', 'skills', 'skillPoints', 'abilityPoints'] as const) {
+        if (key in finalUpdates && JSON.stringify(finalUpdates[key]) === JSON.stringify(current[key])) delete finalUpdates[key];
+      }
+      // Setting the level by hand (Admin Override) moves XP to the start of that level
+      if (finalUpdates.level !== undefined && finalUpdates.level !== current.level && finalUpdates.xp === undefined) {
+        finalUpdates.xp = getXPForLevel(finalUpdates.level);
+      }
+    }
+    let nearDeath = false;
     if (current && rest.hp !== undefined && rest.hp < (current.hp ?? 0)) {
       const deltas = getCrawlerHPLossStats(current, current.hp ?? 0, rest.hp, rest.maxHP ?? current.maxHP);
       finalUpdates.activityStats = addActivityStats(current.activityStats, deltas);
+      nearDeath = !!deltas.lowHealthCount;
     }
-    return writeCrawler(id, finalUpdates);
+    const result = await writeCrawler(id, finalUpdates);
+    if (nearDeath) await awardXP([{ crawlerId: id, amount: XP_REWARDS.nearDeath, reason: 'Near death' }]);
+    return result;
   };
 
   const addCrawler = async (crawler: Crawler) => {
@@ -760,6 +945,7 @@ export const useGameState = () => {
         tier: template.tier,
         items: (template.items ?? []).map(item => ({ ...item, id: crypto.randomUUID() })),
         gold: template.gold,
+        achievement: template.achievement ?? undefined,
         locked: true,
         sentAt: new Date().toISOString(),
       } as Record<string, unknown>,
@@ -768,7 +954,14 @@ export const useGameState = () => {
   };
 
   const unlockLootBox = async (lootBoxId: string) => {
-    return updateItem('lootBoxes', lootBoxId, { locked: false, unlockedAt: new Date().toISOString() });
+    const box = lootBoxes.find(b => b.id === lootBoxId);
+    await updateItem('lootBoxes', lootBoxId, { locked: false, unlockedAt: new Date().toISOString() });
+    // A box's achievement lands on the crawler's profile the moment it's unlocked
+    if (box?.locked && box.achievement?.name) {
+      await awardTrophy(box.crawlerId, box.achievement.name, box.achievement.description);
+      // A box that held only an achievement has nothing left to claim
+      if (box.items.length === 0 && !box.gold) await deleteItem('lootBoxes', lootBoxId);
+    }
   };
 
   const claimLootBoxItems = async (lootBoxId: string, crawlerId: string, itemIds: string[], claimGold = false) => {
@@ -1240,7 +1433,8 @@ export const useGameState = () => {
   };
 
   // Checkpoint of the game at the start of a combat turn, so the player can undo that turn
-  const buildTurnSnapshot = (combatants: CombatantEntry[], turnIndex: number): CombatTurnSnapshot | undefined => {
+  // crawlerHP overrides HP written this same moment (e.g. damage over time at the start of the turn)
+  const buildTurnSnapshot = (combatants: CombatantEntry[], turnIndex: number, crawlerHP: Record<string, number> = {}): CombatTurnSnapshot | undefined => {
     const active = combatants[turnIndex];
     if (!active) return undefined;
     const snapCrawlers: CombatTurnSnapshot['crawlers'] = {};
@@ -1248,7 +1442,7 @@ export const useGameState = () => {
       if (c.type !== 'crawler') continue;
       const crawler = crawlers.find(cr => cr.id === c.id);
       if (!crawler) continue;
-      snapCrawlers[c.id] = { hp: crawler.hp ?? 0, mana: crawler.mana ?? 0, activityStats: crawler.activityStats };
+      snapCrawlers[c.id] = { hp: crawlerHP[c.id] ?? crawler.hp ?? 0, mana: crawler.mana ?? 0, activityStats: crawler.activityStats };
     }
     const activeCrawler = active.type === 'crawler' ? crawlers.find(cr => cr.id === active.id) : undefined;
     return {
@@ -1260,6 +1454,7 @@ export const useGameState = () => {
         hasUsedAction: c.hasUsedAction,
         hasUsedBonusAction: c.hasUsedBonusAction,
         feetMovedThisTurn: c.feetMovedThisTurn,
+        conditions: c.conditions ?? [],
       })),
       crawlers: snapCrawlers,
       knownSpells: activeCrawler?.knownSpells,
@@ -1286,23 +1481,132 @@ export const useGameState = () => {
     if (!combatState || combatState.combatants.length === 0) return;
     const nextIndex = combatState.currentTurnIndex + 1;
     const isNewRound = nextIndex >= combatState.combatants.length;
-    // Reset action flags for the combatant whose turn just ended
-    const resetCombatants = combatState.combatants.map((c, i) => {
+    // Reset action flags for the combatant whose turn just ended, and count down its spell effects
+    let resetCombatants = combatState.combatants.map((c, i) => {
       if (i === combatState.currentTurnIndex) {
-        return { ...c, hasUsedAction: false, hasUsedBonusAction: false, feetMovedThisTurn: 0 };
+        return { ...c, hasUsedAction: false, hasUsedBonusAction: false, feetMovedThisTurn: 0, conditions: tickConditions(c.conditions) };
       }
       return c;
     });
     const newIndex = isNewRound ? 0 : nextIndex;
     if (isNewRound) await tickLanguageEffects('combat');
+    // Damage or healing over time lands at the start of the next combatant's turn
+    const startResult = await applyStartOfTurnConditions(resetCombatants, newIndex);
+    resetCombatants = startResult.combatants;
     await updateItem('combatState', 'current', {
       combatants: resetCombatants,
       currentTurnIndex: newIndex,
       combatRound: isNewRound ? combatState.combatRound + 1 : combatState.combatRound,
       turnStartedAt: Date.now(),
       turnTimerPaused: false,
-      turnSnapshot: buildTurnSnapshot(resetCombatants, newIndex) ?? null,
+      turnSnapshot: buildTurnSnapshot(resetCombatants, newIndex, startResult.crawlerHP) ?? null,
     } as Record<string, unknown>);
+    if (startResult.killedMobIds.length > 0) await lootDefeatedMobs(startResult.killedMobIds);
+  };
+
+  // One turn of a combatant's spell effects has passed; effects with no turns left wear off
+  const tickConditions = (conditions?: ActiveCondition[]): ActiveCondition[] =>
+    (conditions ?? []).flatMap(cond => (cond.turnsLeft > 1 ? [{ ...cond, turnsLeft: cond.turnsLeft - 1 }] : []));
+
+  // Roll damage/healing-over-time effects for the combatant whose turn is starting.
+  // Crawler HP is written straight away; mob HP is returned in the combatants list.
+  const applyStartOfTurnConditions = async (combatants: CombatantEntry[], turnIndex: number) => {
+    const active = combatants[turnIndex];
+    const killedMobIds: string[] = [];
+    const crawlerHP: Record<string, number> = {};
+    const ticking = (active?.conditions ?? []).filter(c => c.perTurnType && (c.perTurnDice ?? []).some(d => d.count > 0));
+    if (!active || ticking.length === 0) return { combatants, killedMobIds, crawlerHP };
+
+    const crawler = active.type === 'crawler' ? crawlers.find(c => c.id === active.id) : undefined;
+    const mob = active.type === 'mob' ? mobs.find(m => m.id === (active.sourceId || active.id)) : undefined;
+    if (!crawler && !mob) return { combatants, killedMobIds, crawlerHP };
+    const maxHP = crawler
+      ? (crawler.maxHP || 0) + (getEquippedModifiers(crawler, getCrawlerInventory(crawler.id)).maxHP ?? 0)
+      : mob?.hitPoints ?? 0;
+    const startHP = crawler ? crawler.hp ?? 0 : active.currentHP ?? mob?.hitPoints ?? 0;
+    let hp = startHP;
+
+    for (const cond of ticking) {
+      const results: { dice: string; result: number }[] = [];
+      let total = 0;
+      for (const die of cond.perTurnDice ?? []) {
+        for (let i = 0; i < die.count; i++) {
+          const roll = Math.floor(Math.random() * die.sides) + 1;
+          results.push({ dice: `d${die.sides}`, result: roll });
+          total += roll;
+        }
+      }
+      const isHealing = cond.perTurnType === 'healing';
+      hp = isHealing ? Math.min(maxHP, hp + total) : Math.max(0, hp - total);
+      await addDiceRoll({
+        id: crypto.randomUUID(),
+        crawlerName: active.name,
+        crawlerId: active.id,
+        timestamp: Date.now(),
+        results,
+        total,
+        statRoll: {
+          stat: `${cond.name} from ${cond.source} (${isHealing ? 'Healing' : 'Damage'} → ${active.name})`,
+          modifier: 0,
+          rawRoll: total,
+          diceLabel: (cond.perTurnDice ?? []).filter(d => d.count > 0).map(d => `${d.count}d${d.sides}`).join(' + '),
+          rollType: isHealing ? 'Healing' : 'Damage',
+        },
+      });
+    }
+
+    if (crawler) {
+      if (hp !== startHP) {
+        crawlerHP[crawler.id] = hp;
+        await writeCrawler(crawler.id, {
+          hp,
+          activityStats: addActivityStats(crawler.activityStats, getCrawlerHPLossStats(crawler, startHP, hp)),
+        });
+      }
+      return { combatants, killedMobIds, crawlerHP };
+    }
+    if (startHP > 0 && hp === 0) killedMobIds.push(active.id);
+    return { combatants: combatants.map((c, i) => (i === turnIndex ? { ...c, currentHP: hp } : c)), killedMobIds, crawlerHP };
+  };
+
+  // Edit combatants against the latest saved combat state, so an effect applied right after
+  // damage doesn't overwrite the HP that damage just wrote
+  const updateCombatantsFresh = (edit: (combatants: CombatantEntry[]) => CombatantEntry[]) =>
+    transact([{ collection: 'combatState', id: 'current' }], ([combatDoc]) => {
+      const combatants = (combatDoc?.combatants as CombatantEntry[] | undefined) ?? [];
+      return [{ type: 'update', collection: 'combatState', id: 'current', data: { combatants: edit(combatants) } }];
+    });
+
+  // Put a spell's effect on each target. Recasting the same spell refreshes its effect instead of stacking.
+  const applyCombatConditions = async (targetIds: string[], effect: SpellEffect, spellName: string, casterName?: string) => {
+    if (!combatState?.active || targetIds.length === 0 || !effect.condition.trim()) return;
+    const targets = new Set(targetIds);
+    const name = effect.condition.trim();
+    await updateCombatantsFresh(combatants => combatants.map(c => {
+      if (!targets.has(c.id)) return c;
+      const others = (c.conditions ?? []).filter(cond => !(cond.source === spellName && cond.name === name));
+      const condition: ActiveCondition = {
+        id: crypto.randomUUID(),
+        name,
+        turnsLeft: Math.max(1, effect.turns || 1),
+        description: effect.description?.trim() || undefined,
+        source: spellName,
+        casterName,
+        perTurnDice: effect.perTurnType ? effect.perTurnDice : undefined,
+        perTurnType: effect.perTurnType,
+      };
+      return { ...c, conditions: [...others, condition] };
+    }));
+    const names = combatState.combatants.filter(c => targets.has(c.id)).map(c => c.name);
+    toast.success(`${names.join(', ')} ${names.length === 1 ? 'is' : 'are'} now ${name}`);
+  };
+
+  // DM removes an effect early (a passed saving throw, a dispel, etc.)
+  const removeCombatCondition = async (combatantId: string, conditionId: string) => {
+    if (!combatState) return;
+    await updateCombatantsFresh(combatants => combatants.map(c =>
+      c.id === combatantId ? { ...c, conditions: (c.conditions ?? []).filter(cond => cond.id !== conditionId) } : c
+    ));
   };
 
   // Undo the current combat turn: put the game back to the checkpoint taken when the turn
@@ -1327,6 +1631,7 @@ export const useGameState = () => {
         hasUsedAction: s.hasUsedAction,
         hasUsedBonusAction: s.hasUsedBonusAction,
         feetMovedThisTurn: s.feetMovedThisTurn ?? 0,
+        conditions: s.conditions ?? [],
       };
     });
 
@@ -1424,6 +1729,23 @@ export const useGameState = () => {
   // A hostile mob that goes down in combat drops its items and gold to the crawlers in the fight
   // (see splitMobLoot). Combat state, crawlers and inventories are read and written in one
   // transaction, and the combatant is marked looted, so a mob never drops its loot twice.
+  // Whether a mob combatant is one the crawlers fight (damage to friendly NPCs earns no XP)
+  const isHostileMobCombatant = (combatId: string): boolean => {
+    const combatant = combatState?.combatants.find(c => c.id === combatId && c.type === 'mob');
+    const mob = combatant ? mobs.find(m => m.id === (combatant.sourceId || combatant.id)) : undefined;
+    if (!mob) return false;
+    const episode = combatState?.episodeId ? episodes.find(e => e.id === combatState.episodeId) : undefined;
+    let placement: Episode['mobPlacements'][number] | undefined;
+    if (episode) {
+      const colonIdx = combatId.indexOf(':');
+      const idx = colonIdx > 0 ? parseInt(combatId.substring(colonIdx + 1), 10) : NaN;
+      placement = !isNaN(idx) && episode.mobPlacements[idx]?.mobId === mob.id
+        ? episode.mobPlacements[idx]
+        : episode.mobPlacements.find(p => p.mobId === mob.id);
+    }
+    return isPlacementHostile(placement, mob);
+  };
+
   const lootDefeatedMobs = async (combatIds: string[]) => {
     if (!combatState || combatIds.length === 0) return;
     const episode = combatState.episodeId ? episodes.find(e => e.id === combatState.episodeId) : undefined;
@@ -1555,6 +1877,9 @@ export const useGameState = () => {
     });
     toast.success(`Looted ${looted.map(d => d.name).join(', ')}`);
     for (const { id, level } of summary.levelUps) toast.success(`${nameOf(id)} reached Looting level ${level}!`, { icon: '💰' });
+    if (summary.levelUps.length > 0) {
+      await awardXP(summary.levelUps.map(({ id, level }) => ({ crawlerId: id, amount: XP_REWARDS.masteryLevelUp, reason: `Looting level ${level}` })));
+    }
   };
 
   // Apply damage to one or more combat targets in a single pass, so splash hits don't
@@ -1572,6 +1897,8 @@ export const useGameState = () => {
     };
     let killingBlows = 0;
     const killedMobIds: string[] = [];
+    let hostileDamage = 0;
+    const xpReasons: { amount: number; reason: string }[] = [];
 
     for (const { targetId, targetType, damage } of hits) {
       let dealt = 0;
@@ -1598,9 +1925,14 @@ export const useGameState = () => {
           combatantsChanged = true;
         }
         dealt = hpBefore - newHP;
+        const hostile = isHostileMobCombatant(targetId);
+        if (hostile) hostileDamage += dealt;
         if (hpBefore > 0 && newHP === 0) {
           killingBlows++;
           killedMobIds.push(targetId);
+          if (hostile) {
+            xpReasons.push({ amount: XP_REWARDS.killPerMobLevel * Math.max(1, mob.level || 1), reason: `Killing blow on ${combatant?.name ?? mob.name}` });
+          }
         }
         logger.log('[GameState] ⚔️ Damage applied to mob', combatant?.name ?? mob.name, ':', damage, '→ HP:', newHP);
       }
@@ -1614,6 +1946,7 @@ export const useGameState = () => {
         (c.currentHP ?? mobs.find(m => m.id === (c.sourceId || c.id))?.hitPoints ?? 1) <= 0;
       const endsCombat = mobCombatants.length > 0 && mobCombatants.every(isDown);
       addDeltas(attackerId, { killingBlows, combatEndingBlows: endsCombat ? 1 : 0 });
+      if (endsCombat) xpReasons.push({ amount: XP_REWARDS.finisher, reason: 'Fight finisher' });
       if (endsCombat) {
         const attacker = crawlers.find(c => c.id === attackerId);
         if (attacker) toast.success(`${attacker.name} landed the final blow!`);
@@ -1634,6 +1967,17 @@ export const useGameState = () => {
       if (deltas) updates.activityStats = addActivityStats(crawler.activityStats, deltas);
       await writeCrawler(id, updates);
     }
+
+    const grants: { crawlerId: string; amount: number; reason: string }[] = [];
+    if (attackerId) {
+      const damageXP = Math.floor(hostileDamage / 2) * XP_REWARDS.damagePer2;
+      if (damageXP > 0) grants.push({ crawlerId: attackerId, amount: damageXP, reason: `Dealt ${hostileDamage} damage` });
+      grants.push(...xpReasons.map(r => ({ crawlerId: attackerId, ...r })));
+    }
+    for (const [id, deltas] of statDeltas) {
+      if (deltas.lowHealthCount) grants.push({ crawlerId: id, amount: XP_REWARDS.nearDeath, reason: 'Near death' });
+    }
+    if (grants.length > 0) await awardXP(grants);
   };
 
   const applyCombatDamage = async (targetId: string, targetType: 'crawler' | 'mob', damage: number, attackerId?: string) => {
@@ -1797,6 +2141,11 @@ export const useGameState = () => {
       }
     }
 
+    // Everyone still standing when the fight ends earns survival XP
+    const survivors = combatState.combatants
+      .filter(c => c.type === 'crawler' && (crawlers.find(cr => cr.id === c.id)?.hp ?? 0) > 0)
+      .map(c => c.id);
+
     await updateItem('combatState', 'current', {
       active: false,
       phase: 'ended',
@@ -1804,6 +2153,9 @@ export const useGameState = () => {
       currentTurnIndex: 0,
     } as Record<string, unknown>);
     logger.log('[GameState] ⚔️ Combat ended');
+    if (combatState.phase === 'combat' && survivors.length > 0) {
+      await awardXP(survivors.map(crawlerId => ({ crawlerId, amount: XP_REWARDS.survived, reason: 'Survived the fight' })));
+    }
   };
 
   const cancelCombat = async () => {
@@ -1986,6 +2338,7 @@ export const useGameState = () => {
     await updateCrawler(crawlerId, { knownSpells, mana: currentMana - cost, ...(languageEffects ? { languageEffects } : {}) });
     if (newMastery > prevMastery) {
       toast.success(`${crawler.name} leveled up ${prev.spellName} to mastery level ${newMastery}!`);
+      await awardXP([{ crawlerId, amount: XP_REWARDS.masteryLevelUp, reason: `${prev.spellName} mastery ${newMastery}` }]);
     }
     return true;
   };
@@ -2181,18 +2534,30 @@ export const useGameState = () => {
     };
   };
 
+  // Every completed trade counts toward Barter; say so when it reaches a new rank
+  const withBarterNotice = async (crawlerId: string, trade: Promise<boolean>) => {
+    const crawler = crawlers.find(c => c.id === crawlerId);
+    const before = getUseSkillRank(crawler?.barterTrades ?? 0);
+    const ok = await trade;
+    if (ok && crawler && getUseSkillRank((crawler.barterTrades ?? 0) + 1) > before) {
+      toast.success(`${crawler.name} reached Barter rank ${before + 1}!`, { icon: '🪙' });
+    }
+    return ok;
+  };
+
   /** Buys one of the stock line matching `item`. Returns true when the trade went through. */
   const buyFromMerchant = async (mob: Mob, crawlerId: string, item: InventoryItem) => {
     if (!mob.merchant) return false;
     const config = mob.merchant;
     const key = merchantItemKey(item);
     const { invDocId, reads } = tradeReads(mob, crawlerId);
-    return transact(reads, ([merchantDoc, crawlerDoc, invDoc]) => {
+    return withBarterNotice(crawlerId, transact(reads, ([merchantDoc, crawlerDoc, invDoc]) => {
       if (!crawlerDoc) throw new Error('Crawler not found.');
       const state = (merchantDoc as unknown as MerchantState | null) ?? createMerchantState(mob.id, config);
       const idx = state.stock.findIndex(e => merchantItemKey(e.item) === key);
       if (idx < 0 || state.stock[idx].quantity <= 0) throw new Error(`${mob.name} is sold out of ${item.name}.`);
-      const price = getMerchantBuyPrice(state.stock[idx].item.goldValue, getEffectiveScrooge(config, state, crawlerId));
+      const trades = Number(crawlerDoc.barterTrades) || 0;
+      const price = getMerchantBuyPrice(state.stock[idx].item.goldValue, getEffectiveScrooge(config, state, crawlerId, getUseSkillRank(trades)));
       const gold = Number(crawlerDoc.gold) || 0;
       if (gold < price) throw new Error(`Not enough gold: ${item.name} costs ${price}.`);
       const stock: MerchantStockEntry[] = state.stock
@@ -2202,10 +2567,10 @@ export const useGameState = () => {
       const items = [...(((invDoc?.items as InventoryItem[]) ?? [])), bought];
       return [
         merchantDocOps(mob, !!merchantDoc, { ...state, stock, gold: state.gold + price }),
-        { type: 'update', collection: 'crawlers', id: crawlerId, data: { gold: gold - price } },
+        { type: 'update', collection: 'crawlers', id: crawlerId, data: { gold: gold - price, barterTrades: trades + 1 } },
         inventoryOp(crawlerId, invDocId, !!invDoc, items),
       ];
-    });
+    }));
   };
 
   /**
@@ -2217,13 +2582,14 @@ export const useGameState = () => {
     if (!mob.merchant) return false;
     const config = mob.merchant;
     const { invDocId, reads } = tradeReads(mob, crawlerId);
-    return transact(reads, ([merchantDoc, crawlerDoc, invDoc]) => {
+    return withBarterNotice(crawlerId, transact(reads, ([merchantDoc, crawlerDoc, invDoc]) => {
       if (!crawlerDoc) throw new Error('Crawler not found.');
       const state = (merchantDoc as unknown as MerchantState | null) ?? createMerchantState(mob.id, config);
       const owned = ((invDoc?.items as InventoryItem[]) ?? []);
       const item = owned.find(i => i.id === itemId);
       if (!item) throw new Error('That item is no longer in your inventory.');
-      const price = getMerchantSellPrice(item.goldValue, getEffectiveScrooge(config, state, crawlerId));
+      const trades = Number(crawlerDoc.barterTrades) || 0;
+      const price = getMerchantSellPrice(item.goldValue, getEffectiveScrooge(config, state, crawlerId, getUseSkillRank(trades)));
       const paid = Math.min(price, state.gold);
       if (paid < minGold) throw new Error(`${mob.name} only has ${state.gold} gold left now. Try again.`);
       const key = merchantItemKey(item);
@@ -2237,10 +2603,10 @@ export const useGameState = () => {
       for (const [slot, id] of Object.entries(equipped)) if (id === itemId) delete equipped[slot];
       return [
         merchantDocOps(mob, !!merchantDoc, { ...state, stock, gold: state.gold - paid }),
-        { type: 'update', collection: 'crawlers', id: crawlerId, data: { gold: (Number(crawlerDoc.gold) || 0) + paid, equippedItems: equipped } },
+        { type: 'update', collection: 'crawlers', id: crawlerId, data: { gold: (Number(crawlerDoc.gold) || 0) + paid, equippedItems: equipped, barterTrades: trades + 1 } },
         inventoryOp(crawlerId, invDocId, !!invDoc, owned.filter(i => i.id !== itemId)),
       ];
-    });
+    }));
   };
 
   /** DM: reset stock, gold and haggling from the merchant's settings. */
@@ -2272,11 +2638,12 @@ export const useGameState = () => {
       return null;
     }
     const cha = crawler.cha + (getEquippedModifiers(crawler, getCrawlerInventory(crawler.id)).cha ?? 0);
-    const modifier = Math.floor((cha - 10) / 2);
+    const barter = getSkillRank(crawler, 'barter');
+    const modifier = Math.floor((cha - 10) / 2) + barter;
     const { rawRoll, results, diceLabel } = rollD20(rollsWithDisadvantage(crawler, cha));
     const total = rawRoll + modifier;
     const dc = config.haggleDC ?? DEFAULT_HAGGLE_DC;
-    const entry: MerchantHaggle = { state: total >= dc ? 'pending' : 'failed', crawlerName: crawler.name, total, dc, at: Date.now() };
+    const entry: MerchantHaggle = { state: isCheckSuccess(rawRoll, total, dc) ? 'pending' : 'failed', crawlerName: crawler.name, total, dc, at: Date.now() };
     const ok = await transact([{ collection: 'merchants', id: mob.id }], ([merchantDoc]) => {
       const state = (merchantDoc as unknown as MerchantState | null) ?? createMerchantState(mob.id, config);
       if (state.haggles?.[crawler.id]) throw new Error(`You already haggled with ${mob.name}. Try again after they restock.`);
@@ -2293,7 +2660,7 @@ export const useGameState = () => {
       timestamp: Date.now(),
       results,
       total,
-      statRoll: { stat: `Haggle with ${mob.name} (Persuasion)`, modifier, rawRoll, diceLabel },
+      statRoll: { stat: `Haggle with ${mob.name} (Persuasion${barter ? ` + Barter ${barter}` : ''})`, modifier, rawRoll, diceLabel },
     });
     return entry;
   };
@@ -2452,6 +2819,15 @@ export const useGameState = () => {
     recordCrawlerMove,
     undoCombatTurn,
     awardTrophy,
+    gameSettings,
+    setXPScale,
+    setDungeonFloor,
+    awardCrawlerXP,
+    spendSkillPoint,
+    spendAbilityPoint,
+    awardQuestXP,
+    applyCombatConditions,
+    removeCombatCondition,
     applyNoChildLeftBehind,
     revokeTrophy,
     overrideMobHealth,

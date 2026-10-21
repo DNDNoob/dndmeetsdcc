@@ -33,6 +33,7 @@ export type CollectionName =
   | 'npcAi'
   | 'languages'
   | 'merchants'
+  | 'gameSettings'
   | string; // Allow any string for flexibility
 
 /**
