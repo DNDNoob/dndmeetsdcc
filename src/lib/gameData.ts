@@ -594,6 +594,106 @@ export interface Mob {
   languages?: string[];      // Language ids it speaks, native first; none set = Worldspeech
   silent?: boolean;          // Never talks in Game Chat (oozes, constructs...)
   merchant?: MerchantConfig;  // NPCs that buy and sell items with crawlers
+  attacks?: MobAttack[];     // Natural attacks the DM rolls in combat (claws, bites...)
+  spellIds?: string[];       // Spells from the campaign spell library this mob can cast
+}
+
+// ======== Mob combat actions ========
+
+/** A natural attack on a mob, set up in the mob creator. Mobs have no ability scores, so the bonuses are flat. */
+export interface MobAttack {
+  id: string;
+  name: string;
+  actionType: SpellActionType;
+  hitBonus?: number;    // added to the d20 to-hit roll
+  damageDice: WeaponDie[];
+  damageBonus?: number; // added to the damage roll
+  damageType?: DamageType;
+  range?: number;       // feet; absent = melee
+  notes?: string;
+}
+
+/** One thing a mob can do in combat: a natural attack, an equipped weapon or a spell. */
+export interface MobCombatAction {
+  key: string;
+  source: 'attack' | 'weapon' | 'spell';
+  name: string;
+  actionType: SpellActionType;
+  hitBonus: number;
+  hitDie?: WeaponDie;
+  damageDice: WeaponDie[];
+  damageBonus: number;
+  damageType?: string;
+  healing: boolean;
+  splash: boolean;
+  range?: number | string;
+  notes?: string;
+}
+
+/** Everything a mob can do in combat: its attacks, its equipped weapons (from its default inventory) and its spells. */
+export function getMobCombatActions(mob: Mob, spells: Spell[]): MobCombatAction[] {
+  const actions: MobCombatAction[] = (mob.attacks ?? []).map(a => ({
+    key: `attack:${a.id}`,
+    source: 'attack' as const,
+    name: a.name || 'Attack',
+    actionType: a.actionType,
+    hitBonus: a.hitBonus ?? 0,
+    damageDice: a.damageDice ?? [],
+    damageBonus: a.damageBonus ?? 0,
+    damageType: a.damageType,
+    healing: false,
+    splash: false,
+    range: a.range,
+    notes: a.notes,
+  }));
+  const equippedIds = new Set(Object.values(mob.equippedItems ?? {}).filter(Boolean));
+  for (const item of mob.defaultInventory ?? []) {
+    if (!item.weaponData || !equippedIds.has(item.id)) continue;
+    const wd = item.weaponData;
+    actions.push({
+      key: `weapon:${item.id}`,
+      source: 'weapon',
+      name: item.name,
+      actionType: 'Action',
+      hitBonus: 0,
+      hitDie: wd.hitDie && wd.hitDie.count > 0 ? wd.hitDie : undefined,
+      damageDice: wd.damageDice ?? [],
+      damageBonus: 0,
+      damageType: wd.damageType,
+      healing: false,
+      splash: !!wd.splashDamage,
+      range: wd.isRanged ? wd.normalRange : undefined,
+      notes: wd.specialEffect,
+    });
+  }
+  for (const id of mob.spellIds ?? []) {
+    const spell = spells.find(s => s.id === id);
+    if (!spell) continue;
+    const sd = spell.spellData;
+    actions.push({
+      key: `spell:${spell.id}`,
+      source: 'spell',
+      name: spell.name,
+      actionType: sd.actionType,
+      hitBonus: 0,
+      hitDie: sd.hitDie && sd.hitDie.count > 0 ? sd.hitDie : undefined,
+      damageDice: sd.damageDice ?? [],
+      damageBonus: 0,
+      damageType: sd.damageType,
+      healing: sd.damageType === 'Healing',
+      splash: !!sd.splashDamage || sd.target === 'Area' || sd.target === 'Multiple',
+      range: sd.range,
+      notes: sd.specialEffect || spell.description,
+    });
+  }
+  return actions;
+}
+
+/** "2d6 + 1d4 + 3" */
+export function formatDamageDice(dice: WeaponDie[], bonus = 0): string {
+  const parts = dice.filter(d => d.count > 0).map(d => `${d.count}d${d.sides}`);
+  if (bonus) parts.push(String(bonus));
+  return parts.join(' + ') || '—';
 }
 
 // ======== Merchants ========
@@ -692,8 +792,14 @@ export const getItemStackKey = (item: InventoryItem): string => {
   const modifiersStr = item.statModifiers
     ? JSON.stringify(Object.entries(item.statModifiers).filter(([, v]) => v !== 0).sort())
     : '';
-  return `${item.name}|${item.description || ''}|${item.equipSlot || ''}|${item.goldValue ?? 0}|${modifiersStr}`;
+  // An upgraded copy never stacks with the plain item, or with copies upgraded differently
+  const upgradeStr = item.isUpgraded ? `|upgraded:${JSON.stringify(item.weaponData ?? null)}` : '';
+  return `${item.name}|${item.description || ''}|${item.equipSlot || ''}|${item.goldValue ?? 0}|${modifiersStr}${upgradeStr}`;
 };
+
+/** An upgraded item's name without the "Upgraded" suffix, which is drawn separately (older upgrades saved it in the name). */
+export const baseItemName = (item: Pick<InventoryItem, 'name' | 'isUpgraded'>): string =>
+  item.isUpgraded ? item.name.replace(/\s+upgraded$/i, '') : item.name;
 
 export interface ItemStack {
   key: string;
@@ -1256,7 +1362,6 @@ export interface Quest {
   actionItems: QuestActionItem[];
   notes: QuestNote[];
   xpReward?: number;      // XP each crawler gets for finishing every visible action item; missing = XP_REWARDS.questDefault
-  xpAwardedTo?: string[]; // crawlerIds already given this quest's XP, so un-ticking and re-ticking can't repeat it
   createdAt: string;
   updatedAt: string;
 }
@@ -1293,7 +1398,44 @@ export interface AssignedQuest {
   episodeId?: string; // optional episode link
   assignedAt: string;
   completedAt?: string;
+  // Progress for this handout. Older handouts lack these and fall back to the quest's own fields.
+  visibleActionIds?: string[];
+  completedActions?: Record<string, string[]>; // actionItemId -> crawlerIds
+  visibleRewardIds?: string[];
+  claimedRewards?: Record<string, string[]>; // rewardId -> crawlerIds
+  notes?: QuestNote[];
+  xpAwardedTo?: string[]; // crawlerIds already given this handout's quest XP, so un-ticking and re-ticking can't repeat it
 }
+
+export interface QuestProgress {
+  visibleActionIds: string[];
+  completedActions: Record<string, string[]>;
+  visibleRewardIds: string[];
+  claimedRewards: Record<string, string[]>;
+  notes: QuestNote[];
+}
+
+/** Fresh progress for a new handout: the quest's show/hide settings are the starting point. */
+export const newQuestProgress = (quest: Quest): QuestProgress => ({
+  visibleActionIds: (quest.actionItems || []).filter(a => a.visible).map(a => a.id),
+  completedActions: {},
+  visibleRewardIds: (quest.rewards || []).filter(r => r.visible).map(r => r.id),
+  claimedRewards: {},
+  notes: [],
+});
+
+/** Progress for one handout, reading the quest's legacy fields for handouts made before progress moved. */
+export const getQuestProgress = (quest: Quest, assigned: AssignedQuest): QuestProgress => ({
+  visibleActionIds: assigned.visibleActionIds
+    ?? (quest.actionItems || []).filter(a => a.visible).map(a => a.id),
+  completedActions: assigned.completedActions
+    ?? Object.fromEntries((quest.actionItems || []).map(a => [a.id, a.completedBy || []])),
+  visibleRewardIds: assigned.visibleRewardIds
+    ?? (quest.rewards || []).filter(r => r.visible).map(r => r.id),
+  claimedRewards: assigned.claimedRewards
+    ?? Object.fromEntries((quest.rewards || []).map(r => [r.id, r.claimedBy || []])),
+  notes: assigned.notes ?? quest.notes ?? [],
+});
 
 export interface WikiPage {
   id: string;

@@ -3,6 +3,7 @@ import PixelIcon from '@/components/ui/PixelIcon';
 import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
+import { ItemName } from "@/components/ItemName";
 import { Crawler, InventoryItem, getItemStackKey, stackItems, EquipmentSlot as SlotType, StatModifiers, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, Spell, SpellData, ITEM_RARITIES, ItemRarity, getItemRarityColor } from "@/lib/gameData";
 import { RarityBadge } from "@/components/ui/RarityBadge";
 import { Coins, Package, Sword, Shield, Plus, Trash2, Edit2, Save, HardHat, Search, BookOpen, Gem, Footprints, Shirt, Hand, Crosshair, ChevronDown, ChevronUp, Wand2, Globe, Lock, Users, Bookmark } from "lucide-react";
@@ -425,11 +426,6 @@ const InventoryView: React.FC<InventoryViewProps> = ({
           )}
         </div>
       )}
-      {item.isUpgraded && (
-        <div>
-          <span className="text-accent text-[10px] font-display">UPGRADED</span>
-        </div>
-      )}
       {item.isSpellTome && (
         <div className="border border-primary/20 bg-primary/5 p-2 space-y-1">
           <span className="text-primary font-display text-[10px] flex items-center gap-1">
@@ -596,7 +592,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                               onClick={() => toggleItemExpanded(expansionKey)}
                               className="text-foreground hover:text-primary transition-colors text-left flex items-center gap-1"
                             >
-                              {item.name}
+                              <ItemName item={item} />
                               {(item.description || item.effects || item.statModifiers || item.weaponData || item.tags) && (
                                 isExpanded
                                   ? <ChevronUp className="w-3 h-3 text-muted-foreground" />
@@ -897,7 +893,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                         {/* Hit Roll Stat Modifiers */}
                         <div>
                           <label className="text-[10px] text-muted-foreground block mb-0.5">Hit Roll Stat Modifiers</label>
-                          <p className="text-[9px] text-muted-foreground/60 mb-1">Adds the crawler&apos;s base stat value to the hit roll</p>
+                          <p className="text-[9px] text-muted-foreground/60 mb-1">Adds the crawler&apos;s ability modifier (with gear) to the hit roll</p>
                           <div className="flex gap-3">
                             {(['str', 'dex', 'con', 'int', 'cha'] as const).map((stat) => (
                               <label key={stat} className="flex items-center gap-1 text-[10px] cursor-pointer">
@@ -915,7 +911,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                         {/* Damage Stat Modifiers */}
                         <div>
                           <label className="text-[10px] text-muted-foreground block mb-0.5">Damage Stat Modifiers</label>
-                          <p className="text-[9px] text-muted-foreground/60 mb-1">Adds the crawler&apos;s base stat value to the damage roll</p>
+                          <p className="text-[9px] text-muted-foreground/60 mb-1">Adds the crawler&apos;s ability modifier (with gear) to the damage roll</p>
                           <div className="flex gap-3">
                             {(['str', 'dex', 'con', 'int', 'cha'] as const).map((stat) => (
                               <label key={stat} className="flex items-center gap-1 text-[10px] cursor-pointer">
@@ -1419,7 +1415,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                                       onClick={() => toggleItemExpanded(`${crawler.id}:${item.id}`)}
                                       className="text-foreground hover:text-primary transition-colors text-left flex items-center gap-1"
                                     >
-                                      {item.name}
+                                      <ItemName item={item} />
                                       {(item.description || item.effects || item.statModifiers || item.weaponData || item.tags) && (
                                         expandedItems.has(`${crawler.id}:${item.id}`)
                                           ? <ChevronUp className="w-3 h-3 text-muted-foreground" />

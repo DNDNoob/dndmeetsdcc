@@ -24,6 +24,7 @@ import {
   WikiPage,
   Quest,
   AssignedQuest,
+  newQuestProgress,
   ChatMessage,
   NpcAiSettings,
   NpcAiStatus,
@@ -102,6 +103,7 @@ export interface DiceRollEntry {
   results: { dice: string; result: number }[];
   total: number;
   statRoll?: { stat: string; modifier: number; rawRoll: number; diceLabel?: string; rollType?: string; dc?: number; success?: boolean };
+  mobRoll?: boolean; // rolled by the DM for a mob (crawlerId holds the mob's combatant id)
   // For loot box notifications
   lootBoxNotification?: {
     boxName: string;
@@ -764,17 +766,19 @@ export const useGameState = () => {
     });
   };
 
-  /** A crawler finished every visible action item of a quest: give its XP once. */
-  const awardQuestXP = async (questId: string, crawlerId: string) => {
+  /** A crawler finished every visible action item of a quest handout: give the quest's XP once per handout. */
+  const awardQuestXP = async (assignedQuestId: string, crawlerId: string) => {
     let amount = 0;
     let questName = '';
-    const ok = await transact([{ collection: 'quests', id: questId }], ([doc]) => {
+    const ok = await transact([{ collection: 'assignedQuests', id: assignedQuestId }], ([doc]) => {
       amount = 0;
-      const quest = doc as unknown as Quest | null;
-      if (!quest || (quest.xpAwardedTo ?? []).includes(crawlerId)) return [];
+      const assigned = doc as unknown as AssignedQuest | null;
+      if (!assigned || (assigned.xpAwardedTo ?? []).includes(crawlerId)) return [];
+      const quest = getCollection<Quest>('quests').find(q => q.id === assigned.questId);
+      if (!quest) return [];
       amount = quest.xpReward ?? XP_REWARDS.questDefault;
       questName = quest.name;
-      return [{ type: 'update', collection: 'quests', id: questId, data: { xpAwardedTo: [...(quest.xpAwardedTo ?? []), crawlerId] } }];
+      return [{ type: 'update', collection: 'assignedQuests', id: assignedQuestId, data: { xpAwardedTo: [...(assigned.xpAwardedTo ?? []), crawlerId] } }];
     });
     if (ok && amount > 0) await awardXP([{ crawlerId, amount, reason: `Quest: ${questName}` }]);
   };
@@ -1063,6 +1067,7 @@ export const useGameState = () => {
   };
 
   const assignQuest = async (questId: string, crawlerIds: string[], episodeId?: string) => {
+    const quest = quests.find(q => q.id === questId);
     const allCrawlerIds = crawlers.filter(c => c.id !== 'dungeonai').map(c => c.id);
     const isPartyQuest = crawlerIds.length >= allCrawlerIds.length && allCrawlerIds.every(id => crawlerIds.includes(id));
     const assignment: AssignedQuest = {
@@ -1072,6 +1077,7 @@ export const useGameState = () => {
       isPartyQuest,
       episodeId,
       assignedAt: new Date().toISOString(),
+      ...(quest ? newQuestProgress(quest) : {}),
     };
     return addItem('assignedQuests', { ...assignment } as Record<string, unknown>);
   };

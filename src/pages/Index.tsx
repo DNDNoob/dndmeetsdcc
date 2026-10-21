@@ -837,19 +837,16 @@ const Index = () => {
 
   // Quest assignment notifications
   const seenAssignedQuestIds = useRef<Set<string>>(new Set());
+  // Only quests handed out after this page opened get a popup (a minute of slack for device clocks)
+  const questPopupsSince = useRef(Date.now() - 60_000);
   useEffect(() => {
     if (!currentPlayer || currentPlayer.type === 'ai') return;
-
-    // Initialize seen IDs on first load
-    if (seenAssignedQuestIds.current.size === 0 && assignedQuests.length > 0) {
-      assignedQuests.forEach(a => seenAssignedQuestIds.current.add(a.id));
-      return;
-    }
 
     const myQuests = assignedQuests.filter(a => a.crawlerIds.includes(currentPlayer.id));
     for (const assigned of myQuests) {
       if (!seenAssignedQuestIds.current.has(assigned.id)) {
         seenAssignedQuestIds.current.add(assigned.id);
+        if (!(Date.parse(assigned.assignedAt) > questPopupsSince.current)) continue;
         const quest = quests.find(q => q.id === assigned.questId);
         if (quest) {
           const label = assigned.isPartyQuest ? `Party Quest: ${quest.name}` : `New Quest: ${quest.name}`;
@@ -1081,7 +1078,7 @@ const Index = () => {
                 mobs={mobs}
                 getCrawlerAssignedQuests={getCrawlerAssignedQuests}
                 quests={quests}
-                onUpdateQuest={updateQuest}
+                onUpdateAssignedQuest={updateAssignedQuest}
                 spells={spells}
                 onCastSpell={castSpell}
                 onForgetSpell={forgetSpell}
@@ -1148,6 +1145,7 @@ const Index = () => {
             {currentView === "dungeonai" && isAdmin && (
               <DungeonAIView
                 mobs={mobs}
+                spells={spells}
                 onUpdateMobs={setMobs}
                 onGenerateMobImage={(mob) => generateMobImage(mob, mobs)}
                 maps={maps}
@@ -1248,6 +1246,11 @@ const Index = () => {
                 onHaggleWithMerchant={haggleWithMerchant}
                 onRestockMerchant={isAdmin ? restockMerchant : undefined}
                 onResolveMerchantHaggle={isAdmin ? resolveMerchantHaggle : undefined}
+                spells={spells}
+                onApplyCombatDamageBatch={isAdmin ? applyCombatDamageBatch : undefined}
+                onRecordCombatAction={isAdmin ? recordCombatAction : undefined}
+                onOverrideMobHealth={isAdmin ? overrideMobHealth : undefined}
+                onHealCrawler={isAdmin ? healCrawler : undefined}
               />
             )}
             {currentView === "sounds" && <SoundEffectsView />}

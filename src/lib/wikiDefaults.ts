@@ -243,13 +243,17 @@ Each weapon has the following configurable properties:
 1. **Attack Roll**: Roll d20 (plus any hit die bonus and stat modifiers) to determine if the attack connects
 2. **Damage Roll**: If the attack hits, roll the weapon's damage dice plus stat modifiers
 
+A stat the weapon uses adds that ability's modifier, counting gear bonuses, the same as any other roll. For example, a sword that uses STR adds +2 for a crawler with STR 14.
+
 ## Advantage and Disadvantage
 
 Right-click an equipped weapon to roll with advantage (2d20, take highest) or disadvantage (2d20, take lowest). This affects only the attack roll, not damage.
 
 ## Weapon Upgrades
 
-Right-click a weapon in your inventory to upgrade it. Upgrades let you modify the weapon's stats, dice, and name. Upgraded weapons are marked with a special label and are not affected by changes to the original item in the DM's library.
+Right-click a weapon in your inventory (or expand it and tap **Upgrade**) to upgrade it. The upgrade window edits everything about the weapon: its name, description, stat bonuses while equipped, dice, damage and weapon type, range, splash and special effects. Only that crawler's copy changes.
+
+When you save a change, the weapon gets **Upgraded** after its name in gold. Saving without changing anything leaves the weapon as it was. Upgraded weapons don't stack with plain copies and are not affected by changes to the original item in the DM's library.
 
 ## Unarmed Strike
 
@@ -444,6 +448,18 @@ Combat proceeds in turn order (highest initiative first). On your turn:
 - The current combatant is highlighted in the combat order bar at the top of the map
 
 The DM advances turns with the "Next Turn" button.
+
+## Mob Turns (DM)
+
+During combat the DM sees a **mob actions panel** in the top left of the Show Time map. It follows the turn order: when a mob's turn comes up, the panel shows everything that mob can do:
+
+- **Attacks** set up for it in the mob creator (claws, bites, tail swipes)
+- **Weapons** it has equipped from its default inventory
+- **Spells** picked for it from the spell library
+
+Tap one to roll it. The to-hit roll (d20 plus the attack's bonus) goes to the dice log under the mob's name in red, so every player sees it. Mobs the party hasn't met show as **???**. Then pick the target (each crawler shows their HP and CON), tap **Roll damage**, and the target's health goes down on its own. Tap **Missed** if the attack didn't land. Splash weapons and area spells let you pick several targets. Healing spells skip the to-hit roll and heal the target instead.
+
+Mobs follow the same rules as crawlers: one action and one bonus action on their turn, and only reactions when it isn't their turn. The panel crosses out the action and bonus action once they're used. To use a mob's reaction on someone else's turn, pick the mob from the menu at the top of the panel. Tap the arrow to fold the panel out of the way.
 
 ## Undo Turn
 
@@ -664,6 +680,17 @@ Each mob has:
 - **Default Inventory** (items the mob carries)
 - **Default Gold**
 - **Equipped Items** (items the mob has equipped, shown with a shield icon)
+- **Attacks & Spells**: what the DM rolls for it in combat (see below)
+
+## Attacks & Spells
+
+Open **Attacks & Spells** when adding or editing a mob in the DM Console:
+
+- **Add attack**: give it a name, whether it uses an Action, Bonus Action or Reaction, a to-hit bonus, damage dice plus a flat damage bonus, a damage type, a range (leave blank for melee) and optional notes. Mobs have no ability scores, so the bonuses are flat numbers
+- **Spells**: add any spell from the campaign's spell library. Mobs don't spend mana
+- **Weapons** the mob has equipped from its default inventory are added on their own
+
+In combat, the DM rolls all of these from the mob actions panel on the map. See [Combat System](/wiki/combat).
 
 ## Encountered Mobs
 
@@ -802,22 +829,24 @@ Quests are objectives the DM creates and assigns to crawlers. They have action i
 2. Fill in the quest **name** and **description**
 3. Add **action items** — tasks for crawlers to complete (hidden from players by default)
 4. Add **item rewards** — search from the shared inventory library and assign a tier (Dirt/Copper/Silver/Gold)
-5. Rewards are also hidden from players by default — toggle visibility with the eye icon
+5. Rewards are also hidden from players by default. The eye icons here set what players see when the quest is first handed out
 6. Click **Create Quest** to save
 
 ## Linking Quests to Episodes
 
-When creating or editing an episode in the Episodes tab, you can select quests to include. This makes them available for assignment during Show Time.
+When creating or editing an episode in the Episodes tab, you can select quests to include. Linked quests are listed first in Show Time, but every quest in the campaign can be handed out from any map.
 
 ## Assigning Quests (DM)
 
-During Show Time, the Quest Panel appears in the map selector when the episode has quests linked:
+During Show Time, the Quest Panel appears in the map selector under the loot boxes:
 
 1. Select a quest to assign
-2. All crawlers are selected by default — deselect any who shouldn't receive it
+2. Every crawler in the campaign is listed and selected by default. Crawlers on this map come first, and the others are marked "not on map". Deselect any who shouldn't receive it
 3. Click **Assign** to give the quest to the selected crawlers
-4. If all crawlers participate, it becomes a **Party Quest**
-5. A notification appears in the dice roller and as a toast for players
+4. If every crawler in the campaign gets it, it becomes a **Party Quest**
+5. A notification appears in the dice roller and as a popup for the players who received it
+
+Each handout keeps its own progress. If the same quest goes to two groups, their checkmarks, revealed items, claimed rewards and notes stay separate.
 
 ## Managing Quests During Play (DM)
 
@@ -836,7 +865,7 @@ Players see their assigned quests on the **Quests** tab of their profile page:
 - Expandable quest cards showing name, description, and Party Quest badge
 - Visible action items with completion status (strikethrough when completed by the DM)
 - Visible rewards with tier color — when all visible action items are completed and a reward is revealed, a **Claim** button appears to add the reward item to the crawler's inventory
-- **Quest Notes**: A shared notepad where any crawler on the quest can add date-stamped text entries. Notes from other crawlers on the same quest are visible to everyone.
+- **Quest Notes**: A shared notepad where any crawler on the quest can add date-stamped text entries. Every crawler who received the same handout sees the others' notes.
 
 ## Notifications
 

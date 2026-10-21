@@ -314,7 +314,7 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
                         <>
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-display text-primary">{entry.crawlerName}</span>
+                              <span className={`font-display ${entry.mobRoll ? 'text-destructive' : 'text-primary'}`}>{entry.crawlerName}</span>
                               <span className="text-[10px] text-muted-foreground/60">{formatTimestamp(entry.timestamp)}</span>
                               {entry.statRoll ? (
                                 <span className="text-xs">

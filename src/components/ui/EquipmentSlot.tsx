@@ -1,6 +1,7 @@
 import React from 'react';
 import { EquipmentSlot as SlotType, InventoryItem } from '@/lib/gameData';
 import { X } from 'lucide-react';
+import { ItemName } from "@/components/ItemName";
 
 interface EquipmentSlotProps {
   slot: SlotType;
@@ -76,7 +77,7 @@ export const EquipmentSlot: React.FC<EquipmentSlotProps> = ({
       {equippedItem ? (
         <div className="absolute inset-0 flex items-center justify-center pt-5">
           <div className="text-center px-1 w-full" title={equippedItem.name}>
-            <p className="text-xs font-bold text-primary line-clamp-2 break-words">{equippedItem.name}</p>
+            <p className="text-xs font-bold text-primary line-clamp-2 break-words"><ItemName item={equippedItem} /></p>
           </div>
           {!disabled && (
             <button

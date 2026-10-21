@@ -1,6 +1,6 @@
 [
   {
-    "date": "2026-10-20",
+    "date": "2026-10-21",
     "changes": [
       "🎲 Skill checks roll against Easy, Medium or Hard DCs that rise 2 per dungeon floor, which the DM sets. A natural 1 always fails and a natural 20 always succeeds, haggling included",
       "⭐ Crawlers now earn XP: damage and killing blows on hostile mobs, finishing a fight, surviving it, coming back from near death, finishing quests, and spell mastery or Looting level-ups. Each grant shows in the dice history",
@@ -14,6 +14,18 @@
       "🔥 Spells can leave effects on their targets in combat, like Burning, Stunned or Blessed, lasting a set number of the target's turns",
       "🩸 Spell effects can deal damage or heal at the start of each of the target's turns, rolled automatically and posted to the dice history",
       "🎯 Effect-only spells open a target picker when cast in combat, and effects show as badges under each portrait in the combat order bar. The DM can remove one early with its ✕",
+      "🎨 Pixel-art icons and mob portraits are now switched on: the free image generator is live, so new items, spells and mobs get their own pictures"
+    ]
+  },
+  {
+    "date": "2026-10-20",
+    "changes": [
+      "🐛 Weapon attack and damage rolls now add the ability modifier (STR 14 adds +2) including gear bonuses, instead of the whole ability score",
+      "⚔️ Upgraded weapons show Upgraded once, in gold after the name, and only when you actually changed something",
+      "⚔️ The weapon upgrade window can now also change the weapon's description and its stat bonuses while equipped",
+      "⚔️ Mobs can have attacks and spells: open Attacks & Spells in the mob creator to add claws, bites and other attacks with their own to-hit bonus and damage dice, and pick spells from the spell library",
+      "🧌 In combat the DM gets a panel in the top left of the map with everything the current mob can do, including weapons it has equipped. Tap one to roll it, pick a target, and the damage comes off their health bar",
+      "🎲 Mob rolls now show in the dice log under the mob's name in red, so every player sees them. Mobs the party hasn't met show as ???",
       "🎨 New items and spells now get a pixel-art icon automatically, made by a free AI image generator from the item's name and description. When the daily free limit runs out, the app picks the closest matching icon from every icon made before",
       "🧌 DMs can auto-generate a pixel-art portrait for new mob types: leave Auto-generate pixel portrait ticked when adding a mob, or click Generate on an existing one. When the daily limit runs out, the closest earlier portrait is used",
       "🔒 Campaigns are now private: only the DM and players who joined can see or change a campaign's data. Before, anyone signed in with Google could edit any campaign",
@@ -43,7 +55,11 @@
       "🪟 Pop-up boxes (new spell, send gold, weapon upgrade, heal and damage targets) close when you click outside them, and now sit above the top menu so their tops aren't hidden",
       "💀 The Mobs page and the DM Console mob list are split into Bosses, Mobs and Characters tabs",
       "📐 More room between the backstory and the Activity section on profiles",
-      "🧭 Show Time's hidden top menu now slides down when you move the mouse anywhere along the top edge, for players too, and no longer pops open over the map tools when you reach for their buttons"
+      "🧭 Show Time's hidden top menu now slides down when you move the mouse anywhere along the top edge, for players too, and no longer pops open over the map tools when you reach for their buttons",
+      "📜 The DM can hand out any quest from Show Time, not only quests linked to the episode first",
+      "📜 The give-quest list now shows every crawler in the campaign, all selected by default, so picking everyone makes a Party Quest even when some crawlers aren't on the map",
+      "📜 Each quest handout keeps its own checkmarks, revealed items, claimed rewards and notes, so two groups on the same quest no longer share progress or read each other's notes",
+      "🐛 Players now get the New Quest popup for the first quest in a campaign, which was being skipped"
     ]
   },
   {
