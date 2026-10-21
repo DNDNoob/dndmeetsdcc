@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
-import { Award, BarChart3, Coins, Crosshair, Crown, Dices, Footprints, Heart, HeartCrack, HeartPulse, ShieldAlert, Skull, Store, Swords, Wand } from "lucide-react";
+import { toast } from "sonner";
+import { Award, BarChart3, Brain, Copy, Coins, Crosshair, Crown, Dices, Footprints, Heart, HeartCrack, HeartPulse, ShieldAlert, Skull, Store, Swords, Wand } from "lucide-react";
 import {
   ABILITY_KEYS,
   CRAWLER_STAT_KEYS,
@@ -7,6 +8,9 @@ import {
   getCrawlerStatValue,
   getLootingLevel,
   getLootsUntilNextLevel,
+  getPlayStyleTags,
+  buildPlayStyleProfile,
+  PLAY_STYLE_RULES,
   type Crawler,
   type CrawlerStatKey,
   type CrawlerStats,
@@ -59,10 +63,12 @@ interface CrawlerStatsPanelProps {
   crawler: Crawler;
   party: Crawler[];
   statsById: CrawlerStatsById;
+  isAdmin?: boolean;
+  rangedItemIds?: string[]; // the crawler's ranged weapons (for the Sharpshooter tag)
 }
 
 /** The profile's Stats tab: every counter the game keeps for a crawler. */
-export const CrawlerStatsPanel: React.FC<CrawlerStatsPanelProps> = ({ crawler, party, statsById }) => {
+export const CrawlerStatsPanel: React.FC<CrawlerStatsPanelProps> = ({ crawler, party, statsById, isAdmin, rangedItemIds = [] }) => {
   const stats: CrawlerStats = statsById[crawler.id] ?? { id: crawler.id };
   const everyone = party.length > 0 ? party : [crawler];
   const partyRank = (key: CrawlerStatKey): string | undefined => {
@@ -89,6 +95,9 @@ export const CrawlerStatsPanel: React.FC<CrawlerStatsPanelProps> = ({ crawler, p
   const averageD20 = d20Rolls > 0 ? ((stats.d20Total ?? 0) / d20Rolls).toFixed(1) : '–';
   const abilityRolls = ABILITY_KEYS.map(k => [k, stats.rollsByAbility?.[k] ?? 0] as const);
   const checks = (stats.checksPassed ?? 0) + (stats.checksFailed ?? 0);
+  const fights = stats.combatsFought ?? 0;
+  const turns = stats.turnsTaken ?? 0;
+  const lootBoxes = Object.entries(stats.lootBoxesByTier ?? {}).map(([tier, n]) => `${tier} ×${n}`).join(', ');
 
   const gearLine = (s: SourceStats, kind: 'item' | 'spell', uses: number): string => {
     const parts = [
@@ -107,8 +116,48 @@ export const CrawlerStatsPanel: React.FC<CrawlerStatsPanelProps> = ({ crawler, p
     return parts.filter(Boolean).join(' · ');
   };
 
+  const tags = isAdmin ? getPlayStyleTags(crawler, everyone, statsById, rangedItemIds) : [];
+  const copyProfile = async () => {
+    const profile = buildPlayStyleProfile(crawler, everyone, statsById, { rangedItemIds });
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(profile, null, 2));
+      toast.success('Play style profile copied');
+    } catch {
+      toast.error("Couldn't copy to the clipboard");
+    }
+  };
+  const moments = stats.moments ?? [];
+
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+      {isAdmin && (
+        <div className="mb-6 border border-accent/40 bg-accent/5 rounded p-3">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <h4 className="font-display text-accent text-sm flex items-center gap-2">
+              <Brain className="w-4 h-4 shrink-0" /> PLAY STYLE <span className="text-muted-foreground text-xs font-sans">(only the DM sees this)</span>
+            </h4>
+            <button
+              onClick={copyProfile}
+              className="text-xs text-primary hover:text-primary/80 flex items-center gap-1"
+              title="Copies what AI prompts like upgrade trees are told about this crawler"
+            >
+              <Copy className="w-3.5 h-3.5" /> Copy AI profile
+            </button>
+          </div>
+          {tags.length === 0 ? (
+            <p className="text-xs text-muted-foreground mt-2">No clear style yet. Tags appear as the crawler plays and stands out from the party.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2 mt-2">
+              {tags.map(tag => (
+                <span key={tag} className="text-xs px-2 py-1 rounded bg-accent/15 border border-accent/40 text-accent" title={PLAY_STYLE_RULES[tag]}>
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <h3 className="font-display text-primary text-xl mb-1 flex items-center gap-2">
         <BarChart3 className="w-6 h-6 shrink-0" /> ACTIVITY STATS
       </h3>
@@ -127,6 +176,20 @@ export const CrawlerStatsPanel: React.FC<CrawlerStatsPanelProps> = ({ crawler, p
           {lootsToNext !== null ? ` · ${lootsToNext} more mob${lootsToNext === 1 ? '' : 's'} to Lv ${lootingLevel + 1}` : ' · max level, loot is never smashed'}
         </span>
       </div>
+
+      <SectionTitle>STANDOUT MOMENTS</SectionTitle>
+      {moments.length === 0 ? (
+        <p className="text-sm text-muted-foreground">None yet. Boss kills, final blows, natural 20s, rescues and finished quests land here.</p>
+      ) : (
+        <ul className="space-y-1">
+          {moments.map(m => (
+            <li key={`${m.at}-${m.text}`} className="text-sm text-foreground bg-muted/30 rounded px-3 py-1.5 flex justify-between gap-2">
+              <span className="break-words">{m.text}</span>
+              <span className="text-xs text-muted-foreground shrink-0">{new Date(m.at).toLocaleDateString()}</span>
+            </li>
+          ))}
+        </ul>
+      )}
 
       <SectionTitle>WEAPONS AND SPELLS</SectionTitle>
       {gear.length === 0 ? (
@@ -156,6 +219,41 @@ export const CrawlerStatsPanel: React.FC<CrawlerStatsPanelProps> = ({ crawler, p
           Most killed: {topVictims.map(([name, n]) => `${name} ×${n}`).join(', ')}
         </p>
       )}
+
+      <SectionTitle>FIGHTING STYLE</SectionTitle>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        <SmallStat label="Fights survived" value={fights > 0 ? `${stats.combatsSurvived ?? 0} of ${fights}` : '–'} />
+        <SmallStat label="Rounds fought" value={stats.roundsFought ?? 0} />
+        <SmallStat label="Knocked to 0 HP" value={stats.zeroHPDrops ?? 0} />
+        <SmallStat label="Feet per turn" value={turns > 0 ? Math.round((stats.turnFeet ?? 0) / turns) : '–'} title="Average movement in a combat turn" />
+        <SmallStat label="Turns doing nothing" value={stats.idleTurns ?? 0} title="No action, bonus action or movement" />
+      </div>
+
+      <SectionTitle>TALKING AND TRADING</SectionTitle>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        <SmallStat label="Lines to NPCs" value={stats.npcLines ?? 0} />
+        <SmallStat label="Persuasion rolls" value={stats.persuasionRolls ?? 0} />
+        <SmallStat label="Haggles won" value={(stats.haggles ?? 0) > 0 ? `${stats.haggleWins ?? 0} of ${stats.haggles}` : '–'} />
+        <SmallStat label="Lines translated" value={stats.translations ?? 0} />
+        <SmallStat label="Gold earned" value={stats.goldEarned ?? 0} title="From loot, loot boxes and selling" />
+        <SmallStat label="Gold spent" value={stats.goldSpent ?? 0} />
+        <SmallStat label="Items bought / sold" value={`${stats.itemsBought ?? 0} / ${stats.itemsSold ?? 0}`} />
+        <SmallStat label="Gear swaps" value={stats.gearSwaps ?? 0} title="Items put into an equipment slot" />
+      </div>
+
+      <SectionTitle>PROGRESS</SectionTitle>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        <SmallStat label="Quests finished" value={stats.questsFinished ?? 0} />
+        <SmallStat label="Noncombat rolls" value={stats.noncombatRolls ?? 0} />
+        <SmallStat label="Loot boxes opened" value={lootBoxes || '0'} />
+      </div>
+
+      <SectionTitle>HABITS</SectionTitle>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        <SmallStat label="Average turn" value={(stats.timedTurns ?? 0) > 0 ? `${Math.round((stats.turnSeconds ?? 0) / (stats.timedTurns ?? 1))} s` : '–'} />
+        <SmallStat label="Turns undone" value={stats.undoTurns ?? 0} />
+        <SmallStat label="Voice / typed lines" value={`${stats.voiceLines ?? 0} / ${stats.typedLines ?? 0}`} />
+      </div>
 
       <SectionTitle>DICE</SectionTitle>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">

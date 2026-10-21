@@ -2399,7 +2399,13 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
 
             {/* Stats Tab: every stat; the profile shows only the ones that stand out */}
             {activeTab === 'stats' && (
-              <CrawlerStatsPanel crawler={selected} party={crawlers} statsById={statsById} />
+              <CrawlerStatsPanel
+                crawler={selected}
+                party={crawlers}
+                statsById={statsById}
+                isAdmin={isAdmin}
+                rangedItemIds={inventory.filter(i => i.weaponData?.isRanged).map(i => i.id)}
+              />
             )}
 
             {/* Spells Tab */}

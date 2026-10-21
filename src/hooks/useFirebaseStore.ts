@@ -22,7 +22,7 @@ interface CounterBump {
   path: string[];
   inc?: number;
   max?: number;
-  set?: string;
+  set?: unknown;
 }
 
 interface UseFirebaseStoreReturn {
@@ -592,27 +592,24 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
       }
       node[path[path.length - 1]] = value;
     };
-    const local: Record<string, unknown> = { ...current };
+    // Remote: increment() sentinels and plain values. Local (optimistic): the same bumps applied to the
+    // latest local copy inside the state updater, so bumps sent back to back don't overwrite each other.
     const remote: Record<string, unknown> = { id, ...(roomId ? { roomId } : {}) };
     for (const b of live) {
-      if (b.set !== undefined) {
-        if (getAt(local, b.path) === b.set) continue;
-        setAt(local, b.path, b.set);
-        setAt(remote, b.path, b.set);
-        continue;
-      }
-      const old = Number(getAt(local, b.path)) || 0;
-      if (b.max !== undefined) {
-        if (b.max <= old) continue;
-        setAt(local, b.path, b.max);
-        setAt(remote, b.path, b.max);
-      } else {
-        setAt(local, b.path, old + (b.inc ?? 0));
-        setAt(remote, b.path, increment(b.inc ?? 0));
-      }
+      if (b.set !== undefined) setAt(remote, b.path, b.set);
+      else if (b.max !== undefined) {
+        if (b.max > (Number(getAt(current, b.path)) || 0)) setAt(remote, b.path, b.max);
+      } else setAt(remote, b.path, increment(b.inc ?? 0));
     }
     setData(prevData => {
       const list = prevData[collection] || [];
+      const local: Record<string, unknown> = { ...(list.find(d => d.id === id) ?? { id }) };
+      for (const b of live) {
+        const old = Number(getAt(local, b.path)) || 0;
+        if (b.set !== undefined) setAt(local, b.path, b.set);
+        else if (b.max !== undefined) setAt(local, b.path, Math.max(old, b.max));
+        else setAt(local, b.path, old + (b.inc ?? 0));
+      }
       return {
         ...prevData,
         [collection]: list.some(d => d.id === id) ? list.map(d => (d.id === id ? local : d)) : [...list, local],
