@@ -85,8 +85,17 @@ import {
   getLevelForXP,
   getCrawlerXP,
   getSkillRank,
-  getUseSkillRank,
-  MAX_SKILL_RANK,
+  getSkillXP,
+  getSkillXPToSpend,
+  getSkillRankForXP,
+  getWeaponProficiency,
+  getWeaponProficiencyXP,
+  WEAPON_XP_PER_HIT,
+  withSkillXP,
+  MAX_SKILL_XP,
+  SKILL_XP_PER_LEVEL,
+  SKILL_XP_PER_SUCCESS,
+  SKILL_XP_PER_TRADE,
   SKILLS,
   type SkillId,
   type AbilityKey,
@@ -744,7 +753,8 @@ export const useGameState = () => {
             hp: (Number(crawler.hp) || 0) + maxHP - (Number(crawler.maxHP) || 0),
             maxMana,
             mana: (Number(crawler.mana) || 0) + maxMana - (Number(crawler.maxMana) || 0),
-            skillPoints: (crawler.skillPoints ?? 0) + gained,
+            skillXPToSpend: getSkillXPToSpend(crawler) + SKILL_XP_PER_LEVEL * gained,
+            skillPoints: 0, // old field; its points were counted into skillXPToSpend
             abilityPoints: (crawler.abilityPoints ?? 0) + gained,
           });
           levelUps.push({ id, level: oldLevel + gained });
@@ -780,21 +790,43 @@ export const useGameState = () => {
     await awardXP(crawlerIds.map(crawlerId => ({ crawlerId, amount: xp, reason: reason.trim() || 'DM award' })), false);
   };
 
-  /** Spends one skill point on a rank of a point-bought skill. */
-  const spendSkillPoint = async (crawlerId: string, skillId: SkillId) => {
+  /** Spends skill XP from level-ups on a skill. Adds to the XP the skill already has, so nothing resets. */
+  const spendSkillXP = async (crawlerId: string, skillId: SkillId, amount: number) => {
     const def = SKILLS.find(s => s.id === skillId);
-    if (!def || def.useBased) return false;
+    const want = Math.floor(amount);
+    if (!def || want <= 0) return false;
     return transact([{ collection: 'crawlers', id: crawlerId }], ([doc]) => {
       const crawler = doc as unknown as Crawler | null;
       if (!crawler) throw new Error('Crawler not found.');
-      if ((crawler.skillPoints ?? 0) <= 0) throw new Error('No skill points to spend.');
-      const rank = getSkillRank(crawler, skillId);
-      if (rank >= MAX_SKILL_RANK) throw new Error(`${def.name} is already at rank ${MAX_SKILL_RANK}.`);
+      const pool = getSkillXPToSpend(crawler);
+      const room = MAX_SKILL_XP - getSkillXP(crawler, skillId);
+      if (room <= 0) throw new Error(`${def.name} is already at its top rank.`);
+      const spend = Math.min(want, pool, room);
+      if (spend <= 0) throw new Error('No skill XP to spend.');
       return [{
         type: 'update', collection: 'crawlers', id: crawlerId,
-        data: { skills: { ...(crawler.skills ?? {}), [skillId]: rank + 1 }, skillPoints: (crawler.skillPoints ?? 0) - 1 },
+        data: { skillXP: withSkillXP(crawler, skillId, spend), skillXPToSpend: pool - spend, skillPoints: 0 },
       }];
     });
+  };
+
+  /** Skill XP a crawler earned by using a skill (a successful check). Toasts a new rank. */
+  const awardSkillXP = async (crawlerId: string, skillId: SkillId, amount: number) => {
+    const def = SKILLS.find(s => s.id === skillId);
+    if (!def || amount <= 0 || !getCollection<Crawler>('crawlers').some(c => c.id === crawlerId)) return;
+    let before = 0;
+    let after = 0;
+    const ok = await transact([{ collection: 'crawlers', id: crawlerId }], ([doc]) => {
+      const crawler = doc as unknown as Crawler | null;
+      if (!crawler) return [];
+      const xp = getSkillXP(crawler, skillId);
+      before = getSkillRankForXP(xp);
+      after = getSkillRankForXP(Math.min(MAX_SKILL_XP, xp + amount));
+      if (xp >= MAX_SKILL_XP) return [];
+      return [{ type: 'update', collection: 'crawlers', id: crawlerId, data: { skillXP: withSkillXP(crawler, skillId, amount) } }];
+    });
+    const name = crawlers.find(c => c.id === crawlerId)?.name ?? 'Crawler';
+    if (ok && after > before) toast.success(`${name} reached ${def.name} rank ${after}!`, { icon: '✨' });
   };
 
   /** Spends one ability point: +1 to that ability's rolls (+2 to the score). No 5-point limit after creation. */
@@ -864,7 +896,7 @@ export const useGameState = () => {
     // A profile save carries the XP and points it was opened with; only send them when edited,
     // so XP earned while the form was open isn't overwritten
     if (current) {
-      for (const key of ['xp', 'skills', 'skillPoints', 'abilityPoints'] as const) {
+      for (const key of ['xp', 'skills', 'skillPoints', 'skillXP', 'skillXPToSpend', 'abilityPoints'] as const) {
         if (key in finalUpdates && JSON.stringify(finalUpdates[key]) === JSON.stringify(current[key])) delete finalUpdates[key];
       }
       // Setting the level by hand (Admin Override) moves XP to the start of that level
@@ -2130,7 +2162,16 @@ export const useGameState = () => {
       await updateItem('combatState', 'current', { combatants } as Record<string, unknown>);
     }
     if (attackerIsCrawler && attackerId) {
+      // One weapon proficiency hit per attack, however many targets it splashed
+      const profHit = !!sourceCounts.hits && !!source?.weaponType;
+      const profStats = getCollection<CrawlerStats>('crawlerStats').find(st => st.id === attackerId);
+      const profBefore = getWeaponProficiency(profStats, source?.weaponType);
+      const profAfter = getSkillRankForXP(Math.min(MAX_SKILL_XP, getWeaponProficiencyXP(profStats, source?.weaponType) + WEAPON_XP_PER_HIT));
+      if (profHit) statBumps.push({ path: ['weaponTypeHits', statKey(source!.weaponType!)], inc: 1 });
       await bumpCrawlerStats(attackerId, [...statBumps, ...sourceBumps(source, sourceCounts, { biggestHit })]);
+      if (profHit && profAfter > profBefore) {
+        toast.success(`${crawlers.find(c => c.id === attackerId)?.name ?? 'Crawler'} reached ${source.weaponType} proficiency ${profAfter}! (+${profAfter} to hit)`, { icon: '⚔️' });
+      }
     }
     if (attackerIsCrawler && attackerId) for (const text of moments) await addMoment(attackerId, text);
     const attackerName = attackerId ? (crawlers.find(c => c.id === attackerId)?.name ?? combatants.find(c => c.id === attackerId)?.name) : undefined;
@@ -2742,9 +2783,9 @@ export const useGameState = () => {
   // Every completed trade counts toward Barter; say so when it reaches a new rank
   const withBarterNotice = async (crawlerId: string, trade: Promise<boolean>) => {
     const crawler = crawlers.find(c => c.id === crawlerId);
-    const before = getUseSkillRank(crawler?.barterTrades ?? 0);
+    const before = getSkillRank(crawler, 'barter');
     const ok = await trade;
-    if (ok && crawler && getUseSkillRank((crawler.barterTrades ?? 0) + 1) > before) {
+    if (ok && crawler && getSkillRankForXP(getSkillXP(crawler, 'barter') + SKILL_XP_PER_TRADE) > before) {
       toast.success(`${crawler.name} reached Barter rank ${before + 1}!`, { icon: '🪙' });
     }
     return ok;
@@ -2763,7 +2804,8 @@ export const useGameState = () => {
       const idx = state.stock.findIndex(e => merchantItemKey(e.item) === key);
       if (idx < 0 || state.stock[idx].quantity <= 0) throw new Error(`${mob.name} is sold out of ${item.name}.`);
       const trades = Number(crawlerDoc.barterTrades) || 0;
-      const price = getMerchantBuyPrice(state.stock[idx].item.goldValue, getEffectiveScrooge(config, state, crawlerId, getUseSkillRank(trades)));
+      const trader = crawlerDoc as unknown as Crawler;
+      const price = getMerchantBuyPrice(state.stock[idx].item.goldValue, getEffectiveScrooge(config, state, crawlerId, getSkillRank(trader, 'barter')));
       const gold = Number(crawlerDoc.gold) || 0;
       if (gold < price) throw new Error(`Not enough gold: ${item.name} costs ${price}.`);
       const stock: MerchantStockEntry[] = state.stock
@@ -2774,7 +2816,7 @@ export const useGameState = () => {
       spent = price;
       return [
         merchantDocOps(mob, !!merchantDoc, { ...state, stock, gold: state.gold + price }),
-        { type: 'update', collection: 'crawlers', id: crawlerId, data: { gold: gold - price, barterTrades: trades + 1 } },
+        { type: 'update', collection: 'crawlers', id: crawlerId, data: { gold: gold - price, barterTrades: trades + 1, skillXP: withSkillXP(trader, 'barter', SKILL_XP_PER_TRADE) } },
         inventoryOp(crawlerId, invDocId, !!invDoc, items),
       ];
     }));
@@ -2799,7 +2841,8 @@ export const useGameState = () => {
       const item = owned.find(i => i.id === itemId);
       if (!item) throw new Error('That item is no longer in your inventory.');
       const trades = Number(crawlerDoc.barterTrades) || 0;
-      const price = getMerchantSellPrice(item.goldValue, getEffectiveScrooge(config, state, crawlerId, getUseSkillRank(trades)));
+      const trader = crawlerDoc as unknown as Crawler;
+      const price = getMerchantSellPrice(item.goldValue, getEffectiveScrooge(config, state, crawlerId, getSkillRank(trader, 'barter')));
       const paid = Math.min(price, state.gold);
       if (paid < minGold) throw new Error(`${mob.name} only has ${state.gold} gold left now. Try again.`);
       earned = paid;
@@ -2814,7 +2857,7 @@ export const useGameState = () => {
       for (const [slot, id] of Object.entries(equipped)) if (id === itemId) delete equipped[slot];
       return [
         merchantDocOps(mob, !!merchantDoc, { ...state, stock, gold: state.gold - paid }),
-        { type: 'update', collection: 'crawlers', id: crawlerId, data: { gold: (Number(crawlerDoc.gold) || 0) + paid, equippedItems: equipped, barterTrades: trades + 1 } },
+        { type: 'update', collection: 'crawlers', id: crawlerId, data: { gold: (Number(crawlerDoc.gold) || 0) + paid, equippedItems: equipped, barterTrades: trades + 1, skillXP: withSkillXP(trader, 'barter', SKILL_XP_PER_TRADE) } },
         inventoryOp(crawlerId, invDocId, !!invDoc, owned.filter(i => i.id !== itemId)),
       ];
     }));
@@ -2852,7 +2895,8 @@ export const useGameState = () => {
     }
     const cha = crawler.cha + (getEquippedModifiers(crawler, getCrawlerInventory(crawler.id)).cha ?? 0);
     const barter = getSkillRank(crawler, 'barter');
-    const modifier = Math.floor((cha - 10) / 2) + barter;
+    const persuasion = getSkillRank(crawler, 'persuasion');
+    const modifier = Math.floor((cha - 10) / 2) + barter + persuasion;
     const { rawRoll, results, diceLabel } = rollD20(rollsWithDisadvantage(crawler, cha));
     const total = rawRoll + modifier;
     const dc = config.haggleDC ?? DEFAULT_HAGGLE_DC;
@@ -2874,8 +2918,10 @@ export const useGameState = () => {
       timestamp: Date.now(),
       results,
       total,
-      statRoll: { stat: `Haggle with ${mob.name} (Persuasion${barter ? ` + Barter ${barter}` : ''})`, modifier, rawRoll, diceLabel },
+      statRoll: { stat: `Haggle with ${mob.name} (Persuasion${persuasion ? ` ${persuasion}` : ''}${barter ? ` + Barter ${barter}` : ''})`, modifier, rawRoll, diceLabel, dc, success: entry.state === 'pending' },
     });
+    // A haggle roll is a Persuasion check: making the DC trains Persuasion
+    if (entry.state === 'pending') await awardSkillXP(crawler.id, 'persuasion', SKILL_XP_PER_SUCCESS);
     return entry;
   };
 
@@ -3054,7 +3100,8 @@ export const useGameState = () => {
     setXPScale,
     setDungeonFloor,
     awardCrawlerXP,
-    spendSkillPoint,
+    spendSkillXP,
+    awardSkillXP,
     spendAbilityPoint,
     awardQuestXP,
     applyCombatConditions,
