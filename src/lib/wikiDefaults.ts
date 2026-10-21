@@ -172,7 +172,33 @@ The **Stats** tab (chart icon) shows every stat above, where the crawler ranks i
 
 - **Weapons and spells**: for each weapon, attack or spell you've used, the attacks or casts, hits, damage, kills, boss kills, best single hit, healing, effects left on targets, friendly fire and damage to neutrals.
 - **Combat**: healing received, neutral kills, the damage type you deal most, and the mobs you've killed most.
+- **Standout moments**: your last 10 big moments, like boss kills, final blows, natural 20s on attacks, bringing a crawler back from 0 HP, finished quests, won haggles and level-ups.
+- **Fighting style**: fights survived, rounds fought, times knocked to 0 HP, average feet moved per combat turn, and turns where you did nothing.
+- **Talking and trading**: lines said to NPCs, Persuasion rolls, haggles won, lines translated for the party, gold earned (loot, loot boxes, selling) and spent, items bought and sold, and gear swaps.
+- **Progress**: quests finished, noncombat rolls and loot boxes opened by tier.
+- **Habits**: your average combat turn time, turns undone, and voice versus typed chat lines.
 - **Dice**: d20 rolls, your average d20 (10.5 is average luck), natural 1s, rolls with disadvantage, checks passed, and how often you roll each ability.
+
+### Play Style (DM only)
+
+The DM also sees **Play Style** tags at the top of the Stats tab, worked out by comparing the crawler with the rest of the party. Hover a tag to see its rule.
+
+| Tag | When it shows |
+|-----|---------------|
+| Striker | Deals at least a quarter more damage than the party average |
+| Finisher | Lands at least a quarter more killing blows than the party average |
+| Tank | Takes at least a quarter more damage than average and survives most fights |
+| Healer | Healing is over a quarter of their damage |
+| Skirmisher | Moves at least a quarter more per combat turn than average |
+| Sharpshooter | Over half their weapon attacks use ranged weapons |
+| Talker | Talks to NPCs and rolls Persuasion at least a quarter more than average |
+| Reckless | Drops near death or to 0 HP at least a quarter more often than average |
+| Hoarder / Spender | Has spent under a quarter / over three quarters of the 50+ gold they earned |
+| Lucky / Cursed | Averages 12+ / 9 or less on 10+ d20 rolls |
+| Loose cannon | 10+ damage, or 5% of their damage, dealt to other crawlers |
+| Troublemaker | Killed a neutral mob or NPC, or dealt them 10+ damage |
+
+Players don't see their tags, so the Dungeon AI's choices stay a surprise. **Copy AI profile** copies the short summary of the crawler that AI prompts (like weapon upgrade trees) are given.
 
 These counters started on 2026-10-21, so play before then isn't included. When a combat turn is undone, its counters go back too.
 
