@@ -68,6 +68,7 @@ import {
   getHaggleBlocker,
   rollD20,
   rollsWithDisadvantage,
+  isCheckSuccess,
   XP_REWARDS,
   getLevelUpIncrease,
   XP_LOG_LIMIT,
@@ -100,7 +101,7 @@ export interface DiceRollEntry {
   timestamp: number;
   results: { dice: string; result: number }[];
   total: number;
-  statRoll?: { stat: string; modifier: number; rawRoll: number; diceLabel?: string; rollType?: string };
+  statRoll?: { stat: string; modifier: number; rawRoll: number; diceLabel?: string; rollType?: string; dc?: number; success?: boolean };
   // For loot box notifications
   lootBoxNotification?: {
     boxName: string;
@@ -641,6 +642,12 @@ export const useGameState = () => {
   const setXPScale = async (xpScale: number) => {
     if (gameSettings) await updateItem('gameSettings', 'current', { xpScale } as Record<string, unknown>);
     else await addItem('gameSettings', { id: 'current', xpScale } as Record<string, unknown>);
+  };
+
+  const setDungeonFloor = async (dungeonFloor: number) => {
+    const floor = Math.max(1, Math.floor(dungeonFloor) || 1);
+    if (gameSettings) await updateItem('gameSettings', 'current', { dungeonFloor: floor } as Record<string, unknown>);
+    else await addItem('gameSettings', { id: 'current', dungeonFloor: floor } as Record<string, unknown>);
   };
 
   /**
@@ -2630,7 +2637,7 @@ export const useGameState = () => {
     const { rawRoll, results, diceLabel } = rollD20(rollsWithDisadvantage(crawler, cha));
     const total = rawRoll + modifier;
     const dc = config.haggleDC ?? DEFAULT_HAGGLE_DC;
-    const entry: MerchantHaggle = { state: total >= dc ? 'pending' : 'failed', crawlerName: crawler.name, total, dc, at: Date.now() };
+    const entry: MerchantHaggle = { state: isCheckSuccess(rawRoll, total, dc) ? 'pending' : 'failed', crawlerName: crawler.name, total, dc, at: Date.now() };
     const ok = await transact([{ collection: 'merchants', id: mob.id }], ([merchantDoc]) => {
       const state = (merchantDoc as unknown as MerchantState | null) ?? createMerchantState(mob.id, config);
       if (state.haggles?.[crawler.id]) throw new Error(`You already haggled with ${mob.name}. Try again after they restock.`);
@@ -2808,6 +2815,7 @@ export const useGameState = () => {
     awardTrophy,
     gameSettings,
     setXPScale,
+    setDungeonFloor,
     awardCrawlerXP,
     spendSkillPoint,
     spendAbilityPoint,

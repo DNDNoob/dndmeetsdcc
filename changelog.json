@@ -2,6 +2,7 @@
   {
     "date": "2026-10-20",
     "changes": [
+      "🎲 Skill checks roll against Easy, Medium or Hard DCs that rise 2 per dungeon floor, which the DM sets. A natural 1 always fails and a natural 20 always succeeds, haggling included",
       "⭐ Crawlers now earn XP: damage and killing blows on hostile mobs, finishing a fight, surviving it, coming back from near death, finishing quests, and spell mastery or Looting level-ups. Each grant shows in the dice history",
       "📈 Levels come from XP with no cap. Each level gives 5% more max HP and max mana (rounded up), a skill point and an ability point, and an XP bar on the profile shows how far you are from the next one",
       "🎯 New Skills tab with six skills: Barter, Athletics, Stealth, Perception, Medicine and Intimidation. Spend skill points on ranks and roll skill checks, which use an action like other rolls",

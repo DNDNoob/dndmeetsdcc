@@ -89,7 +89,7 @@ interface ProfilesViewProps {
   getCrawlerInventory: (crawlerId: string) => InventoryItem[];
   onUpdateCrawlerInventory: (crawlerId: string, items: InventoryItem[]) => void;
   partyGold: number;
-  onStatRoll?: (crawlerName: string, crawlerId: string, stat: string, totalStat: number, bonus?: number) => void;
+  onStatRoll?: (crawlerName: string, crawlerId: string, stat: string, totalStat: number, bonus?: number, dc?: number) => void;
   getCrawlerLootBoxes?: (crawlerId: string) => SentLootBox[];
   claimLootBoxItems?: (lootBoxId: string, crawlerId: string, itemIds: string[], claimGold?: boolean) => Promise<void>;
   getPartyInventory?: () => InventoryItem[];
@@ -112,6 +112,8 @@ interface ProfilesViewProps {
   xpScale?: number;
   onAwardXP?: (crawlerIds: string[], amount: number, reason: string) => Promise<void>;
   onSetXPScale?: (scale: number) => Promise<void>;
+  dungeonFloor?: number;
+  onSetDungeonFloor?: (floor: number) => Promise<void>;
   onSpendSkillPoint?: (crawlerId: string, skillId: SkillId) => Promise<boolean>;
   onSpendAbilityPoint?: (crawlerId: string, ability: AbilityKey) => Promise<boolean>;
   onRevokeTrophy?: (crawlerId: string, trophyId: string) => Promise<void>;
@@ -516,6 +518,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   xpScale = 1,
   onAwardXP,
   onSetXPScale,
+  dungeonFloor = 1,
+  onSetDungeonFloor,
   onSpendSkillPoint,
   onSpendAbilityPoint,
   addDiceRoll,
@@ -1544,6 +1548,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
           xpScale={xpScale}
           onAwardXP={onAwardXP}
           onSetXPScale={onSetXPScale}
+          dungeonFloor={dungeonFloor}
+          onSetDungeonFloor={onSetDungeonFloor}
           onSpendPoints={() => setActiveTab('skills')}
         />
 
@@ -2346,9 +2352,10 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                   rollBlockedReason={isCombatActive ? 'Not your turn, or your action is used' : 'No rolls remaining'}
                   onSpendSkillPoint={onSpendSkillPoint}
                   onSpendAbilityPoint={onSpendAbilityPoint}
-                  onRollSkill={(skill, abilityTotal, rank) => {
+                  dungeonFloor={dungeonFloor}
+                  onRollSkill={(skill, abilityTotal, rank, dc) => {
                     if (!canRoll) return;
-                    onStatRoll?.(selected.name, selected.id, `${skill.name} check${rank ? ` (rank ${rank})` : ''}`, abilityTotal, rank);
+                    onStatRoll?.(selected.name, selected.id, `${skill.name} check${rank ? ` (rank ${rank})` : ''}`, abilityTotal, rank, dc);
                     if (!isTestMode && !isCombatActive) recordNoncombatRoll?.(selected.id);
                     if (isCombatActive && isMyTurn) onRecordCombatAction?.(selected.id, 'action');
                   }}

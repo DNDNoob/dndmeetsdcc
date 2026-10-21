@@ -1106,6 +1106,18 @@ Skills make a crawler better at one kind of thing. Each skill has ranks from 0 t
 
 Press **Roll** on a skill to roll d20 + the linked ability modifier + your rank. The roll goes to the dice history. A skill check uses an action like the Actions tab: in combat it takes your action on your turn, and between fights it uses one of your rolls for the turn.
 
+Pick the check's difficulty above the skills before you roll. The dice history shows whether you beat it.
+
+| Difficulty | DC on Floor 1 | Each floor deeper |
+|------------|---------------|-------------------|
+| Easy | 10 | +2 |
+| Medium | 15 | +2 |
+| Hard | 20 | +2 |
+
+A natural 1 always fails and a natural 20 always succeeds, however big your bonus is. Haggle rolls follow the same rule. Bonuses keep growing as you level, and DCs grow as the party goes deeper, so the d20 still matters on every floor.
+
+The DM sets the party's current floor next to **Auto XP** on any crawler's Profile tab.
+
 More skills will be added later.`,
   },
   {

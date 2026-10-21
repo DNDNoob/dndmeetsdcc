@@ -1265,7 +1265,25 @@ export interface Quest {
 export interface GameSettings {
   id: string;
   xpScale?: number; // multiplies all automatic XP; 1 = 100%
+  dungeonFloor?: number; // the floor the party is on; raises skill check DCs (1 if missing)
 }
+
+// ---- Skill check difficulty ----
+// DCs rise 2 per dungeon floor so the d20 keeps mattering as bonuses grow.
+// A natural 1 always fails and a natural 20 always succeeds.
+export const CHECK_DIFFICULTIES = [
+  { id: 'easy', name: 'Easy', base: 10 },
+  { id: 'medium', name: 'Medium', base: 15 },
+  { id: 'hard', name: 'Hard', base: 20 },
+] as const;
+export type CheckDifficultyId = typeof CHECK_DIFFICULTIES[number]['id'];
+export const DC_PER_FLOOR = 2;
+
+export const getCheckDC = (difficulty: CheckDifficultyId, floor = 1): number =>
+  (CHECK_DIFFICULTIES.find(d => d.id === difficulty)?.base ?? 15) + DC_PER_FLOOR * (Math.max(1, Math.floor(floor)) - 1);
+
+export const isCheckSuccess = (rawRoll: number, total: number, dc: number): boolean =>
+  rawRoll === 1 ? false : rawRoll === 20 ? true : total >= dc;
 
 export interface AssignedQuest {
   id: string;

@@ -2,7 +2,10 @@ import React, { useState } from "react";
 import { Dices, Plus, Sparkles } from "lucide-react";
 import {
   ABILITY_KEYS,
+  CHECK_DIFFICULTIES,
   MAX_SKILL_RANK,
+  getCheckDC,
+  type CheckDifficultyId,
   SKILLS,
   getSkillRank,
   getUsesUntilNextRank,
@@ -20,16 +23,19 @@ interface SkillsPanelProps {
   rollBlockedReason?: string; // shown on Roll buttons when canRoll is false
   onSpendSkillPoint?: (crawlerId: string, skillId: SkillDef["id"]) => Promise<boolean>;
   onSpendAbilityPoint?: (crawlerId: string, ability: AbilityKey) => Promise<boolean>;
-  onRollSkill?: (skill: SkillDef, abilityTotal: number, rank: number) => void;
+  dungeonFloor?: number;
+  onRollSkill?: (skill: SkillDef, abilityTotal: number, rank: number, dc: number) => void;
 }
 
 const fmt = (n: number) => (n >= 0 ? `+${n}` : `${n}`);
 
 /** Skill ranks, spending skill and ability points from level-ups, and skill check rolls. */
 export const SkillsPanel: React.FC<SkillsPanelProps> = ({
-  crawler, equippedMods, canSpend, canRoll, rollBlockedReason, onSpendSkillPoint, onSpendAbilityPoint, onRollSkill,
+  crawler, equippedMods, canSpend, canRoll, rollBlockedReason, dungeonFloor = 1, onSpendSkillPoint, onSpendAbilityPoint, onRollSkill,
 }) => {
   const [busy, setBusy] = useState(false);
+  const [difficulty, setDifficulty] = useState<CheckDifficultyId>("medium");
+  const dc = getCheckDC(difficulty, dungeonFloor);
   const skillPoints = crawler.skillPoints ?? 0;
   const abilityPoints = crawler.abilityPoints ?? 0;
 
@@ -74,6 +80,22 @@ export const SkillsPanel: React.FC<SkillsPanelProps> = ({
         </span>
       </div>
 
+      <div className="flex flex-wrap items-center justify-between gap-2 bg-muted/30 border border-border rounded-lg px-4 py-2">
+        <span className="text-sm text-muted-foreground font-display">CHECK DIFFICULTY</span>
+        <div className="flex items-center gap-2">
+          {CHECK_DIFFICULTIES.map(d => (
+            <button
+              key={d.id}
+              onClick={() => setDifficulty(d.id)}
+              className={`text-xs px-2 py-1 rounded border ${difficulty === d.id ? "bg-primary/20 border-primary text-primary" : "border-border text-muted-foreground"}`}
+            >
+              {d.name} {getCheckDC(d.id, dungeonFloor)}
+            </button>
+          ))}
+          <span className="text-xs text-muted-foreground">Floor {dungeonFloor} · 1 always fails, 20 always succeeds</span>
+        </div>
+      </div>
+
       <div className="grid md:grid-cols-2 gap-3">
         {SKILLS.map(skill => {
           const rank = getSkillRank(crawler, skill.id);
@@ -103,9 +125,9 @@ export const SkillsPanel: React.FC<SkillsPanelProps> = ({
               )}
               <div className="flex gap-2 mt-2">
                 <button
-                  onClick={() => onRollSkill?.(skill, abilityTotal, rank)}
+                  onClick={() => onRollSkill?.(skill, abilityTotal, rank, dc)}
                   disabled={!canRoll}
-                  title={canRoll ? `Roll d20 ${fmt(bonus)}` : rollBlockedReason}
+                  title={canRoll ? `Roll d20 ${fmt(bonus)} vs DC ${dc}` : rollBlockedReason}
                   className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 border border-border rounded text-sm hover:bg-primary/20 hover:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Dices className="w-4 h-4" /> Roll {fmt(bonus)}

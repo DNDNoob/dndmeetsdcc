@@ -28,7 +28,7 @@ import { useIconLibrary } from "@/hooks/useIconLibrary";
 import { useNpcBrain } from "@/hooks/useNpcBrain";
 import { useNpcSpeechMaker } from "@/hooks/useNpcSpeechMaker";
 import { toast } from "sonner";
-import { getNoChildLeftBehindBump, rollD20, rollsWithDisadvantage } from "@/lib/gameData";
+import { getNoChildLeftBehindBump, rollD20, rollsWithDisadvantage, isCheckSuccess } from "@/lib/gameData";
 import type { Episode, Campaign, CrawlerPlacement, EpisodeMobPlacement, Mob, PublicMap, PublicMob, PublicEpisode, InventoryItem, Spell } from "@/lib/gameData";
 import { publicDocId, buildEpisodeBundle } from "@/lib/publicContent";
 import { LanguagesProvider } from "@/contexts/LanguagesContext";
@@ -255,6 +255,7 @@ const Index = () => {
     getCrawlerAssignedQuests,
     gameSettings,
     setXPScale,
+    setDungeonFloor,
     awardCrawlerXP,
     spendSkillPoint,
     spendAbilityPoint,
@@ -761,8 +762,8 @@ const Index = () => {
     navigate(restoredPlayer ? '/app/menu' : '/app');
   };
 
-  // `bonus` adds to the ability modifier, e.g. a skill's rank
-  const handleStatRoll = (crawlerName: string, crawlerId: string, stat: string, totalStat: number, bonus = 0) => {
+  // `bonus` adds to the ability modifier, e.g. a skill's rank. With a `dc` the roll is marked a success or failure.
+  const handleStatRoll = (crawlerName: string, crawlerId: string, stat: string, totalStat: number, bonus = 0, dc?: number) => {
     const modifier = Math.floor((totalStat - 10) / 2) + bonus;
     const { rawRoll, results, diceLabel } = rollD20(rollsWithDisadvantage(crawlers.find(c => c.id === crawlerId), totalStat));
     const total = rawRoll + modifier;
@@ -773,7 +774,7 @@ const Index = () => {
       timestamp: Date.now(),
       results,
       total,
-      statRoll: { stat, modifier, rawRoll, diceLabel },
+      statRoll: { stat, modifier, rawRoll, diceLabel, ...(dc !== undefined ? { dc, success: isCheckSuccess(rawRoll, total, dc) } : {}) },
     };
     addDiceRoll(entry);
   };
@@ -1071,6 +1072,8 @@ const Index = () => {
                 xpScale={gameSettings?.xpScale ?? 1}
                 onAwardXP={awardCrawlerXP}
                 onSetXPScale={setXPScale}
+                dungeonFloor={gameSettings?.dungeonFloor ?? 1}
+                onSetDungeonFloor={setDungeonFloor}
                 onSpendSkillPoint={spendSkillPoint}
                 onSpendAbilityPoint={spendAbilityPoint}
                 onRevokeTrophy={revokeTrophy}

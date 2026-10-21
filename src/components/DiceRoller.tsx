@@ -353,6 +353,11 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
                           {entry.results.length === 1 && entry.results[0].dice === "D20" && entry.results[0].result === 1 && (
                             <span className="text-destructive text-xs font-display">CRITICAL FAIL!</span>
                           )}
+                          {entry.statRoll?.dc !== undefined && (
+                            <span className={`text-xs font-display mr-2 ${entry.statRoll.success ? 'text-primary' : 'text-destructive'}`}>
+                              vs DC {entry.statRoll.dc}: {entry.statRoll.success ? 'SUCCESS' : 'FAIL'}
+                            </span>
+                          )}
                           {entry.statRoll && entry.statRoll.rawRoll === 20 && (
                             <span className="text-accent text-xs font-display">NAT 20!</span>
                           )}

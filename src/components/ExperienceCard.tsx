@@ -15,12 +15,14 @@ interface ExperienceCardProps {
   xpScale: number;
   onAwardXP?: (crawlerIds: string[], amount: number, reason: string) => Promise<void>;
   onSetXPScale?: (scale: number) => Promise<void>;
+  dungeonFloor?: number;
+  onSetDungeonFloor?: (floor: number) => Promise<void>;
   onSpendPoints?: () => void;
 }
 
 /** XP bar, unspent points, recent XP and the DM's Award XP controls for one crawler. */
 export const ExperienceCard: React.FC<ExperienceCardProps> = ({
-  crawler, crawlers, isAdmin, xpScale, onAwardXP, onSetXPScale, onSpendPoints,
+  crawler, crawlers, isAdmin, xpScale, onAwardXP, onSetXPScale, dungeonFloor = 1, onSetDungeonFloor, onSpendPoints,
 }) => {
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
@@ -139,6 +141,17 @@ export const ExperienceCard: React.FC<ExperienceCardProps> = ({
                 >
                   {XP_SCALE_OPTIONS.map(o => <option key={o} value={o}>{Math.round(o * 100)}%</option>)}
                 </select>
+              </label>
+              <label className="text-xs text-muted-foreground flex items-center gap-1" title="The floor the party is on. Skill check DCs go up 2 per floor.">
+                Floor
+                <input
+                  type="number"
+                  min={1}
+                  value={dungeonFloor}
+                  onChange={(e) => onSetDungeonFloor?.(parseInt(e.target.value, 10) || 1)}
+                  aria-label="Dungeon floor"
+                  className="w-14 bg-muted border border-border rounded px-1 py-0.5 text-foreground"
+                />
               </label>
             </div>
           </div>
