@@ -2,6 +2,7 @@
   {
     "date": "2026-10-21",
     "changes": [
+      "📊 The profile's Activity section now shows just the 5 stats where each crawler stands out most compared with the party. A new Stats tab lists every stat with the crawler's party rank and their Looting level",
       "🎲 Skill checks roll against Easy, Medium or Hard DCs that rise 2 per dungeon floor, which the DM sets. A natural 1 always fails and a natural 20 always succeeds, haggling included",
       "🎨 A \"free icons used up\" answer now only pauses icon generation for 30 minutes instead of the rest of the day, so a one-off hiccup can't switch icons off until tomorrow",
       "🎨 Regenerate icon: when editing an item in the Item Library or a spell in the Spell Library, click Regenerate icon for a fresh pixel icon made from its current name and description",

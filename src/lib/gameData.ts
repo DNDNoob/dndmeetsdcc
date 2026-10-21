@@ -297,6 +297,48 @@ export function getHPLossStats(oldHP: number, newHP: number, maxHP: number): Cra
   };
 }
 
+// ---- Crawler stats shown on the profile ----
+
+export type CrawlerStatKey = ActivityStatKey | 'spellCasts' | 'barterTrades';
+
+export const CRAWLER_STAT_LABELS: Record<CrawlerStatKey, string> = {
+  damageDealt: 'Damage Dealt',
+  killingBlows: 'Killing Blows',
+  combatEndingBlows: 'Fight Finishers',
+  damageTaken: 'HP Lost',
+  lowHealthCount: 'Near Death',
+  feetMoved: 'Feet Moved',
+  mobsLooted: 'Mobs Looted',
+  spellCasts: 'Spells Cast',
+  barterTrades: 'Merchant Trades',
+};
+
+export const CRAWLER_STAT_KEYS = Object.keys(CRAWLER_STAT_LABELS) as CrawlerStatKey[];
+
+export const getCrawlerStatValue = (crawler: Crawler, key: CrawlerStatKey): number => {
+  if (key === 'spellCasts') return (crawler.knownSpells ?? []).reduce((sum, s) => sum + (s.castCount || 0), 0);
+  if (key === 'barterTrades') return crawler.barterTrades ?? 0;
+  return crawler.activityStats?.[key] ?? 0;
+};
+
+/**
+ * The stats that stand out most for a crawler: each stat is scored by how far it is above the party's
+ * average, so a healer-ish crawler with few kills shows what they're good at instead. Stats at 0 never
+ * outrank ones with a value; the rest of the list fills in, in the usual order, to always show `count`.
+ */
+export function getHighlightStats(crawler: Crawler, party: Crawler[], count = 5): CrawlerStatKey[] {
+  const others = party.length > 0 ? party : [crawler];
+  const scored = CRAWLER_STAT_KEYS.map((key, order) => {
+    const value = getCrawlerStatValue(crawler, key);
+    const average = others.reduce((sum, c) => sum + getCrawlerStatValue(c, key), 0) / others.length;
+    return { key, order, value, score: value > 0 ? value / Math.max(average, 1) : 0 };
+  });
+  return scored
+    .sort((a, b) => (b.score - a.score) || (a.order - b.order))
+    .slice(0, count)
+    .map(s => s.key);
+}
+
 // Ruler scale: one grid square (the size of a token) is 5 feet
 export const FEET_PER_GRID_SQUARE = 5;
 

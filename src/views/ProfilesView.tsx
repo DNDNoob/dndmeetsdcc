@@ -15,11 +15,11 @@ import { SkillsPanel } from "@/components/SkillsPanel";
 import { usableLanguageIds } from "@/lib/languages";
 import { HealthBar } from "@/components/ui/HealthBar";
 import { EquipmentSlot } from "@/components/ui/EquipmentSlot";
-import { Crawler, getQuestProgress, Mob, InventoryItem, getItemStackKey, stackItems, getLootingLevel, getLootsUntilNextLevel, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery, getInitialCrawlerId, rollD20, rollsWithDisadvantage, ABILITY_KEYS, baseItemName, type SpellEffect, describeSpellEffect, getSkillRank, getCrawlerXP, type SkillId, type AbilityKey } from "@/lib/gameData";
+import { Crawler, getQuestProgress, Mob, InventoryItem, getItemStackKey, stackItems, getLootingLevel, getLootsUntilNextLevel, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery, getInitialCrawlerId, rollD20, rollsWithDisadvantage, ABILITY_KEYS, baseItemName, type SpellEffect, describeSpellEffect, getSkillRank, getCrawlerXP, type SkillId, type AbilityKey, CRAWLER_STAT_KEYS, CRAWLER_STAT_LABELS, getCrawlerStatValue, getHighlightStats, type CrawlerStatKey } from "@/lib/gameData";
 import { ItemName } from "@/components/ItemName";
 import type { DiceRollEntry } from "@/hooks/useGameState";
 import UndoTurnButton, { canUndoCombatTurn } from "@/components/UndoTurnButton";
-import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Backpack, HardHat, Package, Lock, Unlock, ChevronDown, ChevronUp, Check, Search, Send, BookOpen, Filter, X, Gem, Footprints, Shirt, Hand, Target, Swords, RefreshCw, Timer, ScrollText, Eye, EyeOff, CheckSquare, Trophy, Skull, HeartCrack, Crown, Minus, Wand2, Star } from "lucide-react";
+import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Backpack, HardHat, Package, Lock, Unlock, ChevronDown, ChevronUp, Check, Search, Send, BookOpen, Filter, X, Gem, Footprints, Shirt, Hand, Target, Swords, RefreshCw, Timer, ScrollText, Eye, EyeOff, CheckSquare, Trophy, Skull, HeartCrack, Crown, Minus, Wand2, Star, BarChart3, Wand, Store } from "lucide-react";
 
 type SortOption = 'name-asc' | 'name-desc' | 'gold-desc' | 'gold-asc';
 
@@ -29,6 +29,31 @@ const LegsIcon: React.FC<{ className?: string }> = ({ className = "w-4 h-4" }) =
     <path d="M6 2h12v6l-2 14h-2l-1-10h-2l-1 10H8L6 8V2z" />
   </svg>
 );
+
+const CRAWLER_STAT_ICONS: Record<CrawlerStatKey, React.FC<{ className?: string }>> = {
+  damageDealt: Swords,
+  killingBlows: Skull,
+  combatEndingBlows: Crown,
+  damageTaken: Heart,
+  lowHealthCount: HeartCrack,
+  feetMoved: Footprints,
+  mobsLooted: Coins,
+  spellCasts: Wand,
+  barterTrades: Store,
+};
+
+const CrawlerStatTile: React.FC<{ statKey: CrawlerStatKey; value: number; note?: string }> = ({ statKey, value, note }) => {
+  const Icon = CRAWLER_STAT_ICONS[statKey];
+  return (
+    <div className="bg-muted/50 px-3 py-2 rounded">
+      <div className="flex items-center gap-1 text-muted-foreground text-xs">
+        <Icon className="w-3.5 h-3.5 shrink-0" /> {CRAWLER_STAT_LABELS[statKey]}
+      </div>
+      <div className="text-foreground font-bold text-lg">{value.toLocaleString()}</div>
+      {note && <div className="text-xs text-accent">{note}</div>}
+    </div>
+  );
+};
 
 // Helper to get the appropriate icon for an equipment slot
 const getEquipmentIcon = (slot?: string, className: string = "w-4 h-4 shrink-0") => {
@@ -69,7 +94,7 @@ const stableJson = (value: unknown): string => {
   return JSON.stringify(clean(value));
 };
 
-type ProfileTab = 'profile' | 'inventory' | 'actions' | 'skills' | 'spells' | 'reactions' | 'attacks' | 'bonus' | 'quests';
+type ProfileTab = 'profile' | 'inventory' | 'actions' | 'skills' | 'spells' | 'reactions' | 'attacks' | 'bonus' | 'quests' | 'stats';
 
 // Noncombat actions mapped to their associated ability score
 const NONCOMBAT_ACTIONS: { label: string; stat: 'str' | 'dex' | 'con' | 'int' | 'cha' }[] = [
@@ -1161,6 +1186,18 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 </span>
               )}
             </button>
+            <button
+              onClick={() => setActiveTab('stats')}
+              className={`p-3 rounded-l-lg transition-colors flex items-center gap-2 ${
+                activeTab === 'stats'
+                  ? 'bg-primary/20 text-primary border-r-2 border-primary'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              }`}
+              title="Stats"
+            >
+              <BarChart3 className="w-5 h-5" />
+              <span className="hidden xl:inline text-sm font-medium">Stats</span>
+            </button>
           </div>
 
           {/* Tab Content */}
@@ -1584,20 +1621,9 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
 
         {/* Activity stats and DM trophies row */}
         {(() => {
-          const stats = selected.activityStats ?? {};
           const speed = getEffectiveMoveSpeed(selected, inventory);
           const baseSpeed = selected.moveSpeed ?? DEFAULT_MOVE_SPEED;
-          const tiles = [
-            { label: 'Feet Moved', value: stats.feetMoved ?? 0, icon: Footprints },
-            { label: 'Damage Dealt', value: stats.damageDealt ?? 0, icon: Swords },
-            { label: 'Killing Blows', value: stats.killingBlows ?? 0, icon: Skull },
-            { label: 'Fight Finishers', value: stats.combatEndingBlows ?? 0, icon: Crown },
-            { label: 'HP Lost', value: stats.damageTaken ?? 0, icon: Heart },
-            { label: 'Near Death', value: stats.lowHealthCount ?? 0, icon: HeartCrack },
-            { label: 'Mobs Looted', value: stats.mobsLooted ?? 0, icon: Coins },
-          ];
-          const lootingLevel = getLootingLevel(stats.mobsLooted);
-          const lootsToNext = getLootsUntilNextLevel(stats.mobsLooted);
+          const highlights = getHighlightStats(selected, crawlers);
           const trophies = selected.trophies ?? [];
           const handleAward = async () => {
             if (!trophyName.trim()) return;
@@ -1633,21 +1659,16 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                   )}
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {tiles.map(({ label, value, icon: Icon }) => (
-                    <div key={label} className="bg-muted/50 px-3 py-2 rounded">
-                      <div className="flex items-center gap-1 text-muted-foreground text-xs">
-                        <Icon className="w-3.5 h-3.5 shrink-0" /> {label}
-                      </div>
-                      <div className="text-foreground font-bold text-lg">{value.toLocaleString()}</div>
-                    </div>
+                  {highlights.map(key => (
+                    <CrawlerStatTile key={key} statKey={key} value={getCrawlerStatValue(selected, key)} />
                   ))}
-                </div>
-                <div className="mt-3 bg-accent/10 border border-accent/30 rounded px-3 py-2 text-sm" title="Each Looting level makes loot a tenth less likely to be smashed">
-                  <span className="font-display text-accent">Looting Lv {lootingLevel}</span>
-                  <span className="text-muted-foreground">
-                    {lootingLevel > 0 ? ` · loot smashed ${lootingLevel * 10}% less often` : ' · loot is smashed at the normal rate'}
-                    {lootsToNext !== null ? ` · ${lootsToNext} more mob${lootsToNext === 1 ? '' : 's'} to Lv ${lootingLevel + 1}` : ' · max level, loot is never smashed'}
-                  </span>
+                  <button
+                    onClick={() => setActiveTab('stats')}
+                    className="bg-primary/10 border border-primary/30 px-3 py-2 rounded text-primary text-sm font-display hover:bg-primary/20 transition-colors flex items-center justify-center gap-1"
+                    title="Every stat this crawler has, plus their Looting level"
+                  >
+                    <BarChart3 className="w-4 h-4 shrink-0" /> All stats
+                  </button>
                 </div>
               </div>
 
@@ -2384,6 +2405,42 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                     if (isCombatActive && isMyTurn) onRecordCombatAction?.(selected.id, 'action');
                   }}
                 />
+              );
+            })()}
+
+            {/* Stats Tab: every stat; the profile shows only the ones that stand out */}
+            {activeTab === 'stats' && (() => {
+              const party = crawlers.length > 0 ? crawlers : [selected];
+              const partyRank = (key: CrawlerStatKey): string | undefined => {
+                const value = getCrawlerStatValue(selected, key);
+                if (value <= 0 || party.length < 2) return undefined;
+                const rank = 1 + party.filter(c => getCrawlerStatValue(c, key) > value).length;
+                return rank === 1 ? 'Top of the party' : `#${rank} in the party`;
+              };
+              const mobsLooted = selected.activityStats?.mobsLooted ?? 0;
+              const lootingLevel = getLootingLevel(mobsLooted);
+              const lootsToNext = getLootsUntilNextLevel(mobsLooted);
+              return (
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+                  <h3 className="font-display text-primary text-xl mb-1 flex items-center gap-2">
+                    <BarChart3 className="w-6 h-6 shrink-0" /> STATS
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Everything the game counts for {selected.name}. The profile shows the 5 that stand out most compared with the party.
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {CRAWLER_STAT_KEYS.map(key => (
+                      <CrawlerStatTile key={key} statKey={key} value={getCrawlerStatValue(selected, key)} note={partyRank(key)} />
+                    ))}
+                  </div>
+                  <div className="mt-3 bg-accent/10 border border-accent/30 rounded px-3 py-2 text-sm" title="Each Looting level makes loot a tenth less likely to be smashed">
+                    <span className="font-display text-accent">Looting Lv {lootingLevel}</span>
+                    <span className="text-muted-foreground">
+                      {lootingLevel > 0 ? ` · loot smashed ${lootingLevel * 10}% less often` : ' · loot is smashed at the normal rate'}
+                      {lootsToNext !== null ? ` · ${lootsToNext} more mob${lootsToNext === 1 ? '' : 's'} to Lv ${lootingLevel + 1}` : ' · max level, loot is never smashed'}
+                    </span>
+                  </div>
+                </motion.div>
               );
             })()}
 

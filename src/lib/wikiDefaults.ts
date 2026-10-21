@@ -127,7 +127,7 @@ Crawlers can equip items in the following slots: Head, Chest, Legs, Feet, Left H
 
 ## Activity and Trophies
 
-Your profile tracks activity stats like feet moved, damage dealt and killing blows, and shows trophies the DM awards you. See [Activity Stats & Trophies](/wiki/activity-trophies).
+Your profile shows the 5 activity stats where you stand out most, and the **Stats** tab lists them all. It also shows trophies the DM awards you. See [Activity Stats & Trophies](/wiki/activity-trophies).
 
 ## Avatars
 
@@ -145,6 +145,8 @@ Every crawler's profile has an **Activity** section and a **Trophies** section.
 
 ## Activity Stats
 
+To keep the profile tidy, the **Activity** section shows only 5 stats: the ones where this crawler is furthest above the party's average, so a healer with few kills shows what they're good at instead. Stats still at 0 come last. Click **All stats**, or open the **Stats** tab, to see every stat, where the crawler ranks in the party, and their Looting level.
+
 These are tracked automatically as you play:
 
 | Stat | What counts |
@@ -155,6 +157,9 @@ These are tracked automatically as you play:
 | Fight Finishers | Killing blows that take down the last mob standing in a combat |
 | HP Lost | Hit points you lose to attacks and other damage. Changing HP while editing your profile (for example when setting up a new crawler) doesn't count |
 | Near Death | Times your HP drops below 10% of your max HP |
+| Mobs Looted | Defeated mobs whose loot you shared in (raises your Looting level) |
+| Spells Cast | Casts of all your known spells added together |
+| Merchant Trades | Buys and sells with merchants (raises Barter) |
 
 Your **Speed** (feet per combat turn) is shown next to the Activity heading. See [Combat System](/wiki/combat) for how movement works in combat.
 
@@ -387,7 +392,7 @@ Looting is rough work, and some loot gets smashed. Each coin and each copy of a 
 
 ## Looting Level
 
-Every mob a crawler helps loot counts toward their **Looting level**, shown on their profile under Activity with how many more mobs they need for the next level.
+Every mob a crawler helps loot counts toward their **Looting level**, shown on the **Stats** tab of their profile with how many more mobs they need for the next level.
 
 | Level | Mobs looted | Loot smashed |
 |-------|-------------|--------------|
