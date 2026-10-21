@@ -2423,7 +2423,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
               return (
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
                   <h3 className="font-display text-primary text-xl mb-1 flex items-center gap-2">
-                    <BarChart3 className="w-6 h-6 shrink-0" /> STATS
+                    <BarChart3 className="w-6 h-6 shrink-0" /> ACTIVITY STATS
                   </h3>
                   <p className="text-sm text-muted-foreground mb-4">
                     Everything the game counts for {selected.name}. The profile shows the 5 that stand out most compared with the party.
