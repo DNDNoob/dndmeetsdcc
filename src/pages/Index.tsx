@@ -139,6 +139,7 @@ const Index = () => {
 
   const {
     crawlers,
+    crawlerStats,
     updateCrawler,
     addCrawler,
     deleteCrawler,
@@ -1059,6 +1060,7 @@ const Index = () => {
             {currentView === "profiles" && (
               <ProfilesView
                 crawlers={crawlers}
+                crawlerStats={crawlerStats}
                 onUpdateCrawler={updateCrawler}
                 onAddCrawler={addCrawler}
                 onDeleteCrawler={deleteCrawler}

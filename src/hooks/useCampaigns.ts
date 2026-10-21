@@ -141,7 +141,7 @@ export function useCampaigns(userId: string | null) {
       const roomCollections = [
         'crawlers', 'mobs', 'maps', 'inventory', 'episodes', 'soundEffects',
         'diceRolls', 'lootBoxes', 'lootBoxTemplates', 'noncombatTurns',
-        'gameClock', 'combatState', 'wiki', 'quests', 'assignedQuests',
+        'gameClock', 'combatState', 'wiki', 'quests', 'assignedQuests', 'crawlerStats',
       ];
 
       for (const collName of roomCollections) {

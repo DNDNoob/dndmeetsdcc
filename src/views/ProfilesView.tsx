@@ -7,6 +7,7 @@ import { ForeignText } from "@/components/ForeignText";
 import { LanguageSelect } from "@/components/LanguagePicker";
 import { CrawlerLanguagesCard } from "@/components/CrawlerLanguagesCard";
 import { CharacterCreator } from "@/components/CharacterCreator";
+import { CrawlerStatsPanel, CrawlerStatTile } from "@/components/CrawlerStatsPanel";
 import { BACKSTORY_QUESTIONS } from "@/lib/characterCreation";
 import { RarityBadge } from "@/components/ui/RarityBadge";
 import { ConditionBadges } from "@/components/ConditionBadges";
@@ -15,11 +16,13 @@ import { SkillsPanel } from "@/components/SkillsPanel";
 import { usableLanguageIds } from "@/lib/languages";
 import { HealthBar } from "@/components/ui/HealthBar";
 import { EquipmentSlot } from "@/components/ui/EquipmentSlot";
-import { Crawler, getQuestProgress, Mob, InventoryItem, getItemStackKey, stackItems, getLootingLevel, getLootsUntilNextLevel, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery, getInitialCrawlerId, rollD20, rollsWithDisadvantage, ABILITY_KEYS, baseItemName, type SpellEffect, describeSpellEffect, getSkillRank, getCrawlerXP, type SkillId, type AbilityKey, CRAWLER_STAT_KEYS, CRAWLER_STAT_LABELS, getCrawlerStatValue, getHighlightStats, type CrawlerStatKey } from "@/lib/gameData";
+import { Crawler, getQuestProgress, Mob, InventoryItem, getItemStackKey, stackItems, getLootingLevel, getLootsUntilNextLevel, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery, getInitialCrawlerId, rollD20, rollsWithDisadvantage, ABILITY_KEYS, baseItemName, type SpellEffect, describeSpellEffect, getSkillRank, getCrawlerXP, type SkillId, type AbilityKey, getCrawlerStatValue, getHighlightStats, type StatSource, type CrawlerStats, type CrawlerStatsById } from "@/lib/gameData";
 import { ItemName } from "@/components/ItemName";
 import type { DiceRollEntry } from "@/hooks/useGameState";
 import UndoTurnButton, { canUndoCombatTurn } from "@/components/UndoTurnButton";
-import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Backpack, HardHat, Package, Lock, Unlock, ChevronDown, ChevronUp, Check, Search, Send, BookOpen, Filter, X, Gem, Footprints, Shirt, Hand, Target, Swords, RefreshCw, Timer, ScrollText, Eye, EyeOff, CheckSquare, Trophy, Skull, HeartCrack, Crown, Minus, Wand2, Star, BarChart3, Wand, Store } from "lucide-react";
+import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Backpack, HardHat, Package, Lock, Unlock, ChevronDown, ChevronUp, Check, Search, Send, BookOpen, Filter, X, Gem, Footprints, Shirt, Hand, Target, Swords, RefreshCw, Timer, ScrollText, Eye, EyeOff, CheckSquare, Trophy, Skull, HeartCrack, Crown, Minus, Wand2, Star, BarChart3 } from "lucide-react";
+
+const NO_CRAWLER_STATS: CrawlerStats[] = [];
 
 type SortOption = 'name-asc' | 'name-desc' | 'gold-desc' | 'gold-asc';
 
@@ -30,30 +33,13 @@ const LegsIcon: React.FC<{ className?: string }> = ({ className = "w-4 h-4" }) =
   </svg>
 );
 
-const CRAWLER_STAT_ICONS: Record<CrawlerStatKey, React.FC<{ className?: string }>> = {
-  damageDealt: Swords,
-  killingBlows: Skull,
-  combatEndingBlows: Crown,
-  damageTaken: Heart,
-  lowHealthCount: HeartCrack,
-  feetMoved: Footprints,
-  mobsLooted: Coins,
-  spellCasts: Wand,
-  barterTrades: Store,
-};
-
-const CrawlerStatTile: React.FC<{ statKey: CrawlerStatKey; value: number; note?: string }> = ({ statKey, value, note }) => {
-  const Icon = CRAWLER_STAT_ICONS[statKey];
-  return (
-    <div className="bg-muted/50 px-3 py-2 rounded">
-      <div className="flex items-center gap-1 text-muted-foreground text-xs">
-        <Icon className="w-3.5 h-3.5 shrink-0" /> {CRAWLER_STAT_LABELS[statKey]}
-      </div>
-      <div className="text-foreground font-bold text-lg">{value.toLocaleString()}</div>
-      {note && <div className="text-xs text-accent">{note}</div>}
-    </div>
-  );
-};
+// What a weapon attack counts toward in the crawler's stats
+const weaponSource = (weapon: InventoryItem): StatSource => ({
+  kind: 'item',
+  id: weapon.id,
+  name: weapon.name,
+  ...(weapon.weaponData?.damageType ? { damageType: weapon.weaponData.damageType } : {}),
+});
 
 // Helper to get the appropriate icon for an equipment slot
 const getEquipmentIcon = (slot?: string, className: string = "w-4 h-4 shrink-0") => {
@@ -124,6 +110,7 @@ const INITIATIVE_ACTION = { label: 'Initiative', stat: 'dex' as const };
 
 interface ProfilesViewProps {
   crawlers: Crawler[];
+  crawlerStats?: CrawlerStats[];
   onUpdateCrawler: (id: string, updates: Partial<Crawler>) => void;
   onAddCrawler: (crawler: Crawler) => void;
   onDeleteCrawler: (id: string) => void;
@@ -145,9 +132,9 @@ interface ProfilesViewProps {
   onRecordCombatInitiative?: (combatantId: string, roll: number) => Promise<void>;
   onRecordCombatAction?: (combatantId: string, actionType: 'action' | 'bonus') => Promise<void>;
   onUndoCombatTurn?: () => Promise<boolean>;
-  onApplyCombatDamage?: (targetId: string, targetType: 'crawler' | 'mob', damage: number, attackerId?: string) => Promise<void>;
-  onApplyCombatDamageBatch?: (hits: { targetId: string; targetType: 'crawler' | 'mob'; damage: number }[], attackerId?: string) => Promise<void>;
-  onApplyCombatConditions?: (targetIds: string[], effect: SpellEffect, spellName: string, casterName?: string) => Promise<void>;
+  onApplyCombatDamage?: (targetId: string, targetType: 'crawler' | 'mob', damage: number, attackerId?: string, source?: StatSource) => Promise<void>;
+  onApplyCombatDamageBatch?: (hits: { targetId: string; targetType: 'crawler' | 'mob'; damage: number }[], attackerId?: string, source?: StatSource) => Promise<void>;
+  onApplyCombatConditions?: (targetIds: string[], effect: SpellEffect, spellName: string, casterName?: string, casterId?: string, source?: StatSource) => Promise<void>;
   isAdmin?: boolean;
   onAwardTrophy?: (crawlerId: string, name: string, description?: string) => Promise<void>;
   xpScale?: number;
@@ -166,7 +153,7 @@ interface ProfilesViewProps {
   spells?: Spell[];
   onCastSpell?: (crawlerId: string, spellId: string) => Promise<boolean>;
   onForgetSpell?: (crawlerId: string, spellId: string) => Promise<void>;
-  onHealCrawler?: (crawlerId: string, amount: number) => Promise<void>;
+  onHealCrawler?: (crawlerId: string, amount: number, healerId?: string, source?: StatSource) => Promise<void>;
 }
 
 const SPELL_LEARNED_FROM_LABELS: Record<string, string> = {
@@ -529,6 +516,7 @@ const LootBoxSection: React.FC<{
 
 const ProfilesView: React.FC<ProfilesViewProps> = ({
   crawlers,
+  crawlerStats = NO_CRAWLER_STATS,
   onUpdateCrawler,
   onAddCrawler,
   onDeleteCrawler,
@@ -599,9 +587,9 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
 
   // Combat targeting state
   const [showDamageTargetModal, setShowDamageTargetModal] = useState(false);
-  const [pendingDamageRoll, setPendingDamageRoll] = useState<{ dice: string; bonus: number; actionName: string; isSplash?: boolean; effect?: SpellEffect } | null>(null);
+  const [pendingDamageRoll, setPendingDamageRoll] = useState<{ dice: string; bonus: number; actionName: string; isSplash?: boolean; effect?: SpellEffect; source?: StatSource } | null>(null);
   // A spell whose only job is putting an effect on targets (no dice): pick who it lands on
-  const [pendingEffect, setPendingEffect] = useState<{ spellName: string; effect: SpellEffect; canTargetSelf: boolean; multiTarget: boolean } | null>(null);
+  const [pendingEffect, setPendingEffect] = useState<{ spellName: string; effect: SpellEffect; canTargetSelf: boolean; multiTarget: boolean; source?: StatSource } | null>(null);
   const [effectTargetIds, setEffectTargetIds] = useState<string[]>([]);
   const [damageTargetId, setDamageTargetId] = useState<string>('');
   const [damageTargetType, setDamageTargetType] = useState<'crawler' | 'mob'>('mob');
@@ -610,7 +598,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   const [splashDamageResults, setSplashDamageResults] = useState<Record<string, number>>({});
 
   // Healing spell targeting state
-  const [pendingHeal, setPendingHeal] = useState<{ spellName: string; dice: WeaponDie[]; bonus: number; canTargetSelf: boolean; multiTarget: boolean; effect?: SpellEffect } | null>(null);
+  const [pendingHeal, setPendingHeal] = useState<{ spellName: string; dice: WeaponDie[]; bonus: number; canTargetSelf: boolean; multiTarget: boolean; effect?: SpellEffect; source?: StatSource } | null>(null);
   const [healedTargets, setHealedTargets] = useState<Record<string, number>>({});
 
   // Weapon advantage/disadvantage menu
@@ -642,6 +630,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   const [sendQuantities, setSendQuantities] = useState<Record<string, number>>({});
 
   const selected = crawlers.find((c) => c.id === selectedId) || crawlers[0];
+  const statsById = useMemo<CrawlerStatsById>(() => Object.fromEntries(crawlerStats.map(st => [st.id, st])), [crawlerStats]);
   const isOwnProfile = !currentPlayerId || currentPlayerId === selected?.id;
   // Memoize inventory to prevent cascading recomputation of dependent useMemos
   const inventoryRef = useRef<InventoryItem[]>([]);
@@ -1623,7 +1612,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
         {(() => {
           const speed = getEffectiveMoveSpeed(selected, inventory);
           const baseSpeed = selected.moveSpeed ?? DEFAULT_MOVE_SPEED;
-          const highlights = getHighlightStats(selected, crawlers);
+          const highlights = getHighlightStats(selected, crawlers, statsById);
           const trophies = selected.trophies ?? [];
           const handleAward = async () => {
             if (!trophyName.trim()) return;
@@ -1660,7 +1649,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {highlights.map(key => (
-                    <CrawlerStatTile key={key} statKey={key} value={getCrawlerStatValue(selected, key)} />
+                    <CrawlerStatTile key={key} statKey={key} value={getCrawlerStatValue(selected, key, statsById[selected.id])} />
                   ))}
                   <button
                     onClick={() => setActiveTab('stats')}
@@ -2409,40 +2398,9 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             })()}
 
             {/* Stats Tab: every stat; the profile shows only the ones that stand out */}
-            {activeTab === 'stats' && (() => {
-              const party = crawlers.length > 0 ? crawlers : [selected];
-              const partyRank = (key: CrawlerStatKey): string | undefined => {
-                const value = getCrawlerStatValue(selected, key);
-                if (value <= 0 || party.length < 2) return undefined;
-                const rank = 1 + party.filter(c => getCrawlerStatValue(c, key) > value).length;
-                return rank === 1 ? 'Top of the party' : `#${rank} in the party`;
-              };
-              const mobsLooted = selected.activityStats?.mobsLooted ?? 0;
-              const lootingLevel = getLootingLevel(mobsLooted);
-              const lootsToNext = getLootsUntilNextLevel(mobsLooted);
-              return (
-                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-                  <h3 className="font-display text-primary text-xl mb-1 flex items-center gap-2">
-                    <BarChart3 className="w-6 h-6 shrink-0" /> ACTIVITY STATS
-                  </h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Everything the game counts for {selected.name}. The profile shows the 5 that stand out most compared with the party.
-                  </p>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {CRAWLER_STAT_KEYS.map(key => (
-                      <CrawlerStatTile key={key} statKey={key} value={getCrawlerStatValue(selected, key)} note={partyRank(key)} />
-                    ))}
-                  </div>
-                  <div className="mt-3 bg-accent/10 border border-accent/30 rounded px-3 py-2 text-sm" title="Each Looting level makes loot a tenth less likely to be smashed">
-                    <span className="font-display text-accent">Looting Lv {lootingLevel}</span>
-                    <span className="text-muted-foreground">
-                      {lootingLevel > 0 ? ` · loot smashed ${lootingLevel * 10}% less often` : ' · loot is smashed at the normal rate'}
-                      {lootsToNext !== null ? ` · ${lootsToNext} more mob${lootsToNext === 1 ? '' : 's'} to Lv ${lootingLevel + 1}` : ' · max level, loot is never smashed'}
-                    </span>
-                  </div>
-                </motion.div>
-              );
-            })()}
+            {activeTab === 'stats' && (
+              <CrawlerStatsPanel crawler={selected} party={crawlers} statsById={statsById} />
+            )}
 
             {/* Spells Tab */}
             {activeTab === 'spells' && (() => {
@@ -2510,6 +2468,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 // Effects only land in combat, where their turns can count down
                 const effect = isCombatPhaseLocal && sd.effect?.condition?.trim() ? sd.effect : undefined;
                 const isSelfSpell = sd.target === 'Self' || sd.range === 'Self';
+                const source: StatSource = { kind: 'spell', id: ks.spellId, name: spell.name, ...(sd.damageType ? { damageType: sd.damageType } : {}) };
 
                 // Damage spells without a saving throw make a spell attack roll
                 if (dice.length > 0 && !isHealing && !sd.savingThrow && addDiceRoll) {
@@ -2533,10 +2492,10 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 if (dice.length === 0) {
                   if (!effect) return;
                   if (isSelfSpell) {
-                    await onApplyCombatConditions?.([selected.id], effect, spell.name, selected.name);
+                    await onApplyCombatConditions?.([selected.id], effect, spell.name, selected.name, selected.id, source);
                   } else {
                     setEffectTargetIds([]);
-                    setPendingEffect({ spellName: spell.name, effect, canTargetSelf: sd.canTargetSelf, multiTarget });
+                    setPendingEffect({ spellName: spell.name, effect, canTargetSelf: sd.canTargetSelf, multiTarget, source });
                   }
                   return;
                 }
@@ -2546,8 +2505,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                   if (isSelfSpell) {
                     const { results, total } = rollSpellDice(dice);
                     const healed = Math.max(0, total + bonus) + getSkillRank(selected, 'medicine');
-                    await onHealCrawler?.(selected.id, healed);
-                    if (effect) await onApplyCombatConditions?.([selected.id], effect, spell.name, selected.name);
+                    await onHealCrawler?.(selected.id, healed, selected.id, source);
+                    if (effect) await onApplyCombatConditions?.([selected.id], effect, spell.name, selected.name, selected.id, source);
                     addDiceRoll?.({
                       id: crypto.randomUUID(),
                       crawlerName: selected.name,
@@ -2560,12 +2519,12 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                     return;
                   }
                   setHealedTargets({});
-                  setPendingHeal({ spellName: spell.name, dice, bonus, canTargetSelf: sd.canTargetSelf, multiTarget, effect });
+                  setPendingHeal({ spellName: spell.name, dice, bonus, canTargetSelf: sd.canTargetSelf, multiTarget, effect, source });
                   return;
                 }
 
                 if (isCombatPhaseLocal && combatTargets.length > 0) {
-                  setPendingDamageRoll({ dice: formatSpellDice(dice), bonus, actionName: spell.name, isSplash: multiTarget, effect });
+                  setPendingDamageRoll({ dice: formatSpellDice(dice), bonus, actionName: spell.name, isSplash: multiTarget, effect, source });
                   setShowDamageTargetModal(true);
                   setDamageRollResult(null);
                   setDamageTargetId('');
@@ -2755,12 +2714,13 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                     results,
                     total: rollTotal,
                     statRoll: { stat: `${attackName} (Attack)`, modifier, rawRoll, rollType: 'Attack roll', diceLabel },
+                    source: { kind: 'item', id: `attack:${attackName}`, name: attackName },
                   });
                 }
 
                 // A natural 1 misses, so there's no damage to roll
                 if (isCombatPhaseLocal && combatTargets.length > 0 && rawRoll !== 1) {
-                  setPendingDamageRoll({ dice: damageDice, bonus: damageBonus, actionName: attackName });
+                  setPendingDamageRoll({ dice: damageDice, bonus: damageBonus, actionName: attackName, source: { kind: 'item', id: `attack:${attackName}`, name: attackName } });
                   setShowDamageTargetModal(true);
                   setDamageRollResult(null);
                   setSplashTargetIds([]);
@@ -2813,12 +2773,13 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                     results,
                     total: rollTotal,
                     statRoll: { stat: `${weapon.name} (Attack)`, modifier: hitDieResult + hitStatMod, rawRoll, rollType: 'Attack roll' },
+                    source: weaponSource(weapon),
                   });
                 }
 
                 // A natural 1 misses, so there's no damage to roll
                 if (isCombatPhaseLocal && combatTargets.length > 0 && !wd.splashDamage && rawRoll !== 1) {
-                  setPendingDamageRoll({ dice: formatDice(wd.damageDice), bonus: calcWeaponStatMod(wd.damageModifiers), actionName: weapon.name, isSplash: false });
+                  setPendingDamageRoll({ dice: formatDice(wd.damageDice), bonus: calcWeaponStatMod(wd.damageModifiers), actionName: weapon.name, isSplash: false, source: weaponSource(weapon) });
                   setShowDamageTargetModal(true);
                   setDamageRollResult(null);
                   setSplashTargetIds([]);
@@ -2837,7 +2798,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
 
                 // Splash weapons in combat: open target selection modal for per-mob rolls
                 if (wd.splashDamage && isCombatPhaseLocal && combatTargets.length > 0) {
-                  setPendingDamageRoll({ dice: formatDice(wd.damageDice), bonus: calcWeaponStatMod(wd.damageModifiers), actionName: weapon.name, isSplash: true });
+                  setPendingDamageRoll({ dice: formatDice(wd.damageDice), bonus: calcWeaponStatMod(wd.damageModifiers), actionName: weapon.name, isSplash: true, source: weaponSource(weapon) });
                   setShowDamageTargetModal(true);
                   setDamageRollResult(null);
                   setSplashTargetIds([]);
@@ -3486,6 +3447,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
               results,
               total: rollTotal,
               statRoll: { stat: `${weapon.name} (Attack${adv ? ` - ${adv}` : ''})`, modifier: hitDieResult + hitStatMod, rawRoll, rollType: 'Attack roll' },
+              source: weaponSource(weapon),
             });
           }
 
@@ -3493,7 +3455,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
           // A natural 1 misses, so there's no damage to roll
           if (isCombatPhaseLocal && combatTargets.length > 0 && !wd.splashDamage && rawRoll !== 1) {
             const formatDice = (dice: WeaponDie[]): string => dice.map(d => `${d.count}d${d.sides}`).join(' + ');
-            setPendingDamageRoll({ dice: formatDice(wd.damageDice), bonus: calcMod(wd.damageModifiers), actionName: weapon.name, isSplash: false });
+            setPendingDamageRoll({ dice: formatDice(wd.damageDice), bonus: calcMod(wd.damageModifiers), actionName: weapon.name, isSplash: false, source: weaponSource(weapon) });
             setShowDamageTargetModal(true);
             setDamageRollResult(null);
             setSplashTargetIds([]);
@@ -3777,8 +3739,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             }
           }
           const healed = Math.max(0, total + pendingHeal.bonus) + getSkillRank(selected, 'medicine');
-          await onHealCrawler?.(target.id, healed);
-          if (pendingHeal.effect && inCombat) await onApplyCombatConditions?.([target.id], pendingHeal.effect, pendingHeal.spellName, selected.name);
+          await onHealCrawler?.(target.id, healed, selected.id, pendingHeal.source);
+          if (pendingHeal.effect && inCombat) await onApplyCombatConditions?.([target.id], pendingHeal.effect, pendingHeal.spellName, selected.name, selected.id, pendingHeal.source);
           addDiceRoll?.({
             id: crypto.randomUUID(),
             crawlerName: selected.name,
@@ -3885,7 +3847,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
               <button
                 disabled={effectTargetIds.length === 0}
                 onClick={async () => {
-                  await onApplyCombatConditions?.(effectTargetIds, pendingEffect.effect, pendingEffect.spellName, selected.name);
+                  await onApplyCombatConditions?.(effectTargetIds, pendingEffect.effect, pendingEffect.spellName, selected.name, selected.id, pendingEffect.source);
                   closeEffect();
                 }}
                 className="w-full mt-4 py-2 bg-primary text-primary-foreground font-display text-sm rounded hover:bg-primary/90 transition-colors disabled:opacity-50"
@@ -4041,8 +4003,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                       <p className="font-display text-2xl text-destructive">{damageRollResult} DAMAGE</p>
                       <button
                         onClick={async () => {
-                          await onApplyCombatDamage?.(damageTargetId, damageTargetType, damageRollResult, selected.id);
-                          if (pendingDamageRoll.effect) await onApplyCombatConditions?.([damageTargetId], pendingDamageRoll.effect, pendingDamageRoll.actionName, selected.name);
+                          await onApplyCombatDamage?.(damageTargetId, damageTargetType, damageRollResult, selected.id, pendingDamageRoll.source);
+                          if (pendingDamageRoll.effect) await onApplyCombatConditions?.([damageTargetId], pendingDamageRoll.effect, pendingDamageRoll.actionName, selected.name, selected.id, pendingDamageRoll.source);
                           setShowDamageTargetModal(false);
                           setPendingDamageRoll(null);
                           setDamageRollResult(null);
@@ -4119,11 +4081,11 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                             .filter(target => splashDamageResults[target.id] !== undefined)
                             .map(target => ({ targetId: target.id, targetType: target.type, damage: splashDamageResults[target.id] }));
                           if (onApplyCombatDamageBatch) {
-                            await onApplyCombatDamageBatch(hits, selected.id);
+                            await onApplyCombatDamageBatch(hits, selected.id, pendingDamageRoll.source);
                           } else {
-                            for (const hit of hits) await onApplyCombatDamage?.(hit.targetId, hit.targetType, hit.damage, selected.id);
+                            for (const hit of hits) await onApplyCombatDamage?.(hit.targetId, hit.targetType, hit.damage, selected.id, pendingDamageRoll.source);
                           }
-                          if (pendingDamageRoll.effect) await onApplyCombatConditions?.(hits.map(h => h.targetId), pendingDamageRoll.effect, pendingDamageRoll.actionName, selected.name);
+                          if (pendingDamageRoll.effect) await onApplyCombatConditions?.(hits.map(h => h.targetId), pendingDamageRoll.effect, pendingDamageRoll.actionName, selected.name, selected.id, pendingDamageRoll.source);
                           setShowDamageTargetModal(false);
                           setPendingDamageRoll(null);
                           setDamageRollResult(null);

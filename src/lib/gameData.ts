@@ -297,27 +297,105 @@ export function getHPLossStats(oldHP: number, newHP: number, maxHP: number): Cra
   };
 }
 
+// ---- Crawler stats doc: rooms/{roomId}/crawlerStats/{crawlerId} ----
+// Counters the game keeps to learn how each crawler plays (feeds the profile, the DM and AI prompts).
+// Kept apart from the crawler doc, which carries the avatar and changes far less often.
+
+/** What dealt damage, healed or left an effect: a weapon or other item, a spell, or a plain attack. */
+export interface StatSource {
+  kind: 'item' | 'spell';
+  id: string;
+  name: string;
+  damageType?: string;
+}
+
+/** Counters for one weapon, armor piece or spell. */
+export interface SourceStats {
+  name?: string;
+  uses?: number;          // attack rolls made with it (spells count casts in knownSpells instead)
+  hits?: number;          // targets it damaged
+  damage?: number;
+  kills?: number;         // hostile mobs brought to 0 HP
+  bossKills?: number;
+  biggestHit?: number;
+  healing?: number;
+  conditions?: number;    // spell effects left on targets
+  friendlyFire?: number;  // damage to other crawlers
+  neutralDamage?: number; // damage to mobs that aren't hostile, NPCs included
+  neutralKills?: number;
+  damageAbsorbed?: number; // armor: for when a damage-reduction rule exists
+  hitsDeflected?: number;
+}
+
+export interface CrawlerStats {
+  id: string; // = crawlerId
+  items?: Record<string, SourceStats>;
+  spells?: Record<string, SourceStats>;
+  damageByType?: Record<string, number>;
+  killsByMob?: Record<string, number>; // mob name -> hostile kills
+  bossKills?: number;
+  healingDone?: number;
+  healingReceived?: number;
+  friendlyFire?: number;
+  neutralDamage?: number;
+  neutralKills?: number;
+  // Dice
+  rollsByAbility?: Partial<Record<AbilityKey, number>>;
+  d20Rolls?: number;
+  d20Total?: number;
+  nat20s?: number;
+  nat1s?: number;
+  disadvantageRolls?: number;
+  checksPassed?: number;
+  checksFailed?: number;
+}
+
+/** A map key that Firestore accepts (no __x__ names, not too long). */
+export const statKey = (raw: string): string => {
+  const key = (raw || 'unknown').trim().slice(0, 80) || 'unknown';
+  return /^__.*__$/.test(key) ? `_${key}` : key;
+};
+
+/** The ability a dice log stat roll used: "STR", or a skill check like "Stealth check (rank 2)". */
+export const abilityOfRoll = (stat: string): AbilityKey | undefined => {
+  const first = stat.trim().split(/\s+/)[0]?.toLowerCase() ?? '';
+  if ((ABILITY_KEYS as string[]).includes(first)) return first as AbilityKey;
+  return SKILLS.find(s => stat.startsWith(`${s.name} check`))?.ability;
+};
+
 // ---- Crawler stats shown on the profile ----
 
-export type CrawlerStatKey = ActivityStatKey | 'spellCasts' | 'barterTrades';
+export type CrawlerStatKey = ActivityStatKey | 'spellCasts' | 'barterTrades'
+  | 'healingDone' | 'bossKills' | 'nat20s' | 'friendlyFire' | 'neutralDamage';
 
 export const CRAWLER_STAT_LABELS: Record<CrawlerStatKey, string> = {
   damageDealt: 'Damage Dealt',
   killingBlows: 'Killing Blows',
   combatEndingBlows: 'Fight Finishers',
+  bossKills: 'Boss Kills',
+  healingDone: 'Healing Done',
   damageTaken: 'HP Lost',
   lowHealthCount: 'Near Death',
   feetMoved: 'Feet Moved',
   mobsLooted: 'Mobs Looted',
   spellCasts: 'Spells Cast',
   barterTrades: 'Merchant Trades',
+  nat20s: 'Natural 20s',
+  friendlyFire: 'Friendly Fire',
+  neutralDamage: 'Damage to Neutrals',
 };
 
 export const CRAWLER_STAT_KEYS = Object.keys(CRAWLER_STAT_LABELS) as CrawlerStatKey[];
 
-export const getCrawlerStatValue = (crawler: Crawler, key: CrawlerStatKey): number => {
+/** Stats per crawler id, from the crawlerStats collection. */
+export type CrawlerStatsById = Record<string, CrawlerStats | undefined>;
+
+export const getCrawlerStatValue = (crawler: Crawler, key: CrawlerStatKey, stats?: CrawlerStats): number => {
   if (key === 'spellCasts') return (crawler.knownSpells ?? []).reduce((sum, s) => sum + (s.castCount || 0), 0);
   if (key === 'barterTrades') return crawler.barterTrades ?? 0;
+  if (key === 'healingDone' || key === 'bossKills' || key === 'nat20s' || key === 'friendlyFire' || key === 'neutralDamage') {
+    return stats?.[key] ?? 0;
+  }
   return crawler.activityStats?.[key] ?? 0;
 };
 
@@ -326,11 +404,11 @@ export const getCrawlerStatValue = (crawler: Crawler, key: CrawlerStatKey): numb
  * average, so a healer-ish crawler with few kills shows what they're good at instead. Stats at 0 never
  * outrank ones with a value; the rest of the list fills in, in the usual order, to always show `count`.
  */
-export function getHighlightStats(crawler: Crawler, party: Crawler[], count = 5): CrawlerStatKey[] {
+export function getHighlightStats(crawler: Crawler, party: Crawler[], statsById: CrawlerStatsById = {}, count = 5): CrawlerStatKey[] {
   const others = party.length > 0 ? party : [crawler];
   const scored = CRAWLER_STAT_KEYS.map((key, order) => {
-    const value = getCrawlerStatValue(crawler, key);
-    const average = others.reduce((sum, c) => sum + getCrawlerStatValue(c, key), 0) / others.length;
+    const value = getCrawlerStatValue(crawler, key, statsById[crawler.id]);
+    const average = others.reduce((sum, c) => sum + getCrawlerStatValue(c, key, statsById[c.id]), 0) / others.length;
     return { key, order, value, score: value > 0 ? value / Math.max(average, 1) : 0 };
   });
   return scored
@@ -1280,7 +1358,7 @@ export interface CombatTurnSnapshot {
     conditions?: ActiveCondition[];
   }[];
   // HP, mana and activity stats of every crawler in the fight (damage and healing can hit anyone)
-  crawlers: Record<string, { hp: number; mana: number; activityStats?: CrawlerActivityStats }>;
+  crawlers: Record<string, { hp: number; mana: number; activityStats?: CrawlerActivityStats; stats?: CrawlerStats }>;
   knownSpells?: KnownSpell[]; // the active crawler's spells (cast counts change when casting)
   startPosition?: { episodeId: string; mapId: string; x: number; y: number } | null; // token spot before the first move
 }

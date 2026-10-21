@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { db, auth, getCollectionRef, setDoc, doc, deleteDoc, updateDoc, onSnapshot, initAuth, writeBatch, runTransaction } from '../lib/firebase';
+import { db, auth, getCollectionRef, setDoc, doc, deleteDoc, updateDoc, onSnapshot, initAuth, writeBatch, runTransaction, increment } from '../lib/firebase';
 import { diffById, applyDiff, isEmptyDiff } from '../lib/arrayMerge';
 import { isAuthenticatedUser } from '../lib/firebase';
 import { toast } from 'sonner';
@@ -15,6 +15,14 @@ interface BatchOperation {
   collection: CollectionName;
   id: string;
   data?: Record<string, unknown>;
+}
+
+/** One field in a doc, as a path of map keys: `inc` adds to it, `max` raises it to at least that value, `set` writes a label. */
+interface CounterBump {
+  path: string[];
+  inc?: number;
+  max?: number;
+  set?: string;
 }
 
 interface UseFirebaseStoreReturn {
@@ -43,6 +51,7 @@ interface UseFirebaseStoreReturn {
     reads: { collection: CollectionName; id: string }[],
     compute: (docs: (Record<string, unknown> | null)[]) => BatchOperation[],
   ) => Promise<boolean>;
+  bumpCounters: (collection: CollectionName, id: string, bumps: CounterBump[]) => Promise<void>;
 }
 
 interface Creator {
@@ -90,7 +99,7 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
   };
 
   // Collections to sync
-  const collections: CollectionName[] = ['crawlers', 'mobs', 'maps', 'inventory', 'episodes', 'soundEffects', 'diceRolls', 'lootBoxes', 'lootBoxTemplates', 'noncombatTurns', 'gameClock', 'combatState', 'wiki', 'quests', 'assignedQuests', 'spells', 'chatMessages', 'npcAi', 'merchants', 'languages', 'gameSettings'];
+  const collections: CollectionName[] = ['crawlers', 'mobs', 'maps', 'inventory', 'episodes', 'soundEffects', 'diceRolls', 'lootBoxes', 'lootBoxTemplates', 'noncombatTurns', 'gameClock', 'combatState', 'wiki', 'quests', 'assignedQuests', 'spells', 'chatMessages', 'npcAi', 'merchants', 'languages', 'gameSettings', 'crawlerStats'];
 
   // Load and subscribe to real-time updates
   useEffect(() => {
@@ -563,6 +572,59 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
     }
   }, [roomId, requireAuth]);
 
+  // Adds to number fields (nested in maps) with Firestore increment(), creating the doc and any
+  // missing maps, so players bumping the same counters at once never overwrite each other.
+  // `max` bumps write the larger of the local and new value (a rare race can keep the smaller).
+  // Bypasses cleanObject, which would turn the increment() sentinels into plain objects.
+  const bumpCounters = useCallback(async (collection: CollectionName, id: string, bumps: CounterBump[]) => {
+    if (!requireAuth()) return;
+    const live = bumps.filter(b => b.path.length > 0 && ((b.inc ?? 0) !== 0 || b.max !== undefined || b.set !== undefined));
+    if (live.length === 0) return;
+    const current = (dataRef.current[collection] || []).find(d => d.id === id) ?? { id };
+    const getAt = (obj: Record<string, unknown>, path: string[]): unknown =>
+      path.reduce<unknown>((o, k) => (o && typeof o === 'object' ? (o as Record<string, unknown>)[k] : undefined), obj);
+    const setAt = (obj: Record<string, unknown>, path: string[], value: unknown) => {
+      let node = obj;
+      for (const key of path.slice(0, -1)) {
+        const next = node[key];
+        node[key] = next && typeof next === 'object' ? { ...(next as Record<string, unknown>) } : {};
+        node = node[key] as Record<string, unknown>;
+      }
+      node[path[path.length - 1]] = value;
+    };
+    const local: Record<string, unknown> = { ...current };
+    const remote: Record<string, unknown> = { id, ...(roomId ? { roomId } : {}) };
+    for (const b of live) {
+      if (b.set !== undefined) {
+        if (getAt(local, b.path) === b.set) continue;
+        setAt(local, b.path, b.set);
+        setAt(remote, b.path, b.set);
+        continue;
+      }
+      const old = Number(getAt(local, b.path)) || 0;
+      if (b.max !== undefined) {
+        if (b.max <= old) continue;
+        setAt(local, b.path, b.max);
+        setAt(remote, b.path, b.max);
+      } else {
+        setAt(local, b.path, old + (b.inc ?? 0));
+        setAt(remote, b.path, increment(b.inc ?? 0));
+      }
+    }
+    setData(prevData => {
+      const list = prevData[collection] || [];
+      return {
+        ...prevData,
+        [collection]: list.some(d => d.id === id) ? list.map(d => (d.id === id ? local : d)) : [...list, local],
+      };
+    });
+    try {
+      await setDoc(doc(getCollectionRef(collection, roomId || undefined), id), remote, { merge: true });
+    } catch (err) {
+      console.error('[FirebaseStore] ❌ Counter update error:', err);
+    }
+  }, [roomId, requireAuth]);
+
   const getCollection = useCallback(<T = Record<string, unknown>>(collection: CollectionName): T[] => {
     return (data[collection] || []) as T[];
   }, [data]);
@@ -590,8 +652,9 @@ export function useFirebaseStore(): UseFirebaseStoreReturn {
     setCreator,
     mergeArrayById,
     transact,
+    bumpCounters,
   };
 }
 
 // Export BatchOperation type for use in other hooks
-export type { BatchOperation };
+export type { BatchOperation, CounterBump };
