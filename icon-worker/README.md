@@ -11,7 +11,7 @@ cd icon-worker
 CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... npx wrangler deploy
 ```
 
-Then set `VITE_ICON_API_URL=https://dndmeetsdcc-icons.<subdomain>.workers.dev` for the app build.
+Then set `VITE_ICON_API_URL=https://dndmeetsdcc-icons.icon-worker.workers.dev` (already the default in `src/lib/iconGen.ts`) for the app build.
 
 When the daily allocation is used up the Worker answers `429 {"error":"quota"}` and the app falls back
 to matching an existing icon from the shared `iconLibrary` collection by tags.

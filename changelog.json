@@ -1,5 +1,11 @@
 [
   {
+    "date": "2026-10-21",
+    "changes": [
+      "🎨 Pixel-art icons and mob portraits are now switched on: the free image generator is live, so new items, spells and mobs get their own pictures"
+    ]
+  },
+  {
     "date": "2026-10-20",
     "changes": [
       "🐛 Weapon attack and damage rolls now add the ability modifier (STR 14 adds +2) including gear bonuses, instead of the whole ability score",

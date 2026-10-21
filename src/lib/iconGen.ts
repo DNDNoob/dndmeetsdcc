@@ -20,7 +20,9 @@ function subjectTarget(subject: IconSubject): { name: string; description: strin
   const { mob } = subject;
   return { name: mob.name, description: [mob.description, mob.strengths, mob.weaknesses].filter(Boolean).join('. ') };
 }
-const ICON_API_URL = (import.meta.env.VITE_ICON_API_URL as string | undefined)?.replace(/\/$/, '');
+/** The deployed icon Worker (icon-worker/); VITE_ICON_API_URL overrides it. Not a secret. */
+const DEFAULT_ICON_API_URL = 'https://dndmeetsdcc-icons.icon-worker.workers.dev';
+const ICON_API_URL = ((import.meta.env.VITE_ICON_API_URL as string | undefined) || DEFAULT_ICON_API_URL).replace(/\/$/, '');
 const QUOTA_KEY = 'iconGen.quotaExhaustedUntil';
 
 /** Canonical concept → words that mean it. Tags are stored as the canonical concept. */
