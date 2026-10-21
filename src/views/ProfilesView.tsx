@@ -16,7 +16,7 @@ import { SkillsPanel, CheckDifficultyPicker } from "@/components/SkillsPanel";
 import { usableLanguageIds } from "@/lib/languages";
 import { HealthBar } from "@/components/ui/HealthBar";
 import { EquipmentSlot } from "@/components/ui/EquipmentSlot";
-import { Crawler, getQuestProgress, Mob, InventoryItem, getItemStackKey, stackItems, getLootingLevel, getLootsUntilNextLevel, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery, getInitialCrawlerId, rollD20, rollsWithDisadvantage, ABILITY_KEYS, baseItemName, type SpellEffect, describeSpellEffect, getSkillRank, getSkillXPToSpend, getWeaponProficiency, getCheckDC, SKILLS, type SkillDef, type CheckDifficultyId, getCrawlerXP, type SkillId, type AbilityKey, getCrawlerStatValue, getHighlightStats, type StatSource, type CrawlerStats, type CrawlerStatsById } from "@/lib/gameData";
+import { Crawler, getQuestProgress, Mob, InventoryItem, getItemStackKey, stackItems, getLootingLevel, getLootsUntilNextLevel, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery, getInitialCrawlerId, rollD20, rollsWithDisadvantage, ABILITY_KEYS, baseItemName, type SpellEffect, describeSpellEffect, getSkillRank, getSkillXPToSpend, getWeaponProficiency, HAND_TO_HAND, getCheckDC, SKILLS, type SkillDef, type CheckDifficultyId, getCrawlerXP, type SkillId, type AbilityKey, getCrawlerStatValue, getHighlightStats, type StatSource, type CrawlerStats, type CrawlerStatsById } from "@/lib/gameData";
 import { ItemName } from "@/components/ItemName";
 import type { DiceRollEntry } from "@/hooks/useGameState";
 import UndoTurnButton, { canUndoCombatTurn } from "@/components/UndoTurnButton";
@@ -2661,12 +2661,13 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
               // Helper to calculate total modifier from weapon stat modifiers
               const calcWeaponStatMod = weaponStatMod;
 
-              const handleAttackRoll = (attackName: string, stat: 'str' | 'dex', damageDice: string, damageBonus: number) => {
+              const handleAttackRoll = (attackName: string, stat: 'str' | 'dex', damageDice: string, damageBonus: number, weaponType?: string) => {
                 if (!canAttack) return;
                 const baseStat = (selected as Record<string, unknown>)[stat] as number;
                 const mod = equippedMods[stat as keyof StatModifiers] ?? 0;
                 const total = baseStat + mod;
-                const modifier = Math.floor((total - 10) / 2);
+                const modifier = Math.floor((total - 10) / 2) + getWeaponProficiency(statsById[selected.id], weaponType);
+                const source: StatSource = { kind: 'item', id: `attack:${attackName}`, name: attackName, ...(weaponType ? { weaponType } : {}) };
                 const { rawRoll, results, diceLabel } = rollD20(rollsWithDisadvantage(selected, total));
                 const rollTotal = rawRoll + modifier;
 
@@ -2679,13 +2680,13 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                     results,
                     total: rollTotal,
                     statRoll: { stat: `${attackName} (Attack)`, modifier, rawRoll, rollType: 'Attack roll', diceLabel },
-                    source: { kind: 'item', id: `attack:${attackName}`, name: attackName },
+                    source,
                   });
                 }
 
                 // A natural 1 misses, so there's no damage to roll
                 if (isCombatPhaseLocal && combatTargets.length > 0 && rawRoll !== 1) {
-                  setPendingDamageRoll({ dice: damageDice, bonus: damageBonus, actionName: attackName, source: { kind: 'item', id: `attack:${attackName}`, name: attackName } });
+                  setPendingDamageRoll({ dice: damageDice, bonus: damageBonus, actionName: attackName, source });
                   setShowDamageTargetModal(true);
                   setDamageRollResult(null);
                   setSplashTargetIds([]);
@@ -2821,7 +2822,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                     {/* Unarmed Strike */}
                     <button
-                      onClick={() => handleAttackRoll('Unarmed Strike', 'str', 'd4', 0)}
+                      onClick={() => handleAttackRoll('Unarmed Strike', 'str', 'd4', 0, HAND_TO_HAND)}
                       disabled={!canAttack}
                       className={`flex flex-col items-center gap-2 p-4 border-2 rounded-lg transition-colors group ${
                         canAttack
@@ -2832,6 +2833,9 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                       <Hand className={`w-8 h-8 ${canAttack ? 'text-destructive group-hover:scale-110 transition-transform' : 'text-muted-foreground'}`} />
                       <span className={`text-sm font-display ${canAttack ? 'text-destructive' : 'text-muted-foreground'}`}>Unarmed Strike</span>
                       <span className="text-[10px] text-muted-foreground">STR check, d4 damage on hit</span>
+                      {getWeaponProficiency(statsById[selected.id], HAND_TO_HAND) > 0 && (
+                        <span className="text-[10px] text-accent">Hand to Hand proficiency {getWeaponProficiency(statsById[selected.id], HAND_TO_HAND)} · +{getWeaponProficiency(statsById[selected.id], HAND_TO_HAND)} to hit</span>
+                      )}
                     </button>
 
                     {/* Equipped Weapons */}

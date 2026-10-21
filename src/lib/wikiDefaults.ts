@@ -293,9 +293,9 @@ A stat the weapon uses adds that ability's modifier, counting gear bonuses, the 
 
 ## Weapon Proficiency
 
-You get better with each weapon type as you use it. Every attack that hits a hostile mob earns 5 proficiency XP for that weapon's type (Light weapons, Bows, Firearms and so on), and each rank adds +1 to hit with any weapon of that type, up to +10. Ranks follow the same curve as skills: +1 after 10 hits, +2 after 30, +3 after 60, +4 after 100, +5 after 150, and +10 after 550. A splash attack counts once, however many mobs it hits.
+You get better with each weapon type as you use it. Every attack that hits a hostile mob earns 5 proficiency XP for that weapon's type (Light weapons, Bows, Firearms and so on). Unarmed Strike builds **Hand to Hand** proficiency the same way, and each rank adds +1 to hit with any weapon of that type, up to +10. Ranks follow the same curve as skills: +1 after 10 hits, +2 after 30, +3 after 60, +4 after 100, +5 after 150, and +10 after 550. A splash attack counts once, however many mobs it hits.
 
-Your proficiencies are listed at the bottom of the **Skills** tab, and a weapon's card on the Attacks tab shows its bonus. See [Skills](/wiki/skills).
+Once you've landed a hit with a weapon type, its proficiency is listed at the bottom of the **Skills** tab, and a weapon's card on the Attacks tab shows its bonus. See [Skills](/wiki/skills).
 
 ## Advantage and Disadvantage
 

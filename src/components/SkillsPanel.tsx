@@ -13,7 +13,7 @@ import {
   getSkillXPForRank,
   getSkillXPToSpend,
   getWeaponProficiencyXP,
-  WEAPON_TYPES,
+  PROFICIENCY_TYPES,
   WEAPON_XP_PER_HIT,
   type CrawlerStats,
   type CheckDifficultyId,
@@ -80,6 +80,7 @@ export const SkillsPanel: React.FC<SkillsPanelProps> = ({
   const dc = getCheckDC(difficulty, dungeonFloor);
   const pool = getSkillXPToSpend(crawler);
   const abilityPoints = crawler.abilityPoints ?? 0;
+  const usedWeaponTypes = PROFICIENCY_TYPES.filter(type => getWeaponProficiencyXP(stats, type) > 0);
 
   const run = async (fn: () => Promise<unknown>) => {
     if (busy) return;
@@ -201,13 +202,15 @@ export const SkillsPanel: React.FC<SkillsPanelProps> = ({
         </div>
       ))}
 
+      {/* Only weapon types the crawler has landed a hit with */}
+      {usedWeaponTypes.length > 0 && (
       <div>
         <div className="flex flex-wrap items-baseline gap-2 mb-2">
           <h3 className="font-display text-base text-accent">WEAPON PROFICIENCY</h3>
           <span className="text-xs text-muted-foreground">Each attack that hits a hostile mob earns its weapon type {WEAPON_XP_PER_HIT} XP. Each rank is +1 to hit with that type.</span>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-          {WEAPON_TYPES.map(type => {
+          {usedWeaponTypes.map(type => {
             const xp = getWeaponProficiencyXP(stats, type);
             const rank = getSkillRankForXP(xp);
             const atMax = rank >= MAX_SKILL_RANK;
@@ -231,6 +234,7 @@ export const SkillsPanel: React.FC<SkillsPanelProps> = ({
           })}
         </div>
       </div>
+      )}
     </div>
   );
 };

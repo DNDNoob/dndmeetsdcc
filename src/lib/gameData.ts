@@ -581,6 +581,8 @@ export const statKey = (raw: string): string => {
 // Each attack that hits a hostile mob earns its weapon type proficiency XP. Ranks use the skill XP
 // curve (rank 1 after 10 hits, rank 2 after 30…), and each rank is +1 to hit with that type, up to +10.
 export const WEAPON_XP_PER_HIT = 5;
+/** Unarmed Strike's proficiency, alongside the weapon types. */
+export const HAND_TO_HAND = 'Hand to Hand';
 
 export const getWeaponProficiencyXP = (stats: CrawlerStats | null | undefined, weaponType: string | undefined): number =>
   weaponType ? Math.min(MAX_SKILL_XP, WEAPON_XP_PER_HIT * (stats?.weaponTypeHits?.[statKey(weaponType)] ?? 0)) : 0;
@@ -707,6 +709,8 @@ export type DamageType = typeof DAMAGE_TYPES[number];
 
 export const WEAPON_TYPES = ['Arcane', 'Body Upgrade', 'Bows', 'Crossbows', 'Firearms', 'Heavy weapons', 'Improvised', 'Light weapons', 'Mechanical', 'Polearms', 'Throwing', 'Whips'] as const;
 export type WeaponType = typeof WEAPON_TYPES[number];
+/** Every weapon proficiency: Unarmed Strike's Hand to Hand, then the weapon types. */
+export const PROFICIENCY_TYPES: string[] = [HAND_TO_HAND, ...WEAPON_TYPES];
 
 export interface WeaponDie {
   count: number; // number of dice (e.g. 2 for 2d6)
