@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import type { IconLibraryEntry, InventoryItem, Mob, Spell } from '@/lib/gameData';
 
 /**
@@ -263,7 +264,11 @@ async function pixelate(base64Jpeg: string, size: number): Promise<string> {
  * unavailable (not configured, daily free quota used up, or any error) so callers can fall back.
  */
 export async function generateIconImage(prompt: string, idToken: string, size = ICON_SIZE): Promise<string | null> {
-  if (!ICON_API_URL || quotaExhausted()) return null;
+  if (!ICON_API_URL) return null;
+  if (quotaExhausted()) {
+    reportQuotaUsedUp();
+    return null;
+  }
   try {
     const res = await fetch(`${ICON_API_URL}/icon`, {
       method: 'POST',
@@ -272,13 +277,34 @@ export async function generateIconImage(prompt: string, idToken: string, size = 
     });
     if (res.status === 429) {
       markQuotaExhausted();
+      reportQuotaUsedUp();
       return null;
     }
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const { error } = await res.json().catch(() => ({})) as { error?: string };
+      reportGenerationFailure(`${res.status}${error ? ` ${error}` : ''}`);
+      return null;
+    }
     const { image } = await res.json() as { image?: string };
+    if (!image) reportGenerationFailure('no image returned');
     return image ? await pixelate(image, size) : null;
   } catch (err) {
-    console.warn('[IconGen] generation failed, falling back to library match', err);
+    reportGenerationFailure(err instanceof Error ? err.message : String(err));
     return null;
   }
+}
+
+let failureReported = false;
+let quotaReported = false;
+// Each kind of fallback is shown once per page load, so a broken generator gets noticed
+function reportQuotaUsedUp() {
+  if (quotaReported) return;
+  quotaReported = true;
+  toast.info("Today's free pixel icons are used up, so new items get the closest existing icon until the daily reset.");
+}
+function reportGenerationFailure(reason: string) {
+  console.warn('[IconGen] generation failed, falling back to library match:', reason);
+  if (failureReported) return;
+  failureReported = true;
+  toast.error(`Couldn't make a pixel icon (${reason}). Using the closest existing icon instead.`);
 }

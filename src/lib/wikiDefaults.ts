@@ -2086,7 +2086,7 @@ Every new item in the **Item Library**, every new spell in the **Spell Library**
 ## How an Icon Is Picked
 
 1. **Generated** — the app sends the item or spell's name, description, slot, weapon type, damage type or spell school to an AI image generator and turns the picture into a small 48×48 pixel icon. This takes a few seconds; the icon appears once it's ready.
-2. **Matched from the icon library** — the generator is free but has a daily limit (it resets at midnight UTC). When it runs out, the app instead picks the closest icon from every icon made before, using descriptor tags. For example a new "Ember Katana" reuses the icon of a "Flaming Longsword" (sword + fire), and an "Elixir of Mending" reuses a "Healing Potion" icon.
+2. **Matched from the icon library** — the generator is free but has a daily limit (it resets at midnight UTC). When it runs out, the app instead picks the closest icon from every icon made before, using descriptor tags. For example a new "Ember Katana" reuses the icon of a "Flaming Longsword" (sword + fire), and an "Elixir of Mending" reuses a "Healing Potion" icon. A short message tells you when this happens, and a different message appears if the generator itself has a problem.
 
 If nothing in the library is related, the item keeps its normal slot icon.
 
