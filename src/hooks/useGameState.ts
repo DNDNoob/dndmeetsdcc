@@ -88,6 +88,9 @@ import {
   getSkillXP,
   getSkillXPToSpend,
   getSkillRankForXP,
+  getWeaponProficiency,
+  getWeaponProficiencyXP,
+  WEAPON_XP_PER_HIT,
   withSkillXP,
   MAX_SKILL_XP,
   SKILL_XP_PER_LEVEL,
@@ -2149,7 +2152,16 @@ export const useGameState = () => {
       await updateItem('combatState', 'current', { combatants } as Record<string, unknown>);
     }
     if (attackerIsCrawler && attackerId) {
+      // One weapon proficiency hit per attack, however many targets it splashed
+      const profHit = !!sourceCounts.hits && !!source?.weaponType;
+      const profStats = getCollection<CrawlerStats>('crawlerStats').find(st => st.id === attackerId);
+      const profBefore = getWeaponProficiency(profStats, source?.weaponType);
+      const profAfter = getSkillRankForXP(Math.min(MAX_SKILL_XP, getWeaponProficiencyXP(profStats, source?.weaponType) + WEAPON_XP_PER_HIT));
+      if (profHit) statBumps.push({ path: ['weaponTypeHits', statKey(source!.weaponType!)], inc: 1 });
       await bumpCrawlerStats(attackerId, [...statBumps, ...sourceBumps(source, sourceCounts, { biggestHit })]);
+      if (profHit && profAfter > profBefore) {
+        toast.success(`${crawlers.find(c => c.id === attackerId)?.name ?? 'Crawler'} reached ${source.weaponType} proficiency ${profAfter}! (+${profAfter} to hit)`, { icon: '⚔️' });
+      }
     }
     if (attackerIsCrawler && attackerId) for (const text of moments) await addMoment(attackerId, text);
     const attackerName = attackerId ? (crawlers.find(c => c.id === attackerId)?.name ?? combatants.find(c => c.id === attackerId)?.name) : undefined;

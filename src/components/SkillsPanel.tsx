@@ -12,6 +12,10 @@ import {
   getSkillXP,
   getSkillXPForRank,
   getSkillXPToSpend,
+  getWeaponProficiencyXP,
+  WEAPON_TYPES,
+  WEAPON_XP_PER_HIT,
+  type CrawlerStats,
   type CheckDifficultyId,
   SKILLS,
   type AbilityKey,
@@ -54,6 +58,7 @@ const GROUPS: { kind: SkillKind; title: string; note: string }[] = [
 
 interface SkillsPanelProps {
   crawler: Crawler;
+  stats?: CrawlerStats;       // weapon proficiency comes from hit counters
   equippedMods: StatModifiers;
   canSpend: boolean;          // the crawler's player or the DM
   canRoll: boolean;           // an action (combat) or a roll (noncombat) is available
@@ -68,7 +73,7 @@ interface SkillsPanelProps {
 
 /** Skill ranks from skill XP, spending level-up skill XP and ability points, and skill check rolls. */
 export const SkillsPanel: React.FC<SkillsPanelProps> = ({
-  crawler, equippedMods, canSpend, canRoll, rollBlockedReason, dungeonFloor = 1, difficulty, onDifficultyChange,
+  crawler, stats, equippedMods, canSpend, canRoll, rollBlockedReason, dungeonFloor = 1, difficulty, onDifficultyChange,
   onSpendSkillXP, onSpendAbilityPoint, onRollSkill,
 }) => {
   const [busy, setBusy] = useState(false);
@@ -195,6 +200,37 @@ export const SkillsPanel: React.FC<SkillsPanelProps> = ({
           </div>
         </div>
       ))}
+
+      <div>
+        <div className="flex flex-wrap items-baseline gap-2 mb-2">
+          <h3 className="font-display text-base text-accent">WEAPON PROFICIENCY</h3>
+          <span className="text-xs text-muted-foreground">Each attack that hits a hostile mob earns its weapon type {WEAPON_XP_PER_HIT} XP. Each rank is +1 to hit with that type.</span>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+          {WEAPON_TYPES.map(type => {
+            const xp = getWeaponProficiencyXP(stats, type);
+            const rank = getSkillRankForXP(xp);
+            const atMax = rank >= MAX_SKILL_RANK;
+            const start = getSkillXPForRank(rank);
+            const next = getSkillXPForRank(rank + 1);
+            const pct = atMax ? 100 : Math.max(0, Math.min(100, ((xp - start) / (next - start)) * 100));
+            return (
+              <div key={type} className="bg-muted/30 border border-border rounded-lg px-3 py-2" data-testid={`proficiency-${type}`}>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm text-foreground truncate">{type}</span>
+                  <span className={`text-xs font-display ${rank > 0 ? "text-accent" : "text-muted-foreground"}`}>+{rank} hit</span>
+                </div>
+                <div className="h-1 bg-muted rounded-full overflow-hidden mt-1.5" role="progressbar" aria-label={`${type} proficiency XP`} aria-valuenow={xp} aria-valuemin={start} aria-valuemax={next}>
+                  <div className="h-full bg-accent" style={{ width: `${pct}%` }} />
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  {atMax ? "Top rank" : `${Math.ceil((next - xp) / WEAPON_XP_PER_HIT)} more hit${Math.ceil((next - xp) / WEAPON_XP_PER_HIT) === 1 ? "" : "s"} to +${rank + 1}`}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 };

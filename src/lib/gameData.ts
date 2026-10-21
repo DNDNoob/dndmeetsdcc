@@ -369,6 +369,7 @@ export interface StatSource {
   id: string;
   name: string;
   damageType?: string;
+  weaponType?: string; // a weapon's type, for weapon proficiency
 }
 
 /** Counters for one weapon, armor piece or spell. */
@@ -393,6 +394,7 @@ export interface CrawlerStats {
   id: string; // = crawlerId
   items?: Record<string, SourceStats>;
   spells?: Record<string, SourceStats>;
+  weaponTypeHits?: Record<string, number>; // weapon type -> attacks that hit a hostile mob (weapon proficiency)
   damageByType?: Record<string, number>;
   killsByMob?: Record<string, number>; // mob name -> hostile kills
   bossKills?: number;
@@ -574,6 +576,17 @@ export const statKey = (raw: string): string => {
   const key = (raw || 'unknown').trim().slice(0, 80) || 'unknown';
   return /^__.*__$/.test(key) ? `_${key}` : key;
 };
+
+// ---- Weapon proficiency ----
+// Each attack that hits a hostile mob earns its weapon type proficiency XP. Ranks use the skill XP
+// curve (rank 1 after 10 hits, rank 2 after 30…), and each rank is +1 to hit with that type, up to +10.
+export const WEAPON_XP_PER_HIT = 5;
+
+export const getWeaponProficiencyXP = (stats: CrawlerStats | null | undefined, weaponType: string | undefined): number =>
+  weaponType ? Math.min(MAX_SKILL_XP, WEAPON_XP_PER_HIT * (stats?.weaponTypeHits?.[statKey(weaponType)] ?? 0)) : 0;
+
+export const getWeaponProficiency = (stats: CrawlerStats | null | undefined, weaponType: string | undefined): number =>
+  getSkillRankForXP(getWeaponProficiencyXP(stats, weaponType));
 
 /** The ability a dice log stat roll used: "STR", or a skill check like "Stealth check (rank 2)". */
 export const abilityOfRoll = (stat: string): AbilityKey | undefined => {

@@ -2,6 +2,7 @@
   {
     "date": "2026-10-21",
     "changes": [
+      "⚔️ Weapon proficiency: every attack that hits a hostile mob builds proficiency with that weapon type, and each rank is +1 to hit with it, up to +10. See it on the Skills tab and on weapon cards",
       "🎯 Actions tab skill buttons now use your skill ranks and roll against the chosen Easy, Medium or Hard DC, which the Actions and Skills tabs share. Perception and Science & Engineering are now on the Actions tab too",
       "✨ Skills level up from skill XP: passing a check earns 5 XP for that skill, and each rank needs more XP than the last, up to rank 10. XP never resets",
       "📈 Level-ups now give 100 skill XP to spend instead of a skill point, so you can split it across skills or take several ranks at once. Old ranks and unspent points carry over",

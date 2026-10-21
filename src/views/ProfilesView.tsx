@@ -16,7 +16,7 @@ import { SkillsPanel, CheckDifficultyPicker } from "@/components/SkillsPanel";
 import { usableLanguageIds } from "@/lib/languages";
 import { HealthBar } from "@/components/ui/HealthBar";
 import { EquipmentSlot } from "@/components/ui/EquipmentSlot";
-import { Crawler, getQuestProgress, Mob, InventoryItem, getItemStackKey, stackItems, getLootingLevel, getLootsUntilNextLevel, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery, getInitialCrawlerId, rollD20, rollsWithDisadvantage, ABILITY_KEYS, baseItemName, type SpellEffect, describeSpellEffect, getSkillRank, getSkillXPToSpend, getCheckDC, SKILLS, type SkillDef, type CheckDifficultyId, getCrawlerXP, type SkillId, type AbilityKey, getCrawlerStatValue, getHighlightStats, type StatSource, type CrawlerStats, type CrawlerStatsById } from "@/lib/gameData";
+import { Crawler, getQuestProgress, Mob, InventoryItem, getItemStackKey, stackItems, getLootingLevel, getLootsUntilNextLevel, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery, getInitialCrawlerId, rollD20, rollsWithDisadvantage, ABILITY_KEYS, baseItemName, type SpellEffect, describeSpellEffect, getSkillRank, getSkillXPToSpend, getWeaponProficiency, getCheckDC, SKILLS, type SkillDef, type CheckDifficultyId, getCrawlerXP, type SkillId, type AbilityKey, getCrawlerStatValue, getHighlightStats, type StatSource, type CrawlerStats, type CrawlerStatsById } from "@/lib/gameData";
 import { ItemName } from "@/components/ItemName";
 import type { DiceRollEntry } from "@/hooks/useGameState";
 import UndoTurnButton, { canUndoCombatTurn } from "@/components/UndoTurnButton";
@@ -39,6 +39,7 @@ const weaponSource = (weapon: InventoryItem): StatSource => ({
   id: weapon.id,
   name: weapon.name,
   ...(weapon.weaponData?.damageType ? { damageType: weapon.weaponData.damageType } : {}),
+  ...(weapon.weaponData?.weaponType ? { weaponType: weapon.weaponData.weaponType } : {}),
 });
 
 // Helper to get the appropriate icon for an equipment slot
@@ -2335,6 +2336,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
               return (
                 <SkillsPanel
                   crawler={selected}
+                  stats={statsById[selected.id]}
                   equippedMods={equippedMods}
                   canSpend={isAdmin || currentPlayerId === selected.id}
                   canRoll={canRoll}
@@ -2713,7 +2715,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 }
 
                 // Stat modifiers for hit
-                const hitStatMod = calcWeaponStatMod(wd.hitModifiers);
+                const hitStatMod = calcWeaponStatMod(wd.hitModifiers) + getWeaponProficiency(statsById[selected.id], wd.weaponType);
                 const rollTotal = rawRoll + hitDieResult + hitStatMod;
 
                 const results: { dice: string; result: number }[] = [];
@@ -2850,6 +2852,9 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                             </span>
                             <div className="text-[10px] text-muted-foreground space-y-0.5 mt-1">
                               <div>{wd.weaponType} · {wd.isRanged ? 'Ranged' : 'Melee'} · {wd.damageType}</div>
+                              {getWeaponProficiency(statsById[selected.id], wd.weaponType) > 0 && (
+                                <div className="text-accent">{wd.weaponType} proficiency {getWeaponProficiency(statsById[selected.id], wd.weaponType)} · +{getWeaponProficiency(statsById[selected.id], wd.weaponType)} to hit</div>
+                              )}
                               <div>{dmgStr} damage{wd.hitDie ? ` · +${wd.hitDie.count}d${wd.hitDie.sides} to hit` : ''}</div>
                               {wd.isRanged && wd.normalRange && <div>Range: {wd.normalRange}{wd.maxRange ? `/${wd.maxRange}` : ''} ft</div>}
                               {wd.splashDamage && <div className="text-orange-400 font-bold">Splash / Multi-Target</div>}
@@ -3387,7 +3392,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
 
           const calcMod = weaponStatMod;
 
-          const hitStatMod = calcMod(wd.hitModifiers);
+          const hitStatMod = calcMod(wd.hitModifiers) + getWeaponProficiency(statsById[selected.id], wd.weaponType);
           const rollTotal = rawRoll + hitDieResult + hitStatMod;
 
           const results: { dice: string; result: number }[] = [];

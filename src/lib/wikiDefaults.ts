@@ -286,10 +286,16 @@ Each weapon has the following configurable properties:
 
 ## Attack Flow
 
-1. **Attack Roll**: Roll d20 (plus any hit die bonus and stat modifiers) to determine if the attack connects
+1. **Attack Roll**: Roll d20 (plus any hit die bonus, stat modifiers and your weapon proficiency) to determine if the attack connects
 2. **Damage Roll**: If the attack hits, roll the weapon's damage dice plus stat modifiers
 
 A stat the weapon uses adds that ability's modifier, counting gear bonuses, the same as any other roll. For example, a sword that uses STR adds +2 for a crawler with STR 14.
+
+## Weapon Proficiency
+
+You get better with each weapon type as you use it. Every attack that hits a hostile mob earns 5 proficiency XP for that weapon's type (Light weapons, Bows, Firearms and so on), and each rank adds +1 to hit with any weapon of that type, up to +10. Ranks follow the same curve as skills: +1 after 10 hits, +2 after 30, +3 after 60, +4 after 100, +5 after 150, and +10 after 550. A splash attack counts once, however many mobs it hits.
+
+Your proficiencies are listed at the bottom of the **Skills** tab, and a weapon's card on the Attacks tab shows its bonus. See [Skills](/wiki/skills).
 
 ## Advantage and Disadvantage
 
@@ -1207,6 +1213,8 @@ Rank N needs 25 × N × (N + 1) skill XP in total. Skills earn XP three ways, an
 - **Level-ups** give 100 skill XP to spend. On the Skills tab, press **+10** or **Rank N** on any skill to put XP into it. You can split it between skills or pour it into one, which can be enough for several ranks at once. Knowledge skills only grow this way.
 
 Crawlers who bought ranks with the old skill points keep them, and unspent skill points turn into 100 skill XP each.
+
+Weapon proficiency works the same way for weapon types, earned by landing hits. See [Weapons](/wiki/weapons).
 
 ## Skill checks
 
