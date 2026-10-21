@@ -110,7 +110,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ crawlers, onEnter, isAdmin,
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
           >
-            <PlayerSelector crawlers={crawlers} onSelect={onEnter} />
+            <PlayerSelector crawlers={crawlers} isAdmin={isAdmin} onSelect={onEnter} />
           </motion.div>
         )}
       </AnimatePresence>

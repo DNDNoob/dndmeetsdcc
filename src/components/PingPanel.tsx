@@ -26,6 +26,8 @@ interface PingPanelProps {
   onRemoveCombatant?: (combatantId: string) => Promise<void>;
   runtimeCrawlerPlacements?: CrawlerPlacement[];
   runtimeMobPlacements?: EpisodeMobPlacement[];
+  // Map the DM is on in Show Time; combat setup pre-ticks only mobs on it
+  currentMapId?: string | null;
   onAddCombatant?: (combatants: CombatantEntry[]) => Promise<void>;
   isGameActive?: boolean;
   onToggleGameActive?: (active: boolean) => Promise<void>;
@@ -77,6 +79,7 @@ const PingPanel: React.FC<PingPanelProps> = ({
   onRemoveCombatant,
   runtimeCrawlerPlacements,
   runtimeMobPlacements,
+  currentMapId,
   onAddCombatant,
   isGameActive,
   onToggleGameActive,
@@ -179,9 +182,11 @@ const PingPanel: React.FC<PingPanelProps> = ({
         hitPoints: p.currentHP ?? mob.hitPoints,
         encountered: isMobEncountered(mob),
         hostile: isPlacementHostile(p, mob),
+        // Old placements without a map belong to the episode's first map (as in Show Time)
+        mapId: p.mapId || activeEpisode?.mapIds?.[0],
       };
     }).filter((e): e is NonNullable<typeof e> => e !== null);
-  }, [activeEpisode?.mobPlacements, runtimeMobPlacements, mobs]);
+  }, [activeEpisode?.mobPlacements, activeEpisode?.mapIds, runtimeMobPlacements, mobs]);
 
   const allPlayersSpent = noncombatTurnState != null && playerCrawlers.length > 0 && playerCrawlers.every(c => {
     const used = noncombatTurnState.rollsUsed[c.id] ?? 0;
@@ -297,7 +302,8 @@ const PingPanel: React.FC<PingPanelProps> = ({
     setSelectedCombatCrawlers(crawlerSel);
 
     const mobSel: Record<string, boolean> = {};
-    mobCombatEntries.forEach(e => { mobSel[e.combatId] = e.hostile; });
+    // Mobs on other maps are listed but left unticked, so a boss in another room isn't pulled in
+    mobCombatEntries.forEach(e => { mobSel[e.combatId] = e.hostile && (!currentMapId || e.mapId === currentMapId); });
     setSelectedCombatMobs(mobSel);
 
     setShowCombatSetup(true);
@@ -545,6 +551,9 @@ const PingPanel: React.FC<PingPanelProps> = ({
                           )}
                           {!entry.hostile && (
                             <span className="text-[10px] text-green-500 italic">friendly</span>
+                          )}
+                          {currentMapId && entry.mapId !== currentMapId && (
+                            <span className="text-[10px] text-muted-foreground italic">other map</span>
                           )}
                           {!entry.encountered && (
                             <span className="text-[10px] text-muted-foreground italic">unencountered</span>

@@ -6,10 +6,12 @@ import { Crawler } from "@/lib/gameData";
 
 interface PlayerSelectorProps {
   crawlers: Crawler[];
+  // Only the campaign's DM may pick Dungeon AI (DM Access)
+  isAdmin?: boolean;
   onSelect: (playerId: string, playerName: string, playerType: "crawler" | "ai" | "npc") => void;
 }
 
-const PlayerSelector: React.FC<PlayerSelectorProps> = ({ crawlers, onSelect }) => {
+const PlayerSelector: React.FC<PlayerSelectorProps> = ({ crawlers, isAdmin, onSelect }) => {
   const [selectedPlayer, setSelectedPlayer] = useState("npc"); // Default to "Just a Boring NPC"
   const [selectedType, setSelectedType] = useState<"crawler" | "ai" | "npc">("npc");
 
@@ -20,6 +22,7 @@ const PlayerSelector: React.FC<PlayerSelectorProps> = ({ crawlers, onSelect }) =
     let type: "crawler" | "ai" | "npc" = "crawler";
 
     if (selectedPlayer === "dungeon-ai") {
+      if (!isAdmin) return;
       playerName = "Dungeon AI";
       type = "ai";
     } else if (selectedPlayer === "npc") {
@@ -68,9 +71,11 @@ const PlayerSelector: React.FC<PlayerSelectorProps> = ({ crawlers, onSelect }) =
             <optgroup label="Spectators">
               <option value="npc">Just a Boring NPC</option>
             </optgroup>
-            <optgroup label="System Access">
-              <option value="dungeon-ai">Dungeon AI (DM Access)</option>
-            </optgroup>
+            {isAdmin && (
+              <optgroup label="System Access">
+                <option value="dungeon-ai">Dungeon AI (DM Access)</option>
+              </optgroup>
+            )}
           </select>
         </div>
 

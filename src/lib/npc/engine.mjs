@@ -254,7 +254,8 @@ export class NpcRoom {
     const runtime = this.state.runtimeMobPlacements.filter((p) => p.mapId === mapId);
     const muted = new Set(this.settings.mutedMobIds || []);
     return mapSpeakers([...episodePlacements, ...runtime], this.state.mobs, [...(ep.mobPlacements || []), ...runtime])
-      .filter((s) => !s.mob.hidden && !s.mob.silent && !muted.has(s.id) && !muted.has(s.mob.id))
+      // Unencountered (hidden) mobs still talk: their token is on the map
+      .filter((s) => !s.mob.silent && !muted.has(s.id) && !muted.has(s.mob.id))
       .map((s) => {
         const mob = this.speakerMob(s);
         // A token at 0 HP is a corpse: it speaks Dead, so it only answers someone using Speak with Dead

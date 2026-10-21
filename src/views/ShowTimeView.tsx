@@ -60,7 +60,7 @@ interface ShowTimeViewProps {
   combatState?: CombatState | null;
   onRemoveCombatant?: (combatantId: string) => Promise<void>;
   onRemoveCombatCondition?: (combatantId: string, conditionId: string) => Promise<void>;
-  onRuntimePlacementsChange?: (crawlerPlacements: CrawlerPlacement[], runtimeMobPlacements: EpisodeMobPlacement[]) => void;
+  onRuntimePlacementsChange?: (crawlerPlacements: CrawlerPlacement[], runtimeMobPlacements: EpisodeMobPlacement[], currentMapId: string | null) => void;
   onGameActiveChange?: (active: boolean) => void;
   onRegisterGameToggle?: (toggleFn: (active: boolean) => Promise<void>) => void;
   roomId?: string | null;
@@ -900,7 +900,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       if (!selectedEpisode) {
         allMapCrawlerPlacementsRef.current.clear();
         allMapRuntimeMobPlacementsRef.current.clear();
-        onRuntimePlacementsChange?.([], []);
+        onRuntimePlacementsChange?.([], [], null);
       }
       return;
     }
@@ -908,7 +908,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     allMapRuntimeMobPlacementsRef.current.set(currentMapId, runtimeMobPlacements);
     const allCrawler = Array.from(allMapCrawlerPlacementsRef.current.values()).flat();
     const allMob = Array.from(allMapRuntimeMobPlacementsRef.current.values()).flat();
-    onRuntimePlacementsChange?.(allCrawler, allMob);
+    onRuntimePlacementsChange?.(allCrawler, allMob, currentMapId);
   }, [crawlerPlacements, runtimeMobPlacements, currentMapId, selectedEpisode, onRuntimePlacementsChange]);
 
   // Keep refs in sync with state (avoids listener re-subscription / stale closures)
@@ -1150,6 +1150,15 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     // Flag that we need to center the map once dimensions are known
     needsCentering.current = true;
   }, [currentMapId]);
+
+  // The reset above can run after the map image has already loaded (players get the episode a moment
+  // after the map, and data-URL maps load at once), and then onLoad never fires again. Without a
+  // natural size the map isn't fitted to the screen, so phones opened zoomed into its top-left corner.
+  useEffect(() => {
+    const img = mapImageRef.current;
+    if (naturalImageSize || !img || !img.complete || img.naturalWidth === 0) return;
+    setNaturalImageSize({ width: img.naturalWidth, height: img.naturalHeight });
+  }, [naturalImageSize, selectedMap, currentMapId]);
 
   // Center the map in the viewport when image dimensions become known (only on initial load)
   // Centering is handled solely via panOffset (not CSS flex centering) to avoid double-centering
@@ -2298,11 +2307,12 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     [currentMapMobPlacements, runtimeMobPlacements, currentMapId]
   );
 
-  // Every token that can talk (hidden and silent mobs stay quiet). Characters speak as one; each creature
+  // Every token that can talk (silent mobs stay quiet). Unencountered mobs talk too: their token is on
+  // the map, so players can walk up to them. Characters speak as one; each creature
   // copy is its own speaker ("Goblin B") with its own personality.
   const npcSpeakers = useMemo(
     () => mapSpeakers(mobPlacementsOnMap, mobs, [...(selectedEpisode?.mobPlacements ?? []), ...runtimeMobPlacements])
-      .filter(s => !s.mob.hidden && !s.mob.silent),
+      .filter(s => !s.mob.silent),
     [mobPlacementsOnMap, mobs, selectedEpisode?.mobPlacements, runtimeMobPlacements]
   );
 
@@ -2440,6 +2450,27 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     const mapIndex = parseInt(selectedEpisode.mapIds[currentMapIndex], 10);
     return maps[mapIndex] || null;
   }, [selectedEpisode, maps, currentMapIndex]);
+
+  // Keep the shown map in step with the episode. When a live map is deleted, the episode's maps
+  // shift, so the old image (still in the shared Show Time state) would stay on players' screens.
+  useEffect(() => {
+    if (!selectedEpisode || selectedEpisode.mapIds.length === 0 || !selectedMap) return;
+    if (currentMapIndex >= selectedEpisode.mapIds.length) {
+      setCurrentMapIndex(0);
+      if (isAdmin) {
+        const firstUrl = maps[parseInt(selectedEpisode.mapIds[0], 10)] || null;
+        if (firstUrl) {
+          setSelectedMap(firstUrl);
+          broadcastShowtimeState(selectedEpisode.id, 0, firstUrl);
+        }
+      }
+      return;
+    }
+    if (currentMapUrl && currentMapUrl !== selectedMap) {
+      setSelectedMap(currentMapUrl);
+      if (isAdmin) broadcastShowtimeState(selectedEpisode.id, currentMapIndex, currentMapUrl);
+    }
+  }, [selectedEpisode, currentMapIndex, currentMapUrl, selectedMap, maps, isAdmin, broadcastShowtimeState]);
 
   const handlePreviousMap = useCallback(() => {
     if (!selectedEpisode) return;

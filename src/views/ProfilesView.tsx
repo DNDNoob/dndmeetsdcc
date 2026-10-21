@@ -2701,7 +2701,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                   });
                 }
 
-                if (isCombatPhaseLocal && combatTargets.length > 0) {
+                // A natural 1 misses, so there's no damage to roll
+                if (isCombatPhaseLocal && combatTargets.length > 0 && rawRoll !== 1) {
                   setPendingDamageRoll({ dice: damageDice, bonus: damageBonus, actionName: attackName });
                   setShowDamageTargetModal(true);
                   setDamageRollResult(null);
@@ -2758,7 +2759,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                   });
                 }
 
-                if (isCombatPhaseLocal && combatTargets.length > 0 && !wd.splashDamage) {
+                // A natural 1 misses, so there's no damage to roll
+                if (isCombatPhaseLocal && combatTargets.length > 0 && !wd.splashDamage && rawRoll !== 1) {
                   setPendingDamageRoll({ dice: formatDice(wd.damageDice), bonus: calcWeaponStatMod(wd.damageModifiers), actionName: weapon.name, isSplash: false });
                   setShowDamageTargetModal(true);
                   setDamageRollResult(null);
@@ -3431,7 +3433,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
           }
 
           const combatTargets = combatState?.combatants.filter(c => c.id !== selected.id) ?? [];
-          if (isCombatPhaseLocal && combatTargets.length > 0 && !wd.splashDamage) {
+          // A natural 1 misses, so there's no damage to roll
+          if (isCombatPhaseLocal && combatTargets.length > 0 && !wd.splashDamage && rawRoll !== 1) {
             const formatDice = (dice: WeaponDie[]): string => dice.map(d => `${d.count}d${d.sides}`).join(' + ');
             setPendingDamageRoll({ dice: formatDice(wd.damageDice), bonus: calcMod(wd.damageModifiers), actionName: weapon.name, isSplash: false });
             setShowDamageTargetModal(true);
