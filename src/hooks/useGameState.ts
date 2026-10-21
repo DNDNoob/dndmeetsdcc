@@ -825,8 +825,11 @@ export const useGameState = () => {
       }
     }
     let nearDeath = false;
-    if (current && rest.hp !== undefined && rest.hp < (current.hp ?? 0)) {
-      const deltas = getCrawlerHPLossStats(current, current.hp ?? 0, rest.hp, rest.maxHP ?? current.maxHP);
+    // A full profile save (it always carries maxHP) is the DM or player fixing the sheet, not damage,
+    // so it doesn't count toward HP Lost. Combat damage is counted in applyCombatDamageBatch.
+    const isProfileSave = rest.maxHP !== undefined;
+    if (current && !isProfileSave && rest.hp !== undefined && rest.hp < (current.hp ?? 0)) {
+      const deltas = getCrawlerHPLossStats(current, current.hp ?? 0, rest.hp);
       finalUpdates.activityStats = addActivityStats(current.activityStats, deltas);
       nearDeath = !!deltas.lowHealthCount;
     }
@@ -1479,8 +1482,14 @@ export const useGameState = () => {
 
   const advanceCombatTurn = async () => {
     if (!combatState || combatState.combatants.length === 0) return;
-    const nextIndex = combatState.currentTurnIndex + 1;
-    const isNewRound = nextIndex >= combatState.combatants.length;
+    const count = combatState.combatants.length;
+    // Mobs at 0 HP are skipped; if everyone left is down, the turn just passes to the next slot
+    const isDownedMob = (c: CombatantEntry) => c.type === 'mob' && c.currentHP != null && c.currentHP <= 0;
+    let step = 1;
+    while (step < count && isDownedMob(combatState.combatants[(combatState.currentTurnIndex + step) % count])) step++;
+    if (step === count && isDownedMob(combatState.combatants[combatState.currentTurnIndex])) step = 1;
+    const nextIndex = combatState.currentTurnIndex + step;
+    const isNewRound = nextIndex >= count;
     // Reset action flags for the combatant whose turn just ended, and count down its spell effects
     let resetCombatants = combatState.combatants.map((c, i) => {
       if (i === combatState.currentTurnIndex) {
@@ -1488,7 +1497,7 @@ export const useGameState = () => {
       }
       return c;
     });
-    const newIndex = isNewRound ? 0 : nextIndex;
+    const newIndex = nextIndex % count;
     if (isNewRound) await tickLanguageEffects('combat');
     // Damage or healing over time lands at the start of the next combatant's turn
     const startResult = await applyStartOfTurnConditions(resetCombatants, newIndex);
@@ -1956,7 +1965,6 @@ export const useGameState = () => {
     if (combatantsChanged) {
       await updateItem('combatState', 'current', { combatants } as Record<string, unknown>);
     }
-    if (killedMobIds.length > 0) await lootDefeatedMobs(killedMobIds);
     const crawlerIds = new Set([...crawlerHP.keys(), ...statDeltas.keys()]);
     for (const id of crawlerIds) {
       const crawler = crawlers.find(c => c.id === id);
@@ -1978,6 +1986,9 @@ export const useGameState = () => {
       if (deltas.lowHealthCount) grants.push({ crawlerId: id, amount: XP_REWARDS.nearDeath, reason: 'Near death' });
     }
     if (grants.length > 0) await awardXP(grants);
+    // Loot after the attacker's stats are saved: the loot transaction reads the saved crawler,
+    // so the killer's Mobs Looted count isn't overwritten by the older copy above
+    if (killedMobIds.length > 0) await lootDefeatedMobs(killedMobIds);
   };
 
   const applyCombatDamage = async (targetId: string, targetType: 'crawler' | 'mob', damage: number, attackerId?: string) => {

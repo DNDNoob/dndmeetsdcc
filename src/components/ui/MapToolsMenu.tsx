@@ -226,7 +226,7 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
           </div>
         )}
 
-        {/* Main buttons row */}
+        {/* Main buttons row (icons only on phones so the menu stays one row over the map) */}
         <div className="flex items-center gap-2 p-2 flex-wrap">
           {/* Ping button - available to all users */}
           <DungeonButton
@@ -235,8 +235,8 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
             onClick={handlePingModeToggle}
             title="Click map to ping (draw attention)"
           >
-            <Target className="w-4 h-4 mr-1" />
-            Ping
+            <Target className="w-4 h-4 sm:mr-1" />
+            <span className="hidden sm:inline">Ping</span>
           </DungeonButton>
 
           {/* Ruler button - available to all users */}
@@ -246,8 +246,8 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
             onClick={handleRulerModeToggle}
             title="Click map to measure distance"
           >
-            <Ruler className="w-4 h-4 mr-1" />
-            Ruler
+            <Ruler className="w-4 h-4 sm:mr-1" />
+            <span className="hidden sm:inline">Ruler</span>
           </DungeonButton>
 
           {/* Shape button with dropdown - available to all users */}
@@ -262,9 +262,9 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
               >
                 {(() => {
                   const ShapeIcon = SHAPE_OPTIONS.find(s => s.type === selectedShape)?.icon || Square;
-                  return <ShapeIcon className="w-4 h-4 mr-1" />;
+                  return <ShapeIcon className="w-4 h-4 sm:mr-1" />;
                 })()}
-                Shape
+                <span className="hidden sm:inline">Shape</span>
               </DungeonButton>
               <DungeonButton
                 variant={isBoxMode ? "admin" : "default"}
@@ -316,8 +316,8 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
               onClick={handleAddCrawlerModeToggle}
               title="Add crawler to map"
             >
-              <User className="w-4 h-4 mr-1" />
-              +Crawler
+              <User className="w-4 h-4 sm:mr-1" />
+              <span className="hidden sm:inline">+Crawler</span>
             </DungeonButton>
           )}
 
@@ -329,8 +329,8 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
               onClick={handleAddMobModeToggle}
               title="Add mob to map"
             >
-              <Skull className="w-4 h-4 mr-1" />
-              +Mob
+              <Skull className="w-4 h-4 sm:mr-1" />
+              <span className="hidden sm:inline">+Mob</span>
             </DungeonButton>
           )}
 

@@ -35,7 +35,7 @@ See the [Campaigns](/wiki/campaigns) page for full details.
 
 ## Choosing Your Identity
 
-After selecting a campaign, you'll see a splash screen where you pick who you are. Select any available crawler (player character), or choose "Just a Boring NPC" to spectate. The DM is automatically logged in as "Dungeon AI" when entering their own campaign.
+After selecting a campaign, you'll see a splash screen where you pick who you are. Select any available crawler (player character), or choose "Just a Boring NPC" to spectate. The DM is automatically logged in as "Dungeon AI" when entering their own campaign. Only the campaign's DM can pick **Dungeon AI (DM Access)**; players never see that option.
 
 You can switch your identity at any time by clicking the player name in the top-right corner.
 
@@ -153,7 +153,7 @@ These are tracked automatically as you play:
 | Damage Dealt | HP removed from targets by your attacks |
 | Killing Blows | Attacks that bring a mob to 0 HP |
 | Fight Finishers | Killing blows that take down the last mob standing in a combat |
-| HP Lost | Hit points you lose, from attacks or from HP being lowered on your profile |
+| HP Lost | Hit points you lose to attacks and other damage. Changing HP while editing your profile (for example when setting up a new crawler) doesn't count |
 | Near Death | Times your HP drops below 10% of your max HP |
 
 Your **Speed** (feet per combat turn) is shown next to the Activity heading. See [Combat System](/wiki/combat) for how movement works in combat.
@@ -431,6 +431,8 @@ The DM starts combat from the game clock panel during Show Time. They select whi
 
 Every mob placed in the episode can join combat, including mobs the party hasn't encountered yet. Unencountered mobs are tagged *unencountered* in the setup list and have a **Reveal** button. Players see every combatant in the turn order either way.
 
+The setup list ticks the hostile mobs on the map you're on. Mobs on the episode's other maps are listed with an *other map* tag but left unticked, so a boss in the next room isn't pulled into the fight by accident. Tick them yourself if they should join.
+
 ## Initiative Phase
 
 1. Each participant rolls for initiative (d20 + modifiers)
@@ -447,7 +449,7 @@ Combat proceeds in turn order (highest initiative first). On your turn:
 - **Bonus Action**: Use an off-hand attack, dash, disengage, or hide
 - The current combatant is highlighted in the combat order bar at the top of the map
 
-The DM advances turns with the "Next Turn" button.
+The DM advances turns with the "Next Turn" button. Mobs at 0 HP are skipped, so dead mobs don't get turns.
 
 ## Mob Turns (DM)
 
@@ -501,7 +503,7 @@ The DM can toggle between modes, change the countdown duration, and pause/resume
 
 When you attack a target:
 
-1. Roll your attack dice to see if you hit
+1. Roll your attack dice to see if you hit. A **natural 1** misses, so the damage window doesn't open
 2. If the attack connects, select a target from the damage modal
 3. Roll damage dice to determine how much damage you deal
 4. Damage is applied to the target's HP automatically
@@ -514,7 +516,7 @@ Each combatant's HP is tracked independently during combat. For mobs that appear
 
 ## Activity Stats
 
-Damage you deal, killing blows (including the blow that takes down the last enemy) and damage you take are recorded on your profile automatically. See [Activity Stats & Trophies](/wiki/activity-trophies).
+Damage you deal, killing blows (including the blow that takes down the last enemy) and damage you take are recorded on your profile automatically. The crawler who lands the killing blow gets their Mobs Looted credit from that mob's loot like everyone else. See [Activity Stats & Trophies](/wiki/activity-trophies).
 
 ## Ending Combat
 
@@ -563,7 +565,9 @@ You can open an episode in the DM Console editor while it's running in Show Time
 
 ## Deleting Maps
 
-If you delete a map, every episode that uses it is updated: the map is removed from the episode along with the mobs and crawlers placed on it, and the episode's other maps keep their mobs, settings and fog.
+If you delete a map, every episode that uses it is updated: the map is removed from the episode along with the mobs and crawlers placed on it, and the episode's other maps keep their mobs, settings and fog. If the game was running on the deleted map, everyone's Show Time switches to the episode's next map on its own.
+
+When you add mobs or crawlers to an episode, each one goes to the first free spot near the middle of the map, so crawlers don't land on top of mobs.
 
 ## Ending an Episode
 
@@ -694,7 +698,7 @@ In combat, the DM rolls all of these from the mob actions panel on the map. See 
 
 ## Encountered Mobs
 
-New mobs start as **unencountered**: they don't appear in players' Mob Profiles until the party meets them. They still show on the map and can join combat.
+New mobs start as **unencountered**: they don't appear in players' Mob Profiles until the party meets them. They still show on the map, can join combat, and can be talked to in Game Chat when a crawler is within 20 ft.
 
 The DM can mark a mob encountered (or unencountered) from:
 - The DM Console Mobs tab
@@ -944,6 +948,8 @@ If you refresh the page or visit another page (like the DM Console) during a gam
 1. Navigate to Show Time
 2. If the DM has started an episode, you will see the current map
 3. If no episode is active, you will see a waiting screen
+
+The map opens fitted to your screen, centered, on phones too. On phones the map tool buttons show icons only so the tools stay in one row. Pop-ups for the game starting or ending close by themselves after a few seconds, and a new one replaces the last instead of stacking. Loot box and quest pop-ups stay for 15 seconds.
 4. Interact with the map: click to ping, view mob details, see your position
 5. Roll dice and perform actions from your profile page
 
@@ -1648,6 +1654,7 @@ Each campaign supports up to **10 players** (including the DM if they play as a 
 - The DM has access to the DM Console, mob management, episode control, combat admin, loot distribution, and all admin-only features.
 - Players see player-only views (Profiles, Maps, Inventory, Mobs, Show Time, Sounds, Wiki).
 - The DM can also play as a crawler by switching their identity in the player dropdown.
+- Players can't pick **Dungeon AI (DM Access)** on the identity screen; only the campaign's creator gets it.
 
 ## Copying a Campaign
 

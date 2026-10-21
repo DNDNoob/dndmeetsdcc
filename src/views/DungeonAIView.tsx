@@ -652,14 +652,27 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
     };
   };
 
+  // First spread spot on a map that no mob or crawler token already sits on,
+  // so crawlers and mobs added to an episode don't land on top of each other
+  const getOpenPosition = (mapId: string): { x: number; y: number } => {
+    const taken = [
+      ...selectedMobsForEpisode.filter(p => p.mapId === mapId),
+      ...selectedCrawlersForEpisode.filter(p => p.mapId === mapId),
+    ];
+    for (let n = 0; n < 200; n++) {
+      const pos = getSpreadPosition(n);
+      if (!taken.some(t => Math.abs(t.x - pos.x) < 4 && Math.abs(t.y - pos.y) < 4)) return pos;
+    }
+    return getSpreadPosition(taken.length);
+  };
+
   const handleAddMobToEpisode = (mobId: string) => {
     // Get current map ID
     const currentMapId = selectedMapsForEpisode[currentMapIndexForEditor];
     if (!currentMapId) return;
 
     // Allow duplicate mobs - each placement is independent
-    const existingOnMap = selectedMobsForEpisode.filter(p => p.mapId === currentMapId).length;
-    const pos = getSpreadPosition(existingOnMap);
+    const pos = getOpenPosition(currentMapId);
     setSelectedMobsForEpisode([...selectedMobsForEpisode, { mobId, mapId: currentMapId, x: pos.x, y: pos.y }]);
   };
 
@@ -1976,8 +1989,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                                 size="sm"
                                 className="justify-start"
                                 onClick={() => {
-                                  const existingOnMap = selectedCrawlersForEpisode.filter(p => p.mapId === currentMapId).length;
-                                  const pos = getSpreadPosition(existingOnMap);
+                                  const pos = getOpenPosition(currentMapId);
                                   const newPlacement: CrawlerPlacement = {
                                     crawlerId: crawler.id,
                                     mapId: currentMapId,

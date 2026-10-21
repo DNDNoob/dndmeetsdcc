@@ -132,6 +132,8 @@ const Index = () => {
   const [activeEpisode, setActiveEpisode] = useState<Episode | null>(null);
   const [runtimeCrawlerPlacements, setRuntimeCrawlerPlacements] = useState<CrawlerPlacement[]>([]);
   const [runtimeMobPlacements, setRuntimeMobPlacements] = useState<EpisodeMobPlacement[]>([]);
+  // The map the DM's Show Time is on (combat setup only pre-ticks mobs on it)
+  const [showtimeMapId, setShowtimeMapId] = useState<string | null>(null);
   const [isGameActive, setIsGameActive] = useState(false);
   const setGameActiveRef = useRef<((active: boolean) => Promise<void>) | null>(null);
 
@@ -273,6 +275,13 @@ const Index = () => {
     if (!activeCampaign || !user) return false;
     return activeCampaign.ownerId === user.uid;
   }, [activeCampaign, user]);
+
+  // Players can't keep a DM identity (e.g. one saved in this browser before DM Access was owner-only)
+  useEffect(() => {
+    if (activeCampaign && user && !isAdmin && currentPlayer?.type === 'ai') {
+      setCurrentPlayer(null);
+    }
+  }, [activeCampaign, user, isAdmin, currentPlayer]);
 
   // Online NPC brain: runs in the DM's browser during a live game (keys stay in this browser)
   const { npcKeys, setNpcKeys } = useNpcBrain(roomId, isAdmin);
@@ -629,7 +638,11 @@ const Index = () => {
       } else {
         const savedPlayer = localStorage.getItem(STORAGE_KEY_CAMPAIGN_PLAYER_PREFIX + found.id);
         if (savedPlayer) {
-          try { setCurrentPlayer(JSON.parse(savedPlayer)); } catch { /* ignore */ }
+          try {
+            const parsed = JSON.parse(savedPlayer);
+            // A saved DM identity from before DM Access was owner-only is not restored
+            if (parsed?.type !== 'ai') setCurrentPlayer(parsed);
+          } catch { /* ignore */ }
         }
       }
     }
@@ -716,6 +729,8 @@ const Index = () => {
   // --- Navigation handlers ---
 
   const handlePlayerSelect = (playerId: string, playerName: string, playerType: "crawler" | "ai" | "npc") => {
+    // DM Access belongs to the campaign's owner only
+    if (playerType === 'ai' && !isAdmin) return;
     setCurrentPlayer({ id: playerId, name: playerName, type: playerType });
     navigate('/app/menu');
   };
@@ -750,7 +765,9 @@ const Index = () => {
       const savedPlayer = localStorage.getItem(STORAGE_KEY_CAMPAIGN_PLAYER_PREFIX + campaign.id);
       if (savedPlayer) {
         try {
-          restoredPlayer = JSON.parse(savedPlayer);
+          const parsed = JSON.parse(savedPlayer);
+          // A saved DM identity from before DM Access was owner-only is not restored
+          restoredPlayer = parsed?.type === 'ai' ? null : parsed;
         } catch {
           // ignore parse errors
         }
@@ -820,7 +837,7 @@ const Index = () => {
     for (const box of myBoxes) {
       if (!seenLootBoxIds.current.has(box.id)) {
         seenLootBoxIds.current.add(box.id);
-        toast(`New loot box received: ${box.name}!`, { icon: '📦', duration: Infinity });
+        toast(`New loot box received: ${box.name}!`, { icon: '📦', duration: 15000 });
       }
     }
 
@@ -828,7 +845,7 @@ const Index = () => {
     for (const box of myBoxes) {
       const prev = prevMyBoxes.find(b => b.id === box.id);
       if (prev && prev.locked && !box.locked) {
-        toast(`Loot box unlocked: ${box.name}!`, { icon: '🔓', duration: Infinity });
+        toast(`Loot box unlocked: ${box.name}!`, { icon: '🔓', duration: 15000 });
       }
     }
 
@@ -850,7 +867,7 @@ const Index = () => {
         const quest = quests.find(q => q.id === assigned.questId);
         if (quest) {
           const label = assigned.isPartyQuest ? `Party Quest: ${quest.name}` : `New Quest: ${quest.name}`;
-          toast(label, { icon: '📜', duration: Infinity });
+          toast(label, { icon: '📜', duration: 15000 });
         }
       }
     }
@@ -870,7 +887,8 @@ const Index = () => {
       if (!seenSystemRollIds.current.has(roll.id)) {
         seenSystemRollIds.current.add(roll.id);
         const isStart = roll.lootBoxNotification!.tier === 'Gold';
-        toast(roll.lootBoxNotification!.boxName, { icon: isStart ? '⚔️' : '🏁', duration: Infinity });
+        // One game start/end toast at a time (a new one replaces the last), and it closes by itself
+        toast(roll.lootBoxNotification!.boxName, { id: 'game-start-end', icon: isStart ? '⚔️' : '🏁', duration: 6000 });
       }
     }
   }, [diceRolls, currentPlayer]);
@@ -901,9 +919,10 @@ const Index = () => {
     setRuntimeMobPlacements([]);
   }, []);
 
-  const handleRuntimePlacementsChange = useCallback((cp: CrawlerPlacement[], mp: EpisodeMobPlacement[]) => {
+  const handleRuntimePlacementsChange = useCallback((cp: CrawlerPlacement[], mp: EpisodeMobPlacement[], mapId: string | null) => {
     setRuntimeCrawlerPlacements(cp);
     setRuntimeMobPlacements(mp);
+    setShowtimeMapId(mapId);
   }, []);
 
   const handleGameActiveChange = useCallback((active: boolean) => {
@@ -1301,7 +1320,7 @@ const Index = () => {
                 };
                 await addDiceRoll(entry);
                 if (active) {
-                  toast(`${activeEpisode?.name ?? 'Episode'} has started!`, { icon: '⚔️', duration: Infinity });
+                  toast(`${activeEpisode?.name ?? 'Episode'} has started!`, { id: 'game-start-end', icon: '⚔️', duration: 6000 });
                 }
               }}
               crawlers={crawlers}
@@ -1324,6 +1343,7 @@ const Index = () => {
               onRemoveCombatant={removeCombatant}
               runtimeCrawlerPlacements={runtimeCrawlerPlacements}
               runtimeMobPlacements={runtimeMobPlacements}
+              currentMapId={showtimeMapId}
               onAddCombatant={addCombatant}
               onUpdateCombatTimer={updateCombatTimer}
               getCrawlerInventory={getCrawlerInventory}
