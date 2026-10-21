@@ -319,7 +319,7 @@ Weapons, armor, other gear and spells earn **upgrade XP** from the way you use t
 
 ## Progress bars
 
-A gold bar under each item and spell on your profile shows its **Tier** and how much XP it needs for the next one. Tap the bar to see where the XP came from. Equipped items also show a thin gold bar along the bottom of their equipment slot.
+Once an item or spell has earned some XP, a gold bar under it on your profile shows its **Tier** and how much XP it needs for the next one. Tap the bar to see where the XP came from. Equipped items also show a thin gold bar along the bottom of their equipment slot.
 
 ## How each kind earns XP
 

@@ -997,12 +997,14 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   const weaponStatMod = (mods: StatModifiers | undefined): number =>
     ABILITY_KEYS.reduce((total, stat) => mods?.[stat] ? total + Math.floor((selected[stat] + (equippedMods[stat] ?? 0) - 10) / 2) : total, 0);
 
-  // Upgrade XP for this crawler's copy of an item or a known spell (null when it can't level up)
+  // Upgrade XP for this crawler's copy of an item or a known spell (null when it can't level up or has no XP yet)
   const selectedStats = statsById[selected.id];
   const itemUpgrade = (item: InventoryItem): UpgradeProgress | null => {
     const kind = getUpgradeKind(item);
     const { enabled, milestones } = resolveUpgradeXp(kind, item.upgradeXp);
-    return enabled ? { xp: getUpgradeXp(kind, item.upgradeXp, selectedStats?.items?.[statKey(item.id)]), milestones } : null;
+    if (!enabled) return null;
+    const xp = getUpgradeXp(kind, item.upgradeXp, selectedStats?.items?.[statKey(item.id)]);
+    return xp.total > 0 ? { xp, milestones } : null;
   };
   const slotUpgradePercent = (slot: SlotType): number | undefined => {
     const item = getEquippedItem(slot);
@@ -1014,7 +1016,9 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   const spellUpgrade = (ks: KnownSpell, spell: Spell | undefined): UpgradeProgress | null => {
     if (!spell) return null;
     const { enabled, milestones } = resolveUpgradeXp('spell', spell.upgradeXp);
-    return enabled ? { xp: getUpgradeXp('spell', spell.upgradeXp, selectedStats?.spells?.[statKey(ks.spellId)], ks.castCount), milestones } : null;
+    if (!enabled) return null;
+    const xp = getUpgradeXp('spell', spell.upgradeXp, selectedStats?.spells?.[statKey(ks.spellId)], ks.castCount);
+    return xp.total > 0 ? { xp, milestones } : null;
   };
 
   return (

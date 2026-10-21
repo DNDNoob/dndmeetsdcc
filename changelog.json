@@ -2,7 +2,7 @@
   {
     "date": "2026-10-21",
     "changes": [
-      "⬆️ Weapons, armor, gear and spells now earn upgrade XP from how you use them: damage, kills and boss kills for weapons, casts, damage, healing and effects for spells, and rolls boosted by a ring or other gear. A gold Tier bar under each item and spell shows progress, and tapping it shows where the XP came from",
+      "⬆️ Weapons, armor, gear and spells now earn upgrade XP from how you use them: damage, kills and boss kills for weapons, casts, damage, healing and effects for spells, and rolls boosted by a ring or other gear. Once an item or spell earns some XP, a gold Tier bar under it shows progress, and tapping it shows where the XP came from",
       "⚙️ DMs can set how an item or spell earns upgrade XP, and the XP needed for each tier, under Upgrade XP when creating or editing it. New items start with recommended values",
       "🎭 The Stats tab also tracks fighting style (fights survived, feet per turn, times knocked out), talking and trading (NPC chats, Persuasion, haggles, gold earned and spent, gear swaps), progress (quests, loot boxes) and habits (turn time, undone turns, voice vs typed chat), plus a log of each crawler's 10 latest standout moments",
       "🧠 DMs see Play Style tags on each crawler's Stats tab (Striker, Healer, Talker, Loose cannon, Troublemaker and more), worked out against the party, with a Copy AI profile button. Players don't see their tags",
