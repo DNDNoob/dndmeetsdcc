@@ -3,6 +3,7 @@
     "date": "2026-10-21",
     "changes": [
       "🎲 Skill checks roll against Easy, Medium or Hard DCs that rise 2 per dungeon floor, which the DM sets. A natural 1 always fails and a natural 20 always succeeds, haggling included",
+      "🎨 Regenerate icon: when editing an item in the Item Library or a spell in the Spell Library, click Regenerate icon for a fresh pixel icon made from its current name and description",
       "🎨 Generated item and spell icons now have no background and fill their space, so they sit on the page like the other icons instead of in a dark box",
       "🎨 If a pixel icon can't be made, a short message now says why (daily limit used up, or a generator problem) instead of failing silently",
       "⭐ Crawlers now earn XP: damage and killing blows on hostile mobs, finishing a fight, surviving it, coming back from near death, finishing quests, and spell mastery or Looting level-ups. Each grant shows in the dice history",

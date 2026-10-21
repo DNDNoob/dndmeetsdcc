@@ -2090,6 +2090,10 @@ Every new item in the **Item Library**, every new spell in the **Spell Library**
 
 If nothing in the library is related, the item keeps its normal slot icon.
 
+## Regenerating an Icon
+
+Don't like an icon? Edit the item in the **Item Library** (or the spell in the **Spell Library**) and click **Regenerate icon** at the top of the edit form. A new icon is made from the current name and description, so you can tweak the description first to steer it. Click **Save** to keep it. Each new icon uses one of the day's free generations.
+
 ## Mob Portraits (DMs)
 
 New mob types can get a 128×128 pixel-art portrait too, used as their map token and on the Mob Profiles page.
