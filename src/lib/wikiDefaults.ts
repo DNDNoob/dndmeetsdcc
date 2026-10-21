@@ -160,6 +160,21 @@ These are tracked automatically as you play:
 | Mobs Looted | Defeated mobs whose loot you shared in (raises your Looting level) |
 | Spells Cast | Casts of all your known spells added together |
 | Merchant Trades | Buys and sells with merchants (raises Barter) |
+| Boss Kills | Killing blows on boss mobs |
+| Healing Done | HP you restore to crawlers with healing spells |
+| Natural 20s | d20 rolls that came up 20 |
+| Friendly Fire | Damage you deal to other crawlers |
+| Damage to Neutrals | Damage you deal to mobs that aren't hostile, NPCs included |
+
+## The Stats Tab
+
+The **Stats** tab (chart icon) shows every stat above, where the crawler ranks in the party, and their Looting level. Below that it breaks things down further:
+
+- **Weapons and spells**: for each weapon, attack or spell you've used, the attacks or casts, hits, damage, kills, boss kills, best single hit, healing, effects left on targets, friendly fire and damage to neutrals.
+- **Combat**: healing received, neutral kills, the damage type you deal most, and the mobs you've killed most.
+- **Dice**: d20 rolls, your average d20 (10.5 is average luck), natural 1s, rolls with disadvantage, checks passed, and how often you roll each ability.
+
+These counters started on 2026-10-21, so play before then isn't included. When a combat turn is undone, its counters go back too.
 
 Your **Speed** (feet per combat turn) is shown next to the Activity heading. See [Combat System](/wiki/combat) for how movement works in combat.
 

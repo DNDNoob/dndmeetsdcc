@@ -2,6 +2,7 @@
   {
     "date": "2026-10-21",
     "changes": [
+      "📊 The game now keeps count of how each crawler plays: attacks, hits, damage, kills and best hit for every weapon and spell, damage types, the mobs you kill most, boss kills, healing done and received, friendly fire, damage to neutral mobs and NPCs, and dice luck (natural 20s and 1s, average d20, checks passed, rolls per ability). It's all on the Stats tab",
       "📊 The profile's Activity section now shows just the 5 stats where each crawler stands out most compared with the party. A new Stats tab lists every stat with the crawler's party rank and their Looting level",
       "🎲 Skill checks roll against Easy, Medium or Hard DCs that rise 2 per dungeon floor, which the DM sets. A natural 1 always fails and a natural 20 always succeeds, haggling included",
       "🎨 A \"free icons used up\" answer now only pauses icon generation for 30 minutes instead of the rest of the day, so a one-off hiccup can't switch icons off until tomorrow",
