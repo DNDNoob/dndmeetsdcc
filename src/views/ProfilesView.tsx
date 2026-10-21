@@ -16,7 +16,8 @@ import { SkillsPanel, CheckDifficultyPicker } from "@/components/SkillsPanel";
 import { usableLanguageIds } from "@/lib/languages";
 import { HealthBar } from "@/components/ui/HealthBar";
 import { EquipmentSlot } from "@/components/ui/EquipmentSlot";
-import { Crawler, getQuestProgress, Mob, InventoryItem, getItemStackKey, stackItems, getLootingLevel, getLootsUntilNextLevel, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery, getInitialCrawlerId, rollD20, rollsWithDisadvantage, ABILITY_KEYS, baseItemName, type SpellEffect, describeSpellEffect, getSkillRank, getSkillXPToSpend, getWeaponProficiency, HAND_TO_HAND, getCheckDC, SKILLS, type SkillDef, type CheckDifficultyId, getCrawlerXP, type SkillId, type AbilityKey, getCrawlerStatValue, getHighlightStats, type StatSource, type CrawlerStats, type CrawlerStatsById } from "@/lib/gameData";
+import { Crawler, getQuestProgress, Mob, InventoryItem, getItemStackKey, stackItems, getLootingLevel, getLootsUntilNextLevel, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery, getInitialCrawlerId, rollD20, rollsWithDisadvantage, ABILITY_KEYS, baseItemName, type SpellEffect, describeSpellEffect, getSkillRank, getSkillXPToSpend, getWeaponProficiency, HAND_TO_HAND, getCheckDC, SKILLS, type SkillDef, type CheckDifficultyId, getCrawlerXP, type SkillId, type AbilityKey, getCrawlerStatValue, getHighlightStats, type StatSource, type CrawlerStats, type CrawlerStatsById, getUpgradeKind, resolveUpgradeXp, getUpgradeXp, getUpgradeTier, statKey, type UpgradeXpBreakdown } from "@/lib/gameData";
+import { UpgradeXpBar } from "@/components/UpgradeXpBar";
 import { ItemName } from "@/components/ItemName";
 import type { DiceRollEntry } from "@/hooks/useGameState";
 import UndoTurnButton, { canUndoCombatTurn } from "@/components/UndoTurnButton";
@@ -155,6 +156,8 @@ const SPELL_SECTION_LABELS: Record<SpellActionType, string> = {
 const formatSpellDice = (dice: WeaponDie[]): string =>
   dice.filter(d => d.count > 0).map(d => `${d.count}d${d.sides}`).join(' + ');
 
+type UpgradeProgress = { xp: UpgradeXpBreakdown; milestones: number[] };
+
 // One known spell on the crawler's Spells tab: details, mastery progress and a Cast button
 const ProfileSpellCard: React.FC<{
   knownSpell: KnownSpell;
@@ -164,7 +167,8 @@ const ProfileSpellCard: React.FC<{
   isAdmin: boolean;
   onCast: () => void;
   onForget?: () => void;
-}> = ({ knownSpell, spell, currentMana, lockedReason, isAdmin, onCast, onForget }) => {
+  upgrade?: UpgradeProgress | null;
+}> = ({ knownSpell, spell, currentMana, lockedReason, isAdmin, onCast, onForget, upgrade }) => {
   const [expanded, setExpanded] = useState(false);
   const masteryLevel = getSpellMasteryLevel(knownSpell.castCount);
   const castsUntilNext = getCastsUntilNextMastery(knownSpell.castCount);
@@ -263,6 +267,7 @@ const ProfileSpellCard: React.FC<{
             <div className="h-full bg-accent transition-all" style={{ width: `${Math.max(0, Math.min(100, masteryProgress))}%` }} />
           </div>
         </div>
+        {upgrade && <UpgradeXpBar xp={upgrade.xp} milestones={upgrade.milestones} className="pt-1" />}
       </div>
 
       <div className="flex gap-1 p-2 mt-auto">
@@ -975,6 +980,30 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   const weaponStatMod = (mods: StatModifiers | undefined): number =>
     ABILITY_KEYS.reduce((total, stat) => mods?.[stat] ? total + Math.floor((selected[stat] + (equippedMods[stat] ?? 0) - 10) / 2) : total, 0);
 
+  // Upgrade XP for this crawler's copy of an item or a known spell (null when it can't level up or has no XP yet)
+  const selectedStats = statsById[selected.id];
+  const itemUpgrade = (item: InventoryItem): UpgradeProgress | null => {
+    const kind = getUpgradeKind(item);
+    const { enabled, milestones } = resolveUpgradeXp(kind, item.upgradeXp);
+    if (!enabled) return null;
+    const xp = getUpgradeXp(kind, item.upgradeXp, selectedStats?.items?.[statKey(item.id)]);
+    return xp.total > 0 ? { xp, milestones } : null;
+  };
+  const slotUpgradePercent = (slot: SlotType): number | undefined => {
+    const item = getEquippedItem(slot);
+    const upgrade = item && itemUpgrade(item);
+    if (!upgrade) return undefined;
+    const { floor, next } = getUpgradeTier(upgrade.xp.total, upgrade.milestones);
+    return next === null ? 100 : ((upgrade.xp.total - floor) / (next - floor)) * 100;
+  };
+  const spellUpgrade = (ks: KnownSpell, spell: Spell | undefined): UpgradeProgress | null => {
+    if (!spell) return null;
+    const { enabled, milestones } = resolveUpgradeXp('spell', spell.upgradeXp);
+    if (!enabled) return null;
+    const xp = getUpgradeXp('spell', spell.upgradeXp, selectedStats?.spells?.[statKey(ks.spellId)], ks.castCount);
+    return xp.total > 0 ? { xp, milestones } : null;
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -1194,6 +1223,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 slot="head"
                 label="Head"
                 equippedItem={getEquippedItem('head')}
+                upgradePercent={slotUpgradePercent('head')}
                 onDrop={handleEquipItem}
                 onUnequip={handleUnequipItem}
                 disabled={!isOwnProfile}
@@ -1207,6 +1237,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 slot="leftHand"
                 label="Left Hand"
                 equippedItem={getEquippedItem('leftHand')}
+                upgradePercent={slotUpgradePercent('leftHand')}
                 onDrop={handleEquipItem}
                 onUnequip={handleUnequipItem}
                 disabled={!isOwnProfile}
@@ -1215,6 +1246,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 slot="chest"
                 label="Chest"
                 equippedItem={getEquippedItem('chest')}
+                upgradePercent={slotUpgradePercent('chest')}
                 onDrop={handleEquipItem}
                 onUnequip={handleUnequipItem}
                 disabled={!isOwnProfile}
@@ -1223,6 +1255,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 slot="rightHand"
                 label="Right Hand"
                 equippedItem={getEquippedItem('rightHand')}
+                upgradePercent={slotUpgradePercent('rightHand')}
                 onDrop={handleEquipItem}
                 onUnequip={handleUnequipItem}
                 disabled={!isOwnProfile}
@@ -1235,6 +1268,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 slot="ringFinger"
                 label="Ring"
                 equippedItem={getEquippedItem('ringFinger')}
+                upgradePercent={slotUpgradePercent('ringFinger')}
                 onDrop={handleEquipItem}
                 onUnequip={handleUnequipItem}
                 disabled={!isOwnProfile}
@@ -1243,6 +1277,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 slot="legs"
                 label="Legs"
                 equippedItem={getEquippedItem('legs')}
+                upgradePercent={slotUpgradePercent('legs')}
                 onDrop={handleEquipItem}
                 onUnequip={handleUnequipItem}
                 disabled={!isOwnProfile}
@@ -1251,6 +1286,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 slot="weapon"
                 label="Weapon"
                 equippedItem={getEquippedItem('weapon')}
+                upgradePercent={slotUpgradePercent('weapon')}
                 onDrop={handleEquipItem}
                 onUnequip={handleUnequipItem}
                 disabled={!isOwnProfile}
@@ -1264,6 +1300,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 slot="feet"
                 label="Feet"
                 equippedItem={getEquippedItem('feet')}
+                upgradePercent={slotUpgradePercent('feet')}
                 onDrop={handleEquipItem}
                 onUnequip={handleUnequipItem}
                 disabled={!isOwnProfile}
@@ -2013,6 +2050,10 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                                       </span>
                                     )}
                                   </div>
+                                  {(() => {
+                                    const upgrade = itemUpgrade(item);
+                                    return upgrade && <UpgradeXpBar xp={upgrade.xp} milestones={upgrade.milestones} className="mt-1.5" />;
+                                  })()}
 
                                   {/* Expanded detail */}
                                   {isExpanded && (
@@ -2574,6 +2615,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                                 isAdmin={isAdmin}
                                 onCast={() => { if (spell) void handleCastSpell(ks, spell); }}
                                 onForget={onForgetSpell ? () => { void onForgetSpell(selected.id, ks.spellId); } : undefined}
+                                upgrade={spellUpgrade(ks, spell)}
                               />
                             ))}
                           </div>
@@ -2864,6 +2906,10 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                               {wd.splashDamage && <div className="text-orange-400 font-bold">Splash / Multi-Target</div>}
                               {wd.specialEffect && <div className="italic text-accent/70">{wd.specialEffect}</div>}
                             </div>
+                            {(() => {
+                              const upgrade = itemUpgrade(item);
+                              return upgrade && <UpgradeXpBar xp={upgrade.xp} milestones={upgrade.milestones} className="mt-1.5 text-left" />;
+                            })()}
                           </div>
                           {/* Action buttons */}
                           <div className="flex gap-1 p-2 mt-auto">

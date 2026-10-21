@@ -2,6 +2,8 @@
   {
     "date": "2026-10-21",
     "changes": [
+      "⬆️ Weapons, armor, gear and spells now earn upgrade XP from how you use them: damage, kills and boss kills for weapons, casts, damage, healing and effects for spells, and rolls boosted by a ring or other gear. Once an item or spell earns some XP, a gold Tier bar under it shows progress, and tapping it shows where the XP came from",
+      "⚙️ DMs can set how an item or spell earns upgrade XP, and the XP needed for each tier, under Upgrade XP when creating or editing it. New items start with recommended values",
       "⚔️ Weapon proficiency: every attack that hits a hostile mob builds proficiency with that weapon type, and each rank is +1 to hit with it, up to +10. Unarmed Strike builds Hand to Hand proficiency. A proficiency shows on the Skills tab once you've landed a hit with it, and on weapon cards",
       "🎯 Actions tab skill buttons now use your skill ranks and roll against the chosen Easy, Medium or Hard DC, which the Actions and Skills tabs share. Perception and Science & Engineering are now on the Actions tab too",
       "✨ Skills level up from skill XP: passing a check earns 5 XP for that skill, and each rank needs more XP than the last, up to rank 10. XP never resets",

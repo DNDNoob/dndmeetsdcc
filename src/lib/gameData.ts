@@ -388,7 +388,99 @@ export interface SourceStats {
   neutralKills?: number;
   damageAbsorbed?: number; // armor: for when a damage-reduction rule exists
   hitsDeflected?: number;
+  boostedRolls?: number;   // rings and other stat gear: rolls made with an ability the item raises while equipped
 }
+
+// ---- Upgrade XP: items and spells level up from what they do ----
+// Each XP source is worth a set amount; tiers unlock at the milestones. The DM can change both per
+// item or spell, and unset fields use the defaults for that kind of item.
+
+export type UpgradeKind = 'weapon' | 'armor' | 'gear' | 'spell' | 'none';
+
+export const UPGRADE_XP_SOURCES = ['perDamage', 'perKill', 'perBossKill', 'perHealing', 'perCondition', 'perCast', 'perAbsorbed', 'perBoostedRoll'] as const;
+export type UpgradeXpSource = typeof UPGRADE_XP_SOURCES[number];
+
+export interface UpgradeXpSettings extends Partial<Record<UpgradeXpSource, number>> {
+  enabled?: boolean;
+  milestones?: number[]; // total XP for each tier, ascending
+}
+
+export const UPGRADE_XP_SOURCE_LABELS: Record<UpgradeXpSource, string> = {
+  perDamage: 'per damage dealt',
+  perKill: 'per kill',
+  perBossKill: 'per boss kill',
+  perHealing: 'per HP healed',
+  perCondition: 'per effect left on a target',
+  perCast: 'per cast',
+  perAbsorbed: 'per damage absorbed',
+  perBoostedRoll: 'per roll with a stat it raises',
+};
+
+export const DEFAULT_UPGRADE_MILESTONES = [50, 150, 300, 500, 750];
+
+export const DEFAULT_UPGRADE_XP: Record<Exclude<UpgradeKind, 'none'>, Partial<Record<UpgradeXpSource, number>>> = {
+  weapon: { perDamage: 1, perKill: 10, perBossKill: 25 },
+  armor: { perAbsorbed: 1 },
+  gear: { perBoostedRoll: 5 },
+  spell: { perCast: 5, perDamage: 1, perKill: 10, perBossKill: 25, perHealing: 1, perCondition: 5 },
+};
+
+const ARMOR_SLOTS: EquipmentSlot[] = ['head', 'chest', 'legs', 'feet'];
+
+/** What kind of upgradeable thing an item is: weapons, armor, other equippable gear, or nothing (consumables). */
+export const getUpgradeKind = (item: Pick<InventoryItem, 'weaponData' | 'equipSlot'>): UpgradeKind => {
+  if (item.weaponData) return 'weapon';
+  if (!item.equipSlot) return 'none';
+  return ARMOR_SLOTS.includes(item.equipSlot) ? 'armor' : 'gear';
+};
+
+/** The settings in force: the item's own values over the defaults for its kind. */
+export const resolveUpgradeXp = (kind: UpgradeKind, settings?: UpgradeXpSettings): Required<Pick<UpgradeXpSettings, 'enabled' | 'milestones'>> & Partial<Record<UpgradeXpSource, number>> => {
+  const defaults = kind === 'none' ? {} : DEFAULT_UPGRADE_XP[kind];
+  const rates: Partial<Record<UpgradeXpSource, number>> = {};
+  for (const src of UPGRADE_XP_SOURCES) {
+    const value = settings?.[src] ?? defaults[src];
+    if (value) rates[src] = value;
+  }
+  const milestones = (settings?.milestones?.length ? settings.milestones : DEFAULT_UPGRADE_MILESTONES).filter(m => m > 0).sort((a, b) => a - b);
+  return { ...rates, enabled: settings?.enabled ?? kind !== 'none', milestones };
+};
+
+export interface UpgradeXpBreakdown {
+  total: number;
+  parts: { source: UpgradeXpSource; count: number; xp: number }[];
+}
+
+/** XP an item or spell has earned from its counters (`casts` comes from the known spell's cast count). */
+export const getUpgradeXp = (kind: UpgradeKind, settings: UpgradeXpSettings | undefined, stats: SourceStats | undefined, casts = 0): UpgradeXpBreakdown => {
+  const rates = resolveUpgradeXp(kind, settings);
+  const counts: Record<UpgradeXpSource, number> = {
+    perDamage: stats?.damage ?? 0,
+    perKill: Math.max(0, (stats?.kills ?? 0) - (stats?.bossKills ?? 0)),
+    perBossKill: stats?.bossKills ?? 0,
+    perHealing: stats?.healing ?? 0,
+    perCondition: stats?.conditions ?? 0,
+    perCast: casts,
+    perAbsorbed: stats?.damageAbsorbed ?? 0,
+    perBoostedRoll: stats?.boostedRolls ?? 0,
+  };
+  const parts = UPGRADE_XP_SOURCES
+    .filter(src => rates[src] && counts[src])
+    .map(src => ({ source: src, count: counts[src], xp: counts[src] * (rates[src] ?? 0) }));
+  return { total: parts.reduce((sum, p) => sum + p.xp, 0), parts };
+};
+
+export interface UpgradeTierProgress {
+  tier: number;          // milestones reached
+  maxTier: number;
+  floor: number;         // XP where the current tier started
+  next: number | null;   // XP for the next tier, null once every milestone is reached
+}
+
+export const getUpgradeTier = (xp: number, milestones: number[]): UpgradeTierProgress => {
+  const tier = milestones.filter(m => xp >= m).length;
+  return { tier, maxTier: milestones.length, floor: tier > 0 ? milestones[tier - 1] : 0, next: milestones[tier] ?? null };
+};
 
 export interface CrawlerStats {
   id: string; // = crawlerId
@@ -815,6 +907,7 @@ export interface Spell {
   createdBy?: string;        // Firebase uid of creator
   createdByUsername?: string; // Denormalized for display
   isPublic?: boolean;        // Whether visible to players outside the campaign
+  upgradeXp?: UpgradeXpSettings; // How this spell earns upgrade XP (unset fields use the spell defaults)
 }
 
 /** A pixel-art icon in the global `iconLibrary` collection, shared by every campaign. */
@@ -889,6 +982,7 @@ export interface InventoryItem {
   tags?: string[]; // Custom tags for filtering (e.g., "magic", "cursed", "quest")
   weaponData?: WeaponData; // Weapon-specific data (only for items with "weapon" tag or weapon equipSlot)
   isUpgraded?: boolean; // Whether this item has been upgraded by a crawler
+  upgradeXp?: UpgradeXpSettings; // How this item earns upgrade XP (unset fields use the defaults for its kind)
   isSpellTome?: boolean; // Consumable that teaches a spell when used
   iconId?: string; // References an entry in the global iconLibrary collection
   spellTomeData?: {

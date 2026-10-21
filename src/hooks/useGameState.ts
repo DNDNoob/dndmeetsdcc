@@ -1205,7 +1205,17 @@ export const useGameState = () => {
       if (roll.diceLabel === '2d20 low' || entry.results.some(r => r.dice.includes('(Dis)'))) bumps.push({ path: ['disadvantageRolls'], inc: 1 });
     }
     const ability = abilityOfRoll(roll.stat);
-    if (ability) bumps.push({ path: ['rollsByAbility', ability], inc: 1 });
+    if (ability) {
+      bumps.push({ path: ['rollsByAbility', ability], inc: 1 });
+      // Rings and other gear that raise this ability earn upgrade XP from the roll
+      const crawler = crawlers.find(c => c.id === entry.crawlerId);
+      const equippedIds = new Set(Object.values(crawler?.equippedItems ?? {}));
+      for (const item of getCrawlerInventory(entry.crawlerId)) {
+        if (equippedIds.has(item.id) && (item.statModifiers?.[ability] ?? 0) > 0) {
+          bumps.push(...sourceBumps({ kind: 'item', id: item.id, name: item.name }, { boostedRolls: 1 }));
+        }
+      }
+    }
     if (/persuasion/i.test(roll.stat)) bumps.push({ path: ['persuasionRolls'], inc: 1 });
     if (roll.success === true) bumps.push({ path: ['checksPassed'], inc: 1 });
     if (roll.success === false) bumps.push({ path: ['checksFailed'], inc: 1 });
