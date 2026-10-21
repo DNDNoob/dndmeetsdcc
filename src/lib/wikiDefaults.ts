@@ -329,10 +329,10 @@ These are the recommended amounts. The DM can change them for any item or spell.
 |------|---------------|
 | Weapons | 1 per point of damage, 10 per kill, 25 per boss kill |
 | Spells | 5 per cast, 1 per point of damage or healing, 5 per effect left on a target, 10 per kill, 25 per boss kill |
-| Armor (head, chest, legs, feet) | 1 per point of damage absorbed, 5 per attack deflected |
+| Armor (head, chest, legs, feet) | 1 per point of damage absorbed |
 | Other gear (rings, hand slots) | 5 per roll that uses a stat the item raises |
 
-Only hostile kills count. Damage to friendly crawlers or neutral mobs earns nothing. Armor can't earn XP yet: absorbed and deflected damage start counting once armor blocks damage in combat.
+Only hostile kills count. Damage to friendly crawlers or neutral mobs earns nothing. Armor can't earn XP yet: absorbed damage starts counting once armor blocks damage in combat.
 
 ## Tiers
 

@@ -334,7 +334,7 @@ export interface SourceStats {
 
 export type UpgradeKind = 'weapon' | 'armor' | 'gear' | 'spell' | 'none';
 
-export const UPGRADE_XP_SOURCES = ['perDamage', 'perKill', 'perBossKill', 'perHealing', 'perCondition', 'perCast', 'perAbsorbed', 'perDeflect', 'perBoostedRoll'] as const;
+export const UPGRADE_XP_SOURCES = ['perDamage', 'perKill', 'perBossKill', 'perHealing', 'perCondition', 'perCast', 'perAbsorbed', 'perBoostedRoll'] as const;
 export type UpgradeXpSource = typeof UPGRADE_XP_SOURCES[number];
 
 export interface UpgradeXpSettings extends Partial<Record<UpgradeXpSource, number>> {
@@ -350,7 +350,6 @@ export const UPGRADE_XP_SOURCE_LABELS: Record<UpgradeXpSource, string> = {
   perCondition: 'per effect left on a target',
   perCast: 'per cast',
   perAbsorbed: 'per damage absorbed',
-  perDeflect: 'per hit deflected',
   perBoostedRoll: 'per roll with a stat it raises',
 };
 
@@ -358,7 +357,7 @@ export const DEFAULT_UPGRADE_MILESTONES = [50, 150, 300, 500, 750];
 
 export const DEFAULT_UPGRADE_XP: Record<Exclude<UpgradeKind, 'none'>, Partial<Record<UpgradeXpSource, number>>> = {
   weapon: { perDamage: 1, perKill: 10, perBossKill: 25 },
-  armor: { perAbsorbed: 1, perDeflect: 5 },
+  armor: { perAbsorbed: 1 },
   gear: { perBoostedRoll: 5 },
   spell: { perCast: 5, perDamage: 1, perKill: 10, perBossKill: 25, perHealing: 1, perCondition: 5 },
 };
@@ -400,7 +399,6 @@ export const getUpgradeXp = (kind: UpgradeKind, settings: UpgradeXpSettings | un
     perCondition: stats?.conditions ?? 0,
     perCast: casts,
     perAbsorbed: stats?.damageAbsorbed ?? 0,
-    perDeflect: stats?.hitsDeflected ?? 0,
     perBoostedRoll: stats?.boostedRolls ?? 0,
   };
   const parts = UPGRADE_XP_SOURCES
