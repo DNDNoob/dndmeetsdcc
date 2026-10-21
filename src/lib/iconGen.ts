@@ -24,7 +24,7 @@ function subjectTarget(subject: IconSubject): { name: string; description: strin
 /** The deployed icon Worker (icon-worker/); VITE_ICON_API_URL overrides it. Not a secret. */
 const DEFAULT_ICON_API_URL = 'https://dndmeetsdcc-icons.icon-worker.workers.dev';
 const ICON_API_URL = ((import.meta.env.VITE_ICON_API_URL as string | undefined) || DEFAULT_ICON_API_URL).replace(/\/$/, '');
-const QUOTA_KEY = 'iconGen.quotaExhaustedUntil';
+const QUOTA_KEY = 'iconGen.quotaPausedUntil';
 
 /** Canonical concept → words that mean it. Tags are stored as the canonical concept. */
 const CONCEPTS: Record<string, string[]> = {
@@ -226,11 +226,10 @@ function quotaExhausted(): boolean {
 }
 
 function markQuotaExhausted() {
-  // Workers AI free allocation resets at 00:00 UTC
-  const reset = new Date();
-  reset.setUTCHours(24, 0, 0, 0);
+  // Pause briefly rather than until the 00:00 UTC reset, so a wrong "used up" answer can't
+  // switch generation off for the rest of the day
   try {
-    localStorage.setItem(QUOTA_KEY, String(reset.getTime()));
+    localStorage.setItem(QUOTA_KEY, String(Date.now() + 30 * 60 * 1000));
   } catch {
     // storage unavailable; the Worker will just answer 429 again
   }
@@ -340,14 +339,14 @@ export async function generateIconImage(prompt: string, idToken: string, size = 
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
       body: JSON.stringify({ prompt }),
     });
-    if (res.status === 429) {
-      markQuotaExhausted();
-      reportQuotaUsedUp();
-      return null;
-    }
     if (!res.ok) {
-      const { error } = await res.json().catch(() => ({})) as { error?: string };
-      reportGenerationFailure(`${res.status}${error ? ` ${error}` : ''}`);
+      const { error, detail } = await res.json().catch(() => ({})) as { error?: string; detail?: string };
+      if (res.status === 429 && error === 'quota') {
+        markQuotaExhausted();
+        reportQuotaUsedUp(detail);
+      } else {
+        reportGenerationFailure([res.status, error, detail].filter(Boolean).join(' '));
+      }
       return null;
     }
     const { image } = await res.json() as { image?: string };
@@ -362,7 +361,8 @@ export async function generateIconImage(prompt: string, idToken: string, size = 
 let failureReported = false;
 let quotaReported = false;
 // Each kind of fallback is shown once per page load, so a broken generator gets noticed
-function reportQuotaUsedUp() {
+function reportQuotaUsedUp(detail?: string) {
+  if (detail) console.warn('[IconGen] free quota used up:', detail);
   if (quotaReported) return;
   quotaReported = true;
   toast.info("Today's free pixel icons are used up, so new items get the closest existing icon until the daily reset.");

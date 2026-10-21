@@ -4,7 +4,8 @@
  * POST /icon  { prompt: string }  with  Authorization: Bearer <Firebase ID token>
  *   200 { image: "<base64 jpeg>" }
  *   401 bad or missing token (only Google sign-ins may generate, matching Firestore write rules)
- *   429 { error: "quota" } when the Workers AI free allocation is used up for the day
+ *   429 { error: "quota", detail } when the Workers AI free allocation is used up for the day
+ *   503 { error: "busy", detail } when Workers AI is rate limiting; 502 for other failures
  *
  * No API key lives in the app: the Workers AI binding is attached to this Worker.
  */
@@ -44,11 +45,16 @@ export default {
       return json({ image: result.image }, 200, cors);
     } catch (err) {
       const message = String(err?.message || err);
+      const detail = message.slice(0, 200);
+      console.log('[icon] Workers AI error:', message);
       // Workers AI reports an exhausted free allocation as error 4006 / "daily free allocation"
-      if (/4006|free allocation|neurons|quota|rate limit/i.test(message)) {
-        return json({ error: 'quota' }, 429, cors);
+      if (/4006|free allocation|neurons/i.test(message)) {
+        return json({ error: 'quota', detail }, 429, cors);
       }
-      return json({ error: 'generation failed' }, 502, cors);
+      if (/rate limit|3040|capacity/i.test(message)) {
+        return json({ error: 'busy', detail }, 503, cors);
+      }
+      return json({ error: 'generation failed', detail }, 502, cors);
     }
   },
 };
