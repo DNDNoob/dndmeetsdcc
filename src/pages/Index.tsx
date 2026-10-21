@@ -315,7 +315,7 @@ const Index = () => {
 
   // Pixel-art icons: every new item or spell gets one generated (Cloudflare Workers AI), or, once
   // the free daily quota is used up, the best-matching icon from the shared icon library.
-  const { iconImages, assignIcon, generateMobImage } = useIconLibrary(user, isAuthenticated);
+  const { iconImages, assignIcon, regenerateIcon, generateMobImage } = useIconLibrary(user, isAuthenticated);
   // Icons arrive seconds after the save, so they're applied to the latest library state
   const sharedInventoryRef = useRef({ getSharedInventory, updateSharedInventory });
   sharedInventoryRef.current = { getSharedInventory, updateSharedInventory };
@@ -1135,6 +1135,7 @@ const Index = () => {
                 onSaveItemToMyContent={isAuthenticated ? handleSaveItemToMyContent : undefined}
                 showPublicContent={showPublicContent}
                 iconImages={iconImages}
+                onRegenerateIcon={regenerateIcon}
               />
             )}
             {currentView === "spells" && (
@@ -1157,6 +1158,7 @@ const Index = () => {
                 onToggleSpellPublic={handleToggleSpellPublic}
                 showPublicContent={showPublicContent}
                 iconImages={iconImages}
+                onRegenerateIcon={regenerateIcon}
                 currentPlayerId={currentPlayer?.id}
               />
             )}

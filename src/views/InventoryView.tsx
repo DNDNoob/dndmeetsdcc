@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import PixelIcon from '@/components/ui/PixelIcon';
+import IconRegenerateButton from '@/components/IconRegenerateButton';
+import type { IconSubject } from '@/lib/iconGen';
 import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
@@ -64,6 +66,7 @@ interface InventoryViewProps {
   onToggleItemPublic?: (item: InventoryItem, isPublic: boolean) => void;
   showPublicContent?: boolean;
   iconImages?: Record<string, string>; // iconLibrary id -> pixel icon image
+  onRegenerateIcon?: (subject: IconSubject) => Promise<{ id: string; image: string } | null>;
 }
 
 // Copies of the same item are grouped into one stack
@@ -97,6 +100,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   onToggleItemPublic,
   showPublicContent = false,
   iconImages = {},
+  onRegenerateIcon,
 }) => {
   const [editMode, setEditMode] = useState(false);
   // Expanded item details state
@@ -142,6 +146,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     grantsLanguage?: string;
     rarity?: ItemRarity;
     effects?: string;
+    iconId?: string;
   }>({
     name: "", description: "", equipSlot: undefined, goldValue: undefined, statModifiers: undefined, weaponData: undefined,
   });
@@ -221,6 +226,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
       grantsLanguage: item.grantsLanguage,
       rarity: item.rarity,
       effects: item.effects,
+      iconId: item.iconId,
     });
     setShowWeaponConfig(!!item.weaponData);
     setShowSpellTomeConfig(!!item.isSpellTome);
@@ -259,6 +265,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
               grantsLanguage: newLibraryItem.grantsLanguage,
               rarity: newLibraryItem.rarity,
               effects: newLibraryItem.effects?.trim() || undefined,
+              ...(newLibraryItem.iconId ? { iconId: newLibraryItem.iconId } : {}),
               ...(mods && Object.keys(mods).length > 0 ? { statModifiers: mods } : { statModifiers: undefined }),
               ...weaponFields,
               ...spellTomeFields,
@@ -289,6 +296,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 grantsLanguage: newLibraryItem.grantsLanguage,
                 rarity: newLibraryItem.rarity,
                 effects: newLibraryItem.effects?.trim() || undefined,
+                ...(newLibraryItem.iconId ? { iconId: newLibraryItem.iconId } : {}),
                 ...(mods && Object.keys(mods).length > 0 ? { statModifiers: mods } : { statModifiers: undefined }),
                 ...weaponFields,
                 ...spellTomeFields,
@@ -696,6 +704,15 @@ const InventoryView: React.FC<InventoryViewProps> = ({
               <p className="text-xs text-muted-foreground font-medium">
                 {editingLibraryItemId ? '✏️ Editing Item' : '➕ Add New Item'}
               </p>
+              {editingLibraryItemId && onRegenerateIcon && (
+                <IconRegenerateButton
+                  key={editingLibraryItemId}
+                  iconSrc={newLibraryItem.iconId ? iconImages[newLibraryItem.iconId] : undefined}
+                  alt={newLibraryItem.name}
+                  onRegenerate={() => onRegenerateIcon({ kind: 'item', item: { ...newLibraryItem, id: editingLibraryItemId } })}
+                  onIconChange={(iconId) => setNewLibraryItem(prev => ({ ...prev, iconId }))}
+                />
+              )}
               <div className="flex gap-2">
                 <input type="text" placeholder="Item name" value={newLibraryItem.name}
                   onChange={(e) => setNewLibraryItem({ ...newLibraryItem, name: e.target.value })}

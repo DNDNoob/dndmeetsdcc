@@ -1,6 +1,8 @@
 import { closeOnBackdrop } from "@/hooks/useClickAway";
 import { useState } from "react";
 import PixelIcon from '@/components/ui/PixelIcon';
+import IconRegenerateButton from '@/components/IconRegenerateButton';
+import type { IconSubject } from '@/lib/iconGen';
 import { motion } from "framer-motion";
 import { Plus, Trash2, ChevronDown, ChevronUp, BookOpen, Zap, Star, Wand2, X, Check, Globe, Lock, Users, Bookmark } from "lucide-react";
 import { DungeonButton } from "@/components/ui/DungeonButton";
@@ -47,6 +49,7 @@ interface SpellsViewProps {
   onToggleSpellPublic?: (spell: Spell, isPublic: boolean) => void;
   showPublicContent?: boolean;
   iconImages?: Record<string, string>; // iconLibrary id -> pixel icon image
+  onRegenerateIcon?: (subject: IconSubject) => Promise<{ id: string; image: string } | null>;
   currentPlayerId?: string; // crawler id of the player at this screen
   mySpells?: Spell[];
   onSaveSpellToMyContent?: (spell: Spell) => void;
@@ -874,10 +877,15 @@ function SpellEditorModal({
   spell,
   onSave,
   onClose,
+  iconImages,
+  onRegenerateIcon,
 }: {
   spell: Spell;
   onSave: (spell: Spell) => void;
   onClose: () => void;
+  iconImages: Record<string, string>;
+  /** Only passed for spells already in the library; new ones get an icon when added */
+  onRegenerateIcon?: (subject: IconSubject) => Promise<{ id: string; image: string } | null>;
 }) {
   const [draft, setDraft] = useState<Spell>(spell);
   const [tagInput, setTagInput] = useState('');
@@ -917,6 +925,15 @@ function SpellEditorModal({
         </div>
 
         <div className="p-4 space-y-4">
+          {onRegenerateIcon && (
+            <IconRegenerateButton
+              iconSrc={draft.iconId ? iconImages[draft.iconId] : undefined}
+              alt={draft.name}
+              onRegenerate={() => onRegenerateIcon({ kind: 'spell', spell: draft })}
+              onIconChange={(iconId) => setDraft(prev => ({ ...prev, iconId }))}
+            />
+          )}
+
           {/* Name & Description */}
           <div className="space-y-2">
             <div>
@@ -1015,6 +1032,7 @@ const SpellsView: React.FC<SpellsViewProps> = ({
   onToggleSpellPublic,
   showPublicContent = false,
   iconImages = {},
+  onRegenerateIcon,
   mySpells = [],
   onSaveSpellToMyContent,
   currentPlayerId,
@@ -1274,6 +1292,8 @@ const SpellsView: React.FC<SpellsViewProps> = ({
           spell={editingSpell}
           onSave={handleSaveSpell}
           onClose={() => setEditingSpell(null)}
+          iconImages={iconImages}
+          onRegenerateIcon={spells.some(s => s.id === editingSpell.id) ? onRegenerateIcon : undefined}
         />
       )}
     </motion.div>

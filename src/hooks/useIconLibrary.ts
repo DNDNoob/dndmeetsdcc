@@ -10,7 +10,7 @@ import { buildIconPrompt, generateIconImage, getIconTags, matchLibraryIcon, PORT
  * `assignIcon` gives a new item or spell an icon: it generates one through the Cloudflare icon
  * Worker and adds it to the library, or, when generation is unavailable (free quota used up,
  * not configured, not signed in with Google), picks the best existing icon by descriptor tags.
- * `generateMobImage` does the same for mob types with larger portraits.
+ * `regenerateIcon` makes a fresh one on request, and `generateMobImage` makes larger portraits for mob types.
  */
 export function useIconLibrary(user: User | null, canGenerate: boolean) {
   const [icons, setIcons] = useState<IconLibraryEntry[]>([]);
@@ -64,6 +64,12 @@ export function useIconLibrary(user: User | null, canGenerate: boolean) {
     return matchLibraryIcon(subject, iconsRef.current)?.id;
   }, [generateEntry]);
 
+  /** A fresh icon for an item or spell being edited, with no library fallback. */
+  const regenerateIcon = useCallback(async (subject: IconSubject): Promise<{ id: string; image: string } | null> => {
+    const entry = await generateEntry(subject);
+    return entry ? { id: entry.id, image: entry.image } : null;
+  }, [generateEntry]);
+
   /**
    * Pixel portrait for a mob type (returned as an image, since mobs keep their own image field).
    * Falls back to a character's creature portrait, then the closest earlier mob portrait.
@@ -77,5 +83,5 @@ export function useIconLibrary(user: User | null, canGenerate: boolean) {
     return matchLibraryIcon(subject, iconsRef.current)?.image;
   }, [generateEntry]);
 
-  return { icons, iconImages, assignIcon, generateMobImage };
+  return { icons, iconImages, assignIcon, regenerateIcon, generateMobImage };
 }
