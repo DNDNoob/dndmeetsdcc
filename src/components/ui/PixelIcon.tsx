@@ -17,7 +17,7 @@ const PixelIcon: React.FC<PixelIconProps> = ({ src, alt, className, fallback = n
       src={src}
       alt={alt}
       draggable={false}
-      className={cn('w-6 h-6 shrink-0 rounded-sm border border-border/50 bg-background', className)}
+      className={cn('w-6 h-6 shrink-0 object-contain', className)}
       style={{ imageRendering: 'pixelated' }}
     />
   );

@@ -168,7 +168,7 @@ export function buildIconPrompt(subject: IconSubject): string {
     const { mob } = subject;
     const bits = [mob.boss && 'fearsome boss', mob.level && `level ${mob.level}`, mob.kind === 'character' ? 'unique named character' : 'creature'].filter(Boolean);
     return `16-bit pixel art RPG character portrait of ${target.name} (${bits.join(', ')}). ${desc} ` +
-      'Full body, facing the viewer, centered, bold dark outline, limited color palette, crisp pixels, plain dark background, no text, no border.';
+      'Full body, facing the viewer, centered, bold dark outline, limited color palette, crisp pixels, plain flat solid black background, no text, no border.';
   }
   if (subject.kind === 'item') {
     const { item } = subject;
@@ -183,7 +183,7 @@ export function buildIconPrompt(subject: IconSubject): string {
     detail = ` (${[sd?.school, sd?.damageType && sd.damageType !== 'Basic' ? sd.damageType : '', 'spell effect'].filter(Boolean).join(' ').toLowerCase()})`;
   }
   return `16-bit pixel art RPG inventory icon of ${target.name}${detail}. ${desc} ` +
-    'Single centered object, bold dark outline, limited color palette, crisp pixels, plain dark background, no text, no border.';
+    'Single centered object, clean outline, limited color palette, crisp pixels, plain flat solid black background, no text, no border.';
 }
 
 /**
@@ -237,10 +237,36 @@ function markQuotaExhausted() {
 }
 
 /** Downscale a generated image to a small pixel-art PNG data URL. */
-async function pixelate(base64Jpeg: string, size: number): Promise<string> {
+async function pixelate(base64Jpeg: string, size: number, cutout: boolean): Promise<string> {
   const img = new Image();
   img.src = `data:image/jpeg;base64,${base64Jpeg}`;
   await img.decode();
+  let source: CanvasImageSource = img;
+  let sx = 0, sy = 0, sw = img.width, sh = img.height;
+  let work: ImageData | null = null;
+  if (cutout) {
+    // Find the object at a working size: clear the plain background, then crop to what's left
+    const ws = Math.min(256, size * 4);
+    const wc = document.createElement('canvas');
+    wc.width = ws;
+    wc.height = ws;
+    const wctx = wc.getContext('2d');
+    if (!wctx) throw new Error('canvas unavailable');
+    wctx.drawImage(img, 0, 0, ws, ws);
+    work = wctx.getImageData(0, 0, ws, ws);
+    const box = clearBackground(work);
+    wctx.putImageData(work, 0, 0);
+    if (box) {
+      // Square crop around the object with a pixel of margin, so it fills the icon
+      const side = Math.min(ws, Math.max(box.w, box.h) + 2);
+      sx = Math.max(0, Math.min(ws - side, Math.round(box.x + box.w / 2 - side / 2)));
+      sy = Math.max(0, Math.min(ws - side, Math.round(box.y + box.h / 2 - side / 2)));
+      sw = sh = side;
+    } else {
+      sw = sh = ws;
+    }
+    source = wc;
+  }
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
@@ -248,22 +274,61 @@ async function pixelate(base64Jpeg: string, size: number): Promise<string> {
   if (!ctx) throw new Error('canvas unavailable');
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(img, 0, 0, size, size);
-  // Posterize to a limited palette so the result reads as pixel art
+  ctx.drawImage(source, sx, sy, sw, sh, 0, 0, size, size);
+  // Posterize to a limited palette and snap alpha, so the result reads as crisp pixel art
   const data = ctx.getImageData(0, 0, size, size);
   const step = 32;
   for (let i = 0; i < data.data.length; i += 4) {
     for (let c = 0; c < 3; c++) data.data[i + c] = Math.min(255, Math.round(data.data[i + c] / step) * step);
+    if (cutout) data.data[i + 3] = data.data[i + 3] < 128 ? 0 : 255;
   }
   ctx.putImageData(data, 0, 0);
   return canvas.toDataURL('image/png');
 }
 
 /**
+ * Makes the plain background transparent by flood-filling from the edges with pixels close to
+ * the corner colour. Returns the bounding box of what's left, or null if nothing is.
+ */
+function clearBackground(image: ImageData): { x: number; y: number; w: number; h: number } | null {
+  const { width: w, height: h, data } = image;
+  const corners = [0, w - 1, (h - 1) * w, h * w - 1];
+  const bg = [0, 1, 2].map(c => corners.reduce((sum, p) => sum + data[p * 4 + c], 0) / 4);
+  const isBackground = (p: number) =>
+    Math.abs(data[p * 4] - bg[0]) + Math.abs(data[p * 4 + 1] - bg[1]) + Math.abs(data[p * 4 + 2] - bg[2]) <= 60;
+  const seen = new Uint8Array(w * h);
+  const stack: number[] = [];
+  for (let x = 0; x < w; x++) stack.push(x, (h - 1) * w + x);
+  for (let y = 0; y < h; y++) stack.push(y * w, y * w + w - 1);
+  while (stack.length) {
+    const p = stack.pop()!;
+    if (seen[p] || !isBackground(p)) continue;
+    seen[p] = 1;
+    data[p * 4 + 3] = 0;
+    const x = p % w;
+    if (x > 0) stack.push(p - 1);
+    if (x < w - 1) stack.push(p + 1);
+    if (p >= w) stack.push(p - w);
+    if (p < w * (h - 1)) stack.push(p + w);
+  }
+  let minX = w, minY = h, maxX = -1, maxY = -1;
+  for (let p = 0; p < w * h; p++) {
+    if (seen[p]) continue;
+    const x = p % w, y = (p - x) / w;
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  }
+  return maxX < 0 ? null : { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
+}
+
+/**
  * Ask the icon Worker for a new icon. Resolves to a PNG data URL, or null when generation is
  * unavailable (not configured, daily free quota used up, or any error) so callers can fall back.
+ * With cutout, the plain background is cleared and the icon is cropped to the object.
  */
-export async function generateIconImage(prompt: string, idToken: string, size = ICON_SIZE): Promise<string | null> {
+export async function generateIconImage(prompt: string, idToken: string, size = ICON_SIZE, cutout = true): Promise<string | null> {
   if (!ICON_API_URL) return null;
   if (quotaExhausted()) {
     reportQuotaUsedUp();
@@ -287,7 +352,7 @@ export async function generateIconImage(prompt: string, idToken: string, size = 
     }
     const { image } = await res.json() as { image?: string };
     if (!image) reportGenerationFailure('no image returned');
-    return image ? await pixelate(image, size) : null;
+    return image ? await pixelate(image, size, cutout) : null;
   } catch (err) {
     reportGenerationFailure(err instanceof Error ? err.message : String(err));
     return null;
