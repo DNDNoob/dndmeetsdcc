@@ -43,6 +43,14 @@ import {
   getEquippedModifiers,
   addActivityStats,
   getHPLossStats,
+  type CrawlerStats,
+  type CrawlerMoment,
+  CRAWLER_MOMENTS_MAX,
+  type StatSource,
+  type SourceStats,
+  statKey,
+  abilityOfRoll,
+  isBossMob,
   remapEpisodeMapRefs,
   type CrawlerActivityStats,
   type CrawlerTrophy,
@@ -104,6 +112,7 @@ export interface DiceRollEntry {
   total: number;
   statRoll?: { stat: string; modifier: number; rawRoll: number; diceLabel?: string; rollType?: string; dc?: number; success?: boolean };
   mobRoll?: boolean; // rolled by the DM for a mob (crawlerId holds the mob's combatant id)
+  source?: StatSource; // the weapon or spell an attack roll was made with (counts its uses)
   // For loot box notifications
   lootBoxNotification?: {
     boxName: string;
@@ -155,6 +164,7 @@ export const useGameState = () => {
     setCreator,
     mergeArrayById,
     transact,
+    bumpCounters,
   } = useGame();
 
   // Cache for memoization - store previous collection values and their serialized forms
@@ -211,6 +221,39 @@ export const useGameState = () => {
     if (!isLoaded || stored.length === 0) return defaultMobs;
     return stored;
   }, [getCollection, isLoaded]);
+
+  // How each crawler plays: one counters doc per crawler (doc id = crawlerId)
+  const crawlerStats = useMemo(() => getStableCollection<CrawlerStats>('crawlerStats'), [getCollection, isLoaded]);
+
+  // Add to a crawler's stat counters. Each bump is a path in the doc plus an amount (or a new max).
+  type StatBump = { path: string[]; inc?: number; max?: number; set?: unknown };
+  const bumpCrawlerStats = async (crawlerId: string, bumps: StatBump[]) => {
+    if (!crawlerId || bumps.length === 0) return;
+    await bumpCounters('crawlerStats', crawlerId, bumps);
+  };
+  // A standout moment for the crawler's log (newest first, capped), used by the profile and AI prompts
+  // The last list written per crawler, so moments added back to back (before the store re-renders) all stay
+  const lastMoments = useRef<Record<string, CrawlerMoment[]>>({});
+  const addMoment = async (crawlerId: string, text: string) => {
+    if (!crawlers.some(c => c.id === crawlerId)) return;
+    const stored = getCollection<CrawlerStats>('crawlerStats').find(st => st.id === crawlerId)?.moments ?? [];
+    const written = lastMoments.current[crawlerId] ?? [];
+    const current = (written[0]?.at ?? 0) > (stored[0]?.at ?? 0) ? written : stored;
+    const moments: CrawlerMoment[] = [{ at: Date.now(), text: text.slice(0, 120) }, ...current].slice(0, CRAWLER_MOMENTS_MAX);
+    lastMoments.current[crawlerId] = moments;
+    await bumpCrawlerStats(crawlerId, [{ path: ['moments'], set: moments }]);
+  };
+  // Bumps for a weapon's or spell's own counters, plus its name so the profile can show it
+  const sourceBumps = (source: StatSource | undefined, counters: Partial<Record<keyof SourceStats, number>>, maxes: Partial<Record<keyof SourceStats, number>> = {}): StatBump[] => {
+    if (!source?.id) return [];
+    const base = [source.kind === 'spell' ? 'spells' : 'items', statKey(source.id)];
+    const bumps: StatBump[] = Object.entries(counters)
+      .filter(([, v]) => v)
+      .map(([k, v]) => ({ path: [...base, k], inc: v }));
+    for (const [k, v] of Object.entries(maxes)) if (v) bumps.push({ path: [...base, k], max: v });
+    if (bumps.length > 0) bumps.push({ path: [...base, 'name'], set: source.name });
+    return bumps;
+  };
 
   // Maps are stored as Firestore documents; normalize to string[] of image data
   const maps = useMemo(() => {
@@ -727,6 +770,7 @@ export const useGameState = () => {
       xpNotification: { lines, levelUps: levelUps.map(l => `${nameOf(l.id)} reached Level ${l.level}!`) },
     });
     for (const { id, level } of levelUps) toast.success(`${nameOf(id)} reached Level ${level}!`, { icon: '⭐' });
+    for (const { id, level } of levelUps) await addMoment(id, `Reached level ${level}`);
   };
 
   /** DM: give the same XP to one or more crawlers, exactly as typed (not scaled). */
@@ -780,6 +824,10 @@ export const useGameState = () => {
       questName = quest.name;
       return [{ type: 'update', collection: 'assignedQuests', id: assignedQuestId, data: { xpAwardedTo: [...(assigned.xpAwardedTo ?? []), crawlerId] } }];
     });
+    if (ok && questName) {
+      await bumpCrawlerStats(crawlerId, [{ path: ['questsFinished'], inc: 1 }]);
+      await addMoment(crawlerId, `Finished the quest ${questName}`);
+    }
     if (ok && amount > 0) await awardXP([{ crawlerId, amount, reason: `Quest: ${questName}` }]);
   };
 
@@ -834,6 +882,12 @@ export const useGameState = () => {
       nearDeath = !!deltas.lowHealthCount;
     }
     const result = await writeCrawler(id, finalUpdates);
+    if (current && finalUpdates.equippedItems) {
+      const before = current.equippedItems ?? {};
+      const swaps = Object.entries(finalUpdates.equippedItems)
+        .filter(([slot, itemId]) => itemId && before[slot as keyof typeof before] !== itemId).length;
+      await bumpCrawlerStats(id, [{ path: ['gearSwaps'], inc: swaps }]);
+    }
     if (nearDeath) await awardXP([{ crawlerId: id, amount: XP_REWARDS.nearDeath, reason: 'Near death' }]);
     return result;
   };
@@ -959,6 +1013,7 @@ export const useGameState = () => {
   const unlockLootBox = async (lootBoxId: string) => {
     const box = lootBoxes.find(b => b.id === lootBoxId);
     await updateItem('lootBoxes', lootBoxId, { locked: false, unlockedAt: new Date().toISOString() });
+    if (box?.locked) await bumpCrawlerStats(box.crawlerId, [{ path: ['lootBoxesByTier', statKey(box.tier)], inc: 1 }]);
     // A box's achievement lands on the crawler's profile the moment it's unlocked
     if (box?.locked && box.achievement?.name) {
       await awardTrophy(box.crawlerId, box.achievement.name, box.achievement.description);
@@ -987,6 +1042,7 @@ export const useGameState = () => {
       const crawler = crawlers.find(c => c.id === crawlerId);
       if (crawler) {
         await updateCrawler(crawlerId, { gold: (crawler.gold || 0) + box.gold });
+        await bumpCrawlerStats(crawlerId, [{ path: ['goldEarned'], inc: box.gold }]);
       }
     }
 
@@ -1103,8 +1159,37 @@ export const useGameState = () => {
     return [...stored].sort((a, b) => b.timestamp - a.timestamp);
   }, [getCollection, isLoaded]);
 
+  // Dice counters for crawler rolls: d20s (average, natural 20s and 1s, disadvantage), abilities
+  // used, checks passed or failed, and attack rolls made with each weapon
+  const diceStatBumps = (entry: DiceRollEntry): StatBump[] => {
+    const roll = entry.statRoll;
+    if (entry.mobRoll || !roll || !crawlers.some(c => c.id === entry.crawlerId)) return [];
+    const bumps: StatBump[] = [];
+    const isD20 = entry.results.some(r => r.dice.startsWith('D20')) && roll.rollType !== 'Damage' && roll.rollType !== 'Healing';
+    if (isD20 && roll.rawRoll >= 1 && roll.rawRoll <= 20) {
+      bumps.push({ path: ['d20Rolls'], inc: 1 }, { path: ['d20Total'], inc: roll.rawRoll });
+      if (roll.rawRoll === 20) bumps.push({ path: ['nat20s'], inc: 1 });
+      if (roll.rawRoll === 1) bumps.push({ path: ['nat1s'], inc: 1 });
+      if (roll.diceLabel === '2d20 low' || entry.results.some(r => r.dice.includes('(Dis)'))) bumps.push({ path: ['disadvantageRolls'], inc: 1 });
+    }
+    const ability = abilityOfRoll(roll.stat);
+    if (ability) bumps.push({ path: ['rollsByAbility', ability], inc: 1 });
+    if (/persuasion/i.test(roll.stat)) bumps.push({ path: ['persuasionRolls'], inc: 1 });
+    if (roll.success === true) bumps.push({ path: ['checksPassed'], inc: 1 });
+    if (roll.success === false) bumps.push({ path: ['checksFailed'], inc: 1 });
+    if (roll.rollType === 'Attack roll' && entry.source?.kind === 'item') {
+      bumps.push(...sourceBumps(entry.source, { uses: 1 }));
+    }
+    return bumps;
+  };
+
   const addDiceRoll = async (entry: DiceRollEntry) => {
     await addItem('diceRolls', { ...entry } as Record<string, unknown>);
+    await bumpCrawlerStats(entry.crawlerId, diceStatBumps(entry));
+    const roll = entry.statRoll;
+    if (!entry.mobRoll && roll?.rollType === 'Attack roll' && roll.rawRoll === 20 && entry.results.some(r => r.dice.startsWith('D20'))) {
+      await addMoment(entry.crawlerId, `Rolled a natural 20 attacking with ${entry.source?.name ?? roll.stat.replace(/ \(.*$/, '')}`);
+    }
     const all = getCollection('diceRolls') as DiceRollEntry[];
     if (all.length > 500) {
       const sorted = [...all].sort((a, b) => a.timestamp - b.timestamp);
@@ -1180,6 +1265,7 @@ export const useGameState = () => {
     const updatedRolls = { ...current.rollsUsed };
     updatedRolls[crawlerId] = (updatedRolls[crawlerId] ?? 0) + 1;
     await updateItem('noncombatTurns', 'current', { rollsUsed: updatedRolls } as Record<string, unknown>);
+    await bumpCrawlerStats(crawlerId, [{ path: ['noncombatRolls'], inc: 1 }]);
   };
 
   const getNoncombatRollsRemaining = (crawlerId: string): number => {
@@ -1445,7 +1531,9 @@ export const useGameState = () => {
       if (c.type !== 'crawler') continue;
       const crawler = crawlers.find(cr => cr.id === c.id);
       if (!crawler) continue;
-      snapCrawlers[c.id] = { hp: crawlerHP[c.id] ?? crawler.hp ?? 0, mana: crawler.mana ?? 0, activityStats: crawler.activityStats };
+      // The active crawler's stat counters (what their turn adds to them is theirs to undo)
+      const stats = c.id === active.id ? crawlerStats.find(st => st.id === c.id) : undefined;
+      snapCrawlers[c.id] = { hp: crawlerHP[c.id] ?? crawler.hp ?? 0, mana: crawler.mana ?? 0, activityStats: crawler.activityStats, ...(stats ? { stats } : {}) };
     }
     const activeCrawler = active.type === 'crawler' ? crawlers.find(cr => cr.id === active.id) : undefined;
     return {
@@ -1498,6 +1586,21 @@ export const useGameState = () => {
       return c;
     });
     const newIndex = nextIndex % count;
+    // The crawler whose turn ended: how far they moved, whether they did anything, and how long it took
+    const ended = combatState.combatants[combatState.currentTurnIndex];
+    if (ended?.type === 'crawler') {
+      const feet = Math.round(ended.feetMovedThisTurn ?? 0);
+      const idle = !ended.hasUsedAction && !ended.hasUsedBonusAction && feet === 0;
+      const seconds = combatState.turnStartedAt && !combatState.turnTimerPaused
+        ? Math.min(600, Math.round((Date.now() - combatState.turnStartedAt) / 1000)) : 0;
+      await bumpCrawlerStats(ended.id, [
+        { path: ['turnsTaken'], inc: 1 },
+        { path: ['turnFeet'], inc: feet },
+        { path: ['idleTurns'], inc: idle ? 1 : 0 },
+        { path: ['timedTurns'], inc: seconds > 0 ? 1 : 0 },
+        { path: ['turnSeconds'], inc: seconds },
+      ]);
+    }
     if (isNewRound) await tickLanguageEffects('combat');
     // Damage or healing over time lands at the start of the next combatant's turn
     const startResult = await applyStartOfTurnConditions(resetCombatants, newIndex);
@@ -1587,7 +1690,7 @@ export const useGameState = () => {
     });
 
   // Put a spell's effect on each target. Recasting the same spell refreshes its effect instead of stacking.
-  const applyCombatConditions = async (targetIds: string[], effect: SpellEffect, spellName: string, casterName?: string) => {
+  const applyCombatConditions = async (targetIds: string[], effect: SpellEffect, spellName: string, casterName?: string, casterId?: string, source?: StatSource) => {
     if (!combatState?.active || targetIds.length === 0 || !effect.condition.trim()) return;
     const targets = new Set(targetIds);
     const name = effect.condition.trim();
@@ -1608,6 +1711,9 @@ export const useGameState = () => {
     }));
     const names = combatState.combatants.filter(c => targets.has(c.id)).map(c => c.name);
     toast.success(`${names.join(', ')} ${names.length === 1 ? 'is' : 'are'} now ${name}`);
+    if (casterId && crawlers.some(c => c.id === casterId)) {
+      await bumpCrawlerStats(casterId, sourceBumps(source, { conditions: targets.size }));
+    }
   };
 
   // DM removes an effect early (a passed saving throw, a dispel, etc.)
@@ -1687,7 +1793,14 @@ export const useGameState = () => {
         crawlerOps.push({ type: 'update', collection: 'crawlers', id: crawlerId, data });
       }
     }
+    // The active crawler's stat counters go back to the turn's start too (the snapshot holds the whole doc)
+    const statsNow = crawlerStats.find(st => st.id === active.id);
+    const statsThen = snap.crawlers[active.id]?.stats ?? { id: active.id };
+    if (active.type === 'crawler' && statsNow && JSON.stringify(statsNow) !== JSON.stringify(statsThen)) {
+      crawlerOps.push({ type: 'add', collection: 'crawlerStats', id: active.id, data: { ...statsThen, id: active.id } });
+    }
     if (crawlerOps.length > 0) await batchWrite(crawlerOps);
+    if (active.type === 'crawler') await bumpCrawlerStats(active.id, [{ path: ['undoTurns'], inc: 1 }]);
 
     await updateItem('combatState', 'current', {
       combatants: restoredCombatants,
@@ -1862,6 +1975,9 @@ export const useGameState = () => {
       await updateItem('episodes', episode.id, { mobPlacements, updatedAt: new Date().toISOString() } as Record<string, unknown>);
     }
 
+    for (const [id, gold] of Object.entries(summary.gold)) {
+      if (gold > 0 && crawlers.some(c => c.id === id)) await bumpCrawlerStats(id, [{ path: ['goldEarned'], inc: gold }]);
+    }
     const nameOf = (id: string) => crawlers.find(c => c.id === id)?.name ?? 'Unknown';
     const totalGold = Object.values(summary.gold).reduce((a, b) => a + b, 0);
     const describe = (list: InventoryItem[]) =>
@@ -1896,7 +2012,20 @@ export const useGameState = () => {
   const applyCombatDamageBatch = async (
     hits: { targetId: string; targetType: 'crawler' | 'mob'; damage: number }[],
     attackerId?: string,
+    source?: StatSource,
   ) => {
+    // Stat counters for the attacking crawler and the weapon or spell they used
+    const attackerIsCrawler = !!attackerId && crawlers.some(c => c.id === attackerId);
+    const statBumps: StatBump[] = [];
+    const sourceCounts: Partial<Record<keyof SourceStats, number>> = {};
+    const countFor = (key: keyof SourceStats, amount: number) => {
+      if (!amount) return;
+      statBumps.push({ path: [key], inc: amount });
+      sourceCounts[key] = (sourceCounts[key] ?? 0) + amount;
+    };
+    let biggestHit = 0;
+    const downedCrawlerIds: string[] = [];
+    const moments: string[] = [];
     let combatants = combatState?.combatants ?? [];
     let combatantsChanged = false;
     const crawlerHP = new Map<string, number>();
@@ -1919,6 +2048,8 @@ export const useGameState = () => {
         crawlerHP.set(targetId, newHP);
         addDeltas(targetId, getCrawlerHPLossStats(crawler, oldHP, newHP));
         dealt = oldHP - newHP;
+        if (oldHP > 0 && newHP === 0) downedCrawlerIds.push(targetId);
+        if (attackerIsCrawler && attackerId !== targetId) countFor('friendlyFire', dealt);
         logger.log('[GameState] ⚔️ Damage applied to crawler', crawler.name, ':', damage, '→ HP:', newHP);
       } else {
         const combatant = combatants.find(c => c.id === targetId);
@@ -1936,9 +2067,30 @@ export const useGameState = () => {
         dealt = hpBefore - newHP;
         const hostile = isHostileMobCombatant(targetId);
         if (hostile) hostileDamage += dealt;
+        if (attackerIsCrawler && dealt > 0) {
+          if (hostile) {
+            sourceCounts.hits = (sourceCounts.hits ?? 0) + 1;
+            sourceCounts.damage = (sourceCounts.damage ?? 0) + dealt;
+            if (source?.damageType) statBumps.push({ path: ['damageByType', statKey(source.damageType)], inc: dealt });
+            biggestHit = Math.max(biggestHit, dealt);
+          } else {
+            countFor('neutralDamage', dealt);
+          }
+        }
         if (hpBefore > 0 && newHP === 0) {
           killingBlows++;
           killedMobIds.push(targetId);
+          if (attackerIsCrawler) {
+            if (!hostile) countFor('neutralKills', 1);
+            else {
+              sourceCounts.kills = (sourceCounts.kills ?? 0) + 1;
+              statBumps.push({ path: ['killsByMob', statKey(mob.name)], inc: 1 });
+              if (isBossMob(mob)) {
+                countFor('bossKills', 1);
+                moments.push(`Killed the boss ${combatant?.name ?? mob.name}${source ? ` with ${source.name}` : ''}`);
+              }
+            }
+          }
           if (hostile) {
             xpReasons.push({ amount: XP_REWARDS.killPerMobLevel * Math.max(1, mob.level || 1), reason: `Killing blow on ${combatant?.name ?? mob.name}` });
           }
@@ -1959,11 +2111,22 @@ export const useGameState = () => {
       if (endsCombat) {
         const attacker = crawlers.find(c => c.id === attackerId);
         if (attacker) toast.success(`${attacker.name} landed the final blow!`);
+        const lastName = combatants.find(c => c.id === killedMobIds[killedMobIds.length - 1])?.name;
+        if (lastName && !moments.some(m => m.includes(lastName))) moments.push(`Landed the final blow on ${lastName}${source ? ` with ${source.name}` : ''}`);
       }
     }
 
     if (combatantsChanged) {
       await updateItem('combatState', 'current', { combatants } as Record<string, unknown>);
+    }
+    if (attackerIsCrawler && attackerId) {
+      await bumpCrawlerStats(attackerId, [...statBumps, ...sourceBumps(source, sourceCounts, { biggestHit })]);
+    }
+    if (attackerIsCrawler && attackerId) for (const text of moments) await addMoment(attackerId, text);
+    const attackerName = attackerId ? (crawlers.find(c => c.id === attackerId)?.name ?? combatants.find(c => c.id === attackerId)?.name) : undefined;
+    for (const id of downedCrawlerIds) {
+      await bumpCrawlerStats(id, [{ path: ['zeroHPDrops'], inc: 1 }]);
+      await addMoment(id, attackerName && attackerId !== id ? `Knocked to 0 HP by ${attackerName}` : 'Knocked to 0 HP');
     }
     const crawlerIds = new Set([...crawlerHP.keys(), ...statDeltas.keys()]);
     for (const id of crawlerIds) {
@@ -1991,8 +2154,8 @@ export const useGameState = () => {
     if (killedMobIds.length > 0) await lootDefeatedMobs(killedMobIds);
   };
 
-  const applyCombatDamage = async (targetId: string, targetType: 'crawler' | 'mob', damage: number, attackerId?: string) => {
-    await applyCombatDamageBatch([{ targetId, targetType, damage }], attackerId);
+  const applyCombatDamage = async (targetId: string, targetType: 'crawler' | 'mob', damage: number, attackerId?: string, source?: StatSource) => {
+    await applyCombatDamageBatch([{ targetId, targetType, damage }], attackerId, source);
   };
 
   // Record feet a crawler moved. When movement is limited this also spends the crawler's
@@ -2164,6 +2327,16 @@ export const useGameState = () => {
       currentTurnIndex: 0,
     } as Record<string, unknown>);
     logger.log('[GameState] ⚔️ Combat ended');
+    if (combatState.phase === 'combat') {
+      for (const c of combatState.combatants) {
+        if (c.type !== 'crawler') continue;
+        await bumpCrawlerStats(c.id, [
+          { path: ['combatsFought'], inc: 1 },
+          { path: ['combatsSurvived'], inc: survivors.includes(c.id) ? 1 : 0 },
+          { path: ['roundsFought'], inc: combatState.combatRound || 1 },
+        ]);
+      }
+    }
     if (combatState.phase === 'combat' && survivors.length > 0) {
       await awardXP(survivors.map(crawlerId => ({ crawlerId, amount: XP_REWARDS.survived, reason: 'Survived the fight' })));
     }
@@ -2379,13 +2552,24 @@ export const useGameState = () => {
   };
 
   // Restore HP to a crawler, capped at their effective max HP (equipment included)
-  const healCrawler = async (crawlerId: string, amount: number) => {
+  // `healerId` and `source`: the crawler and spell or item that healed, for their stats
+  const healCrawler = async (crawlerId: string, amount: number, healerId?: string, source?: StatSource) => {
     const crawler = crawlers.find(c => c.id === crawlerId);
     if (!crawler || amount <= 0) return;
     const mods = getEquippedModifiers(crawler, getCrawlerInventory(crawlerId));
     const effectiveMaxHP = (crawler.maxHP || 0) + (mods.maxHP ?? 0);
     const newHP = Math.min(effectiveMaxHP, (crawler.hp ?? 0) + amount);
     await updateCrawler(crawlerId, { hp: newHP });
+    const healed = Math.max(0, newHP - (crawler.hp ?? 0));
+    if (healed > 0) {
+      await bumpCrawlerStats(crawlerId, [{ path: ['healingReceived'], inc: healed }]);
+      if (healerId && crawlers.some(c => c.id === healerId)) {
+        await bumpCrawlerStats(healerId, [{ path: ['healingDone'], inc: healed }, ...sourceBumps(source, { healing: healed })]);
+        if ((crawler.hp ?? 0) <= 0 && healerId !== crawlerId) {
+          await addMoment(healerId, `Brought ${crawler.name} back from 0 HP${source ? ` with ${source.name}` : ''}`);
+        }
+      }
+    }
   };
 
   // Consume a spell tome item: learn all spells in the tome (skipping known ones) and remove the item
@@ -2562,7 +2746,8 @@ export const useGameState = () => {
     const config = mob.merchant;
     const key = merchantItemKey(item);
     const { invDocId, reads } = tradeReads(mob, crawlerId);
-    return withBarterNotice(crawlerId, transact(reads, ([merchantDoc, crawlerDoc, invDoc]) => {
+    let spent = 0;
+    const ok = await withBarterNotice(crawlerId, transact(reads, ([merchantDoc, crawlerDoc, invDoc]) => {
       if (!crawlerDoc) throw new Error('Crawler not found.');
       const state = (merchantDoc as unknown as MerchantState | null) ?? createMerchantState(mob.id, config);
       const idx = state.stock.findIndex(e => merchantItemKey(e.item) === key);
@@ -2576,12 +2761,15 @@ export const useGameState = () => {
         .filter(e => e.quantity > 0);
       const bought: InventoryItem = { ...state.stock[idx].item, id: `item-${crypto.randomUUID()}` };
       const items = [...(((invDoc?.items as InventoryItem[]) ?? [])), bought];
+      spent = price;
       return [
         merchantDocOps(mob, !!merchantDoc, { ...state, stock, gold: state.gold + price }),
         { type: 'update', collection: 'crawlers', id: crawlerId, data: { gold: gold - price, barterTrades: trades + 1 } },
         inventoryOp(crawlerId, invDocId, !!invDoc, items),
       ];
     }));
+    if (ok) await bumpCrawlerStats(crawlerId, [{ path: ['goldSpent'], inc: spent }, { path: ['itemsBought'], inc: 1 }]);
+    return ok;
   };
 
   /**
@@ -2593,7 +2781,8 @@ export const useGameState = () => {
     if (!mob.merchant) return false;
     const config = mob.merchant;
     const { invDocId, reads } = tradeReads(mob, crawlerId);
-    return withBarterNotice(crawlerId, transact(reads, ([merchantDoc, crawlerDoc, invDoc]) => {
+    let earned = 0;
+    const ok = await withBarterNotice(crawlerId, transact(reads, ([merchantDoc, crawlerDoc, invDoc]) => {
       if (!crawlerDoc) throw new Error('Crawler not found.');
       const state = (merchantDoc as unknown as MerchantState | null) ?? createMerchantState(mob.id, config);
       const owned = ((invDoc?.items as InventoryItem[]) ?? []);
@@ -2603,6 +2792,7 @@ export const useGameState = () => {
       const price = getMerchantSellPrice(item.goldValue, getEffectiveScrooge(config, state, crawlerId, getUseSkillRank(trades)));
       const paid = Math.min(price, state.gold);
       if (paid < minGold) throw new Error(`${mob.name} only has ${state.gold} gold left now. Try again.`);
+      earned = paid;
       const key = merchantItemKey(item);
       const idx = state.stock.findIndex(e => merchantItemKey(e.item) === key);
       const { equipped: _eq, ...cleanItem } = item;
@@ -2618,6 +2808,8 @@ export const useGameState = () => {
         inventoryOp(crawlerId, invDocId, !!invDoc, owned.filter(i => i.id !== itemId)),
       ];
     }));
+    if (ok) await bumpCrawlerStats(crawlerId, [{ path: ['goldEarned'], inc: earned }, { path: ['itemsSold'], inc: 1 }]);
+    return ok;
   };
 
   /** DM: reset stock, gold and haggling from the merchant's settings. */
@@ -2661,6 +2853,7 @@ export const useGameState = () => {
       return [merchantDocOps(mob, !!merchantDoc, { ...state, haggles: { ...(state.haggles ?? {}), [crawler.id]: entry } })];
     });
     if (!ok) return null;
+    await bumpCrawlerStats(crawler.id, [{ path: ['haggles'], inc: 1 }]);
     // Haggling costs the action (combat) or one of this turn's rolls (noncombat)
     if (combatState?.active && combatState.phase !== 'ended') await recordCombatAction(crawler.id, 'action');
     else await recordNoncombatRoll(crawler.id);
@@ -2678,17 +2871,25 @@ export const useGameState = () => {
 
   /** DM: approve (one Scrooge level off for that crawler) or deny a haggle that met the DC. */
   const resolveMerchantHaggle = async (mob: Mob, crawlerId: string, approve: boolean) => {
-    return transact([{ collection: 'merchants', id: mob.id }], ([merchantDoc]) => {
+    let approved = false;
+    const ok = await transact([{ collection: 'merchants', id: mob.id }], ([merchantDoc]) => {
+      approved = false;
       const state = merchantDoc as unknown as MerchantState | null;
       const haggle = state?.haggles?.[crawlerId];
       if (!state || !haggle || haggle.state !== 'pending') return [];
       const discounts = { ...(state.discounts ?? {}) };
       if (approve) discounts[crawlerId] = (discounts[crawlerId] ?? 0) + 1;
+      approved = approve;
       return [{
         type: 'update', collection: 'merchants', id: mob.id,
         data: { discounts, haggles: { ...state.haggles, [crawlerId]: { ...haggle, state: approve ? 'approved' : 'denied' } } },
       }];
     });
+    if (ok && approved) {
+      await bumpCrawlerStats(crawlerId, [{ path: ['haggleWins'], inc: 1 }]);
+      await addMoment(crawlerId, `Talked ${mob.name} into lower prices`);
+    }
+    return ok;
   };
 
   const sendChatMessage = async (message: Omit<ChatMessage, 'id' | 'createdAt'>) => {
@@ -2701,6 +2902,14 @@ export const useGameState = () => {
       createdAt: Date.now(),
     };
     await addItem('chatMessages', entry as unknown as Record<string, unknown>);
+    if (entry.authorType === 'crawler') {
+      await bumpCrawlerStats(entry.authorId, entry.translationOf
+        ? [{ path: ['translations'], inc: 1 }]
+        : [
+          { path: [entry.viaVoice ? 'voiceLines' : 'typedLines'], inc: 1 },
+          { path: ['npcLines'], inc: (entry.toMobIds?.length || entry.nearMobIds?.length) ? 1 : 0 },
+        ]);
+    }
     // Speak with Dead style spells: each line in the language uses up a question
     if (entry.authorType === 'crawler' && !entry.translationOf) {
       const crawler = crawlers.find(c => c.id === entry.authorId);
@@ -2756,6 +2965,7 @@ export const useGameState = () => {
 
   return {
     crawlers,
+    crawlerStats,
     updateCrawler,
     addCrawler,
     deleteCrawler,

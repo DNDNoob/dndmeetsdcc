@@ -297,6 +297,283 @@ export function getHPLossStats(oldHP: number, newHP: number, maxHP: number): Cra
   };
 }
 
+// ---- Crawler stats doc: rooms/{roomId}/crawlerStats/{crawlerId} ----
+// Counters the game keeps to learn how each crawler plays (feeds the profile, the DM and AI prompts).
+// Kept apart from the crawler doc, which carries the avatar and changes far less often.
+
+/** What dealt damage, healed or left an effect: a weapon or other item, a spell, or a plain attack. */
+export interface StatSource {
+  kind: 'item' | 'spell';
+  id: string;
+  name: string;
+  damageType?: string;
+}
+
+/** Counters for one weapon, armor piece or spell. */
+export interface SourceStats {
+  name?: string;
+  uses?: number;          // attack rolls made with it (spells count casts in knownSpells instead)
+  hits?: number;          // targets it damaged
+  damage?: number;
+  kills?: number;         // hostile mobs brought to 0 HP
+  bossKills?: number;
+  biggestHit?: number;
+  healing?: number;
+  conditions?: number;    // spell effects left on targets
+  friendlyFire?: number;  // damage to other crawlers
+  neutralDamage?: number; // damage to mobs that aren't hostile, NPCs included
+  neutralKills?: number;
+  damageAbsorbed?: number; // armor: for when a damage-reduction rule exists
+  hitsDeflected?: number;
+}
+
+export interface CrawlerStats {
+  id: string; // = crawlerId
+  items?: Record<string, SourceStats>;
+  spells?: Record<string, SourceStats>;
+  damageByType?: Record<string, number>;
+  killsByMob?: Record<string, number>; // mob name -> hostile kills
+  bossKills?: number;
+  healingDone?: number;
+  healingReceived?: number;
+  friendlyFire?: number;
+  neutralDamage?: number;
+  neutralKills?: number;
+  // Dice
+  rollsByAbility?: Partial<Record<AbilityKey, number>>;
+  d20Rolls?: number;
+  d20Total?: number;
+  nat20s?: number;
+  nat1s?: number;
+  disadvantageRolls?: number;
+  checksPassed?: number;
+  checksFailed?: number;
+  // Combat style
+  zeroHPDrops?: number;      // times knocked to 0 HP
+  combatsFought?: number;
+  combatsSurvived?: number;  // still standing when the fight ended
+  roundsFought?: number;
+  turnsTaken?: number;       // combat turns that ended
+  turnFeet?: number;         // feet moved across those turns
+  idleTurns?: number;        // turns with no action, bonus action or movement
+  // Social
+  npcLines?: number;         // chat lines said to NPCs nearby or picked with @
+  persuasionRolls?: number;
+  haggles?: number;
+  haggleWins?: number;       // haggles the DM approved
+  translations?: number;     // lines translated for the party
+  // Economy
+  goldEarned?: number;       // from loot, loot boxes and selling
+  goldSpent?: number;        // at merchants
+  itemsBought?: number;
+  itemsSold?: number;
+  gearSwaps?: number;        // items put into an equipment slot
+  // Exploration and progress
+  noncombatRolls?: number;
+  lootBoxesByTier?: Record<string, number>;
+  questsFinished?: number;
+  // Player habits
+  timedTurns?: number;       // combat turns with a turn clock
+  turnSeconds?: number;      // time those turns took (each capped at 10 minutes)
+  undoTurns?: number;
+  voiceLines?: number;       // chat lines sent with the hold-to-talk mic
+  typedLines?: number;
+  // Standout moments, newest first (capped at CRAWLER_MOMENTS_MAX)
+  moments?: CrawlerMoment[];
+}
+
+export interface CrawlerMoment {
+  at: number; // epoch ms
+  text: string;
+}
+
+export const CRAWLER_MOMENTS_MAX = 10;
+
+// ---- Play style: tags worked out from the stats, compared with the party ----
+// Shown to the DM only (players don't see them, so the AI's upgrade picks stay a surprise),
+// and sent with AI prompts such as upgrade trees.
+
+export type PlayStyleTag =
+  | 'Striker' | 'Finisher' | 'Tank' | 'Healer' | 'Skirmisher' | 'Sharpshooter' | 'Talker'
+  | 'Reckless' | 'Hoarder' | 'Spender' | 'Lucky' | 'Cursed' | 'Loose cannon' | 'Troublemaker';
+
+export const PLAY_STYLE_RULES: Record<PlayStyleTag, string> = {
+  Striker: 'Deals at least a quarter more damage than the party average',
+  Finisher: 'Lands at least a quarter more killing blows than the party average',
+  Tank: 'Takes at least a quarter more damage than the party average and survives most fights',
+  Healer: 'Healing is over a quarter of their damage',
+  Skirmisher: 'Moves at least a quarter more feet per combat turn than the party average',
+  Sharpshooter: 'Over half their weapon attacks use ranged weapons',
+  Talker: 'Talks to NPCs and rolls Persuasion at least a quarter more than the party average',
+  Reckless: 'Drops near death or to 0 HP at least a quarter more often than the party average',
+  Hoarder: 'Has spent under a quarter of the 50+ gold they earned',
+  Spender: 'Has spent over three quarters of the 50+ gold they earned',
+  Lucky: 'Averages 12 or more on 10+ d20 rolls',
+  Cursed: 'Averages 9 or less on 10+ d20 rolls',
+  'Loose cannon': 'Has dealt 10+ damage, or 5% of their damage, to other crawlers',
+  Troublemaker: 'Has killed a neutral mob or NPC, or dealt them 10+ damage',
+};
+
+const statsOf = (statsById: CrawlerStatsById, id: string): CrawlerStats => statsById[id] ?? { id };
+
+/** Play style tags for a crawler. `rangedItemIds`: their weapons that are ranged. */
+export function getPlayStyleTags(crawler: Crawler, party: Crawler[], statsById: CrawlerStatsById, rangedItemIds: string[] = []): PlayStyleTag[] {
+  const everyone = party.length > 0 ? party : [crawler];
+  const st = statsOf(statsById, crawler.id);
+  const avg = (value: (c: Crawler) => number) => everyone.reduce((sum, c) => sum + value(c), 0) / everyone.length;
+  const standsOut = (value: (c: Crawler) => number) => {
+    const mine = value(crawler);
+    return mine > 0 && mine >= 1.25 * avg(value) && everyone.length > 1;
+  };
+  const damage = (c: Crawler) => c.activityStats?.damageDealt ?? 0;
+  const tags: PlayStyleTag[] = [];
+  if (standsOut(damage)) tags.push('Striker');
+  if (standsOut(c => c.activityStats?.killingBlows ?? 0)) tags.push('Finisher');
+  const fights = st.combatsFought ?? 0;
+  if (standsOut(c => c.activityStats?.damageTaken ?? 0) && (fights === 0 || (st.combatsSurvived ?? 0) / fights >= 0.5)) tags.push('Tank');
+  if ((st.healingDone ?? 0) > 0 && (st.healingDone ?? 0) > 0.25 * damage(crawler)) tags.push('Healer');
+  if (standsOut(c => {
+    const s = statsOf(statsById, c.id);
+    return (s.turnsTaken ?? 0) > 0 ? (s.turnFeet ?? 0) / (s.turnsTaken ?? 1) : 0;
+  })) tags.push('Skirmisher');
+  const itemStats = Object.entries(st.items ?? {});
+  const attacks = itemStats.reduce((sum, [, s]) => sum + (s.uses ?? 0), 0);
+  const ranged = itemStats.filter(([id]) => rangedItemIds.includes(id)).reduce((sum, [, s]) => sum + (s.uses ?? 0), 0);
+  if (attacks > 0 && ranged / attacks > 0.5) tags.push('Sharpshooter');
+  if (standsOut(c => {
+    const s = statsOf(statsById, c.id);
+    return (s.npcLines ?? 0) + (s.persuasionRolls ?? 0);
+  })) tags.push('Talker');
+  if (standsOut(c => (c.activityStats?.lowHealthCount ?? 0) + (statsOf(statsById, c.id).zeroHPDrops ?? 0))) tags.push('Reckless');
+  const earned = st.goldEarned ?? 0;
+  if (earned >= 50) {
+    const spentShare = (st.goldSpent ?? 0) / earned;
+    if (spentShare < 0.25) tags.push('Hoarder');
+    else if (spentShare > 0.75) tags.push('Spender');
+  }
+  const rolls = st.d20Rolls ?? 0;
+  if (rolls >= 10) {
+    const average = (st.d20Total ?? 0) / rolls;
+    if (average >= 12) tags.push('Lucky');
+    else if (average <= 9) tags.push('Cursed');
+  }
+  const friendly = st.friendlyFire ?? 0;
+  if (friendly >= 10 || (friendly > 0 && friendly >= 0.05 * damage(crawler))) tags.push('Loose cannon');
+  if ((st.neutralKills ?? 0) > 0 || (st.neutralDamage ?? 0) >= 10) tags.push('Troublemaker');
+  return tags;
+}
+
+/**
+ * A compact description of how a crawler plays, for AI prompts (upgrade trees, NPCs). Pass `itemId`
+ * to include that weapon's, armor's or spell's own counters. Only non-zero numbers are kept.
+ */
+export function buildPlayStyleProfile(
+  crawler: Crawler,
+  party: Crawler[],
+  statsById: CrawlerStatsById,
+  options: { rangedItemIds?: string[]; itemId?: string } = {},
+): Record<string, unknown> {
+  const st = statsOf(statsById, crawler.id);
+  const compact = (obj: Record<string, unknown>): Record<string, unknown> =>
+    Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined && v !== 0 && v !== '' && !(Array.isArray(v) && v.length === 0)));
+  const abilityRolls = st.rollsByAbility ?? {};
+  const favoriteAbility = (Object.entries(abilityRolls) as [AbilityKey, number][]).sort((a, b) => b[1] - a[1])[0]?.[0];
+  const item = options.itemId ? (st.items?.[options.itemId] ?? st.spells?.[options.itemId]) : undefined;
+  const topVictims = Object.entries(st.killsByMob ?? {}).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name]) => name);
+  const damageTypes = Object.entries(st.damageByType ?? {}).sort((a, b) => b[1] - a[1]).map(([type]) => type);
+  return compact({
+    crawler: compact({
+      name: crawler.name, race: crawler.race, job: crawler.job, level: crawler.level,
+      abilities: { str: crawler.str, dex: crawler.dex, con: crawler.con, int: crawler.int, cha: crawler.cha },
+      backstory: crawler.backstory ? compact({ ...crawler.backstory }) : undefined,
+    }),
+    style: compact({
+      tags: getPlayStyleTags(crawler, party, statsById, options.rangedItemIds),
+      favoriteAbility,
+      averageD20: st.d20Rolls ? Math.round(((st.d20Total ?? 0) / st.d20Rolls) * 10) / 10 : undefined,
+      nat20s: st.nat20s, nat1s: st.nat1s,
+    }),
+    combat: compact({
+      damageDealt: crawler.activityStats?.damageDealt, killingBlows: crawler.activityStats?.killingBlows,
+      bossKills: st.bossKills, healingDone: st.healingDone, damageTaken: crawler.activityStats?.damageTaken,
+      nearDeath: crawler.activityStats?.lowHealthCount, knockedOut: st.zeroHPDrops,
+      friendlyFire: st.friendlyFire, neutralDamage: st.neutralDamage, neutralKills: st.neutralKills,
+      favoriteDamageTypes: damageTypes.slice(0, 3), mostKilled: topVictims,
+    }),
+    item: item ? compact({ ...item }) : undefined,
+    moments: (st.moments ?? []).map(m => m.text),
+    social: compact({ npcLines: st.npcLines, persuasionRolls: st.persuasionRolls, haggleWins: st.haggleWins, translations: st.translations }),
+    economy: compact({ goldEarned: st.goldEarned, goldSpent: st.goldSpent, itemsBought: st.itemsBought, itemsSold: st.itemsSold }),
+  });
+}
+
+/** A map key that Firestore accepts (no __x__ names, not too long). */
+export const statKey = (raw: string): string => {
+  const key = (raw || 'unknown').trim().slice(0, 80) || 'unknown';
+  return /^__.*__$/.test(key) ? `_${key}` : key;
+};
+
+/** The ability a dice log stat roll used: "STR", or a skill check like "Stealth check (rank 2)". */
+export const abilityOfRoll = (stat: string): AbilityKey | undefined => {
+  const first = stat.trim().split(/\s+/)[0]?.toLowerCase() ?? '';
+  if ((ABILITY_KEYS as string[]).includes(first)) return first as AbilityKey;
+  return SKILLS.find(s => stat.startsWith(`${s.name} check`))?.ability;
+};
+
+// ---- Crawler stats shown on the profile ----
+
+export type CrawlerStatKey = ActivityStatKey | 'spellCasts' | 'barterTrades'
+  | 'healingDone' | 'bossKills' | 'nat20s' | 'friendlyFire' | 'neutralDamage';
+
+export const CRAWLER_STAT_LABELS: Record<CrawlerStatKey, string> = {
+  damageDealt: 'Damage Dealt',
+  killingBlows: 'Killing Blows',
+  combatEndingBlows: 'Fight Finishers',
+  bossKills: 'Boss Kills',
+  healingDone: 'Healing Done',
+  damageTaken: 'HP Lost',
+  lowHealthCount: 'Near Death',
+  feetMoved: 'Feet Moved',
+  mobsLooted: 'Mobs Looted',
+  spellCasts: 'Spells Cast',
+  barterTrades: 'Merchant Trades',
+  nat20s: 'Natural 20s',
+  friendlyFire: 'Friendly Fire',
+  neutralDamage: 'Damage to Neutrals',
+};
+
+export const CRAWLER_STAT_KEYS = Object.keys(CRAWLER_STAT_LABELS) as CrawlerStatKey[];
+
+/** Stats per crawler id, from the crawlerStats collection. */
+export type CrawlerStatsById = Record<string, CrawlerStats | undefined>;
+
+export const getCrawlerStatValue = (crawler: Crawler, key: CrawlerStatKey, stats?: CrawlerStats): number => {
+  if (key === 'spellCasts') return (crawler.knownSpells ?? []).reduce((sum, s) => sum + (s.castCount || 0), 0);
+  if (key === 'barterTrades') return crawler.barterTrades ?? 0;
+  if (key === 'healingDone' || key === 'bossKills' || key === 'nat20s' || key === 'friendlyFire' || key === 'neutralDamage') {
+    return stats?.[key] ?? 0;
+  }
+  return crawler.activityStats?.[key] ?? 0;
+};
+
+/**
+ * The stats that stand out most for a crawler: each stat is scored by how far it is above the party's
+ * average, so a healer-ish crawler with few kills shows what they're good at instead. Stats at 0 never
+ * outrank ones with a value; the rest of the list fills in, in the usual order, to always show `count`.
+ */
+export function getHighlightStats(crawler: Crawler, party: Crawler[], statsById: CrawlerStatsById = {}, count = 5): CrawlerStatKey[] {
+  const others = party.length > 0 ? party : [crawler];
+  const scored = CRAWLER_STAT_KEYS.map((key, order) => {
+    const value = getCrawlerStatValue(crawler, key, statsById[crawler.id]);
+    const average = others.reduce((sum, c) => sum + getCrawlerStatValue(c, key, statsById[c.id]), 0) / others.length;
+    return { key, order, value, score: value > 0 ? value / Math.max(average, 1) : 0 };
+  });
+  return scored
+    .sort((a, b) => (b.score - a.score) || (a.order - b.order))
+    .slice(0, count)
+    .map(s => s.key);
+}
+
 // Ruler scale: one grid square (the size of a token) is 5 feet
 export const FEET_PER_GRID_SQUARE = 5;
 
@@ -1238,7 +1515,7 @@ export interface CombatTurnSnapshot {
     conditions?: ActiveCondition[];
   }[];
   // HP, mana and activity stats of every crawler in the fight (damage and healing can hit anyone)
-  crawlers: Record<string, { hp: number; mana: number; activityStats?: CrawlerActivityStats }>;
+  crawlers: Record<string, { hp: number; mana: number; activityStats?: CrawlerActivityStats; stats?: CrawlerStats }>;
   knownSpells?: KnownSpell[]; // the active crawler's spells (cast counts change when casting)
   startPosition?: { episodeId: string; mapId: string; x: number; y: number } | null; // token spot before the first move
 }
