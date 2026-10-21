@@ -286,10 +286,16 @@ Each weapon has the following configurable properties:
 
 ## Attack Flow
 
-1. **Attack Roll**: Roll d20 (plus any hit die bonus and stat modifiers) to determine if the attack connects
+1. **Attack Roll**: Roll d20 (plus any hit die bonus, stat modifiers and your weapon proficiency) to determine if the attack connects
 2. **Damage Roll**: If the attack hits, roll the weapon's damage dice plus stat modifiers
 
 A stat the weapon uses adds that ability's modifier, counting gear bonuses, the same as any other roll. For example, a sword that uses STR adds +2 for a crawler with STR 14.
+
+## Weapon Proficiency
+
+You get better with each weapon type as you use it. Every attack that hits a hostile mob earns 5 proficiency XP for that weapon's type (Light weapons, Bows, Firearms and so on). Unarmed Strike builds **Hand to Hand** proficiency the same way, and each rank adds +1 to hit with any weapon of that type, up to +10. Ranks follow the same curve as skills: +1 after 10 hits, +2 after 30, +3 after 60, +4 after 100, +5 after 150, and +10 after 550. A splash attack counts once, however many mobs it hits.
+
+Once you've landed a hit with a weapon type, its proficiency is listed at the bottom of the **Skills** tab, and a weapon's card on the Attacks tab shows its bonus. See [Skills](/wiki/skills).
 
 ## Advantage and Disadvantage
 
@@ -1094,7 +1100,7 @@ Each crawler gets one haggle per merchant until the merchant is restocked. Haggl
 
 Your **Barter** skill lowers prices on top of haggling. Every 2 Barter ranks take 1 off the Scrooge Factor you trade at, and each rank adds +1 to your haggle rolls. Prices never drop below an item's gold value, so you can't buy low and sell back to the same merchant for a profit. The trade window shows how much your Barter is taking off.
 
-Barter isn't bought with skill points. It ranks up as you use it: every buy or sell counts, and ranks come at 10, 30, 60 and 100 trades and so on, up to rank 10. See [Skills](/wiki/skills).
+Every buy or sell earns 5 Barter skill XP, and you can also spend level-up skill XP on it. See [Skills](/wiki/skills).
 
 ## Restocking (DM)
 
@@ -1146,10 +1152,10 @@ The XP bar under **LEVEL** on the Profile tab shows how close you are to the nex
 Level-ups happen automatically. Each level gives:
 
 - **+5% max HP and +5% max mana**, rounded up (always at least +1). Your current HP and mana go up by the same amount. A 25 HP, 3 mana crawler reaching Level 2 gets +2 HP and +1 mana.
-- **1 skill point** to spend on a skill. See [Skills](/wiki/skills).
+- **100 skill XP** to spend on any skills you like. See [Skills](/wiki/skills).
 - **1 ability point.** Each point is +1 to that ability's rolls. The 5-point limit from the character creator doesn't apply to level-up points.
 
-When you have points to spend, a gold badge shows on your profile and on the Skills tab. Spend them on the **Skills** tab.
+When you have skill XP or points to spend, a gold badge shows on your profile and on the Skills tab. Spend them on the **Skills** tab.
 
 ## For the DM
 
@@ -1167,27 +1173,54 @@ When you have points to spend, a gold badge shows on your profile and on the Ski
     order: 15.6,
     content: `# Skills
 
-Skills make a crawler better at one kind of thing. Each skill has ranks from 0 to 10, shown on the profile's **Skills** tab.
+Skills make a crawler better at one kind of thing. Each skill has ranks from 0 to 10, shown on the profile's **Skills** tab and on the **Actions** tab buttons. Every rank is +1 to that skill's checks.
 
-| Skill | Ability | What each rank does |
-|-------|---------|---------------------|
-| Barter | CHA | Every 2 ranks lower a merchant's Scrooge Factor by 1 for you; +1 to haggle rolls |
-| Athletics | STR | +1 to climb, jump and grapple checks; every 3 ranks add +5 ft of movement |
-| Stealth | DEX | +1 to sneak and hide checks |
-| Perception | INT | +1 to spot, search and sense-lies checks |
-| Medicine | INT | +1 HP on every heal you give with a spell |
-| Intimidation | CHA | +1 to threaten checks |
+| Skill | Ability | Kind | Extra |
+|-------|---------|------|-------|
+| Acrobatics | DEX | Roll | |
+| Animal Handling | CHA | Roll | |
+| Athletics | STR | Roll | Every 3 ranks add +5 ft of movement |
+| Deception | CHA | Roll | |
+| Intimidation | CHA | Roll | |
+| Medicine | INT | Roll | +1 HP per rank on every heal you give |
+| Performance | CHA | Roll | |
+| Persuasion | CHA | Roll | Adds to haggle rolls |
+| Sleight of Hand | DEX | Roll | |
+| Stealth | DEX | Roll | |
+| Survival | CON | Roll | |
+| Arcana | INT | Roll | |
+| Perception | INT | Roll | |
+| Religion, Nature, Investigation, History, Memory, Science & Engineering | INT | Knowledge | |
+| Barter | CHA | Trade | Every 2 ranks lower a merchant's Scrooge Factor by 1 for you; +1 per rank to haggle rolls |
 
-## Getting ranks
+## Skill XP and ranks
 
-- **Skill points:** you get one each level. Press **+** on a skill to spend one on a rank. Athletics, Stealth, Perception, Medicine and Intimidation are bought this way.
-- **By use:** Barter ranks up as you trade with merchants. Every buy or sell counts, and ranks come at 10, 30, 60 and 100 trades and so on, like Looting. See [Merchants](/wiki/merchants).
+A skill's rank comes from its **skill XP**. Each rank costs more than the last:
+
+| Rank | Total skill XP |
+|------|----------------|
+| 1 | 50 |
+| 2 | 150 |
+| 3 | 300 |
+| 4 | 500 |
+| 5 | 750 |
+| 10 | 2,750 |
+
+Rank N needs 25 × N × (N + 1) skill XP in total. Skills earn XP three ways, and it all adds up, so nothing ever resets:
+
+- **Roll skills** earn 5 skill XP every time you pass a check with them, from the Actions or Skills tab. A failed check earns nothing. A passed haggle earns Persuasion XP.
+- **Barter** earns 5 skill XP for every buy or sell. See [Merchants](/wiki/merchants).
+- **Level-ups** give 100 skill XP to spend. On the Skills tab, press **+10** or **Rank N** on any skill to put XP into it. You can split it between skills or pour it into one, which can be enough for several ranks at once. Knowledge skills only grow this way.
+
+Crawlers who bought ranks with the old skill points keep them, and unspent skill points turn into 100 skill XP each.
+
+Weapon proficiency works the same way for weapon types, earned by landing hits. See [Weapons](/wiki/weapons).
 
 ## Skill checks
 
-Press **Roll** on a skill to roll d20 + the linked ability modifier + your rank. The roll goes to the dice history. A skill check uses an action like the Actions tab: in combat it takes your action on your turn, and between fights it uses one of your rolls for the turn.
+Press a skill on the **Actions** tab, or **Roll** on the Skills tab, to roll d20 + the linked ability modifier + your rank. The roll goes to the dice history. A skill check uses an action: in combat it takes your action on your turn, and between fights it uses one of your rolls for the turn.
 
-Pick the check's difficulty above the skills before you roll. The dice history shows whether you beat it.
+Pick the check's difficulty above the skills before you roll; both tabs share the same choice. The dice history shows whether you beat it.
 
 | Difficulty | DC on Floor 1 | Each floor deeper |
 |------------|---------------|-------------------|
@@ -1197,9 +1230,7 @@ Pick the check's difficulty above the skills before you roll. The dice history s
 
 A natural 1 always fails and a natural 20 always succeeds, however big your bonus is. Haggle rolls follow the same rule. Bonuses keep growing as you level, and DCs grow as the party goes deeper, so the d20 still matters on every floor.
 
-The DM sets the party's current floor next to **Auto XP** on any crawler's Profile tab.
-
-More skills will be added later.`,
+The DM sets the party's current floor next to **Auto XP** on any crawler's Profile tab.`,
   },
   {
     id: 'talking-npcs',

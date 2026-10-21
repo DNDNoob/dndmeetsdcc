@@ -2,6 +2,10 @@
   {
     "date": "2026-10-21",
     "changes": [
+      "⚔️ Weapon proficiency: every attack that hits a hostile mob builds proficiency with that weapon type, and each rank is +1 to hit with it, up to +10. Unarmed Strike builds Hand to Hand proficiency. A proficiency shows on the Skills tab once you've landed a hit with it, and on weapon cards",
+      "🎯 Actions tab skill buttons now use your skill ranks and roll against the chosen Easy, Medium or Hard DC, which the Actions and Skills tabs share. Perception and Science & Engineering are now on the Actions tab too",
+      "✨ Skills level up from skill XP: passing a check earns 5 XP for that skill, and each rank needs more XP than the last, up to rank 10. XP never resets",
+      "📈 Level-ups now give 100 skill XP to spend instead of a skill point, so you can split it across skills or take several ranks at once. Old ranks and unspent points carry over",
       "🎭 The Stats tab also tracks fighting style (fights survived, feet per turn, times knocked out), talking and trading (NPC chats, Persuasion, haggles, gold earned and spent, gear swaps), progress (quests, loot boxes) and habits (turn time, undone turns, voice vs typed chat), plus a log of each crawler's 10 latest standout moments",
       "🧠 DMs see Play Style tags on each crawler's Stats tab (Striker, Healer, Talker, Loose cannon, Troublemaker and more), worked out against the party, with a Copy AI profile button. Players don't see their tags",
       "📊 The game now keeps count of how each crawler plays: attacks, hits, damage, kills and best hit for every weapon and spell, damage types, the mobs you kill most, boss kills, healing done and received, friendly fire, damage to neutral mobs and NPCs, and dice luck (natural 20s and 1s, average d20, checks passed, rolls per ability). It's all on the Stats tab",
