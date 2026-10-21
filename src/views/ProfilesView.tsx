@@ -16,8 +16,11 @@ import { SkillsPanel, CheckDifficultyPicker } from "@/components/SkillsPanel";
 import { usableLanguageIds } from "@/lib/languages";
 import { HealthBar } from "@/components/ui/HealthBar";
 import { EquipmentSlot } from "@/components/ui/EquipmentSlot";
-import { Crawler, getQuestProgress, Mob, InventoryItem, getItemStackKey, stackItems, getLootingLevel, getLootsUntilNextLevel, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery, getInitialCrawlerId, rollD20, rollsWithDisadvantage, ABILITY_KEYS, baseItemName, type SpellEffect, describeSpellEffect, getSkillRank, getSkillXPToSpend, getWeaponProficiency, HAND_TO_HAND, getCheckDC, SKILLS, type SkillDef, type CheckDifficultyId, getCrawlerXP, type SkillId, type AbilityKey, getCrawlerStatValue, getHighlightStats, type StatSource, type CrawlerStats, type CrawlerStatsById, getUpgradeKind, resolveUpgradeXp, getUpgradeXp, getUpgradeTier, statKey, type UpgradeXpBreakdown } from "@/lib/gameData";
+import { Crawler, getQuestProgress, Mob, InventoryItem, getItemStackKey, stackItems, getLootingLevel, getLootsUntilNextLevel, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery, getInitialCrawlerId, rollD20, rollsWithDisadvantage, ABILITY_KEYS, baseItemName, type SpellEffect, describeSpellEffect, getSkillRank, getSkillXPToSpend, getWeaponProficiency, HAND_TO_HAND, getCheckDC, SKILLS, type SkillDef, type CheckDifficultyId, getCrawlerXP, type SkillId, type AbilityKey, getCrawlerStatValue, getHighlightStats, type StatSource, type CrawlerStats, type CrawlerStatsById, getUpgradeKind, resolveUpgradeXp, getUpgradeXp, getUpgradeTier, statKey, type UpgradeXpBreakdown, type EquippedItems } from "@/lib/gameData";
 import { UpgradeXpBar } from "@/components/UpgradeXpBar";
+import { UpgradeList } from "@/components/UpgradeList";
+import { resolveKnownSpell, hasDrawback } from "@/lib/upgrades";
+import { toast } from "sonner";
 import { ItemName } from "@/components/ItemName";
 import type { DiceRollEntry } from "@/hooks/useGameState";
 import UndoTurnButton, { canUndoCombatTurn } from "@/components/UndoTurnButton";
@@ -212,7 +215,7 @@ const ProfileSpellCard: React.FC<{
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
               <Wand2 className={`w-4 h-4 shrink-0 ${canCast ? 'text-primary' : 'text-muted-foreground'}`} />
-              <span className={`text-sm font-display truncate ${canCast ? 'text-primary' : 'text-muted-foreground'}`}>{spell.name}</span>
+              <span className={`text-sm font-display truncate ${canCast ? 'text-primary' : 'text-muted-foreground'}`}><ItemName item={{ name: spell.name, isUpgraded: !!knownSpell.upgrades?.length, upgrades: knownSpell.upgrades }} /></span>
               {masteryLevel > 0 && (
                 <span className="flex items-center gap-0.5 text-[10px] text-accent shrink-0" title={`Mastery level ${masteryLevel}`}>
                   <Star className="w-2.5 h-2.5" />M{masteryLevel}
@@ -249,7 +252,8 @@ const ProfileSpellCard: React.FC<{
         {expanded && (
           <div className="border-t border-border/50 pt-1.5 mt-1 space-y-1 text-[11px]">
             {spell.description && <p className="text-muted-foreground whitespace-pre-wrap">{spell.description}</p>}
-            {sd.specialEffect && <p className="text-accent italic">{sd.specialEffect}</p>}
+            {sd.specialEffect && <p className="text-accent italic whitespace-pre-wrap">{sd.specialEffect}</p>}
+            <UpgradeList upgrades={knownSpell.upgrades} />
             <p className="text-muted-foreground">Learned from: <span className="text-foreground">{SPELL_LEARNED_FROM_LABELS[knownSpell.learnedFrom] ?? knownSpell.learnedFrom}</span></p>
             {isAdmin && onForget && (
               <button onClick={onForget} className="text-[10px] text-destructive hover:underline">Forget spell</button>
@@ -805,10 +809,28 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
     }
   };
 
+  // Cursed bargains: a locked item can't come off (the DM can lift it), and some items turn to dust when they do.
+  // Returns false when the item in this slot must stay put.
+  const releaseSlot = (slot: SlotType, equippedItems: EquippedItems): boolean => {
+    const current = inventory.find(i => i.id === equippedItems[slot]);
+    if (!current) return true;
+    if (hasDrawback(current.upgrades, 'locked') && !isAdmin) {
+      toast.error(`${baseItemName(current)} is cursed and won't come off. Ask the DM.`);
+      return false;
+    }
+    if (hasDrawback(current.upgrades, 'destroyOnUnequip')) {
+      if (!window.confirm(`${baseItemName(current)} turns to dust if you take it off. Take it off anyway?`)) return false;
+      onUpdateCrawlerInventory(selected.id, inventory.filter(i => i.id !== current.id));
+      toast(`${baseItemName(current)} crumbled to dust.`, { icon: '💀' });
+    }
+    return true;
+  };
+
   const handleEquipItem = (slot: SlotType, itemId: string) => {
     const equippedItems = editMode
       ? (editData.equippedItems ?? selected.equippedItems ?? {})
       : (selected.equippedItems ?? {});
+    if (equippedItems[slot] && equippedItems[slot] !== itemId && !releaseSlot(slot, equippedItems)) return;
 
     const updatedEquipped = { ...equippedItems, [slot]: itemId };
 
@@ -824,6 +846,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
       ? (editData.equippedItems ?? selected.equippedItems ?? {})
       : (selected.equippedItems ?? {});
 
+    if (!releaseSlot(slot, equippedItems)) return;
     const updatedEquipped = { ...equippedItems };
     delete updatedEquipped[slot];
 
@@ -2064,6 +2087,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                                       {item.effects && (
                                         <p className="text-xs text-accent italic whitespace-pre-wrap"><span className="not-italic text-muted-foreground">Effects: </span>{item.effects}</p>
                                       )}
+                                      <UpgradeList upgrades={item.upgrades} armorData={item.armorData} />
                                       {item.statModifiers && Object.entries(item.statModifiers).some(([, v]) => v !== 0) && (
                                         <div className="flex flex-wrap gap-1">
                                           {Object.entries(item.statModifiers).filter(([, v]) => v !== 0).map(([stat, val]) => (
@@ -2422,7 +2446,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
               const currentMana = selected.mana ?? 0;
               const effectiveMaxMana = (selected.maxMana || 0) + (equippedMods.maxMana ?? 0);
               const resolveSpell = (ks: KnownSpell): Spell | undefined =>
-                spellLibrary.find(s => s.id === ks.spellId) ?? ks.customSpell;
+                resolveKnownSpell(ks, spellLibrary);
 
               // Same turn rules as the Attacks, Bonus Actions and Reactions tabs
               const getLockedReason = (actionType: SpellActionType): string | null => {

@@ -8,6 +8,7 @@ import { Plus, Trash2, ChevronDown, ChevronUp, BookOpen, Zap, Star, Wand2, X, Ch
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { LanguageSelect } from "@/components/LanguagePicker";
+import { applyUpgradesToSpell } from "@/lib/upgrades";
 import { UpgradeXpEditor } from "@/components/UpgradeXpEditor";
 import {
   Crawler,
@@ -752,7 +753,8 @@ function KnownSpellCard({
 }) {
   const [expanded, setExpanded] = useState(false);
   const masteryLevel = getSpellMasteryLevel(knownSpell.castCount);
-  const spell = librarySpell ?? knownSpell.customSpell;
+  const baseSpell = librarySpell ?? knownSpell.customSpell;
+  const spell = baseSpell && applyUpgradesToSpell(baseSpell, knownSpell.upgrades);
   const isCustom = !librarySpell; // embedded custom spell, not in library
   const effectiveMana = spell
     ? getEffectiveManaCost(spell.spellData.manaCost, masteryLevel)

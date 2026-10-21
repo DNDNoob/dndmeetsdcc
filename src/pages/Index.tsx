@@ -204,6 +204,8 @@ const Index = () => {
     recordCrawlerMove,
     undoCombatTurn,
     awardTrophy,
+    giveUpgrade,
+    undoLastUpgrade,
     applyNoChildLeftBehind,
     revokeTrophy,
     overrideMobHealth,
@@ -1210,6 +1212,9 @@ const Index = () => {
                 onImportPublicMap={handleImportPublicMap}
                 onImportPublicMob={handleImportPublicMob}
                 onImportPublicEpisode={handleImportPublicEpisode}
+                getCrawlerInventory={getCrawlerInventory}
+                onGiveUpgrade={giveUpgrade}
+                onUndoUpgrade={undoLastUpgrade}
               />
             )}
             {currentView === "showtime" && (

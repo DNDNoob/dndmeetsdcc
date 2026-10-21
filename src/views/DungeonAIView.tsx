@@ -8,9 +8,11 @@ import MobKindFields from "@/components/MobKindFields";
 import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
+import { UpgradeGiver } from "@/components/UpgradeGiver";
+import type { UpgradeTarget } from "@/hooks/useGameState";
 import MapMobPlacementEditor from "@/components/ui/MapMobPlacementEditor";
 import MapDesignerPopout from "@/components/ui/MapDesignerPopout";
-import { Mob, Episode, stackItems, DEFAULT_LOOT_DESTRUCTION_CHANCE, getMobKind, isBossMob, mobSection, type MobSection, legacyMobType, EpisodeMobPlacement, Crawler, CrawlerPlacement, InventoryItem, LootBoxTemplate, LootBoxTier, getLootBoxTierColor, type EquipmentSlot, type EquippedItems, Quest, QuestReward, QuestActionItem, QuestRewardTier, type CampaignMapDoc, type PublicMap, type PublicMob, type PublicEpisode, isMerchant, type Spell, XP_REWARDS } from "@/lib/gameData";
+import { Mob, Episode, stackItems, DEFAULT_LOOT_DESTRUCTION_CHANCE, getMobKind, isBossMob, mobSection, type MobSection, legacyMobType, EpisodeMobPlacement, Crawler, CrawlerPlacement, InventoryItem, LootBoxTemplate, LootBoxTier, getLootBoxTierColor, type EquipmentSlot, type EquippedItems, Quest, QuestReward, QuestActionItem, QuestRewardTier, type CampaignMapDoc, type PublicMap, type PublicMob, type PublicEpisode, isMerchant, type Spell, type ItemUpgrade, XP_REWARDS } from "@/lib/gameData";
 import { Brain, Sparkles, Upload, Plus, Trash2, Map, Skull, Image as ImageIcon, Save, Edit2, X, Layers, ChevronLeft, ChevronRight, User, Package, Search, Maximize2, Shield, ChevronDown as ChevronDownIcon, ScrollText, Eye, EyeOff, CheckSquare, GripVertical, Users, Globe } from "lucide-react";
 import { storage } from "@/lib/firebase";
 import { ShareToggle, ImportButton } from "@/components/ui/ShareToggle";
@@ -58,6 +60,10 @@ interface DungeonAIViewProps {
   onImportPublicEpisode?: (episode: PublicEpisode) => Promise<void>;
   /** Campaign spell library, for the spells a mob can cast */
   spells?: Spell[];
+  // Upgrades tab: give a crawler's item or spell an upgrade by hand
+  getCrawlerInventory?: (crawlerId: string) => InventoryItem[];
+  onGiveUpgrade?: (crawlerId: string, target: UpgradeTarget, upgrade: ItemUpgrade) => Promise<void>;
+  onUndoUpgrade?: (crawlerId: string, target: UpgradeTarget) => Promise<void>;
 }
 
 /** Shown in place of a community list when the user hasn't opted in to public content. */
@@ -107,6 +113,9 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   onImportPublicMob,
   onImportPublicEpisode,
   spells = [],
+  getCrawlerInventory,
+  onGiveUpgrade,
+  onUndoUpgrade,
 }) => {
   // Content without a creator was made here by the DM; imported content keeps its original creator
   const canShare = (createdBy?: string) => !!currentUserId && (!createdBy || createdBy === currentUserId);
@@ -115,7 +124,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   const communityMobs = publicMobs.filter(m => m.sourceCampaignId !== currentCampaignId);
   const communityEpisodes = publicEpisodes.filter(e => e.sourceCampaignId !== currentCampaignId);
 
-  const [activeTab, setActiveTab] = useState<"mobs" | "maps" | "episodes" | "lootboxes" | "quests">("mobs");
+  const [activeTab, setActiveTab] = useState<"mobs" | "maps" | "episodes" | "lootboxes" | "quests" | "upgrades">("mobs");
   const [mobListTab, setMobListTab] = useState<MobSection>("boss");
   const [sharingAll, setSharingAll] = useState(false);
   const [newMob, setNewMob] = useState<Partial<Mob>>({
@@ -828,6 +837,15 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
           >
             <ScrollText className="w-4 h-4 mr-2" /> Quests
           </DungeonButton>
+          {getCrawlerInventory && onGiveUpgrade && onUndoUpgrade && (
+            <DungeonButton
+              variant={activeTab === "upgrades" ? "admin" : "default"}
+              onClick={() => setActiveTab("upgrades")}
+              className="flex-1"
+            >
+              <Sparkles className="w-4 h-4 mr-2" /> Upgrades
+            </DungeonButton>
+          )}
         </div>
 
         {activeTab === "mobs" && (
@@ -2555,6 +2573,10 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
               )}
             </div>
           </div>
+        )}
+
+        {activeTab === "upgrades" && getCrawlerInventory && onGiveUpgrade && onUndoUpgrade && (
+          <UpgradeGiver crawlers={crawlers} spells={spells} getCrawlerInventory={getCrawlerInventory} onGive={onGiveUpgrade} onUndo={onUndoUpgrade} />
         )}
 
         {activeTab === "quests" && (

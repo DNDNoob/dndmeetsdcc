@@ -932,6 +932,7 @@ export interface KnownSpell {
   learnedAt: string; // ISO timestamp
   castCount: number; // total casts, drives mastery level
   customSpell?: Spell; // full spell data for one-off tome spells that aren't in the library
+  upgrades?: ItemUpgrade[]; // upgrades to this crawler's copy, applied on top of the library spell when read
 }
 
 // Mastery threshold: level N requires 5*N*(N+1) total casts (10, 30, 60, 100, ...)
@@ -996,6 +997,46 @@ export interface InventoryItem {
   isPublic?: boolean;        // Whether visible to players outside the campaign
   language?: string;         // Written in this language: the description is scrambled for crawlers who don't know it
   grantsLanguage?: string;   // While equipped, the crawler knows this language (a druid's charm grants Beast)
+  armorData?: ArmorData;     // Armor rating, damage reduction, resistances and vulnerabilities (set by upgrades for now)
+  upgrades?: ItemUpgrade[];  // Upgrades given to this crawler's copy, oldest first (see src/lib/upgrades.ts)
+}
+
+export interface ArmorData {
+  rating?: number;        // adds to the wearer's DC
+  reduction?: number;     // taken off each hit
+  resist?: string[];      // damage or weapon types that do half damage
+  vulnerable?: string[];  // damage or weapon types that do double damage
+}
+
+// ---- Upgrades: effects the game applies to one crawler's copy of an item or spell ----
+export type UpgradeEffect =
+  | { type: 'dice'; target: 'damage' | 'hit'; step?: number; addDie?: WeaponDie }   // step: die sizes up (d8 -> d10 is 1)
+  | { type: 'property'; rangeFt?: number; damageType?: string; splash?: boolean; durationTurns?: number }
+  | { type: 'stat'; mods: StatModifiers }
+  | { type: 'onHit'; chance: number; condition?: string; turns?: number; extraDie?: WeaponDie }
+  | { type: 'action'; name: string; uses: 'perCombat' | 'perDay' | 'atWill'; damage?: WeaponDie; text?: string }
+  | { type: 'defense'; armorRating?: number; reduction?: number; resist?: string[]; vulnerable?: string[] }
+  | { type: 'language'; language: string }
+  | { type: 'strange'; text: string };
+export type UpgradeEffectType = UpgradeEffect['type'];
+
+export type UpgradeDrawback =
+  | { type: 'statPenalty'; mods: StatModifiers }
+  | { type: 'destroyOnUnequip' }
+  | { type: 'locked' }
+  | { type: 'cost'; hp?: number; mana?: number }
+  | { type: 'strange'; text: string };
+
+export interface ItemUpgrade {
+  id: string;
+  name: string;
+  flavor?: string;
+  effects: UpgradeEffect[];
+  drawback?: UpgradeDrawback;  // a cursed bargain
+  source: 'dm' | 'ai' | 'preset';
+  treeName?: string;
+  appliedAt: string;           // ISO timestamp
+  before?: Record<string, unknown>; // the item's changed fields before this upgrade, so the DM can undo it
 }
 
 // Compute total stat modifiers from all equipped items on a crawler
