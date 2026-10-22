@@ -245,7 +245,11 @@ async function main() {
     mapIndex[m.key] = String(i);
     const file = path.join(TUTORIAL_DIR, 'maps', m.file);
     const storagePath = `maps/tutorial-${slug(m.key)}.jpg`;
-    const image = COMMIT ? await uploadMap(storagePath, file) : `(upload ${m.file}, ${(fs.statSync(file).size / 1e6).toFixed(2)} MB → ${storagePath})`;
+    // Small enough for a Firestore field (like the app's 950 KB cutoff): store inline, else upload to Storage
+    const inline = `data:image/jpeg;base64,${fs.readFileSync(file).toString('base64')}`;
+    const fits = inline.length <= 950_000;
+    const image = fits ? inline : COMMIT ? await uploadMap(storagePath, file) : `(upload ${m.file}, ${(fs.statSync(file).size / 1e6).toFixed(2)} MB → ${storagePath})`;
+    log(`map ${m.name}: ${fits ? `inline (${(inline.length / 1e6).toFixed(2)} MB)` : 'Storage'}`);
     const id = `tutorial-map-${i}-${slug(m.key)}`;
     mapDocs.push({ id, name: m.name, image });
     writes.push({ path: `${room}/maps/${id}`, data: { id, name: m.name, image, roomId: campaignId, ...attribution, createdAt: now, updatedAt: now } });
