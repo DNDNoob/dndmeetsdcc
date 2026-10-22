@@ -717,6 +717,12 @@ export const useGameState = () => {
     else await addItem('gameSettings', { id: 'current', xpScale } as Record<string, unknown>);
   };
 
+  const setLibraryHidden = async (library: 'items' | 'spells', hidden: boolean) => {
+    const field = library === 'items' ? 'hideItemLibrary' : 'hideSpellLibrary';
+    if (gameSettings) await updateItem('gameSettings', 'current', { [field]: hidden } as Record<string, unknown>);
+    else await addItem('gameSettings', { id: 'current', [field]: hidden } as Record<string, unknown>);
+  };
+
   const setDungeonFloor = async (dungeonFloor: number) => {
     const floor = Math.max(1, Math.floor(dungeonFloor) || 1);
     if (gameSettings) await updateItem('gameSettings', 'current', { dungeonFloor: floor } as Record<string, unknown>);
@@ -3308,6 +3314,7 @@ export const useGameState = () => {
     gameSettings,
     setXPScale,
     setDungeonFloor,
+    setLibraryHidden,
     awardCrawlerXP,
     spendSkillXP,
     awardSkillXP,

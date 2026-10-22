@@ -7,7 +7,8 @@
       "🧘 When an item or spell reaches a new upgrade tier, the Dungeon AI meditates on how you play and offers 3 upgrade trees of 3 steps each. Pick one with the new Choose your path button: you get its first step now, and each later tier unlocks the next step to Claim",
       "🏆 New achievement: Fully Evolved, for finishing all 3 steps of an upgrade tree. Trees can also rename the item",
       "🎲 DMs can see every upgrade tree in progress in the DM Console's Upgrades tab, read what the AI wrote, and Re-roll trees to ask again. If the AI is unavailable, ready-made trees are offered instead",
-      "🔒 Right-click Upgrade on a weapon (free editing) is now DM-only"
+      "🔒 Right-click Upgrade on a weapon (free editing) is now DM-only",
+      "🙈 DMs can hide the Item Library (Inventory page) and the Spell Library (Spells page) from players with a Shown to players / Hidden from players switch next to each library title. Players still see their own items and known spells"
     ]
   },
   {

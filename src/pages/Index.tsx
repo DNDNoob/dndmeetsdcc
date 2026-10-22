@@ -269,6 +269,7 @@ const Index = () => {
     gameSettings,
     setXPScale,
     setDungeonFloor,
+    setLibraryHidden,
     awardCrawlerXP,
     spendSkillXP,
     awardSkillXP,
@@ -1152,6 +1153,8 @@ const Index = () => {
                 onConsumeSpellTome={consumeSpellTome}
                 onPromoteSpellToLibrary={promoteSpellToLibrary}
                 isAdmin={isAdmin}
+                libraryHidden={!!gameSettings?.hideItemLibrary}
+                onSetLibraryHidden={isAdmin ? (hidden) => setLibraryHidden('items', hidden) : undefined}
                 currentUserId={user?.uid}
                 currentUsername={userProfile?.username}
                 publicItems={publicItems}
@@ -1175,6 +1178,8 @@ const Index = () => {
                 onCastSpell={castSpell}
                 onPromoteSpellToLibrary={promoteSpellToLibrary}
                 isAdmin={isAdmin}
+                libraryHidden={!!gameSettings?.hideSpellLibrary}
+                onSetLibraryHidden={isAdmin ? (hidden) => setLibraryHidden('spells', hidden) : undefined}
                 currentUserId={user?.uid}
                 currentUsername={userProfile?.username}
                 publicSpells={publicSpells}
