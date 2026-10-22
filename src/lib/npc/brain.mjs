@@ -184,7 +184,7 @@ export const buildSystemPrompt = ({ mob, secretUnlocked, scene, memory, speaking
     const knows = knownLanguages?.length > 1 ? ` (you know ${knownLanguages.join(', ')})` : '';
     lines.push(realLanguage
       ? `You are speaking ${speaking}${knows}. Write every word of your line in ${realLanguage}, never in English, even if the crawlers spoke English.`
-      : `You are speaking ${speaking}${knows}. Write your words in plain English; the game shows them in ${speaking}.`);
+      : `You are speaking ${speaking}${knows}. Write your words in plain English; the game turns them into ${speaking} by itself, so never encode, cipher or translate them.`);
   }
   lines.push('');
   lines.push('The scene:');
@@ -259,6 +259,23 @@ export const cleanLine = (raw, name) => {
   text = text.replace(/^["“”'‘’]+|["“”'‘’]+$/g, '').trim();
   if (text.length > 220) text = text.slice(0, 217).replace(/\s+\S*$/, '') + '…';
   return text;
+};
+
+/**
+ * Some online models take "you are speaking Base64" literally and send an encoded blob (or a
+ * made-up cipher) instead of words, which no reader can follow. A line that is one long run of
+ * code characters is decoded when it hides plain text; otherwise it comes back as '' (unusable).
+ */
+export const undoEncodedLine = (text) => {
+  const t = (text || '').trim();
+  if (/\s/.test(t) || !/^[A-Za-z0-9+/_-]{12,}={0,2}$/.test(t) || !/[0-9+/=_-]|[a-z][A-Z]/.test(t)) return t;
+  try {
+    const bin = atob(t.replace(/-/g, '+').replace(/_/g, '/').replace(/=+$/, ''));
+    const decoded = new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(bin, (c) => c.charCodeAt(0))).trim();
+    return /^[\x20-\x7E\u00A0-\u024F’“”…—]+$/.test(decoded) && /[a-z]{2,}\s+[a-z]{2,}/i.test(decoded) ? decoded : '';
+  } catch {
+    return '';
+  }
 };
 
 // ── Preset lines ──
