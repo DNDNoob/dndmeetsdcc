@@ -1,7 +1,7 @@
 // App-side language rules: who understands what, scrambled text, and how a chat line reads
 // for each viewer (including party translators). Built-in languages are in languageList.mjs.
 import { BUILT_IN_LANGUAGES, GESTURE_LANGUAGE_IDS, DEFAULT_LANGUAGE_ID, TELEPATHIC_LANGUAGE_ID, REAL_LANGUAGES, languageName, crawlerLanguageIds as knownLanguageIds, crawlerUnderstands as understandsLanguage, type LanguageInfo } from './languageList.mjs';
-import type { ChatMessage, Crawler, CustomLanguage, LanguageEffect } from './gameData';
+import { translateModeAt, type ChatMessage, type Crawler, type CustomLanguage, type LanguageEffect } from './gameData';
 
 export { BUILT_IN_LANGUAGES, DEFAULT_LANGUAGE_ID, TELEPATHIC_LANGUAGE_ID, languageName, mobLanguageIds } from './languageList.mjs';
 export type { LanguageInfo } from './languageList.mjs';
@@ -166,8 +166,8 @@ export interface ChatLineView {
 }
 
 /** Translators who can carry a line in this language to the party. */
-const translatorsFor = (languageId: string, party: Crawler[]) =>
-  party.filter(c => (c.translateMode === 'auto' || c.translateMode === 'review') && crawlerUnderstands(c, languageId));
+const translatorsFor = (languageId: string, party: Crawler[], at: number | undefined) =>
+  party.filter(c => translateModeAt(c, at) !== 'off' && crawlerUnderstands(c, languageId));
 
 export const readChatLine = (
   m: ChatMessage,
@@ -192,7 +192,9 @@ export const readChatLine = (
       .map(t => ({ by: t.authorName, text: t.text, twisted: t.text.trim() !== understood.trim() && t.text.trim() !== m.text.trim(), mine: t.authorId === reader.crawler?.id }));
     const me = reader.crawler;
     const someoneNeedsIt = reader.party.some(c => c.id !== me?.id && !crawlerUnderstands(c, languageId) && !(m.authorType === 'crawler' && m.authorId === c.id));
-    const canTranslate = !!me && me.translateMode === 'review' && !own
+    // A line said while checking lines, or an older line from before translating was switched on
+    const modeThen = me ? translateModeAt(me, m.createdAt) : 'off';
+    const canTranslate = !!me && (modeThen === 'review' || (modeThen === 'off' && (me.translateMode ?? 'off') !== 'off')) && !own
       && crawlerUnderstands(me, languageId) && someoneNeedsIt
       && !translations.some(t => t.authorId === me.id);
     return {
@@ -203,14 +205,16 @@ export const readChatLine = (
   }
 
   // Someone speaking a language doesn't translate their own words
-  const translators = translatorsFor(languageId, reader.party)
+  const translators = translatorsFor(languageId, reader.party, m.createdAt)
     .filter(t => t.id !== reader.crawler?.id && !(m.authorType === 'crawler' && m.authorId === t.id));
   // A translator's own version wins (it may be twisted); newest one if several posted
-  const told = [...translations].reverse().find(t => translators.some(c => c.id === t.authorId));
+  // (any party member who knows the language: older lines can be passed on one at a time)
+  const told = [...translations].reverse().find(t => t.authorId !== reader.crawler?.id
+    && reader.party.some(c => c.id === t.authorId && crawlerUnderstands(c, languageId)));
   if (told) return { text: told.text, languageId, languageName: name, scrambled: false, via: byCrawler(told.authorId)?.name ?? told.authorName };
-  const auto = translators.find(c => c.translateMode === 'auto');
+  const auto = translators.find(c => translateModeAt(c, m.createdAt) === 'auto');
   if (auto) return { text: understood, languageId, languageName: name, scrambled: false, via: auto.name };
-  const checking = translators.find(c => c.translateMode === 'review');
+  const checking = translators.find(c => translateModeAt(c, m.createdAt) === 'review');
   return {
     // Beast, Plant and Dead: show what the speaker does rather than gibberish
     text: (GESTURE_LANGUAGE_IDS.includes(languageId) && m.gesture) || scrambleText(m.text, languageId), languageId, languageName: name, scrambled: true,

@@ -29,7 +29,7 @@ import { useNpcBrain } from "@/hooks/useNpcBrain";
 import { useUpgradeMeditation } from "@/hooks/useUpgradeMeditation";
 import { useNpcSpeechMaker } from "@/hooks/useNpcSpeechMaker";
 import { toast } from "sonner";
-import { getNoChildLeftBehindBump, rollD20, rollsWithDisadvantage, isCheckSuccess, skillForLabel, SKILL_XP_PER_SUCCESS } from "@/lib/gameData";
+import { getNoChildLeftBehindBump, rollD20, rollsWithDisadvantage, isCheckSuccess, skillForLabel, SKILL_XP_PER_SUCCESS, translateModeUpdate } from "@/lib/gameData";
 import type { Episode, Campaign, CrawlerPlacement, EpisodeMobPlacement, Mob, PublicMap, PublicMob, PublicEpisode, InventoryItem, Spell } from "@/lib/gameData";
 import { publicDocId, buildEpisodeBundle } from "@/lib/publicContent";
 import { LanguagesProvider } from "@/contexts/LanguagesContext";
@@ -1294,7 +1294,7 @@ const Index = () => {
                 onSetNpcSecretState={isAdmin ? setNpcSecretState : undefined}
                 npcKeys={isAdmin ? npcKeys : undefined}
                 onChangeNpcKeys={isAdmin ? setNpcKeys : undefined}
-                onSetTranslateMode={async (crawlerId, mode) => { await updateCrawler(crawlerId, { translateMode: mode }); }}
+                onSetTranslateMode={async (crawlerId, mode) => { const c = crawlers.find(x => x.id === crawlerId); await updateCrawler(crawlerId, c ? translateModeUpdate(c, mode) : { translateMode: mode }); }}
                 merchants={merchants}
                 onBuyFromMerchant={buyFromMerchant}
                 onSellToMerchant={sellToMerchant}
