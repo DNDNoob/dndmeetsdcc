@@ -28,7 +28,7 @@ import { useIconLibrary } from "@/hooks/useIconLibrary";
 import { useNpcBrain } from "@/hooks/useNpcBrain";
 import { useNpcSpeechMaker } from "@/hooks/useNpcSpeechMaker";
 import { toast } from "sonner";
-import { getNoChildLeftBehindBump, rollD20, rollsWithDisadvantage, isCheckSuccess } from "@/lib/gameData";
+import { getNoChildLeftBehindBump, rollD20, rollsWithDisadvantage, isCheckSuccess, skillForLabel, SKILL_XP_PER_SUCCESS } from "@/lib/gameData";
 import type { Episode, Campaign, CrawlerPlacement, EpisodeMobPlacement, Mob, PublicMap, PublicMob, PublicEpisode, InventoryItem, Spell } from "@/lib/gameData";
 import { publicDocId, buildEpisodeBundle } from "@/lib/publicContent";
 import { LanguagesProvider } from "@/contexts/LanguagesContext";
@@ -204,6 +204,8 @@ const Index = () => {
     recordCrawlerMove,
     undoCombatTurn,
     awardTrophy,
+    giveUpgrade,
+    undoLastUpgrade,
     applyNoChildLeftBehind,
     revokeTrophy,
     overrideMobHealth,
@@ -260,7 +262,8 @@ const Index = () => {
     setXPScale,
     setDungeonFloor,
     awardCrawlerXP,
-    spendSkillPoint,
+    spendSkillXP,
+    awardSkillXP,
     spendAbilityPoint,
     awardQuestXP,
     roomId,
@@ -785,6 +788,7 @@ const Index = () => {
     const modifier = Math.floor((totalStat - 10) / 2) + bonus;
     const { rawRoll, results, diceLabel } = rollD20(rollsWithDisadvantage(crawlers.find(c => c.id === crawlerId), totalStat));
     const total = rawRoll + modifier;
+    const success = dc !== undefined ? isCheckSuccess(rawRoll, total, dc) : undefined;
     const entry: DiceRollEntry = {
       id: crypto.randomUUID(),
       crawlerName,
@@ -792,9 +796,12 @@ const Index = () => {
       timestamp: Date.now(),
       results,
       total,
-      statRoll: { stat, modifier, rawRoll, diceLabel, ...(dc !== undefined ? { dc, success: isCheckSuccess(rawRoll, total, dc) } : {}) },
+      statRoll: { stat, modifier, rawRoll, diceLabel, ...(dc !== undefined ? { dc, success } : {}) },
     };
     addDiceRoll(entry);
+    // A passed check with a roll skill earns that skill XP
+    const skill = skillForLabel(stat);
+    if (success && skill?.kind === 'roll') void awardSkillXP(crawlerId, skill.id, SKILL_XP_PER_SUCCESS);
   };
 
   const handleToggleMapVisibility = (index: number) => {
@@ -1092,7 +1099,7 @@ const Index = () => {
                 onSetXPScale={setXPScale}
                 dungeonFloor={gameSettings?.dungeonFloor ?? 1}
                 onSetDungeonFloor={setDungeonFloor}
-                onSpendSkillPoint={spendSkillPoint}
+                onSpendSkillXP={spendSkillXP}
                 onSpendAbilityPoint={spendAbilityPoint}
                 onRevokeTrophy={revokeTrophy}
                 addDiceRoll={addDiceRoll}
@@ -1205,6 +1212,9 @@ const Index = () => {
                 onImportPublicMap={handleImportPublicMap}
                 onImportPublicMob={handleImportPublicMob}
                 onImportPublicEpisode={handleImportPublicEpisode}
+                getCrawlerInventory={getCrawlerInventory}
+                onGiveUpgrade={giveUpgrade}
+                onUndoUpgrade={undoLastUpgrade}
               />
             )}
             {currentView === "showtime" && (

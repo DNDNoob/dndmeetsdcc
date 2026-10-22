@@ -286,10 +286,16 @@ Each weapon has the following configurable properties:
 
 ## Attack Flow
 
-1. **Attack Roll**: Roll d20 (plus any hit die bonus and stat modifiers) to determine if the attack connects
+1. **Attack Roll**: Roll d20 (plus any hit die bonus, stat modifiers and your weapon proficiency) to determine if the attack connects
 2. **Damage Roll**: If the attack hits, roll the weapon's damage dice plus stat modifiers
 
 A stat the weapon uses adds that ability's modifier, counting gear bonuses, the same as any other roll. For example, a sword that uses STR adds +2 for a crawler with STR 14.
+
+## Weapon Proficiency
+
+You get better with each weapon type as you use it. Every attack that hits a hostile mob earns 5 proficiency XP for that weapon's type (Light weapons, Bows, Firearms and so on). Unarmed Strike builds **Hand to Hand** proficiency the same way, and each rank adds +1 to hit with any weapon of that type, up to +10. Ranks follow the same curve as skills: +1 after 10 hits, +2 after 30, +3 after 60, +4 after 100, +5 after 150, and +10 after 550. A splash attack counts once, however many mobs it hits.
+
+Once you've landed a hit with a weapon type, its proficiency is listed at the bottom of the **Skills** tab, and a weapon's card on the Attacks tab shows its bonus. See [Skills](/wiki/skills).
 
 ## Advantage and Disadvantage
 
@@ -301,9 +307,86 @@ Right-click a weapon in your inventory (or expand it and tap **Upgrade**) to upg
 
 When you save a change, the weapon gets **Upgraded** after its name in gold. Saving without changing anything leaves the weapon as it was. Upgraded weapons don't stack with plain copies and are not affected by changes to the original item in the DM's library.
 
+Weapons also earn **upgrade XP** as you fight with them, shown as a gold bar on the item. See [Item & Spell Upgrade XP](/wiki/upgrade-xp).
+
 ## Unarmed Strike
 
 Every crawler can perform an unarmed strike (STR check, d4 damage) without needing a weapon equipped.`,
+  },
+  {
+    id: 'upgrade-xp',
+    slug: 'upgrade-xp',
+    title: 'Item & Spell Upgrade XP',
+    category: 'Game Mechanics',
+    order: 11.5,
+    content: `# Item & Spell Upgrade XP
+
+Weapons, armor, other gear and spells earn **upgrade XP** from the way you use them. Each crawler's copy earns its own XP.
+
+## Progress bars
+
+Once an item or spell has earned some XP, a gold bar under it on your profile shows its **Tier** and how much XP it needs for the next one. Tap the bar to see where the XP came from. Equipped items also show a thin gold bar along the bottom of their equipment slot.
+
+## How each kind earns XP
+
+These are the recommended amounts. The DM can change them for any item or spell.
+
+| Kind | Earns XP from |
+|------|---------------|
+| Weapons | 1 per point of damage, 10 per kill, 25 per boss kill |
+| Spells | 5 per cast, 1 per point of damage or healing, 5 per effect left on a target, 10 per kill, 25 per boss kill |
+| Armor (head, chest, legs, feet) | 1 per point of damage absorbed |
+| Other gear (rings, hand slots) | 5 per roll that uses a stat the item raises |
+
+Only hostile kills count. Damage to friendly crawlers or neutral mobs earns nothing. Armor can't earn XP yet: absorbed damage starts counting once armor blocks damage in combat.
+
+## Tiers
+
+By default an item or spell reaches Tier 1 at 50 XP, then Tier 2 at 150, Tier 3 at 300, Tier 4 at 500 and Tier 5 at 750. Reaching a tier doesn't change the item yet: picking upgrades at each tier is coming next.
+
+## Setting XP for an item or spell (DM)
+
+When creating or editing an item in the Item Library, or a spell in Vernon's Library, open **Upgrade XP**:
+
+- **Can upgrade**: untick it for items that should never upgrade.
+- **Milestones**: the total XP needed for each tier, separated by commas.
+- **XP earned**: how much XP each action is worth.
+- **Reset to recommended values** puts everything back to the defaults above.
+
+Items without an equipment slot (potions, keys, junk) don't earn upgrade XP.
+
+## Upgrades
+
+An upgrade changes one crawler's copy of an item or spell, and can give it a new name. Upgraded items show **Upgraded** after their name, and expanding the item lists each upgrade with its flavor text. Spells keep following the library spell, with the crawler's upgrades added on top.
+
+What an upgrade can do:
+
+| Effect | Example | What happens |
+|--------|---------|--------------|
+| Dice change | Damage die d8 to d10, +1d4 to hit | Changes the dice rolled |
+| Weapon or spell property | +10 ft range, Fire damage, splash, longer duration | Changes the weapon or spell |
+| Stat bonus while equipped | +1 STR, +5 max HP | Added to the item's stat bonuses |
+| Language | Speak Beast while equipped | Works like any language item |
+| Defense | +1 armor rating, resists Bows, vulnerable to Fire | Saved on the item; counts in combat once armor rules arrive |
+| On-hit effect, new action, strange | 25% chance to set Burning, "Shatter Swing" once per combat | Written on the item for the DM to rule on |
+
+## Cursed bargains
+
+An upgrade can come with a price. The item gets a red **Cursed** mark, and the price shows under the upgrade.
+
+- **Stat penalty**: taken off the item's stat bonuses while equipped.
+- **HP or mana cost per use**: taken every time you attack with the weapon or cast the spell.
+- **Destroyed if unequipped**: taking it off (or swapping it out) turns it to dust, after a warning.
+- **Can't be unequipped**: it stays in its slot until the DM takes it off.
+- **Strange**: anything else, for the DM to rule on.
+
+## Announcements and achievements
+
+Every upgrade is posted to the dice log in gold, with any price in red, so the whole party sees it. A crawler's first weapon upgrade earns **Sharpened**, first armor upgrade **Hardened**, first spell upgrade **Spellwright**, and first cursed bargain **Deal With the Devil**.
+
+## Giving an upgrade (DM)
+
+Open the **DM Console** and the **Upgrades** tab. Pick the crawler and the item or spell, name the upgrade, add flavor text, optionally give the item a new name, and add one or more effects. Add a cursed bargain if you like, then click **Give**. **Take back the latest upgrade** undoes the most recent one, restoring the numbers it changed.`,
   },
   {
     id: 'inventory',
@@ -1094,7 +1177,7 @@ Each crawler gets one haggle per merchant until the merchant is restocked. Haggl
 
 Your **Barter** skill lowers prices on top of haggling. Every 2 Barter ranks take 1 off the Scrooge Factor you trade at, and each rank adds +1 to your haggle rolls. Prices never drop below an item's gold value, so you can't buy low and sell back to the same merchant for a profit. The trade window shows how much your Barter is taking off.
 
-Barter isn't bought with skill points. It ranks up as you use it: every buy or sell counts, and ranks come at 10, 30, 60 and 100 trades and so on, up to rank 10. See [Skills](/wiki/skills).
+Every buy or sell earns 5 Barter skill XP, and you can also spend level-up skill XP on it. See [Skills](/wiki/skills).
 
 ## Restocking (DM)
 
@@ -1146,10 +1229,10 @@ The XP bar under **LEVEL** on the Profile tab shows how close you are to the nex
 Level-ups happen automatically. Each level gives:
 
 - **+5% max HP and +5% max mana**, rounded up (always at least +1). Your current HP and mana go up by the same amount. A 25 HP, 3 mana crawler reaching Level 2 gets +2 HP and +1 mana.
-- **1 skill point** to spend on a skill. See [Skills](/wiki/skills).
+- **100 skill XP** to spend on any skills you like. See [Skills](/wiki/skills).
 - **1 ability point.** Each point is +1 to that ability's rolls. The 5-point limit from the character creator doesn't apply to level-up points.
 
-When you have points to spend, a gold badge shows on your profile and on the Skills tab. Spend them on the **Skills** tab.
+When you have skill XP or points to spend, a gold badge shows on your profile and on the Skills tab. Spend them on the **Skills** tab.
 
 ## For the DM
 
@@ -1167,27 +1250,54 @@ When you have points to spend, a gold badge shows on your profile and on the Ski
     order: 15.6,
     content: `# Skills
 
-Skills make a crawler better at one kind of thing. Each skill has ranks from 0 to 10, shown on the profile's **Skills** tab.
+Skills make a crawler better at one kind of thing. Each skill has ranks from 0 to 10, shown on the profile's **Skills** tab and on the **Actions** tab buttons. Every rank is +1 to that skill's checks.
 
-| Skill | Ability | What each rank does |
-|-------|---------|---------------------|
-| Barter | CHA | Every 2 ranks lower a merchant's Scrooge Factor by 1 for you; +1 to haggle rolls |
-| Athletics | STR | +1 to climb, jump and grapple checks; every 3 ranks add +5 ft of movement |
-| Stealth | DEX | +1 to sneak and hide checks |
-| Perception | INT | +1 to spot, search and sense-lies checks |
-| Medicine | INT | +1 HP on every heal you give with a spell |
-| Intimidation | CHA | +1 to threaten checks |
+| Skill | Ability | Kind | Extra |
+|-------|---------|------|-------|
+| Acrobatics | DEX | Roll | |
+| Animal Handling | CHA | Roll | |
+| Athletics | STR | Roll | Every 3 ranks add +5 ft of movement |
+| Deception | CHA | Roll | |
+| Intimidation | CHA | Roll | |
+| Medicine | INT | Roll | +1 HP per rank on every heal you give |
+| Performance | CHA | Roll | |
+| Persuasion | CHA | Roll | Adds to haggle rolls |
+| Sleight of Hand | DEX | Roll | |
+| Stealth | DEX | Roll | |
+| Survival | CON | Roll | |
+| Arcana | INT | Roll | |
+| Perception | INT | Roll | |
+| Religion, Nature, Investigation, History, Memory, Science & Engineering | INT | Knowledge | |
+| Barter | CHA | Trade | Every 2 ranks lower a merchant's Scrooge Factor by 1 for you; +1 per rank to haggle rolls |
 
-## Getting ranks
+## Skill XP and ranks
 
-- **Skill points:** you get one each level. Press **+** on a skill to spend one on a rank. Athletics, Stealth, Perception, Medicine and Intimidation are bought this way.
-- **By use:** Barter ranks up as you trade with merchants. Every buy or sell counts, and ranks come at 10, 30, 60 and 100 trades and so on, like Looting. See [Merchants](/wiki/merchants).
+A skill's rank comes from its **skill XP**. Each rank costs more than the last:
+
+| Rank | Total skill XP |
+|------|----------------|
+| 1 | 50 |
+| 2 | 150 |
+| 3 | 300 |
+| 4 | 500 |
+| 5 | 750 |
+| 10 | 2,750 |
+
+Rank N needs 25 × N × (N + 1) skill XP in total. Skills earn XP three ways, and it all adds up, so nothing ever resets:
+
+- **Roll skills** earn 5 skill XP every time you pass a check with them, from the Actions or Skills tab. A failed check earns nothing. A passed haggle earns Persuasion XP.
+- **Barter** earns 5 skill XP for every buy or sell. See [Merchants](/wiki/merchants).
+- **Level-ups** give 100 skill XP to spend. On the Skills tab, press **+10** or **Rank N** on any skill to put XP into it. You can split it between skills or pour it into one, which can be enough for several ranks at once. Knowledge skills only grow this way.
+
+Crawlers who bought ranks with the old skill points keep them, and unspent skill points turn into 100 skill XP each.
+
+Weapon proficiency works the same way for weapon types, earned by landing hits. See [Weapons](/wiki/weapons).
 
 ## Skill checks
 
-Press **Roll** on a skill to roll d20 + the linked ability modifier + your rank. The roll goes to the dice history. A skill check uses an action like the Actions tab: in combat it takes your action on your turn, and between fights it uses one of your rolls for the turn.
+Press a skill on the **Actions** tab, or **Roll** on the Skills tab, to roll d20 + the linked ability modifier + your rank. The roll goes to the dice history. A skill check uses an action: in combat it takes your action on your turn, and between fights it uses one of your rolls for the turn.
 
-Pick the check's difficulty above the skills before you roll. The dice history shows whether you beat it.
+Pick the check's difficulty above the skills before you roll; both tabs share the same choice. The dice history shows whether you beat it.
 
 | Difficulty | DC on Floor 1 | Each floor deeper |
 |------------|---------------|-------------------|
@@ -1197,9 +1307,7 @@ Pick the check's difficulty above the skills before you roll. The dice history s
 
 A natural 1 always fails and a natural 20 always succeeds, however big your bonus is. Haggle rolls follow the same rule. Bonuses keep growing as you level, and DCs grow as the party goes deeper, so the d20 still matters on every floor.
 
-The DM sets the party's current floor next to **Auto XP** on any crawler's Profile tab.
-
-More skills will be added later.`,
+The DM sets the party's current floor next to **Auto XP** on any crawler's Profile tab.`,
   },
   {
     id: 'talking-npcs',

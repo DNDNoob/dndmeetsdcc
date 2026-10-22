@@ -6,7 +6,9 @@ import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import { ItemName } from "@/components/ItemName";
-import { Crawler, InventoryItem, getItemStackKey, stackItems, EquipmentSlot as SlotType, StatModifiers, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, Spell, SpellData, ITEM_RARITIES, ItemRarity, getItemRarityColor } from "@/lib/gameData";
+import { UpgradeList } from "@/components/UpgradeList";
+import { UpgradeXpEditor } from "@/components/UpgradeXpEditor";
+import { Crawler, InventoryItem, getUpgradeKind, type UpgradeXpSettings, getItemStackKey, stackItems, EquipmentSlot as SlotType, StatModifiers, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, Spell, SpellData, ITEM_RARITIES, ItemRarity, getItemRarityColor } from "@/lib/gameData";
 import { RarityBadge } from "@/components/ui/RarityBadge";
 import { Coins, Package, Sword, Shield, Plus, Trash2, Edit2, Save, HardHat, Search, BookOpen, Gem, Footprints, Shirt, Hand, Crosshair, ChevronDown, ChevronUp, Wand2, Globe, Lock, Users, Bookmark } from "lucide-react";
 import { SpellDataEditor } from "@/views/SpellsView";
@@ -147,6 +149,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     rarity?: ItemRarity;
     effects?: string;
     iconId?: string;
+    upgradeXp?: UpgradeXpSettings;
   }>({
     name: "", description: "", equipSlot: undefined, goldValue: undefined, statModifiers: undefined, weaponData: undefined,
   });
@@ -227,6 +230,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
       rarity: item.rarity,
       effects: item.effects,
       iconId: item.iconId,
+      upgradeXp: item.upgradeXp,
     });
     setShowWeaponConfig(!!item.weaponData);
     setShowSpellTomeConfig(!!item.isSpellTome);
@@ -269,6 +273,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
               ...(mods && Object.keys(mods).length > 0 ? { statModifiers: mods } : { statModifiers: undefined }),
               ...weaponFields,
               ...spellTomeFields,
+              upgradeXp: newLibraryItem.upgradeXp,
             }
           : item
       );
@@ -300,6 +305,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 ...(mods && Object.keys(mods).length > 0 ? { statModifiers: mods } : { statModifiers: undefined }),
                 ...weaponFields,
                 ...spellTomeFields,
+                upgradeXp: newLibraryItem.upgradeXp,
               };
             }
             return ci;
@@ -324,6 +330,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
         ...(mods && Object.keys(mods).length > 0 ? { statModifiers: mods } : {}),
         ...weaponFields,
         ...spellTomeFields,
+        ...(newLibraryItem.upgradeXp ? { upgradeXp: newLibraryItem.upgradeXp } : {}),
         ...(currentUserId ? { createdBy: currentUserId, createdByUsername: currentUsername } : {}),
         isPublic: false,
       };
@@ -376,6 +383,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
           <span className="text-accent italic whitespace-pre-wrap">{item.effects}</span>
         </div>
       )}
+      <UpgradeList upgrades={item.upgrades} armorData={item.armorData} />
       {item.goldValue !== undefined && item.goldValue > 0 && (
         <div>
           <span className="text-muted-foreground">Value: </span>
@@ -993,6 +1001,14 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 </div>
               )}
             </div>
+          )}
+
+          {getUpgradeKind(newLibraryItem) !== 'none' && (
+            <UpgradeXpEditor
+              kind={getUpgradeKind(newLibraryItem)}
+              value={newLibraryItem.upgradeXp}
+              onChange={(upgradeXp) => setNewLibraryItem({ ...newLibraryItem, upgradeXp })}
+            />
           )}
 
           {/* Spell Tome Configuration */}

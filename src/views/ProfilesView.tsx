@@ -12,11 +12,15 @@ import { BACKSTORY_QUESTIONS } from "@/lib/characterCreation";
 import { RarityBadge } from "@/components/ui/RarityBadge";
 import { ConditionBadges } from "@/components/ConditionBadges";
 import { ExperienceCard } from "@/components/ExperienceCard";
-import { SkillsPanel } from "@/components/SkillsPanel";
+import { SkillsPanel, CheckDifficultyPicker } from "@/components/SkillsPanel";
 import { usableLanguageIds } from "@/lib/languages";
 import { HealthBar } from "@/components/ui/HealthBar";
 import { EquipmentSlot } from "@/components/ui/EquipmentSlot";
-import { Crawler, getQuestProgress, Mob, InventoryItem, getItemStackKey, stackItems, getLootingLevel, getLootsUntilNextLevel, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery, getInitialCrawlerId, rollD20, rollsWithDisadvantage, ABILITY_KEYS, baseItemName, type SpellEffect, describeSpellEffect, getSkillRank, getCrawlerXP, type SkillId, type AbilityKey, getCrawlerStatValue, getHighlightStats, type StatSource, type CrawlerStats, type CrawlerStatsById } from "@/lib/gameData";
+import { Crawler, getQuestProgress, Mob, InventoryItem, getItemStackKey, stackItems, getLootingLevel, getLootsUntilNextLevel, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery, getInitialCrawlerId, rollD20, rollsWithDisadvantage, ABILITY_KEYS, baseItemName, type SpellEffect, describeSpellEffect, getSkillRank, getSkillXPToSpend, getWeaponProficiency, HAND_TO_HAND, getCheckDC, SKILLS, type SkillDef, type CheckDifficultyId, getCrawlerXP, type SkillId, type AbilityKey, getCrawlerStatValue, getHighlightStats, type StatSource, type CrawlerStats, type CrawlerStatsById, getUpgradeKind, resolveUpgradeXp, getUpgradeXp, getUpgradeTier, statKey, type UpgradeXpBreakdown, type EquippedItems } from "@/lib/gameData";
+import { UpgradeXpBar } from "@/components/UpgradeXpBar";
+import { UpgradeList } from "@/components/UpgradeList";
+import { resolveKnownSpell, hasDrawback } from "@/lib/upgrades";
+import { toast } from "sonner";
 import { ItemName } from "@/components/ItemName";
 import type { DiceRollEntry } from "@/hooks/useGameState";
 import UndoTurnButton, { canUndoCombatTurn } from "@/components/UndoTurnButton";
@@ -39,6 +43,7 @@ const weaponSource = (weapon: InventoryItem): StatSource => ({
   id: weapon.id,
   name: weapon.name,
   ...(weapon.weaponData?.damageType ? { damageType: weapon.weaponData.damageType } : {}),
+  ...(weapon.weaponData?.weaponType ? { weaponType: weapon.weaponData.weaponType } : {}),
 });
 
 // Helper to get the appropriate icon for an equipment slot
@@ -82,29 +87,9 @@ const stableJson = (value: unknown): string => {
 
 type ProfileTab = 'profile' | 'inventory' | 'actions' | 'skills' | 'spells' | 'reactions' | 'attacks' | 'bonus' | 'quests' | 'stats';
 
-// Noncombat actions mapped to their associated ability score
-const NONCOMBAT_ACTIONS: { label: string; stat: 'str' | 'dex' | 'con' | 'int' | 'cha' }[] = [
-  { label: 'Acrobatics', stat: 'dex' },
-  { label: 'Animal Handling', stat: 'cha' },
-  { label: 'Athletics', stat: 'str' },
-  { label: 'Deception', stat: 'cha' },
-  { label: 'Intimidation', stat: 'cha' },
-  { label: 'Medicine', stat: 'int' },
-  { label: 'Performance', stat: 'cha' },
-  { label: 'Persuasion', stat: 'cha' },
-  { label: 'Sleight of Hand', stat: 'dex' },
-  { label: 'Stealth', stat: 'dex' },
-  { label: 'Survival', stat: 'con' },
-  { label: 'Arcana', stat: 'int' },
-];
-
-const INTELLIGENCE_ACTIONS: { label: string; stat: 'int' }[] = [
-  { label: 'Religion', stat: 'int' },
-  { label: 'Nature', stat: 'int' },
-  { label: 'Investigation', stat: 'int' },
-  { label: 'History', stat: 'int' },
-  { label: 'Memory', stat: 'int' },
-];
+// Actions tab buttons: the roll skills, then the INT knowledge skills (Barter is used by trading)
+const ROLL_SKILLS = SKILLS.filter(sk => sk.kind === 'roll');
+const KNOWLEDGE_SKILLS = SKILLS.filter(sk => sk.kind === 'knowledge');
 
 const INITIATIVE_ACTION = { label: 'Initiative', stat: 'dex' as const };
 
@@ -142,7 +127,7 @@ interface ProfilesViewProps {
   onSetXPScale?: (scale: number) => Promise<void>;
   dungeonFloor?: number;
   onSetDungeonFloor?: (floor: number) => Promise<void>;
-  onSpendSkillPoint?: (crawlerId: string, skillId: SkillId) => Promise<boolean>;
+  onSpendSkillXP?: (crawlerId: string, skillId: SkillId, amount: number) => Promise<boolean>;
   onSpendAbilityPoint?: (crawlerId: string, ability: AbilityKey) => Promise<boolean>;
   onRevokeTrophy?: (crawlerId: string, trophyId: string) => Promise<void>;
   addDiceRoll?: (entry: DiceRollEntry) => Promise<void>;
@@ -174,6 +159,8 @@ const SPELL_SECTION_LABELS: Record<SpellActionType, string> = {
 const formatSpellDice = (dice: WeaponDie[]): string =>
   dice.filter(d => d.count > 0).map(d => `${d.count}d${d.sides}`).join(' + ');
 
+type UpgradeProgress = { xp: UpgradeXpBreakdown; milestones: number[] };
+
 // One known spell on the crawler's Spells tab: details, mastery progress and a Cast button
 const ProfileSpellCard: React.FC<{
   knownSpell: KnownSpell;
@@ -183,7 +170,8 @@ const ProfileSpellCard: React.FC<{
   isAdmin: boolean;
   onCast: () => void;
   onForget?: () => void;
-}> = ({ knownSpell, spell, currentMana, lockedReason, isAdmin, onCast, onForget }) => {
+  upgrade?: UpgradeProgress | null;
+}> = ({ knownSpell, spell, currentMana, lockedReason, isAdmin, onCast, onForget, upgrade }) => {
   const [expanded, setExpanded] = useState(false);
   const masteryLevel = getSpellMasteryLevel(knownSpell.castCount);
   const castsUntilNext = getCastsUntilNextMastery(knownSpell.castCount);
@@ -227,7 +215,7 @@ const ProfileSpellCard: React.FC<{
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
               <Wand2 className={`w-4 h-4 shrink-0 ${canCast ? 'text-primary' : 'text-muted-foreground'}`} />
-              <span className={`text-sm font-display truncate ${canCast ? 'text-primary' : 'text-muted-foreground'}`}>{spell.name}</span>
+              <span className={`text-sm font-display truncate ${canCast ? 'text-primary' : 'text-muted-foreground'}`}><ItemName item={{ name: spell.name, isUpgraded: !!knownSpell.upgrades?.length, upgrades: knownSpell.upgrades }} /></span>
               {masteryLevel > 0 && (
                 <span className="flex items-center gap-0.5 text-[10px] text-accent shrink-0" title={`Mastery level ${masteryLevel}`}>
                   <Star className="w-2.5 h-2.5" />M{masteryLevel}
@@ -264,7 +252,8 @@ const ProfileSpellCard: React.FC<{
         {expanded && (
           <div className="border-t border-border/50 pt-1.5 mt-1 space-y-1 text-[11px]">
             {spell.description && <p className="text-muted-foreground whitespace-pre-wrap">{spell.description}</p>}
-            {sd.specialEffect && <p className="text-accent italic">{sd.specialEffect}</p>}
+            {sd.specialEffect && <p className="text-accent italic whitespace-pre-wrap">{sd.specialEffect}</p>}
+            <UpgradeList upgrades={knownSpell.upgrades} />
             <p className="text-muted-foreground">Learned from: <span className="text-foreground">{SPELL_LEARNED_FROM_LABELS[knownSpell.learnedFrom] ?? knownSpell.learnedFrom}</span></p>
             {isAdmin && onForget && (
               <button onClick={onForget} className="text-[10px] text-destructive hover:underline">Forget spell</button>
@@ -282,6 +271,7 @@ const ProfileSpellCard: React.FC<{
             <div className="h-full bg-accent transition-all" style={{ width: `${Math.max(0, Math.min(100, masteryProgress))}%` }} />
           </div>
         </div>
+        {upgrade && <UpgradeXpBar xp={upgrade.xp} milestones={upgrade.milestones} className="pt-1" />}
       </div>
 
       <div className="flex gap-1 p-2 mt-auto">
@@ -549,7 +539,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   onSetXPScale,
   dungeonFloor = 1,
   onSetDungeonFloor,
-  onSpendSkillPoint,
+  onSpendSkillXP,
   onSpendAbilityPoint,
   addDiceRoll,
   mobs: mobsProp,
@@ -563,6 +553,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
 }) => {
   // Players land on their own crawler; the DM (and spectators) start on the first one
   const [selectedId, setSelectedId] = useState(() => getInitialCrawlerId(crawlers, currentPlayerId));
+  // Check difficulty for skill rolls, shared by the Actions and Skills tabs
+  const [checkDifficulty, setCheckDifficulty] = useState<CheckDifficultyId>('medium');
   const [editMode, setEditMode] = useState(false);
   const [showCreator, setShowCreator] = useState(false);
   const [editData, setEditData] = useState<Partial<Crawler>>({});
@@ -817,10 +809,28 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
     }
   };
 
+  // Cursed bargains: a locked item can't come off (the DM can lift it), and some items turn to dust when they do.
+  // Returns false when the item in this slot must stay put.
+  const releaseSlot = (slot: SlotType, equippedItems: EquippedItems): boolean => {
+    const current = inventory.find(i => i.id === equippedItems[slot]);
+    if (!current) return true;
+    if (hasDrawback(current.upgrades, 'locked') && !isAdmin) {
+      toast.error(`${baseItemName(current)} is cursed and won't come off. Ask the DM.`);
+      return false;
+    }
+    if (hasDrawback(current.upgrades, 'destroyOnUnequip')) {
+      if (!window.confirm(`${baseItemName(current)} turns to dust if you take it off. Take it off anyway?`)) return false;
+      onUpdateCrawlerInventory(selected.id, inventory.filter(i => i.id !== current.id));
+      toast(`${baseItemName(current)} crumbled to dust.`, { icon: '💀' });
+    }
+    return true;
+  };
+
   const handleEquipItem = (slot: SlotType, itemId: string) => {
     const equippedItems = editMode
       ? (editData.equippedItems ?? selected.equippedItems ?? {})
       : (selected.equippedItems ?? {});
+    if (equippedItems[slot] && equippedItems[slot] !== itemId && !releaseSlot(slot, equippedItems)) return;
 
     const updatedEquipped = { ...equippedItems, [slot]: itemId };
 
@@ -836,6 +846,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
       ? (editData.equippedItems ?? selected.equippedItems ?? {})
       : (selected.equippedItems ?? {});
 
+    if (!releaseSlot(slot, equippedItems)) return;
     const updatedEquipped = { ...equippedItems };
     delete updatedEquipped[slot];
 
@@ -992,6 +1003,30 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   const weaponStatMod = (mods: StatModifiers | undefined): number =>
     ABILITY_KEYS.reduce((total, stat) => mods?.[stat] ? total + Math.floor((selected[stat] + (equippedMods[stat] ?? 0) - 10) / 2) : total, 0);
 
+  // Upgrade XP for this crawler's copy of an item or a known spell (null when it can't level up or has no XP yet)
+  const selectedStats = statsById[selected.id];
+  const itemUpgrade = (item: InventoryItem): UpgradeProgress | null => {
+    const kind = getUpgradeKind(item);
+    const { enabled, milestones } = resolveUpgradeXp(kind, item.upgradeXp);
+    if (!enabled) return null;
+    const xp = getUpgradeXp(kind, item.upgradeXp, selectedStats?.items?.[statKey(item.id)]);
+    return xp.total > 0 ? { xp, milestones } : null;
+  };
+  const slotUpgradePercent = (slot: SlotType): number | undefined => {
+    const item = getEquippedItem(slot);
+    const upgrade = item && itemUpgrade(item);
+    if (!upgrade) return undefined;
+    const { floor, next } = getUpgradeTier(upgrade.xp.total, upgrade.milestones);
+    return next === null ? 100 : ((upgrade.xp.total - floor) / (next - floor)) * 100;
+  };
+  const spellUpgrade = (ks: KnownSpell, spell: Spell | undefined): UpgradeProgress | null => {
+    if (!spell) return null;
+    const { enabled, milestones } = resolveUpgradeXp('spell', spell.upgradeXp);
+    if (!enabled) return null;
+    const xp = getUpgradeXp('spell', spell.upgradeXp, selectedStats?.spells?.[statKey(ks.spellId)], ks.castCount);
+    return xp.total > 0 ? { xp, milestones } : null;
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -1106,8 +1141,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             >
               <Sparkles className="w-5 h-5" />
               <span className="hidden xl:inline text-sm font-medium">Skills</span>
-              {((selected?.skillPoints ?? 0) + (selected?.abilityPoints ?? 0)) > 0 && (
-                <span className="bg-accent/20 text-accent text-xs px-1.5 py-0.5 rounded-full">{(selected?.skillPoints ?? 0) + (selected?.abilityPoints ?? 0)}</span>
+              {(getSkillXPToSpend(selected) > 0 || (selected?.abilityPoints ?? 0) > 0) && (
+                <span className="bg-accent/20 text-accent text-xs px-1.5 py-0.5 rounded-full" title="Skill XP or ability points to spend">!</span>
               )}
             </button>
             <button
@@ -1211,6 +1246,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 slot="head"
                 label="Head"
                 equippedItem={getEquippedItem('head')}
+                upgradePercent={slotUpgradePercent('head')}
                 onDrop={handleEquipItem}
                 onUnequip={handleUnequipItem}
                 disabled={!isOwnProfile}
@@ -1224,6 +1260,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 slot="leftHand"
                 label="Left Hand"
                 equippedItem={getEquippedItem('leftHand')}
+                upgradePercent={slotUpgradePercent('leftHand')}
                 onDrop={handleEquipItem}
                 onUnequip={handleUnequipItem}
                 disabled={!isOwnProfile}
@@ -1232,6 +1269,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 slot="chest"
                 label="Chest"
                 equippedItem={getEquippedItem('chest')}
+                upgradePercent={slotUpgradePercent('chest')}
                 onDrop={handleEquipItem}
                 onUnequip={handleUnequipItem}
                 disabled={!isOwnProfile}
@@ -1240,6 +1278,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 slot="rightHand"
                 label="Right Hand"
                 equippedItem={getEquippedItem('rightHand')}
+                upgradePercent={slotUpgradePercent('rightHand')}
                 onDrop={handleEquipItem}
                 onUnequip={handleUnequipItem}
                 disabled={!isOwnProfile}
@@ -1252,6 +1291,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 slot="ringFinger"
                 label="Ring"
                 equippedItem={getEquippedItem('ringFinger')}
+                upgradePercent={slotUpgradePercent('ringFinger')}
                 onDrop={handleEquipItem}
                 onUnequip={handleUnequipItem}
                 disabled={!isOwnProfile}
@@ -1260,6 +1300,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 slot="legs"
                 label="Legs"
                 equippedItem={getEquippedItem('legs')}
+                upgradePercent={slotUpgradePercent('legs')}
                 onDrop={handleEquipItem}
                 onUnequip={handleUnequipItem}
                 disabled={!isOwnProfile}
@@ -1268,6 +1309,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 slot="weapon"
                 label="Weapon"
                 equippedItem={getEquippedItem('weapon')}
+                upgradePercent={slotUpgradePercent('weapon')}
                 onDrop={handleEquipItem}
                 onUnequip={handleUnequipItem}
                 disabled={!isOwnProfile}
@@ -1281,6 +1323,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 slot="feet"
                 label="Feet"
                 equippedItem={getEquippedItem('feet')}
+                upgradePercent={slotUpgradePercent('feet')}
                 onDrop={handleEquipItem}
                 onUnequip={handleUnequipItem}
                 disabled={!isOwnProfile}
@@ -2030,6 +2073,10 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                                       </span>
                                     )}
                                   </div>
+                                  {(() => {
+                                    const upgrade = itemUpgrade(item);
+                                    return upgrade && <UpgradeXpBar xp={upgrade.xp} milestones={upgrade.milestones} className="mt-1.5" />;
+                                  })()}
 
                                   {/* Expanded detail */}
                                   {isExpanded && (
@@ -2040,6 +2087,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                                       {item.effects && (
                                         <p className="text-xs text-accent italic whitespace-pre-wrap"><span className="not-italic text-muted-foreground">Effects: </span>{item.effects}</p>
                                       )}
+                                      <UpgradeList upgrades={item.upgrades} armorData={item.armorData} />
                                       {item.statModifiers && Object.entries(item.statModifiers).some(([, v]) => v !== 0) && (
                                         <div className="flex flex-wrap gap-1">
                                           {Object.entries(item.statModifiers).filter(([, v]) => v !== 0).map(([stat, val]) => (
@@ -2136,9 +2184,10 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 ? (isMyTurn && !hasUsedAction)
                 : canRoll;
 
-              const handleActionRoll = (actionLabel: string, stat: string, total: number) => {
+              const checkDC = getCheckDC(checkDifficulty, dungeonFloor);
+              const handleActionRoll = (skill: SkillDef, total: number, rank: number) => {
                 if (!canUseActions) return;
-                onStatRoll?.(selected.name, selected.id, actionLabel, total);
+                onStatRoll?.(selected.name, selected.id, `${skill.name} check${rank ? ` (rank ${rank})` : ''}`, total, rank, checkDC);
                 if (!isTestMode && !isCombatActive) {
                   recordNoncombatRoll?.(selected.id);
                 }
@@ -2237,71 +2286,40 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                   </div>
                 ))}
 
-                {/* General Actions */}
-                <div>
-                  <h3 className="font-display text-base text-accent mb-3">Actions</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                    {NONCOMBAT_ACTIONS.map(action => {
-                      const baseStat = (selected as Record<string, unknown>)[action.stat] as number;
-                      const mod = equippedMods[action.stat as keyof StatModifiers] ?? 0;
-                      const total = baseStat + mod;
-                      const disabled = !canUseActions;
-                      return (
-                        <button
-                          key={action.label}
-                          onClick={() => handleActionRoll(action.label, action.stat, total)}
-                          disabled={disabled}
-                          className={`flex flex-col items-center gap-1 p-3 border rounded-lg transition-colors text-left group ${
-                            !disabled
-                              ? 'bg-muted/50 border-border hover:bg-primary/20 hover:border-primary'
-                              : 'bg-muted/20 border-border/50 opacity-50 cursor-not-allowed'
-                          }`}
-                          title={!disabled ? `Roll d20 + ${action.stat.toUpperCase()} (${total})` : isCombatActive ? 'Not your turn' : 'No rolls remaining'}
-                        >
-                          <span className={`text-sm font-semibold transition-colors ${!disabled ? 'text-foreground group-hover:text-primary' : 'text-muted-foreground'}`}>{action.label}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {action.stat.toUpperCase()} {mod !== 0 ? (
-                              <span>
-                                <span>{baseStat}</span>
-                                <span className={mod > 0 ? 'text-green-400' : 'text-red-400'}>{mod > 0 ? `+${mod}` : mod}</span>
-                                <span className="text-orange-400"> = {total}</span>
-                              </span>
-                            ) : (
-                              <span className="font-bold">{total}</span>
-                            )}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                <CheckDifficultyPicker difficulty={checkDifficulty} onChange={setCheckDifficulty} dungeonFloor={dungeonFloor} />
 
-                {/* Intelligence Based Actions */}
-                <div>
-                  <h3 className="font-display text-base text-accent mb-3 flex items-center gap-2">
-                    <Brain className="w-4 h-4" /> Intelligence Based
+                {([
+                  { title: 'Actions', note: 'Pass a check to earn skill XP.', skills: ROLL_SKILLS, cols: 'lg:grid-cols-4' },
+                  { title: 'Intelligence Based', note: 'Knowledge grows from skill XP you spend.', skills: KNOWLEDGE_SKILLS, cols: 'lg:grid-cols-3' },
+                ]).map(group => (
+                <div key={group.title}>
+                  <h3 className="font-display text-base text-accent mb-3 flex flex-wrap items-baseline gap-2">
+                    {group.skills === KNOWLEDGE_SKILLS && <Brain className="w-4 h-4 self-center" />} {group.title}
+                    <span className="text-xs text-muted-foreground font-sans">{group.note}</span>
                   </h3>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
-                    {INTELLIGENCE_ACTIONS.map(action => {
-                      const baseStat = selected.int;
-                      const mod = equippedMods.int ?? 0;
+                  <div className={`grid grid-cols-2 md:grid-cols-3 ${group.cols} gap-2`}>
+                    {group.skills.map(skill => {
+                      const baseStat = selected[skill.ability];
+                      const mod = equippedMods[skill.ability] ?? 0;
                       const total = baseStat + mod;
+                      const rank = getSkillRank(selected, skill.id);
+                      const bonus = Math.floor((total - 10) / 2) + rank;
                       const disabled = !canUseActions;
                       return (
                         <button
-                          key={action.label}
-                          onClick={() => handleActionRoll(action.label, action.stat, total)}
+                          key={skill.id}
+                          onClick={() => handleActionRoll(skill, total, rank)}
                           disabled={disabled}
                           className={`flex flex-col items-center gap-1 p-3 border rounded-lg transition-colors text-left group ${
                             !disabled
                               ? 'bg-muted/50 border-border hover:bg-primary/20 hover:border-primary'
                               : 'bg-muted/20 border-border/50 opacity-50 cursor-not-allowed'
                           }`}
-                          title={!disabled ? `Roll d20 + INT (${total})` : isCombatActive ? 'Not your turn' : 'No rolls remaining'}
+                          title={!disabled ? `Roll d20 ${bonus >= 0 ? '+' : ''}${bonus} vs DC ${checkDC}` : isCombatActive ? 'Not your turn' : 'No rolls remaining'}
                         >
-                          <span className={`text-sm font-semibold transition-colors ${!disabled ? 'text-foreground group-hover:text-primary' : 'text-muted-foreground'}`}>{action.label}</span>
+                          <span className={`text-sm font-semibold transition-colors ${!disabled ? 'text-foreground group-hover:text-primary' : 'text-muted-foreground'}`}>{skill.name}</span>
                           <span className="text-xs text-muted-foreground">
-                            INT {mod !== 0 ? (
+                            {skill.ability.toUpperCase()} {mod !== 0 ? (
                               <span>
                                 <span>{baseStat}</span>
                                 <span className={mod > 0 ? 'text-green-400' : 'text-red-400'}>{mod > 0 ? `+${mod}` : mod}</span>
@@ -2310,12 +2328,15 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                             ) : (
                               <span className="font-bold">{total}</span>
                             )}
+                            {rank > 0 && <span className="text-accent"> · Rank {rank}</span>}
                           </span>
+                          <span className="text-xs font-display text-primary">{bonus >= 0 ? '+' : ''}{bonus} vs DC {checkDC}</span>
                         </button>
                       );
                     })}
                   </div>
                 </div>
+                ))}
 
                 {/* Initiative - always visible but context-aware */}
                 {!isInitiativePhase && (
@@ -2380,11 +2401,14 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
               return (
                 <SkillsPanel
                   crawler={selected}
+                  stats={statsById[selected.id]}
                   equippedMods={equippedMods}
                   canSpend={isAdmin || currentPlayerId === selected.id}
                   canRoll={canRoll}
                   rollBlockedReason={isCombatActive ? 'Not your turn, or your action is used' : 'No rolls remaining'}
-                  onSpendSkillPoint={onSpendSkillPoint}
+                  onSpendSkillXP={onSpendSkillXP}
+                  difficulty={checkDifficulty}
+                  onDifficultyChange={setCheckDifficulty}
                   onSpendAbilityPoint={onSpendAbilityPoint}
                   dungeonFloor={dungeonFloor}
                   onRollSkill={(skill, abilityTotal, rank, dc) => {
@@ -2422,7 +2446,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
               const currentMana = selected.mana ?? 0;
               const effectiveMaxMana = (selected.maxMana || 0) + (equippedMods.maxMana ?? 0);
               const resolveSpell = (ks: KnownSpell): Spell | undefined =>
-                spellLibrary.find(s => s.id === ks.spellId) ?? ks.customSpell;
+                resolveKnownSpell(ks, spellLibrary);
 
               // Same turn rules as the Attacks, Bonus Actions and Reactions tabs
               const getLockedReason = (actionType: SpellActionType): string | null => {
@@ -2615,6 +2639,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                                 isAdmin={isAdmin}
                                 onCast={() => { if (spell) void handleCastSpell(ks, spell); }}
                                 onForget={onForgetSpell ? () => { void onForgetSpell(selected.id, ks.spellId); } : undefined}
+                                upgrade={spellUpgrade(ks, spell)}
                               />
                             ))}
                           </div>
@@ -2702,12 +2727,13 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
               // Helper to calculate total modifier from weapon stat modifiers
               const calcWeaponStatMod = weaponStatMod;
 
-              const handleAttackRoll = (attackName: string, stat: 'str' | 'dex', damageDice: string, damageBonus: number) => {
+              const handleAttackRoll = (attackName: string, stat: 'str' | 'dex', damageDice: string, damageBonus: number, weaponType?: string) => {
                 if (!canAttack) return;
                 const baseStat = (selected as Record<string, unknown>)[stat] as number;
                 const mod = equippedMods[stat as keyof StatModifiers] ?? 0;
                 const total = baseStat + mod;
-                const modifier = Math.floor((total - 10) / 2);
+                const modifier = Math.floor((total - 10) / 2) + getWeaponProficiency(statsById[selected.id], weaponType);
+                const source: StatSource = { kind: 'item', id: `attack:${attackName}`, name: attackName, ...(weaponType ? { weaponType } : {}) };
                 const { rawRoll, results, diceLabel } = rollD20(rollsWithDisadvantage(selected, total));
                 const rollTotal = rawRoll + modifier;
 
@@ -2720,13 +2746,13 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                     results,
                     total: rollTotal,
                     statRoll: { stat: `${attackName} (Attack)`, modifier, rawRoll, rollType: 'Attack roll', diceLabel },
-                    source: { kind: 'item', id: `attack:${attackName}`, name: attackName },
+                    source,
                   });
                 }
 
                 // A natural 1 misses, so there's no damage to roll
                 if (isCombatPhaseLocal && combatTargets.length > 0 && rawRoll !== 1) {
-                  setPendingDamageRoll({ dice: damageDice, bonus: damageBonus, actionName: attackName, source: { kind: 'item', id: `attack:${attackName}`, name: attackName } });
+                  setPendingDamageRoll({ dice: damageDice, bonus: damageBonus, actionName: attackName, source });
                   setShowDamageTargetModal(true);
                   setDamageRollResult(null);
                   setSplashTargetIds([]);
@@ -2756,7 +2782,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 }
 
                 // Stat modifiers for hit
-                const hitStatMod = calcWeaponStatMod(wd.hitModifiers);
+                const hitStatMod = calcWeaponStatMod(wd.hitModifiers) + getWeaponProficiency(statsById[selected.id], wd.weaponType);
                 const rollTotal = rawRoll + hitDieResult + hitStatMod;
 
                 const results: { dice: string; result: number }[] = [];
@@ -2862,7 +2888,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                     {/* Unarmed Strike */}
                     <button
-                      onClick={() => handleAttackRoll('Unarmed Strike', 'str', 'd4', 0)}
+                      onClick={() => handleAttackRoll('Unarmed Strike', 'str', 'd4', 0, HAND_TO_HAND)}
                       disabled={!canAttack}
                       className={`flex flex-col items-center gap-2 p-4 border-2 rounded-lg transition-colors group ${
                         canAttack
@@ -2873,6 +2899,9 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                       <Hand className={`w-8 h-8 ${canAttack ? 'text-destructive group-hover:scale-110 transition-transform' : 'text-muted-foreground'}`} />
                       <span className={`text-sm font-display ${canAttack ? 'text-destructive' : 'text-muted-foreground'}`}>Unarmed Strike</span>
                       <span className="text-[10px] text-muted-foreground">STR check, d4 damage on hit</span>
+                      {getWeaponProficiency(statsById[selected.id], HAND_TO_HAND) > 0 && (
+                        <span className="text-[10px] text-accent">Hand to Hand proficiency {getWeaponProficiency(statsById[selected.id], HAND_TO_HAND)} · +{getWeaponProficiency(statsById[selected.id], HAND_TO_HAND)} to hit</span>
+                      )}
                     </button>
 
                     {/* Equipped Weapons */}
@@ -2893,11 +2922,18 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                             </span>
                             <div className="text-[10px] text-muted-foreground space-y-0.5 mt-1">
                               <div>{wd.weaponType} · {wd.isRanged ? 'Ranged' : 'Melee'} · {wd.damageType}</div>
+                              {getWeaponProficiency(statsById[selected.id], wd.weaponType) > 0 && (
+                                <div className="text-accent">{wd.weaponType} proficiency {getWeaponProficiency(statsById[selected.id], wd.weaponType)} · +{getWeaponProficiency(statsById[selected.id], wd.weaponType)} to hit</div>
+                              )}
                               <div>{dmgStr} damage{wd.hitDie ? ` · +${wd.hitDie.count}d${wd.hitDie.sides} to hit` : ''}</div>
                               {wd.isRanged && wd.normalRange && <div>Range: {wd.normalRange}{wd.maxRange ? `/${wd.maxRange}` : ''} ft</div>}
                               {wd.splashDamage && <div className="text-orange-400 font-bold">Splash / Multi-Target</div>}
                               {wd.specialEffect && <div className="italic text-accent/70">{wd.specialEffect}</div>}
                             </div>
+                            {(() => {
+                              const upgrade = itemUpgrade(item);
+                              return upgrade && <UpgradeXpBar xp={upgrade.xp} milestones={upgrade.milestones} className="mt-1.5 text-left" />;
+                            })()}
                           </div>
                           {/* Action buttons */}
                           <div className="flex gap-1 p-2 mt-auto">
@@ -3430,7 +3466,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
 
           const calcMod = weaponStatMod;
 
-          const hitStatMod = calcMod(wd.hitModifiers);
+          const hitStatMod = calcMod(wd.hitModifiers) + getWeaponProficiency(statsById[selected.id], wd.weaponType);
           const rollTotal = rawRoll + hitDieResult + hitStatMod;
 
           const results: { dice: string; result: number }[] = [];

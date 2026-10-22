@@ -48,8 +48,10 @@ export interface Crawler {
   usesAbilityPoints?: boolean;  // Made with the character creator: abilities at 0 points (score 10 or less) roll with disadvantage
   xp?: number;                  // Total experience; missing = exactly what `level` needs (crawlers from before XP)
   xpLog?: XPLogEntry[];         // Most recent grants first, capped at XP_LOG_LIMIT
-  skills?: Partial<Record<SkillId, number>>; // Ranks bought with skill points (Barter is use-based, see barterTrades)
-  skillPoints?: number;         // Unspent skill points from level-ups
+  skills?: Partial<Record<SkillId, number>>; // Old: ranks bought with skill points (now skillXP)
+  skillPoints?: number;         // Old: unspent skill points (now skillXPToSpend)
+  skillXP?: Partial<Record<SkillId, number>>; // Skill XP per skill; the rank comes from it (getSkillRank)
+  skillXPToSpend?: number;      // Skill XP from level-ups, not yet spent on a skill
   abilityPoints?: number;       // Unspent ability points from level-ups
   barterTrades?: number;        // Completed buys and sells with merchants; raises Barter
 }
@@ -132,44 +134,104 @@ export const getLevelForXP = (xp: number): number => {
 export const getCrawlerXP = (crawler: Pick<Crawler, 'xp' | 'level'>): number =>
   crawler.xp ?? getXPForLevel(crawler.level || 1);
 
-export type SkillId = 'barter' | 'athletics' | 'stealth' | 'perception' | 'medicine' | 'intimidation';
+export type SkillId =
+  | 'acrobatics' | 'animalHandling' | 'athletics' | 'deception' | 'intimidation' | 'medicine' | 'performance'
+  | 'persuasion' | 'sleightOfHand' | 'stealth' | 'survival' | 'arcana' | 'perception'
+  | 'religion' | 'nature' | 'investigation' | 'history' | 'memory' | 'science'
+  | 'barter';
+
+/**
+ * roll: earns skill XP from successful checks. knowledge: only from skill XP spent at level-ups.
+ * trade: earns skill XP from trading with merchants. Every kind can also take spent skill XP.
+ */
+export type SkillKind = 'roll' | 'knowledge' | 'trade';
 
 export interface SkillDef {
   id: SkillId;
   name: string;
   ability: AbilityKey;
+  kind: SkillKind;
   description: string;
-  useBased?: boolean; // levels up by use instead of skill points
 }
 
+const checks = (what: string) => `+1 per rank to ${what} checks.`;
 export const SKILLS: SkillDef[] = [
-  { id: 'barter', name: 'Barter', ability: 'cha', useBased: true, description: 'Every 2 ranks lower a merchant\'s Scrooge factor by 1 for you, and each rank adds +1 to haggle rolls. Levels up as you buy and sell.' },
-  { id: 'athletics', name: 'Athletics', ability: 'str', description: '+1 per rank to climb, jump and grapple checks. Every 3 ranks add +5 ft of movement.' },
-  { id: 'stealth', name: 'Stealth', ability: 'dex', description: '+1 per rank to sneak and hide checks.' },
-  { id: 'perception', name: 'Perception', ability: 'int', description: '+1 per rank to spot, search and sense-lies checks.' },
-  { id: 'medicine', name: 'Medicine', ability: 'int', description: '+1 HP per rank on every heal you give.' },
-  { id: 'intimidation', name: 'Intimidation', ability: 'cha', description: '+1 per rank to threaten checks.' },
+  { id: 'acrobatics', name: 'Acrobatics', ability: 'dex', kind: 'roll', description: checks('balance, tumble and dodge') },
+  { id: 'animalHandling', name: 'Animal Handling', ability: 'cha', kind: 'roll', description: checks('calm, tame and ride') },
+  { id: 'athletics', name: 'Athletics', ability: 'str', kind: 'roll', description: `${checks('climb, jump and grapple')} Every 3 ranks add +5 ft of movement.` },
+  { id: 'deception', name: 'Deception', ability: 'cha', kind: 'roll', description: checks('lie and bluff') },
+  { id: 'intimidation', name: 'Intimidation', ability: 'cha', kind: 'roll', description: checks('threaten') },
+  { id: 'medicine', name: 'Medicine', ability: 'int', kind: 'roll', description: `${checks('treat and diagnose')} Also +1 HP per rank on every heal you give.` },
+  { id: 'performance', name: 'Performance', ability: 'cha', kind: 'roll', description: checks('perform and entertain') },
+  { id: 'persuasion', name: 'Persuasion', ability: 'cha', kind: 'roll', description: `${checks('persuade')} Also adds to haggle rolls.` },
+  { id: 'sleightOfHand', name: 'Sleight of Hand', ability: 'dex', kind: 'roll', description: checks('pickpocket, palm and pick locks') },
+  { id: 'stealth', name: 'Stealth', ability: 'dex', kind: 'roll', description: checks('sneak and hide') },
+  { id: 'survival', name: 'Survival', ability: 'con', kind: 'roll', description: checks('track, forage and endure') },
+  { id: 'arcana', name: 'Arcana', ability: 'int', kind: 'roll', description: checks('magic lore') },
+  { id: 'perception', name: 'Perception', ability: 'int', kind: 'roll', description: checks('spot, search and sense-lies') },
+  { id: 'religion', name: 'Religion', ability: 'int', kind: 'knowledge', description: checks('religion') },
+  { id: 'nature', name: 'Nature', ability: 'int', kind: 'knowledge', description: checks('nature') },
+  { id: 'investigation', name: 'Investigation', ability: 'int', kind: 'knowledge', description: checks('investigation') },
+  { id: 'history', name: 'History', ability: 'int', kind: 'knowledge', description: checks('history') },
+  { id: 'memory', name: 'Memory', ability: 'int', kind: 'knowledge', description: checks('memory') },
+  { id: 'science', name: 'Science & Engineering', ability: 'int', kind: 'knowledge', description: checks('science, engineering and technology') },
+  { id: 'barter', name: 'Barter', ability: 'cha', kind: 'trade', description: 'Every 2 ranks lower a merchant\'s Scrooge factor by 1 for you, and each rank adds +1 to haggle rolls. Earns skill XP as you buy and sell.' },
 ];
 export const MAX_SKILL_RANK = 10;
 
-// Use-based skills follow the Looting curve: rank N after 5·N·(N+1) uses (10, 30, 60, 100…)
-export const getUseSkillRank = (uses = 0): number => {
+// ---- Skill XP ----
+// A skill's rank comes from its skill XP. Rank N needs 25·N·(N+1) XP in total (50, 150, 300, 500…),
+// so each rank costs more than the last. XP is never reset: spending XP adds to what a skill earned.
+export const SKILL_XP_PER_SUCCESS = 5;   // a successful check with a roll skill
+export const SKILL_XP_PER_TRADE = 5;     // a buy or sell (Barter)
+export const SKILL_XP_PER_LEVEL = 100;   // skill XP to spend, from each character level-up
+
+export const getSkillXPForRank = (rank: number): number => {
+  const r = Math.max(0, Math.min(MAX_SKILL_RANK, Math.floor(rank)));
+  return 25 * r * (r + 1);
+};
+export const MAX_SKILL_XP = getSkillXPForRank(MAX_SKILL_RANK);
+
+export const getSkillRankForXP = (xp: number): number => {
   let rank = 0;
-  while (rank < MAX_SKILL_RANK && uses >= 5 * (rank + 1) * (rank + 2)) rank++;
+  while (rank < MAX_SKILL_RANK && xp >= getSkillXPForRank(rank + 1)) rank++;
   return rank;
 };
 
-/** Uses left before the next rank of a use-based skill, or null at the max rank. */
-export const getUsesUntilNextRank = (uses = 0): number | null => {
-  const rank = getUseSkillRank(uses);
-  return rank >= MAX_SKILL_RANK ? null : 5 * (rank + 1) * (rank + 2) - uses;
+type SkillCrawler = Pick<Crawler, 'skills' | 'skillXP' | 'barterTrades' | 'skillPoints' | 'skillXPToSpend'>;
+
+/** A skill's XP. Crawlers from before skill XP count their bought ranks (and Barter their trades). */
+export const getSkillXP = (crawler: SkillCrawler | null | undefined, id: SkillId): number => {
+  if (!crawler) return 0;
+  const stored = crawler.skillXP?.[id];
+  if (stored !== undefined) return Math.max(0, Math.min(MAX_SKILL_XP, stored));
+  const legacy = id === 'barter'
+    ? SKILL_XP_PER_TRADE * (crawler.barterTrades ?? 0)
+    : getSkillXPForRank(crawler.skills?.[id] ?? 0);
+  return Math.min(MAX_SKILL_XP, legacy);
 };
 
-export const getSkillRank = (crawler: Pick<Crawler, 'skills' | 'barterTrades'> | null | undefined, id: SkillId): number => {
-  if (!crawler) return 0;
-  if (id === 'barter') return getUseSkillRank(crawler.barterTrades ?? 0);
-  return Math.max(0, Math.min(MAX_SKILL_RANK, Math.floor(crawler.skills?.[id] ?? 0)));
+export const getSkillRank = (crawler: SkillCrawler | null | undefined, id: SkillId): number =>
+  getSkillRankForXP(getSkillXP(crawler, id));
+
+/** Skill XP left to spend. Unspent skill points from before skill XP are worth a level's skill XP each. */
+export const getSkillXPToSpend = (crawler: SkillCrawler | null | undefined): number =>
+  Math.max(0, crawler?.skillXPToSpend ?? (crawler?.skillPoints ?? 0) * SKILL_XP_PER_LEVEL);
+
+/** Every skill's XP as stored, filling in crawlers from before skill XP, plus `id` changed by `delta`. */
+export const withSkillXP = (crawler: SkillCrawler, id: SkillId, delta: number): Partial<Record<SkillId, number>> => {
+  const all: Partial<Record<SkillId, number>> = {};
+  for (const s of SKILLS) {
+    const xp = getSkillXP(crawler, s.id);
+    if (xp > 0) all[s.id] = xp;
+  }
+  all[id] = Math.max(0, Math.min(MAX_SKILL_XP, (all[id] ?? 0) + delta));
+  return all;
 };
+
+/** The skill a roll label belongs to, e.g. "Stealth" or "Stealth check (rank 2)". */
+export const skillForLabel = (label: string): SkillDef | undefined =>
+  SKILLS.find(s => label === s.name || label.startsWith(`${s.name} check`));
 
 /** Scrooge levels a crawler's Barter takes off: 1 per 2 ranks. */
 export const getBarterScroogeReduction = (barterRank: number): number => Math.floor(barterRank / 2);
@@ -307,6 +369,7 @@ export interface StatSource {
   id: string;
   name: string;
   damageType?: string;
+  weaponType?: string; // a weapon's type, for weapon proficiency
 }
 
 /** Counters for one weapon, armor piece or spell. */
@@ -325,12 +388,105 @@ export interface SourceStats {
   neutralKills?: number;
   damageAbsorbed?: number; // armor: for when a damage-reduction rule exists
   hitsDeflected?: number;
+  boostedRolls?: number;   // rings and other stat gear: rolls made with an ability the item raises while equipped
 }
+
+// ---- Upgrade XP: items and spells level up from what they do ----
+// Each XP source is worth a set amount; tiers unlock at the milestones. The DM can change both per
+// item or spell, and unset fields use the defaults for that kind of item.
+
+export type UpgradeKind = 'weapon' | 'armor' | 'gear' | 'spell' | 'none';
+
+export const UPGRADE_XP_SOURCES = ['perDamage', 'perKill', 'perBossKill', 'perHealing', 'perCondition', 'perCast', 'perAbsorbed', 'perBoostedRoll'] as const;
+export type UpgradeXpSource = typeof UPGRADE_XP_SOURCES[number];
+
+export interface UpgradeXpSettings extends Partial<Record<UpgradeXpSource, number>> {
+  enabled?: boolean;
+  milestones?: number[]; // total XP for each tier, ascending
+}
+
+export const UPGRADE_XP_SOURCE_LABELS: Record<UpgradeXpSource, string> = {
+  perDamage: 'per damage dealt',
+  perKill: 'per kill',
+  perBossKill: 'per boss kill',
+  perHealing: 'per HP healed',
+  perCondition: 'per effect left on a target',
+  perCast: 'per cast',
+  perAbsorbed: 'per damage absorbed',
+  perBoostedRoll: 'per roll with a stat it raises',
+};
+
+export const DEFAULT_UPGRADE_MILESTONES = [50, 150, 300, 500, 750];
+
+export const DEFAULT_UPGRADE_XP: Record<Exclude<UpgradeKind, 'none'>, Partial<Record<UpgradeXpSource, number>>> = {
+  weapon: { perDamage: 1, perKill: 10, perBossKill: 25 },
+  armor: { perAbsorbed: 1 },
+  gear: { perBoostedRoll: 5 },
+  spell: { perCast: 5, perDamage: 1, perKill: 10, perBossKill: 25, perHealing: 1, perCondition: 5 },
+};
+
+const ARMOR_SLOTS: EquipmentSlot[] = ['head', 'chest', 'legs', 'feet'];
+
+/** What kind of upgradeable thing an item is: weapons, armor, other equippable gear, or nothing (consumables). */
+export const getUpgradeKind = (item: Pick<InventoryItem, 'weaponData' | 'equipSlot'>): UpgradeKind => {
+  if (item.weaponData) return 'weapon';
+  if (!item.equipSlot) return 'none';
+  return ARMOR_SLOTS.includes(item.equipSlot) ? 'armor' : 'gear';
+};
+
+/** The settings in force: the item's own values over the defaults for its kind. */
+export const resolveUpgradeXp = (kind: UpgradeKind, settings?: UpgradeXpSettings): Required<Pick<UpgradeXpSettings, 'enabled' | 'milestones'>> & Partial<Record<UpgradeXpSource, number>> => {
+  const defaults = kind === 'none' ? {} : DEFAULT_UPGRADE_XP[kind];
+  const rates: Partial<Record<UpgradeXpSource, number>> = {};
+  for (const src of UPGRADE_XP_SOURCES) {
+    const value = settings?.[src] ?? defaults[src];
+    if (value) rates[src] = value;
+  }
+  const milestones = (settings?.milestones?.length ? settings.milestones : DEFAULT_UPGRADE_MILESTONES).filter(m => m > 0).sort((a, b) => a - b);
+  return { ...rates, enabled: settings?.enabled ?? kind !== 'none', milestones };
+};
+
+export interface UpgradeXpBreakdown {
+  total: number;
+  parts: { source: UpgradeXpSource; count: number; xp: number }[];
+}
+
+/** XP an item or spell has earned from its counters (`casts` comes from the known spell's cast count). */
+export const getUpgradeXp = (kind: UpgradeKind, settings: UpgradeXpSettings | undefined, stats: SourceStats | undefined, casts = 0): UpgradeXpBreakdown => {
+  const rates = resolveUpgradeXp(kind, settings);
+  const counts: Record<UpgradeXpSource, number> = {
+    perDamage: stats?.damage ?? 0,
+    perKill: Math.max(0, (stats?.kills ?? 0) - (stats?.bossKills ?? 0)),
+    perBossKill: stats?.bossKills ?? 0,
+    perHealing: stats?.healing ?? 0,
+    perCondition: stats?.conditions ?? 0,
+    perCast: casts,
+    perAbsorbed: stats?.damageAbsorbed ?? 0,
+    perBoostedRoll: stats?.boostedRolls ?? 0,
+  };
+  const parts = UPGRADE_XP_SOURCES
+    .filter(src => rates[src] && counts[src])
+    .map(src => ({ source: src, count: counts[src], xp: counts[src] * (rates[src] ?? 0) }));
+  return { total: parts.reduce((sum, p) => sum + p.xp, 0), parts };
+};
+
+export interface UpgradeTierProgress {
+  tier: number;          // milestones reached
+  maxTier: number;
+  floor: number;         // XP where the current tier started
+  next: number | null;   // XP for the next tier, null once every milestone is reached
+}
+
+export const getUpgradeTier = (xp: number, milestones: number[]): UpgradeTierProgress => {
+  const tier = milestones.filter(m => xp >= m).length;
+  return { tier, maxTier: milestones.length, floor: tier > 0 ? milestones[tier - 1] : 0, next: milestones[tier] ?? null };
+};
 
 export interface CrawlerStats {
   id: string; // = crawlerId
   items?: Record<string, SourceStats>;
   spells?: Record<string, SourceStats>;
+  weaponTypeHits?: Record<string, number>; // weapon type -> attacks that hit a hostile mob (weapon proficiency)
   damageByType?: Record<string, number>;
   killsByMob?: Record<string, number>; // mob name -> hostile kills
   bossKills?: number;
@@ -513,6 +669,19 @@ export const statKey = (raw: string): string => {
   return /^__.*__$/.test(key) ? `_${key}` : key;
 };
 
+// ---- Weapon proficiency ----
+// Each attack that hits a hostile mob earns its weapon type proficiency XP. Ranks use the skill XP
+// curve (rank 1 after 10 hits, rank 2 after 30…), and each rank is +1 to hit with that type, up to +10.
+export const WEAPON_XP_PER_HIT = 5;
+/** Unarmed Strike's proficiency, alongside the weapon types. */
+export const HAND_TO_HAND = 'Hand to Hand';
+
+export const getWeaponProficiencyXP = (stats: CrawlerStats | null | undefined, weaponType: string | undefined): number =>
+  weaponType ? Math.min(MAX_SKILL_XP, WEAPON_XP_PER_HIT * (stats?.weaponTypeHits?.[statKey(weaponType)] ?? 0)) : 0;
+
+export const getWeaponProficiency = (stats: CrawlerStats | null | undefined, weaponType: string | undefined): number =>
+  getSkillRankForXP(getWeaponProficiencyXP(stats, weaponType));
+
 /** The ability a dice log stat roll used: "STR", or a skill check like "Stealth check (rank 2)". */
 export const abilityOfRoll = (stat: string): AbilityKey | undefined => {
   const first = stat.trim().split(/\s+/)[0]?.toLowerCase() ?? '';
@@ -632,6 +801,8 @@ export type DamageType = typeof DAMAGE_TYPES[number];
 
 export const WEAPON_TYPES = ['Arcane', 'Body Upgrade', 'Bows', 'Crossbows', 'Firearms', 'Heavy weapons', 'Improvised', 'Light weapons', 'Mechanical', 'Polearms', 'Throwing', 'Whips'] as const;
 export type WeaponType = typeof WEAPON_TYPES[number];
+/** Every weapon proficiency: Unarmed Strike's Hand to Hand, then the weapon types. */
+export const PROFICIENCY_TYPES: string[] = [HAND_TO_HAND, ...WEAPON_TYPES];
 
 export interface WeaponDie {
   count: number; // number of dice (e.g. 2 for 2d6)
@@ -736,6 +907,7 @@ export interface Spell {
   createdBy?: string;        // Firebase uid of creator
   createdByUsername?: string; // Denormalized for display
   isPublic?: boolean;        // Whether visible to players outside the campaign
+  upgradeXp?: UpgradeXpSettings; // How this spell earns upgrade XP (unset fields use the spell defaults)
 }
 
 /** A pixel-art icon in the global `iconLibrary` collection, shared by every campaign. */
@@ -760,6 +932,7 @@ export interface KnownSpell {
   learnedAt: string; // ISO timestamp
   castCount: number; // total casts, drives mastery level
   customSpell?: Spell; // full spell data for one-off tome spells that aren't in the library
+  upgrades?: ItemUpgrade[]; // upgrades to this crawler's copy, applied on top of the library spell when read
 }
 
 // Mastery threshold: level N requires 5*N*(N+1) total casts (10, 30, 60, 100, ...)
@@ -810,6 +983,7 @@ export interface InventoryItem {
   tags?: string[]; // Custom tags for filtering (e.g., "magic", "cursed", "quest")
   weaponData?: WeaponData; // Weapon-specific data (only for items with "weapon" tag or weapon equipSlot)
   isUpgraded?: boolean; // Whether this item has been upgraded by a crawler
+  upgradeXp?: UpgradeXpSettings; // How this item earns upgrade XP (unset fields use the defaults for its kind)
   isSpellTome?: boolean; // Consumable that teaches a spell when used
   iconId?: string; // References an entry in the global iconLibrary collection
   spellTomeData?: {
@@ -823,6 +997,47 @@ export interface InventoryItem {
   isPublic?: boolean;        // Whether visible to players outside the campaign
   language?: string;         // Written in this language: the description is scrambled for crawlers who don't know it
   grantsLanguage?: string;   // While equipped, the crawler knows this language (a druid's charm grants Beast)
+  armorData?: ArmorData;     // Armor rating, damage reduction, resistances and vulnerabilities (set by upgrades for now)
+  upgrades?: ItemUpgrade[];  // Upgrades given to this crawler's copy, oldest first (see src/lib/upgrades.ts)
+}
+
+export interface ArmorData {
+  rating?: number;        // adds to the wearer's DC
+  reduction?: number;     // taken off each hit
+  resist?: string[];      // damage or weapon types that do half damage
+  vulnerable?: string[];  // damage or weapon types that do double damage
+}
+
+// ---- Upgrades: effects the game applies to one crawler's copy of an item or spell ----
+export type UpgradeEffect =
+  | { type: 'dice'; target: 'damage' | 'hit'; step?: number; addDie?: WeaponDie }   // step: die sizes up (d8 -> d10 is 1)
+  | { type: 'property'; rangeFt?: number; damageType?: string; splash?: boolean; durationTurns?: number }
+  | { type: 'stat'; mods: StatModifiers }
+  | { type: 'onHit'; chance: number; condition?: string; turns?: number; extraDie?: WeaponDie }
+  | { type: 'action'; name: string; uses: 'perCombat' | 'perDay' | 'atWill'; damage?: WeaponDie; text?: string }
+  | { type: 'defense'; armorRating?: number; reduction?: number; resist?: string[]; vulnerable?: string[] }
+  | { type: 'language'; language: string }
+  | { type: 'strange'; text: string };
+export type UpgradeEffectType = UpgradeEffect['type'];
+
+export type UpgradeDrawback =
+  | { type: 'statPenalty'; mods: StatModifiers }
+  | { type: 'destroyOnUnequip' }
+  | { type: 'locked' }
+  | { type: 'cost'; hp?: number; mana?: number }
+  | { type: 'strange'; text: string };
+
+export interface ItemUpgrade {
+  id: string;
+  name: string;
+  flavor?: string;
+  effects: UpgradeEffect[];
+  drawback?: UpgradeDrawback;  // a cursed bargain
+  source: 'dm' | 'ai' | 'preset';
+  treeName?: string;
+  newName?: string;            // renames this crawler's copy ("Rusty Sword" -> "Gravemaker")
+  appliedAt: string;           // ISO timestamp
+  before?: Record<string, unknown>; // the item's changed fields before this upgrade, so the DM can undo it
 }
 
 // Compute total stat modifiers from all equipped items on a crawler
