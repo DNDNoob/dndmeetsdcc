@@ -24,7 +24,7 @@ import { collection, doc, onSnapshot, setDoc, FieldPath } from 'firebase/firesto
 import {
   hasPersonality, distance, mentionsName, timeOfDay, hpWords,
   buildSystemPrompt, buildLinePrompt, buildShouldSpeakPrompt, buildSecretCheckPrompt,
-  formatTranscript, isYes, cleanLine, undoEncodedLine, parseGestureLine, hasGestureStyle, presetLine,
+  formatTranscript, isYes, cleanLine, undoEncodedLine, parseGestureLine, parseRealLanguageLine, hasGestureStyle, presetLine,
   rollPersonalityTraits, buildPersonalityPrompt, parsePersonality, defaultPersuasionDC, PERSONALITY_SYSTEM_PROMPT,
   MEMORY_SYSTEM_PROMPT, buildMemoryPrompt, parseMemory,
 } from './brain.mjs';
@@ -893,6 +893,7 @@ export class NpcRoom {
     const gestureStyle = hasGestureStyle(language) ? language : undefined;
     let line = '';
     let gesture = '';
+    let meaning = '';
     try {
       const secretUnlocked = this.secrets[mob.id]?.state === 'unlocked';
       const system = buildSystemPrompt({
@@ -900,19 +901,20 @@ export class NpcRoom {
         speaking: this.languageName(language), knownLanguages: known.map((id) => this.languageName(id)), gesture: gestureStyle,
         realLanguage: REAL_LANGUAGES[language],
       });
-      const raw = await this.ask(tier, system, buildLinePrompt({ mob, transcript, trigger: job.trigger }), { maxTokens: gestureStyle ? 110 : 80, temperature: 0.8 });
+      const raw = await this.ask(tier, system, buildLinePrompt({ mob, transcript, trigger: job.trigger }), { maxTokens: gestureStyle || REAL_LANGUAGES[language] ? 110 : 80, temperature: 0.8 });
       if (gestureStyle) ({ text: line, gesture } = parseGestureLine(raw, mob.name));
+      else if (REAL_LANGUAGES[language]) ({ text: line, meaning } = parseRealLanguageLine(raw, mob.name));
       else line = undoEncodedLine(cleanLine(raw, mob.name));
     } finally {
       await this.writeStatus({ thinking: null });
     }
     // The model sent code instead of words: say something readable rather than post the blob
     if (!line && !gestureStyle) line = presetLine(language);
-    await this.postLine(mob, placement, { text: line, language, gesture, mapId });
+    await this.postLine(mob, placement, { text: line, language, gesture, meaning, mapId });
   }
 
   /** Put an NPC line in the chat (unless NPCs were muted while it was being written). */
-  async postLine(mob, placement, { text, language, gesture, preset = false, mapId = this.currentMapId }) {
+  async postLine(mob, placement, { text, language, gesture, meaning, preset = false, mapId = this.currentMapId }) {
     const muted = this.settings.mutedMobIds || [];
     if (!text || !this.live || !this.enabled || this.settings.mutedAll || muted.includes(mob.id) || muted.includes(mob.sourceMobId)) return;
 
@@ -925,6 +927,7 @@ export class NpcRoom {
       text,
       language,
       ...(gesture ? { gesture } : {}),
+      ...(meaning ? { meaning } : {}),
       ...(preset ? { preset: true } : {}),
       createdAt: Date.now(),
       episodeId: this.showtime?.episodeId,

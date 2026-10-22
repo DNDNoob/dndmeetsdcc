@@ -183,18 +183,20 @@ export const readChatLine = (
   // Worldspeech is the everyday tongue: only label it for someone who can't follow it
   const labelled = languageId !== DEFAULT_LANGUAGE_ID ? name : undefined;
   const byCrawler = (id: string) => reader.party.find(c => c.id === id);
+  // Spanish NPC lines carry their English meaning: that's what knowing the language gets you
+  const understood = m.meaning || m.text;
 
   if (understands) {
     const toldParty = translations
       .filter(t => reader.isAdmin || t.authorId === reader.crawler?.id)
-      .map(t => ({ by: t.authorName, text: t.text, twisted: t.text.trim() !== m.text.trim(), mine: t.authorId === reader.crawler?.id }));
+      .map(t => ({ by: t.authorName, text: t.text, twisted: t.text.trim() !== understood.trim() && t.text.trim() !== m.text.trim(), mine: t.authorId === reader.crawler?.id }));
     const me = reader.crawler;
     const someoneNeedsIt = reader.party.some(c => c.id !== me?.id && !crawlerUnderstands(c, languageId) && !(m.authorType === 'crawler' && m.authorId === c.id));
     const canTranslate = !!me && me.translateMode === 'review' && !own
       && crawlerUnderstands(me, languageId) && someoneNeedsIt
       && !translations.some(t => t.authorId === me.id);
     return {
-      text: m.text, languageId, languageName: labelled, scrambled: false,
+      text: understood, languageId, languageName: labelled, scrambled: false,
       ...(toldParty.length ? { toldParty } : {}),
       ...(canTranslate ? { canTranslate } : {}),
     };
@@ -207,7 +209,7 @@ export const readChatLine = (
   const told = [...translations].reverse().find(t => translators.some(c => c.id === t.authorId));
   if (told) return { text: told.text, languageId, languageName: name, scrambled: false, via: byCrawler(told.authorId)?.name ?? told.authorName };
   const auto = translators.find(c => c.translateMode === 'auto');
-  if (auto) return { text: m.text, languageId, languageName: name, scrambled: false, via: auto.name };
+  if (auto) return { text: understood, languageId, languageName: name, scrambled: false, via: auto.name };
   const checking = translators.find(c => c.translateMode === 'review');
   return {
     // Beast, Plant and Dead: show what the speaker does rather than gibberish

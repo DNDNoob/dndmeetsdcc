@@ -1518,7 +1518,7 @@ Crawlers and mobs know languages. If someone talks in a language you don't know,
 | **Plant** | Rustling, creaking and slow movement. Speak with Plants grants it |
 | **Dead** | The voice of a corpse. Speak with Dead grants it |
 
-Each language looks different when you can't read it: Kra Kow is harsh grunts, Mewmew is mrrps, Ward sign is symbols, Mindspeech is waves. Base64 really is Base64, so a crawler with a decoder and some patience might work it out. Spanish is real Spanish: NPCs write their lines in Spanish, and crawlers who don't know it see the same Spanish words.
+Each language looks different when you can't read it: Kra Kow is harsh grunts, Mewmew is mrrps, Ward sign is symbols, Mindspeech is waves. Base64 really is Base64, so a crawler with a decoder and some patience might work it out. Spanish is real Spanish: NPCs write their lines in Spanish, and crawlers who don't know it see the Spanish words. Crawlers who know Spanish (and the DM) see what the line means in English.
 
 ## What Your Crawler Knows
 

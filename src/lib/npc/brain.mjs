@@ -183,7 +183,7 @@ export const buildSystemPrompt = ({ mob, secretUnlocked, scene, memory, speaking
   } else if (speaking) {
     const knows = knownLanguages?.length > 1 ? ` (you know ${knownLanguages.join(', ')})` : '';
     lines.push(realLanguage
-      ? `You are speaking ${speaking}${knows}. Write every word of your line in ${realLanguage}, never in English, even if the crawlers spoke English.`
+      ? `You are speaking ${speaking}${knows}. Write every word of your line in ${realLanguage}, never in English, even if the crawlers spoke English. Then add " || " and the same line in plain English, for crawlers who understand ${realLanguage}.`
       : `You are speaking ${speaking}${knows}. Write your words in plain English; the game turns them into ${speaking} by itself, so never encode, cipher or translate them.`);
   }
   lines.push('');
@@ -198,6 +198,8 @@ export const buildSystemPrompt = ({ mob, secretUnlocked, scene, memory, speaking
     lines.push('Rules: Reply with ONE line in this exact form: what you mean, in plain words (25 words or fewer) || what the crawlers see and hear you do (15 words or fewer, third person, no name).');
     lines.push(`Example: ${style.example}`);
     lines.push('Stay in character. No quotation marks, no name prefix.');
+  } else if (realLanguage) {
+    lines.push(`Rules: Reply with ONE line in this exact form: your spoken line in ${realLanguage} (25 words or fewer) || the same line in English. Stay in character.`);
   } else {
     lines.push('Rules: Reply with ONE line of spoken dialogue, 25 words or fewer. Stay in character.');
     lines.push('No narration, no stage directions, no actions in asterisks, no quotation marks, no name prefix.');
@@ -326,6 +328,17 @@ export const parseGestureLine = (raw, name) => {
   if (name) gesture = gesture.replace(new RegExp(`^${escapeRegex(name)}\\s+`, 'i'), '');
   if (gesture.length > 140) gesture = gesture.slice(0, 137).replace(/\s+\S*$/, '') + '…';
   return { text: cleanLine(words, name), gesture: gesture ? `*${gesture}*` : '' };
+};
+
+/**
+ * Split a reply in a real language ("¡Hola, amigo! || Hello, friend!") into the words as spoken
+ * and their English meaning, for crawlers who know the language. No " || " → meaning is ''.
+ */
+export const parseRealLanguageLine = (raw, name) => {
+  const text = stripThinking(raw).trim();
+  const firstLine = text.split(/\r?\n/).map((l) => l.trim()).find((l) => l.length > 0) || '';
+  const [words, ...rest] = firstLine.split('||');
+  return { text: cleanLine(words, name), meaning: cleanLine(rest.join(' '), name) };
 };
 
 // ── Auto-generated personalities ──
