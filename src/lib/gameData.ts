@@ -1892,6 +1892,8 @@ export interface GameSettings {
   id: string;
   xpScale?: number; // multiplies all automatic XP; 1 = 100%
   dungeonFloor?: number; // the floor the party is on; raises skill check DCs (1 if missing)
+  hideItemLibrary?: boolean; // DM switch: players can't see the Item Library on the Inventory page
+  hideSpellLibrary?: boolean; // DM switch: players can't see the Spell Library on the Spells page
 }
 
 // ---- Skill check difficulty ----

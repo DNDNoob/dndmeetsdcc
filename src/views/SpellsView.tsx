@@ -10,6 +10,7 @@ import { DungeonCard } from "@/components/ui/DungeonCard";
 import { LanguageSelect } from "@/components/LanguagePicker";
 import { applyUpgradesToSpell } from "@/lib/upgrades";
 import { UpgradeXpEditor } from "@/components/UpgradeXpEditor";
+import { LibraryVisibilityToggle, HiddenLibraryNotice } from "@/components/LibraryVisibilityToggle";
 import {
   Crawler,
   getInitialCrawlerId,
@@ -53,6 +54,8 @@ interface SpellsViewProps {
   iconImages?: Record<string, string>; // iconLibrary id -> pixel icon image
   onRegenerateIcon?: (subject: IconSubject) => Promise<{ id: string; image: string } | null>;
   currentPlayerId?: string; // crawler id of the player at this screen
+  libraryHidden?: boolean; // DM switch: hide the Spell Library from players
+  onSetLibraryHidden?: (hidden: boolean) => void; // DM only
   mySpells?: Spell[];
   onSaveSpellToMyContent?: (spell: Spell) => void;
 }
@@ -1045,6 +1048,8 @@ const SpellsView: React.FC<SpellsViewProps> = ({
   mySpells = [],
   onSaveSpellToMyContent,
   currentPlayerId,
+  libraryHidden = false,
+  onSetLibraryHidden,
 }) => {
   const [selectedCrawlerId, setSelectedCrawlerId] = useState<string>(() => getInitialCrawlerId(crawlers, currentPlayerId));
   const [editingSpell, setEditingSpell] = useState<Spell | null>(null);
@@ -1091,7 +1096,10 @@ const SpellsView: React.FC<SpellsViewProps> = ({
         {/* ── LEFT: Spell Library ── */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-display text-muted-foreground">SPELL LIBRARY</h2>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-sm font-display text-muted-foreground">SPELL LIBRARY</h2>
+              {onSetLibraryHidden && <LibraryVisibilityToggle hidden={libraryHidden} onChange={onSetLibraryHidden} />}
+            </div>
             {isAdmin && (
               <DungeonButton
                 variant="default"
@@ -1104,6 +1112,11 @@ const SpellsView: React.FC<SpellsViewProps> = ({
             )}
           </div>
 
+          {libraryHidden && !isAdmin ? (
+            <DungeonCard className="p-4">
+              <HiddenLibraryNotice kind="spells" />
+            </DungeonCard>
+          ) : (<>
           {/* Filters */}
           <div className="flex gap-2">
             <input
@@ -1151,6 +1164,7 @@ const SpellsView: React.FC<SpellsViewProps> = ({
               ))}
             </div>
           )}
+          </>)}
           {/* My Content: personal spells not tied to a campaign */}
           {isAdmin && mySpells.some(ms => !spells.some(s => s.id === ms.id)) && (
             <div className="border border-accent/20 bg-accent/5 p-3 rounded space-y-2 mt-3">

@@ -439,6 +439,10 @@ Each item can have:
 
 The Item Library can be filtered by rarity with the **All Rarities** menu next to the slot filter. Rarity is optional; items without one show no tag. Rarity and effects can also be set on items in **My Content**.
 
+### Hiding the Item Library from players
+
+The DM sees a **Shown to players** switch next to the Item Library title. Tap it to change it to **Hidden from players**. While it is hidden, players see a short note instead of the library, and the "add from library" search in edit mode is hidden from them too. Items already in a crawler's inventory stay visible to that player. Tap the switch again to show the library. The DM always sees the full library.
+
 ## Managing Inventory
 
 - Click "Edit" on the inventory page to enter edit mode
@@ -1900,6 +1904,8 @@ Vernon's Library is split into two panels:
 
 - **Left panel — Spell Library**: The shared collection of reusable spells. DMs can create, edit, and delete spells here. Any library spell can be granted directly to a crawler.
 - **Right panel — Known Spells**: Per-crawler spell lists showing cast counts, mastery levels, and effective mana costs.
+
+The DM can hide the Spell Library from players with the **Shown to players / Hidden from players** switch next to the **SPELL LIBRARY** title. While it is hidden, players see a short note instead of the library, but still see the spells their crawlers already know.
 
 Players cast their spells from the **Spells** tab on their crawler's profile. See [Casting & Mastery](/wiki/casting-mastery).
 

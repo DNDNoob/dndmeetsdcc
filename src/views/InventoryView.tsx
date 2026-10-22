@@ -12,6 +12,7 @@ import { Crawler, InventoryItem, getUpgradeKind, type UpgradeXpSettings, getItem
 import { RarityBadge } from "@/components/ui/RarityBadge";
 import { Coins, Package, Sword, Shield, Plus, Trash2, Edit2, Save, HardHat, Search, BookOpen, Gem, Footprints, Shirt, Hand, Crosshair, ChevronDown, ChevronUp, Wand2, Globe, Lock, Users, Bookmark } from "lucide-react";
 import { SpellDataEditor } from "@/views/SpellsView";
+import { LibraryVisibilityToggle, HiddenLibraryNotice } from "@/components/LibraryVisibilityToggle";
 
 // Inline SVG for legs/pants slot
 const LegsIcon: React.FC<{ className?: string }> = ({ className = "w-4 h-4" }) => (
@@ -60,6 +61,8 @@ interface InventoryViewProps {
   onConsumeSpellTome?: (crawlerId: string, itemId: string) => Promise<void>;
   onPromoteSpellToLibrary?: (spell: Spell) => Promise<void>;
   isAdmin?: boolean;
+  libraryHidden?: boolean; // DM switch: hide the Item Library from players
+  onSetLibraryHidden?: (hidden: boolean) => void; // DM only
   currentUserId?: string;
   currentUsername?: string;
   publicItems?: InventoryItem[];
@@ -94,6 +97,8 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   onConsumeSpellTome,
   onPromoteSpellToLibrary,
   isAdmin = false,
+  libraryHidden = false,
+  onSetLibraryHidden,
   currentUserId,
   currentUsername,
   publicItems = [],
@@ -361,6 +366,8 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   };
 
   const libraryItems = getSharedInventory();
+  // Players can't browse (or add from) the library while the DM has it hidden
+  const libraryLocked = libraryHidden && !isAdmin;
 
   // Crawler copies made before the library item got its icon fall back to the library item's icon
   const getItemIconSrc = (item: InventoryItem): string | undefined => {
@@ -537,10 +544,14 @@ const InventoryView: React.FC<InventoryViewProps> = ({
 
         {/* Item Library */}
         <div className="border border-primary/30 bg-muted/20 p-4 mb-6">
-          <h3 className="font-display text-lg text-primary flex items-center gap-2 mb-4">
-            <BookOpen className="w-5 h-5" />
-            ITEM LIBRARY
-          </h3>
+          <div className="flex items-center justify-between gap-2 flex-wrap mb-4">
+            <h3 className="font-display text-lg text-primary flex items-center gap-2">
+              <BookOpen className="w-5 h-5" />
+              ITEM LIBRARY
+            </h3>
+            {onSetLibraryHidden && <LibraryVisibilityToggle hidden={libraryHidden} onChange={onSetLibraryHidden} />}
+          </div>
+          {libraryLocked ? <HiddenLibraryNotice kind="items" /> : (<>
           {/* Search and filters */}
           <div className="flex flex-col sm:flex-row gap-2 mb-3">
             <div className="relative flex-1">
@@ -1187,6 +1198,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
               );
             })()}
           </div>
+          </>)}
         </div>
 
         {/* My Content: personal items not tied to a campaign */}
@@ -1321,7 +1333,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 </div>
 
                 {/* Search library items */}
-                {editMode && libraryItems.length > 0 && (
+                {editMode && !libraryLocked && libraryItems.length > 0 && (
                   <div className="mb-3">
                     <div className="relative">
                       <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
