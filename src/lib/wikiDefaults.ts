@@ -1424,7 +1424,9 @@ The dot next to the chat button is green when an NPC brain is listening. The cha
 
 NPCs can also say their lines out loud. Turn on **Spoken voices** in the Game Chat settings (gear icon). From then on, every NPC line is read aloud on every player's device at the same moment its speech bubble appears.
 
-- The voices come from online voice services, using free keys you paste into the chat settings: **Gemini** first, then **Groq**, then **ElevenLabs**. When one runs out of free use (or its key is missing or rejected), the next one takes over automatically, and the chat settings say which one is in use and when the others come back.
+- The voices come from online voice services, using free keys you paste into the chat settings: **Gemini** first, then **Groq**, then **ElevenLabs**. When one runs out of free use (or its key is missing or rejected), the next one takes over automatically, and the chat settings say which one is in use, why the others stopped, and when they come back. Each Gemini voice model has its own free allowance, so when one is used up the next one is tried first.
+- **Groq voices** need a one-time step: sign in at [console.groq.com](https://console.groq.com/playground), pick the **orpheus-v1-english** model in the Playground and accept its terms. Until then Groq voices are skipped.
+- **ElevenLabs voices** need a key with the **Voices (read)** permission, so the game can list your account's voices.
 - Gemini and Groq get a one-word mood tag worked out from the NPC's Voice and manner notes and attitude (gruff, nervous, cheerful, angry, sly, whispering, slow or fast), so a gruff dwarf sounds gruff and a nervous goblin sounds nervous. Only the line itself is spoken; accents come from the voice you pick.
 - If a line can't be voiced for the players, the chat settings say why under Spoken voices.
 - Lines play by themselves. If a browser won't play sound until you've tapped the page, the line waits and plays on your first tap.

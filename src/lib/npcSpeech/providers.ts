@@ -81,6 +81,19 @@ export const voiceEnginesInOrder = (keys: NpcOnlineKeys): VoiceEngine[] =>
 
 class Rested extends Error {}
 
+/** The short reason inside a service's error reply, if it gave one. */
+const serviceMessage = (body: string): string => {
+  let msg = '';
+  try {
+    const data = JSON.parse(body);
+    msg = data?.error?.message ?? data?.detail?.message ?? data?.message ?? '';
+  } catch {
+    // Not JSON: no reason to show
+  }
+  msg = String(msg).replace(/\s+/g, ' ').trim();
+  return msg.length > 140 ? `${msg.slice(0, 137)}…` : msg;
+};
+
 /** Rest a service after a failed request, for as long as the failure suggests, and move on. */
 async function failed(engine: VoiceEngine, keys: NpcOnlineKeys, res: Response): Promise<never> {
   const name = VOICE_ENGINES.find(e => e.id === engine)!.name;
@@ -95,10 +108,13 @@ async function failed(engine: VoiceEngine, keys: NpcOnlineKeys, res: Response): 
         : delay ? Number(delay) * 1000 + 1000
           : 2 * MINUTE;
     restFor(engine, keys, ms, `${name} voices used up for now`);
+  } else if (engine === 'groq' && /terms/i.test(body)) {
+    restFor(engine, keys, HOUR, 'Groq voices need the Orpheus terms accepted once at console.groq.com (Playground, model orpheus-v1-english)');
   } else if (res.status === 401 || res.status === 403) {
     restFor(engine, keys, HOUR, `${name} key was rejected for voices`);
   } else {
-    restFor(engine, keys, MINUTE, `${name} voice error ${res.status}`);
+    const said = serviceMessage(body);
+    restFor(engine, keys, res.status === 400 ? 10 * MINUTE : MINUTE, `${name} voice error ${res.status}${said ? ` (${said})` : ''}`);
   }
   console.warn(`[NpcSpeech] ${name} ${res.status}: ${body}`);
   throw new Rested();
@@ -166,8 +182,10 @@ async function gemini(req: SpeakRequest, key: string, keys: NpcOnlineKeys): Prom
   // Written directions, even short ones, sometimes get read out.
   const tag = GEMINI_TAGS[moodOf(req.traits.manner)] ?? pace(req.traits.speed);
   const prompt = tag ? `[${tag}] ${req.text}` : req.text;
-  while (geminiModel < GEMINI_MODELS.length) {
-    const model = GEMINI_MODELS[geminiModel];
+  // Each model has its own free allowance, so a used-up one passes the line to the next
+  let usedUp: Response | null = null;
+  for (let i = geminiModel; i < GEMINI_MODELS.length; i++) {
+    const model = GEMINI_MODELS[i];
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
@@ -179,7 +197,8 @@ async function gemini(req: SpeakRequest, key: string, keys: NpcOnlineKeys): Prom
         },
       }),
     });
-    if (res.status === 404) { geminiModel++; continue; } // retired model name: try the next one
+    if (res.status === 404) { if (i === geminiModel) geminiModel++; continue; } // retired model name: try the next one
+    if (res.status === 429) { usedUp ??= res; continue; }
     if (!res.ok) return failed('gemini', keys, res);
     const data = await res.json();
     const part = data?.candidates?.[0]?.content?.parts?.find((p: { inlineData?: unknown }) => p.inlineData)?.inlineData;
@@ -187,6 +206,7 @@ async function gemini(req: SpeakRequest, key: string, keys: NpcOnlineKeys): Prom
     const rate = Number(/rate=(\d+)/.exec(part.mimeType ?? '')?.[1]) || 24000;
     return { blob: pcmToWav(base64ToBytes(part.data), rate), ext: 'wav', engine: 'gemini' };
   }
+  if (usedUp) return failed('gemini', keys, usedUp);
   geminiModel = 0;
   restFor('gemini', keys, HOUR, 'No Gemini voice model is available');
   throw new Rested();
@@ -224,12 +244,21 @@ async function groq(req: SpeakRequest, key: string, keys: NpcOnlineKeys): Promis
 }
 
 // ElevenLabs voices differ by account, so they're read from the account the first time
-let elevenVoices: { key: string; list: Promise<CatalogVoice[]> } | null = null;
+let elevenVoices: { key: string; list: Promise<CatalogVoice[]>; why?: string } | null = null;
 
 export function elevenLabsVoices(key: string): Promise<CatalogVoice[]> {
   if (elevenVoices?.key === key) return elevenVoices.list;
-  const list = fetch('https://api.elevenlabs.io/v1/voices', { headers: { 'xi-api-key': key } })
-    .then(r => (r.ok ? r.json() : { voices: [] }))
+  const entry: { key: string; list: Promise<CatalogVoice[]>; why?: string } = { key, list: Promise.resolve([]) };
+  entry.list = fetch('https://api.elevenlabs.io/v1/voices', { headers: { 'xi-api-key': key } })
+    .then(async r => {
+      if (r.ok) return r.json();
+      const body = await r.text().catch(() => '');
+      entry.why = /voices_read|permission/i.test(body)
+        ? 'the ElevenLabs key needs the Voices (read) permission'
+        : r.status === 401 ? 'ElevenLabs rejected the key' : `ElevenLabs error ${r.status}`;
+      console.warn(`[NpcSpeech] ElevenLabs voices ${r.status}: ${body.slice(0, 300)}`);
+      return { voices: [] };
+    })
     .then((data: { voices?: { voice_id: string; name: string; labels?: Record<string, string> }[] }) =>
       (data.voices ?? []).map((v): CatalogVoice => {
         const l = v.labels ?? {};
@@ -244,16 +273,21 @@ export function elevenLabsVoices(key: string): Promise<CatalogVoice[]> {
           bright: /young|child|bright|upbeat|energetic|cheerful|playful/.test(desc),
         };
       }))
-    .catch(() => []);
-  elevenVoices = { key, list };
-  return list;
+    .catch(() => {
+      entry.why = "couldn't reach ElevenLabs";
+      return [];
+    });
+  elevenVoices = entry;
+  return entry.list;
 }
 
 async function elevenlabs(req: SpeakRequest, key: string, keys: NpcOnlineKeys): Promise<SpokenClip> {
   const voices = await elevenLabsVoices(key);
   const voice = req.pick?.elevenlabs || fitVoice(voices, req.traits)?.id;
   if (!voice) {
-    restFor('elevenlabs', keys, HOUR, "Couldn't load ElevenLabs voices");
+    const why = elevenVoices?.key === key ? elevenVoices.why : undefined;
+    if (elevenVoices?.key === key) elevenVoices = null; // try the list again after the rest
+    restFor('elevenlabs', keys, HOUR, `Couldn't load ElevenLabs voices${why ? `: ${why}` : ''}`);
     throw new Rested();
   }
   const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice}?output_format=mp3_44100_64`, {
