@@ -2,6 +2,7 @@
   {
     "date": "2026-10-22",
     "changes": [
+      "🔤 Mob token letters (A, B, C) now only show when the same mob is on the current map more than once. A character placed on several maps no longer gets an A",
       "📖 New tutorial episode, Tutorial: Rat Problem: a starter campaign with a hardware store and a thrift store to shop in, spell tomes, a quest, a basement boss fight and a street brawl with 12 Hooded Cultists. Its weapons and spells upgrade quickly so new players see upgrades early. See the Tutorial Episode page in the wiki",
       "🧘 When an item or spell reaches a new upgrade tier, the Dungeon AI meditates on how you play and offers 3 upgrade trees of 3 steps each. Pick one with the new Choose your path button: you get its first step now, and each later tier unlocks the next step to Claim",
       "🏆 New achievement: Fully Evolved, for finishing all 3 steps of an upgrade tree. Trees can also rename the item",
