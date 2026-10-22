@@ -118,7 +118,7 @@ import { useGame } from "@/contexts/GameContext";
 import { DEFAULT_LANGUAGE_ID, questionEffectFor } from "@/lib/languages";
 import type { BatchOperation } from "@/hooks/useFirebaseStore";
 import { db, storage } from "@/lib/firebase";
-import { doc, getDoc, setDoc, deleteDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, deleteDoc, updateDoc, serverTimestamp, FieldPath } from "firebase/firestore";
 import { ref as storageRef, deleteObject } from "firebase/storage";
 import { logger } from "@/lib/logger";
 import { toast } from "sonner";
@@ -3211,18 +3211,36 @@ export const useGameState = () => {
     }
   };
 
+  // One speaker's entry in npcAi/secrets or npcAi/memories, replaced as a whole. Creature copies have
+  // ids like "goblinId~b", and updateDoc rejects "~" in a field path, so write with an explicit FieldPath.
+  const writeNpcAiEntry = async (docId: 'secrets' | 'memories', key: string, value: Record<string, unknown>) => {
+    if (!db) {
+      await writeNpcAiDoc(docId, { [key]: value });
+      return;
+    }
+    const path = roomId ? `rooms/${roomId}/npcAi/${docId}` : `npcAi/${docId}`;
+    const clean = JSON.parse(JSON.stringify(value)) as Record<string, unknown>; // drops undefined fields
+    try {
+      await setDoc(doc(db, path), { [key]: clean }, { mergeFields: [new FieldPath(key)] });
+    } catch (err) {
+      logger.error('[GameState] ❌ NPC AI write failed', { docId, key, err });
+      toast.error('Failed to save changes. Please try again.', { id: 'save-error' });
+      throw err;
+    }
+  };
+
   const updateNpcAiSettings = async (updates: Partial<Omit<NpcAiSettings, 'id'>>) => {
     await writeNpcAiDoc('settings', updates as Record<string, unknown>);
   };
 
   // DM edits to what a speaker remembers (an empty note list with no feelings clears it)
   const setNpcMemory = async (speakerId: string, memory: NpcMemory) => {
-    await writeNpcAiDoc('memories', { [speakerId]: { ...memory, updatedAt: Date.now() } });
+    await writeNpcAiEntry('memories', speakerId, { ...memory, updatedAt: Date.now() });
   };
 
   const setNpcSecretState = async (mobId: string, state: NpcSecretState) => {
     const entry: NpcSecretEntry = { state, at: Date.now() };
-    await writeNpcAiDoc('secrets', { [mobId]: entry });
+    await writeNpcAiEntry('secrets', mobId, { ...entry });
   };
 
   return {
