@@ -1081,13 +1081,13 @@
     },
     {
       "id": "tutorial-mob-pointy-hats",
-      "name": "White Hat",
+      "name": "Hooded Cultist",
       "kind": "creature",
       "level": 1,
       "hitPoints": 3,
       "hidden": true,
       "silent": true,
-      "description": "Robed figures in tall white pointy hats, chanting in the dark. Cowards: as soon as one takes any damage, it flees (the DM moves it off the map or removes it).",
+      "description": "Figures in black robes and hoods, chanting in the dark. Cowards: as soon as one takes any damage, it flees (the DM moves it off the map or removes it).",
       "weaknesses": "Flee the moment they're hurt.",
       "strengths": "There are a lot of them.",
       "attacks": [
@@ -1107,7 +1107,7 @@
         }
       ],
       "defaultGold": 1,
-      "portrait": "white-hat.jpg"
+      "portrait": "hooded-cultist.jpg"
     },
     {
       "id": "tutorial-mob-thephen-socking",
@@ -1396,6 +1396,6 @@
   "episode": {
     "id": "tutorial-episode-rat-problem",
     "name": "Tutorial: Rat Problem",
-    "description": "READ ALOUD (Home, afternoon): You and your friends are throwing a DnD party tonight, and you're out of everything. QWERTY is beeping at the empty snack bowl and the parrot won't shut up. | STREET (afternoon): On the walk to the hardware store, a squirrel is robbing the bird feeder. Across the street, the blinds twitch. A poster on the telephone pole: MISSING. | HARDWARE STORE (late afternoon): Señor Gringo greets you with terrible Spanish. Stock up before the sun goes down. A hipster named Ralph Nander invites you to his thrift store, the Sacred Stone. | SACRED STONE THRIFT STORE: Ralph sells dusty old books he swears \"actually work, man.\" Each one teaches a spell. | THE KNOCK (back Home, night): The party is just starting when BANG BANG BANG. Your creepy neighbor is at the door, sweating: \"Rats! In my basement! Please, buddy, I need help!\" Give the quest Clear Out the Rats. The players choose: help him, or not. | DON'T HELP (switch to Street Night): A freak storm knocks out the power and a lightning strike sets your house on fire. Out in the cold, you hear chanting in the distance. The only house with lights on is the neighbor's. | HELP (Street Night, then his house): He leads you across the street and inside. \"Rats are downstairs. I'm gonna grab a Xanax, take the edge off.\" He leaves. BANGING from the basement door. Kitchen, upstairs, or basement? | BASEMENT: The banging stops the moment someone reaches the door. It's pitch black at the bottom of the stairs (fog of war). A college kid in a rat fursuit, gagged, squeaking. Spare fursuits on a rack, one for each of you. LIGHTNING. The neighbor is at the top of the stairs with a shotgun and a smile. Start combat. | AFTER THE FIGHT (Street Night): The chanting is right outside now. Twelve figures in tall white pointy hats fill the street with tiki torches. Reveal them and start combat. They're cowards: any one that takes damage flees."
+    "description": "READ ALOUD (Home, afternoon): You and your friends are throwing a DnD party tonight, and you're out of everything. QWERTY is beeping at the empty snack bowl and the parrot won't shut up. | STREET (afternoon): On the walk to the hardware store, a squirrel is robbing the bird feeder. Across the street, the blinds twitch. A poster on the telephone pole: MISSING. | HARDWARE STORE (late afternoon): Señor Gringo greets you with terrible Spanish. Stock up before the sun goes down. A hipster named Ralph Nander invites you to his thrift store, the Sacred Stone. | SACRED STONE THRIFT STORE: Ralph sells dusty old books he swears \"actually work, man.\" Each one teaches a spell. | THE KNOCK (back Home, night): The party is just starting when BANG BANG BANG. Your creepy neighbor is at the door, sweating: \"Rats! In my basement! Please, buddy, I need help!\" Give the quest Clear Out the Rats. The players choose: help him, or not. | DON'T HELP (switch to Street Night): A freak storm knocks out the power and a lightning strike sets your house on fire. Out in the cold, you hear chanting in the distance. The only house with lights on is the neighbor's. | HELP (Street Night, then his house): He leads you across the street and inside. \"Rats are downstairs. I'm gonna grab a Xanax, take the edge off.\" He leaves. BANGING from the basement door. Kitchen, upstairs, or basement? | BASEMENT: The banging stops the moment someone reaches the door. It's pitch black at the bottom of the stairs (fog of war). A college kid in a rat fursuit, gagged, squeaking. Spare fursuits on a rack, one for each of you. LIGHTNING. The neighbor is at the top of the stairs with a shotgun and a smile. Start combat. | AFTER THE FIGHT (Street Night): The chanting is right outside now. Twelve hooded cultists in black robes fill the street with tiki torches. Reveal them and start combat. They're cowards: any one that takes damage flees."
   }
 }
