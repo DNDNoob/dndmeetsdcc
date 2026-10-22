@@ -1,5 +1,14 @@
 [
   {
+    "date": "2026-10-22",
+    "changes": [
+      "🧘 When an item or spell reaches a new upgrade tier, the Dungeon AI meditates on how you play and offers 3 upgrade trees of 3 steps each. Pick one with the new Choose your path button: you get its first step now, and each later tier unlocks the next step to Claim",
+      "🏆 New achievement: Fully Evolved, for finishing all 3 steps of an upgrade tree. Trees can also rename the item",
+      "🎲 DMs can see every upgrade tree in progress in the DM Console's Upgrades tab, read what the AI wrote, and Re-roll trees to ask again. If the AI is unavailable, ready-made trees are offered instead",
+      "🔒 Right-click Upgrade on a weapon (free editing) is now DM-only"
+    ]
+  },
+  {
     "date": "2026-10-21",
     "changes": [
       "✨ DMs can give upgrades to a crawler's item or spell from the new Upgrades tab in the DM Console: bigger dice, more range, a new damage type, splash, stat bonuses, languages, defenses, on-hit effects, new actions or something strange, and can rename the item or spell. Each one is posted to the dice log",

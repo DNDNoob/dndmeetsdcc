@@ -26,6 +26,7 @@ import { usePublicContent } from "@/hooks/usePublicContent";
 import { useMyContent } from "@/hooks/useMyContent";
 import { useIconLibrary } from "@/hooks/useIconLibrary";
 import { useNpcBrain } from "@/hooks/useNpcBrain";
+import { useUpgradeMeditation } from "@/hooks/useUpgradeMeditation";
 import { useNpcSpeechMaker } from "@/hooks/useNpcSpeechMaker";
 import { toast } from "sonner";
 import { getNoChildLeftBehindBump, rollD20, rollsWithDisadvantage, isCheckSuccess, skillForLabel, SKILL_XP_PER_SUCCESS } from "@/lib/gameData";
@@ -206,6 +207,13 @@ const Index = () => {
     awardTrophy,
     giveUpgrade,
     undoLastUpgrade,
+    crawlerStatsById,
+    dueUpgrades,
+    advanceUpgrade,
+    offerUpgradeTrees,
+    chooseUpgradeTree,
+    claimUpgradeStep,
+    rerollUpgradeTrees,
     applyNoChildLeftBehind,
     revokeTrophy,
     overrideMobHealth,
@@ -289,6 +297,12 @@ const Index = () => {
 
   // Online NPC brain: runs in the DM's browser during a live game (keys stay in this browser)
   const { npcKeys, setNpcKeys } = useNpcBrain(roomId, isAdmin);
+
+  // Item and spell milestones: the DM's browser asks the Dungeon AI for upgrade trees
+  useUpgradeMeditation({
+    roomId, isDm: isAdmin, isLoaded, keys: npcKeys, due: dueUpgrades, crawlers, statsById: crawlerStatsById,
+    advanceUpgrade, offerUpgradeTrees,
+  });
 
   // Spoken voices: the DM's browser reads new NPC lines aloud and shares the clips with players
   useNpcSpeechMaker({
@@ -1110,6 +1124,8 @@ const Index = () => {
                 spells={spells}
                 onCastSpell={castSpell}
                 onForgetSpell={forgetSpell}
+                onChooseUpgradeTree={chooseUpgradeTree}
+                onClaimUpgradeStep={claimUpgradeStep}
                 onHealCrawler={healCrawler}
               />
             )}
@@ -1215,6 +1231,7 @@ const Index = () => {
                 getCrawlerInventory={getCrawlerInventory}
                 onGiveUpgrade={giveUpgrade}
                 onUndoUpgrade={undoLastUpgrade}
+                onRerollUpgradeTrees={rerollUpgradeTrees}
               />
             )}
             {currentView === "showtime" && (

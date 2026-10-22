@@ -19,6 +19,7 @@ import { EquipmentSlot } from "@/components/ui/EquipmentSlot";
 import { Crawler, getQuestProgress, Mob, InventoryItem, getItemStackKey, stackItems, getLootingLevel, getLootsUntilNextLevel, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery, getInitialCrawlerId, rollD20, rollsWithDisadvantage, ABILITY_KEYS, baseItemName, type SpellEffect, describeSpellEffect, getSkillRank, getSkillXPToSpend, getWeaponProficiency, HAND_TO_HAND, getCheckDC, SKILLS, type SkillDef, type CheckDifficultyId, getCrawlerXP, type SkillId, type AbilityKey, getCrawlerStatValue, getHighlightStats, type StatSource, type CrawlerStats, type CrawlerStatsById, getUpgradeKind, resolveUpgradeXp, getUpgradeXp, getUpgradeTier, statKey, type UpgradeXpBreakdown, type EquippedItems } from "@/lib/gameData";
 import { UpgradeXpBar } from "@/components/UpgradeXpBar";
 import { UpgradeList } from "@/components/UpgradeList";
+import { UpgradePathPrompt } from "@/components/UpgradePathPrompt";
 import { resolveKnownSpell, hasDrawback } from "@/lib/upgrades";
 import { toast } from "sonner";
 import { ItemName } from "@/components/ItemName";
@@ -138,6 +139,8 @@ interface ProfilesViewProps {
   spells?: Spell[];
   onCastSpell?: (crawlerId: string, spellId: string) => Promise<boolean>;
   onForgetSpell?: (crawlerId: string, spellId: string) => Promise<void>;
+  onChooseUpgradeTree?: (crawlerId: string, target: { kind: 'item' | 'spell'; id: string }, treeIndex: number) => Promise<void>;
+  onClaimUpgradeStep?: (crawlerId: string, target: { kind: 'item' | 'spell'; id: string }) => Promise<void>;
   onHealCrawler?: (crawlerId: string, amount: number, healerId?: string, source?: StatSource) => Promise<void>;
 }
 
@@ -171,7 +174,8 @@ const ProfileSpellCard: React.FC<{
   onCast: () => void;
   onForget?: () => void;
   upgrade?: UpgradeProgress | null;
-}> = ({ knownSpell, spell, currentMana, lockedReason, isAdmin, onCast, onForget, upgrade }) => {
+  pathPrompt?: React.ReactNode;
+}> = ({ knownSpell, spell, currentMana, lockedReason, isAdmin, onCast, onForget, upgrade, pathPrompt }) => {
   const [expanded, setExpanded] = useState(false);
   const masteryLevel = getSpellMasteryLevel(knownSpell.castCount);
   const castsUntilNext = getCastsUntilNextMastery(knownSpell.castCount);
@@ -272,6 +276,7 @@ const ProfileSpellCard: React.FC<{
           </div>
         </div>
         {upgrade && <UpgradeXpBar xp={upgrade.xp} milestones={upgrade.milestones} className="pt-1" />}
+        {pathPrompt}
       </div>
 
       <div className="flex gap-1 p-2 mt-auto">
@@ -549,6 +554,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   spells: spellLibrary = [],
   onCastSpell,
   onForgetSpell,
+  onChooseUpgradeTree,
+  onClaimUpgradeStep,
   onHealCrawler,
 }) => {
   // Players land on their own crawler; the DM (and spectators) start on the first one
@@ -1019,6 +1026,17 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
     const { floor, next } = getUpgradeTier(upgrade.xp.total, upgrade.milestones);
     return next === null ? 100 : ((upgrade.xp.total - floor) / (next - floor)) * 100;
   };
+  // The upgrade tree prompt (meditating / Choose your path / Claim) under an item or spell
+  const pathPrompt = (target: { kind: 'item' | 'spell'; id: string }, path: KnownSpell['upgradePath'], name: string, className: string) => (
+    <UpgradePathPrompt
+      path={path}
+      itemName={name}
+      canAct={(isOwnProfile || isAdmin) && !!onChooseUpgradeTree}
+      onChoose={(i) => onChooseUpgradeTree?.(selected.id, target, i)}
+      onClaim={() => onClaimUpgradeStep?.(selected.id, target)}
+      className={className}
+    />
+  );
   const spellUpgrade = (ks: KnownSpell, spell: Spell | undefined): UpgradeProgress | null => {
     if (!spell) return null;
     const { enabled, milestones } = resolveUpgradeXp('spell', spell.upgradeXp);
@@ -2043,7 +2061,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                                 });
                               }}
                               onContextMenu={(e) => {
-                                if (isOwnProfile && item.weaponData) {
+                                if (isAdmin && item.weaponData) {
                                   e.preventDefault();
                                   openWeaponUpgrade(item);
                                 }
@@ -2051,7 +2069,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                               className={`bg-muted/50 p-3 rounded-lg border transition-colors select-none ${
                                 isEquipped ? 'border-primary/50' : 'border-border'
                               } ${isOwnProfile && item.equipSlot ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'} hover:bg-muted/70`}
-                              title={isOwnProfile && item.equipSlot ? 'Drag to equip slot, or double-click to equip' + (item.weaponData ? '. Right-click to upgrade.' : '') : 'Click to expand'}
+                              title={isOwnProfile && item.equipSlot ? 'Drag to equip slot, or double-click to equip' + (isAdmin && item.weaponData ? '. Right-click to upgrade.' : '') : 'Click to expand'}
                             >
                               <div className="flex items-start gap-2">
                                 {getEquipmentIcon(item.equipSlot, "w-4 h-4 shrink-0 mt-0.5")}
@@ -2077,6 +2095,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                                     const upgrade = itemUpgrade(item);
                                     return upgrade && <UpgradeXpBar xp={upgrade.xp} milestones={upgrade.milestones} className="mt-1.5" />;
                                   })()}
+                                  {pathPrompt({ kind: 'item', id: item.id }, item.upgradePath, baseItemName(item), 'mt-1.5')}
 
                                   {/* Expanded detail */}
                                   {isExpanded && (
@@ -2122,7 +2141,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                                         </div>
                                       )}
                                       <div className="flex gap-2 mt-1">
-                                        {isOwnProfile && item.weaponData && (
+                                        {isAdmin && item.weaponData && (
                                           <button
                                             onClick={(e) => {
                                               e.stopPropagation();
@@ -2640,6 +2659,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                                 onCast={() => { if (spell) void handleCastSpell(ks, spell); }}
                                 onForget={onForgetSpell ? () => { void onForgetSpell(selected.id, ks.spellId); } : undefined}
                                 upgrade={spellUpgrade(ks, spell)}
+                                pathPrompt={pathPrompt({ kind: 'spell', id: ks.spellId }, ks.upgradePath, ks.spellName, 'mt-1')}
                               />
                             ))}
                           </div>
@@ -2934,6 +2954,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                               const upgrade = itemUpgrade(item);
                               return upgrade && <UpgradeXpBar xp={upgrade.xp} milestones={upgrade.milestones} className="mt-1.5 text-left" />;
                             })()}
+                            {pathPrompt({ kind: 'item', id: item.id }, item.upgradePath, baseItemName(item), 'mt-1.5')}
                           </div>
                           {/* Action buttons */}
                           <div className="flex gap-1 p-2 mt-auto">

@@ -342,7 +342,7 @@ Only hostile kills count. Damage to friendly crawlers or neutral mobs earns noth
 
 ## Tiers
 
-By default an item or spell reaches Tier 1 at 50 XP, then Tier 2 at 150, Tier 3 at 300, Tier 4 at 500 and Tier 5 at 750. Reaching a tier doesn't change the item yet: picking upgrades at each tier is coming next.
+By default an item or spell reaches Tier 1 at 50 XP, then Tier 2 at 150, Tier 3 at 300, Tier 4 at 500 and Tier 5 at 750. Each new tier earns an upgrade: see **Upgrade trees** below.
 
 ## Setting XP for an item or spell (DM)
 
@@ -384,9 +384,24 @@ An upgrade can come with a price. The item gets a red **Cursed** mark, and the p
 
 Every upgrade is posted to the dice log in gold, with any price in red, so the whole party sees it. A crawler's first weapon upgrade earns **Sharpened**, first armor upgrade **Hardened**, first spell upgrade **Spellwright**, and first cursed bargain **Deal With the Devil**.
 
+## Upgrade trees
+
+When an item or spell reaches a new tier, the dice log announces it and the item shows *"The Dungeon AI is meditating on your accomplishments, crawler."* The Dungeon AI looks at how you actually play (your weapons, kills, favorite stats, spells) and writes **3 upgrade trees** for it: one that leans into your style, one that patches a weakness, and a wild card. Each tree has 3 steps.
+
+When it's done, a glowing **Choose your path** button appears on the item (in Inventory and Attacks) or spell. Open it to compare the trees and pick one. You get its first step straight away. Each later tier unlocks the next step of the same tree: tap **Claim** on the item to take it. Finishing all 3 steps earns the **Fully Evolved** achievement. After that, the next tier starts a new meditation with fresh trees.
+
+- The AI may rename the item, usually on a tree's last step.
+- At most one step across all trees is a cursed bargain, which is stronger than the rest.
+- Every step is checked against power limits for its tier before you see it, so the AI can't hand out anything game-breaking.
+- Only the crawler's player or the DM can pick a path or claim a step.
+
+The Dungeon AI uses the DM's free Groq or Gemini key from the NPC settings, so the DM's browser needs to be open on the campaign for meditations to finish. If there's no key, or the AI answers badly twice, ready-made trees are offered instead.
+
 ## Giving an upgrade (DM)
 
-Open the **DM Console** and the **Upgrades** tab. Pick the crawler and the item or spell, name the upgrade, add flavor text, optionally give the item a new name, and add one or more effects. Add a cursed bargain if you like, then click **Give**. **Take back the latest upgrade** undoes the most recent one, restoring the numbers it changed.`,
+Open the **DM Console** and the **Upgrades** tab. Pick the crawler and the item or spell, name the upgrade, add flavor text, optionally give the item a new name, and add one or more effects. Add a cursed bargain if you like, then click **Give**. **Take back the latest upgrade** undoes the most recent one, restoring the numbers it changed.
+
+The same tab lists every item and spell with an upgrade tree in progress. Pick one to see the trees on offer, the path taken, and what the AI was asked and answered. **Re-roll trees** throws away the offered trees and asks the Dungeon AI again. The DM can also still right-click a weapon in a crawler's inventory to edit it freely.`,
   },
   {
     id: 'inventory',

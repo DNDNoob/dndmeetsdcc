@@ -64,6 +64,7 @@ interface DungeonAIViewProps {
   getCrawlerInventory?: (crawlerId: string) => InventoryItem[];
   onGiveUpgrade?: (crawlerId: string, target: UpgradeTarget, upgrade: ItemUpgrade) => Promise<void>;
   onUndoUpgrade?: (crawlerId: string, target: UpgradeTarget) => Promise<void>;
+  onRerollUpgradeTrees?: (crawlerId: string, target: UpgradeTarget) => Promise<void>;
 }
 
 /** Shown in place of a community list when the user hasn't opted in to public content. */
@@ -116,6 +117,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
   getCrawlerInventory,
   onGiveUpgrade,
   onUndoUpgrade,
+  onRerollUpgradeTrees,
 }) => {
   // Content without a creator was made here by the DM; imported content keeps its original creator
   const canShare = (createdBy?: string) => !!currentUserId && (!createdBy || createdBy === currentUserId);
@@ -2576,7 +2578,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
         )}
 
         {activeTab === "upgrades" && getCrawlerInventory && onGiveUpgrade && onUndoUpgrade && (
-          <UpgradeGiver crawlers={crawlers} spells={spells} getCrawlerInventory={getCrawlerInventory} onGive={onGiveUpgrade} onUndo={onUndoUpgrade} />
+          <UpgradeGiver crawlers={crawlers} spells={spells} getCrawlerInventory={getCrawlerInventory} onGive={onGiveUpgrade} onUndo={onUndoUpgrade} onReroll={onRerollUpgradeTrees} />
         )}
 
         {activeTab === "quests" && (
