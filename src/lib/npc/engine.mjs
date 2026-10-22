@@ -24,7 +24,7 @@ import { collection, doc, onSnapshot, setDoc, FieldPath } from 'firebase/firesto
 import {
   hasPersonality, distance, mentionsName, timeOfDay, hpWords,
   buildSystemPrompt, buildLinePrompt, buildShouldSpeakPrompt, buildSecretCheckPrompt,
-  formatTranscript, isYes, cleanLine, parseGestureLine, hasGestureStyle, presetLine,
+  formatTranscript, isYes, cleanLine, undoEncodedLine, parseGestureLine, hasGestureStyle, presetLine,
   rollPersonalityTraits, buildPersonalityPrompt, parsePersonality, defaultPersuasionDC, PERSONALITY_SYSTEM_PROMPT,
   MEMORY_SYSTEM_PROMPT, buildMemoryPrompt, parseMemory,
 } from './brain.mjs';
@@ -902,10 +902,12 @@ export class NpcRoom {
       });
       const raw = await this.ask(tier, system, buildLinePrompt({ mob, transcript, trigger: job.trigger }), { maxTokens: gestureStyle ? 110 : 80, temperature: 0.8 });
       if (gestureStyle) ({ text: line, gesture } = parseGestureLine(raw, mob.name));
-      else line = cleanLine(raw, mob.name);
+      else line = undoEncodedLine(cleanLine(raw, mob.name));
     } finally {
       await this.writeStatus({ thinking: null });
     }
+    // The model sent code instead of words: say something readable rather than post the blob
+    if (!line && !gestureStyle) line = presetLine(language);
     await this.postLine(mob, placement, { text: line, language, gesture, mapId });
   }
 
