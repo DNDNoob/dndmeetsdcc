@@ -1782,6 +1782,34 @@ Inside Account Settings, the **Decision History** panel shows a log of significa
 - The date and time`,
   },
   {
+    id: 'tutorial-episode',
+    slug: 'tutorial-episode',
+    title: 'Tutorial Episode: Rat Problem',
+    category: 'Basics',
+    order: 6,
+    content: `# Tutorial Episode: Rat Problem
+
+**Tutorial: Rat Problem** is a short starter adventure that shows a new group the main parts of the app in one evening of play. It comes as its own campaign, so it never mixes with your other games.
+
+## The Setup
+
+You and your friends are throwing a DnD party tonight, and you're out of supplies. Time for a trip to the hardware store. The neighbor across the street has been acting strange lately...
+
+## What It Teaches
+
+| Feature | Where |
+| --- | --- |
+| Character setup | Before play |
+| NPC chat | Every character you meet |
+| Languages | Some people don't speak Worldspeech |
+| Trading and haggling | The hardware store and a thrift store |
+| Spells from tomes | The thrift store |
+| Quests | A neighbor needs help |
+| Noncombat turns | Around the neighborhood |
+| Fog of war | Dark places |
+| Combat, loot and upgrades | You'll find out |`,
+  },
+  {
     id: 'campaigns',
     slug: 'campaigns',
     title: 'Campaigns',
