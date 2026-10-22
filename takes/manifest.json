@@ -2,6 +2,7 @@
   {
     "slug": "boss-fight",
     "setting": "Boss fight",
+    "round": 1,
     "take": 1,
     "file": "boss-fight-take1.mp3",
     "seed": 785366728,
@@ -25,6 +26,7 @@
   {
     "slug": "boss-fight",
     "setting": "Boss fight",
+    "round": 1,
     "take": 2,
     "file": "boss-fight-take2.mp3",
     "seed": 174100275,
@@ -48,6 +50,7 @@
   {
     "slug": "boss-fight",
     "setting": "Boss fight",
+    "round": 1,
     "take": 3,
     "file": "boss-fight-take3.mp3",
     "seed": 1645427740,
@@ -69,8 +72,153 @@
     "model": "acestep-v15-turbo"
   },
   {
+    "slug": "boss-fight-r2a",
+    "setting": "Boss fight",
+    "round": 2,
+    "take": 1,
+    "file": "round2/boss-fight-r2a-take1.mp3",
+    "seed": 1152691650,
+    "tags": "fast-paced epic battle music, blast beat drums, shredding electric guitar, aggressive brass stabs, intense choir, frantic staccato strings, high energy, instrumental",
+    "bpm": 180,
+    "duration_s": 156.0,
+    "generation_seconds": 198.0,
+    "mean_volume_db": -16.0,
+    "size_bytes": 1872710,
+    "acestep_version": "1.5.0",
+    "requested_duration_s": 160,
+    "settings": {
+      "dtype": "float32",
+      "inference_steps": 8,
+      "thinking": false,
+      "offload_to_cpu": true,
+      "offload_dit_to_cpu": true
+    },
+    "model": "acestep-v15-turbo"
+  },
+  {
+    "slug": "boss-fight-r2a",
+    "setting": "Boss fight",
+    "round": 2,
+    "take": 2,
+    "file": "round2/boss-fight-r2a-take2.mp3",
+    "seed": 11166740,
+    "tags": "fast-paced epic battle music, blast beat drums, shredding electric guitar, aggressive brass stabs, intense choir, frantic staccato strings, high energy, instrumental",
+    "bpm": 180,
+    "duration_s": 156.0,
+    "generation_seconds": 208.0,
+    "mean_volume_db": -17.0,
+    "size_bytes": 1872710,
+    "acestep_version": "1.5.0",
+    "requested_duration_s": 160,
+    "settings": {
+      "dtype": "float32",
+      "inference_steps": 8,
+      "thinking": false,
+      "offload_to_cpu": true,
+      "offload_dit_to_cpu": true
+    },
+    "model": "acestep-v15-turbo"
+  },
+  {
+    "slug": "boss-fight-r2a",
+    "setting": "Boss fight",
+    "round": 2,
+    "take": 3,
+    "file": "round2/boss-fight-r2a-take3.mp3",
+    "seed": 1172478213,
+    "tags": "fast-paced epic battle music, blast beat drums, shredding electric guitar, aggressive brass stabs, intense choir, frantic staccato strings, high energy, instrumental",
+    "bpm": 180,
+    "duration_s": 156.0,
+    "generation_seconds": 307.5,
+    "mean_volume_db": -18.2,
+    "size_bytes": 1872710,
+    "acestep_version": "1.5.0",
+    "requested_duration_s": 160,
+    "settings": {
+      "dtype": "float32",
+      "inference_steps": 8,
+      "thinking": false,
+      "offload_to_cpu": true,
+      "offload_dit_to_cpu": true
+    },
+    "model": "acestep-v15-turbo"
+  },
+  {
+    "slug": "boss-fight-r2b",
+    "setting": "Boss fight",
+    "round": 2,
+    "take": 1,
+    "file": "round2/boss-fight-r2b-take1.mp3",
+    "seed": 1855287412,
+    "tags": "symphonic metal, double kick drums, driving distorted guitar riffs, racing orchestra, epic choir, urgent, relentless, instrumental",
+    "bpm": 170,
+    "duration_s": 156.0,
+    "generation_seconds": 341.3,
+    "mean_volume_db": -15.7,
+    "size_bytes": 1872710,
+    "acestep_version": "1.5.0",
+    "requested_duration_s": 160,
+    "settings": {
+      "dtype": "float32",
+      "inference_steps": 8,
+      "thinking": false,
+      "offload_to_cpu": true,
+      "offload_dit_to_cpu": true
+    },
+    "model": "acestep-v15-turbo"
+  },
+  {
+    "slug": "boss-fight-r2b",
+    "setting": "Boss fight",
+    "round": 2,
+    "take": 2,
+    "file": "round2/boss-fight-r2b-take2.mp3",
+    "seed": 1255137899,
+    "tags": "symphonic metal, double kick drums, driving distorted guitar riffs, racing orchestra, epic choir, urgent, relentless, instrumental",
+    "bpm": 170,
+    "duration_s": 156.0,
+    "generation_seconds": 410.6,
+    "mean_volume_db": -17.6,
+    "size_bytes": 1872710,
+    "acestep_version": "1.5.0",
+    "requested_duration_s": 160,
+    "settings": {
+      "dtype": "float32",
+      "inference_steps": 8,
+      "thinking": false,
+      "offload_to_cpu": true,
+      "offload_dit_to_cpu": true
+    },
+    "model": "acestep-v15-turbo"
+  },
+  {
+    "slug": "boss-fight-r2b",
+    "setting": "Boss fight",
+    "round": 2,
+    "take": 3,
+    "file": "round2/boss-fight-r2b-take3.mp3",
+    "seed": 1376604138,
+    "tags": "symphonic metal, double kick drums, driving distorted guitar riffs, racing orchestra, epic choir, urgent, relentless, instrumental",
+    "bpm": 170,
+    "duration_s": 156.0,
+    "generation_seconds": 336.5,
+    "mean_volume_db": -16.7,
+    "size_bytes": 1872710,
+    "acestep_version": "1.5.0",
+    "requested_duration_s": 160,
+    "settings": {
+      "dtype": "float32",
+      "inference_steps": 8,
+      "thinking": false,
+      "offload_to_cpu": true,
+      "offload_dit_to_cpu": true
+    },
+    "model": "acestep-v15-turbo"
+  },
+  {
     "slug": "combat",
     "setting": "Combat",
+    "round": 1,
     "take": 1,
     "file": "combat-take1.mp3",
     "seed": 1082787105,
@@ -94,6 +242,7 @@
   {
     "slug": "combat",
     "setting": "Combat",
+    "round": 1,
     "take": 2,
     "file": "combat-take2.mp3",
     "seed": 96812659,
@@ -117,6 +266,7 @@
   {
     "slug": "combat",
     "setting": "Combat",
+    "round": 1,
     "take": 3,
     "file": "combat-take3.mp3",
     "seed": 2090416197,
@@ -138,8 +288,81 @@
     "model": "acestep-v15-turbo"
   },
   {
+    "slug": "combat-r2",
+    "setting": "Combat",
+    "round": 2,
+    "take": 1,
+    "file": "round2/combat-r2-take1.mp3",
+    "seed": 1066052548,
+    "tags": "fast action battle music, energetic orchestral, pounding taiko drums, rapid string ostinato, heroic brass, driving, instrumental",
+    "bpm": 160,
+    "duration_s": 156.0,
+    "generation_seconds": 536.7,
+    "mean_volume_db": -16.0,
+    "size_bytes": 1872710,
+    "acestep_version": "1.5.0",
+    "requested_duration_s": 160,
+    "settings": {
+      "dtype": "float32",
+      "inference_steps": 8,
+      "thinking": false,
+      "offload_to_cpu": true,
+      "offload_dit_to_cpu": true
+    },
+    "model": "acestep-v15-turbo"
+  },
+  {
+    "slug": "combat-r2",
+    "setting": "Combat",
+    "round": 2,
+    "take": 2,
+    "file": "round2/combat-r2-take2.mp3",
+    "seed": 780698737,
+    "tags": "fast action battle music, energetic orchestral, pounding taiko drums, rapid string ostinato, heroic brass, driving, instrumental",
+    "bpm": 160,
+    "duration_s": 156.0,
+    "generation_seconds": 339.5,
+    "mean_volume_db": -15.2,
+    "size_bytes": 1872710,
+    "acestep_version": "1.5.0",
+    "requested_duration_s": 160,
+    "settings": {
+      "dtype": "float32",
+      "inference_steps": 8,
+      "thinking": false,
+      "offload_to_cpu": true,
+      "offload_dit_to_cpu": true
+    },
+    "model": "acestep-v15-turbo"
+  },
+  {
+    "slug": "combat-r2",
+    "setting": "Combat",
+    "round": 2,
+    "take": 3,
+    "file": "round2/combat-r2-take3.mp3",
+    "seed": 2125105290,
+    "tags": "fast action battle music, energetic orchestral, pounding taiko drums, rapid string ostinato, heroic brass, driving, instrumental",
+    "bpm": 160,
+    "duration_s": 156.0,
+    "generation_seconds": 183.9,
+    "mean_volume_db": -17.0,
+    "size_bytes": 1872710,
+    "acestep_version": "1.5.0",
+    "requested_duration_s": 160,
+    "settings": {
+      "dtype": "float32",
+      "inference_steps": 8,
+      "thinking": false,
+      "offload_to_cpu": true,
+      "offload_dit_to_cpu": true
+    },
+    "model": "acestep-v15-turbo"
+  },
+  {
     "slug": "crypt",
     "setting": "Crypt or haunted area",
+    "round": 1,
     "take": 1,
     "file": "crypt-take1.mp3",
     "seed": 1194768751,
@@ -163,6 +386,7 @@
   {
     "slug": "crypt",
     "setting": "Crypt or haunted area",
+    "round": 1,
     "take": 2,
     "file": "crypt-take2.mp3",
     "seed": 1096761884,
@@ -186,6 +410,7 @@
   {
     "slug": "crypt",
     "setting": "Crypt or haunted area",
+    "round": 1,
     "take": 3,
     "file": "crypt-take3.mp3",
     "seed": 2064145410,
@@ -207,8 +432,153 @@
     "model": "acestep-v15-turbo"
   },
   {
+    "slug": "crypt-r2a",
+    "setting": "Crypt or haunted area",
+    "round": 2,
+    "take": 1,
+    "file": "round2/crypt-r2a-take1.mp3",
+    "seed": 1129255247,
+    "tags": "horror film score, dissonant screeching strings, eerie whispers, low drones, creaking, detuned music box, sudden stingers, unsettling, instrumental",
+    "bpm": 60,
+    "duration_s": 156.0,
+    "generation_seconds": 364.3,
+    "mean_volume_db": -17.2,
+    "size_bytes": 1872710,
+    "acestep_version": "1.5.0",
+    "requested_duration_s": 160,
+    "settings": {
+      "dtype": "float32",
+      "inference_steps": 8,
+      "thinking": false,
+      "offload_to_cpu": true,
+      "offload_dit_to_cpu": true
+    },
+    "model": "acestep-v15-turbo"
+  },
+  {
+    "slug": "crypt-r2a",
+    "setting": "Crypt or haunted area",
+    "round": 2,
+    "take": 2,
+    "file": "round2/crypt-r2a-take2.mp3",
+    "seed": 2045459796,
+    "tags": "horror film score, dissonant screeching strings, eerie whispers, low drones, creaking, detuned music box, sudden stingers, unsettling, instrumental",
+    "bpm": 60,
+    "duration_s": 156.0,
+    "generation_seconds": 172.1,
+    "mean_volume_db": -15.5,
+    "size_bytes": 1872710,
+    "acestep_version": "1.5.0",
+    "requested_duration_s": 160,
+    "settings": {
+      "dtype": "float32",
+      "inference_steps": 8,
+      "thinking": false,
+      "offload_to_cpu": true,
+      "offload_dit_to_cpu": true
+    },
+    "model": "acestep-v15-turbo"
+  },
+  {
+    "slug": "crypt-r2a",
+    "setting": "Crypt or haunted area",
+    "round": 2,
+    "take": 3,
+    "file": "round2/crypt-r2a-take3.mp3",
+    "seed": 710240617,
+    "tags": "horror film score, dissonant screeching strings, eerie whispers, low drones, creaking, detuned music box, sudden stingers, unsettling, instrumental",
+    "bpm": 60,
+    "duration_s": 156.0,
+    "generation_seconds": 272.8,
+    "mean_volume_db": -16.1,
+    "size_bytes": 1872710,
+    "acestep_version": "1.5.0",
+    "requested_duration_s": 160,
+    "settings": {
+      "dtype": "float32",
+      "inference_steps": 8,
+      "thinking": false,
+      "offload_to_cpu": true,
+      "offload_dit_to_cpu": true
+    },
+    "model": "acestep-v15-turbo"
+  },
+  {
+    "slug": "crypt-r2b",
+    "setting": "Crypt or haunted area",
+    "round": 2,
+    "take": 1,
+    "file": "round2/crypt-r2b-take1.mp3",
+    "seed": 1127372602,
+    "tags": "dark ambient horror, haunted, ghostly choir, reversed piano, deep rumbling bass, metallic scrapes, heartbeat pulse, terrifying, instrumental",
+    "bpm": 70,
+    "duration_s": 156.0,
+    "generation_seconds": 237.4,
+    "mean_volume_db": -16.4,
+    "size_bytes": 1872710,
+    "acestep_version": "1.5.0",
+    "requested_duration_s": 160,
+    "settings": {
+      "dtype": "float32",
+      "inference_steps": 8,
+      "thinking": false,
+      "offload_to_cpu": true,
+      "offload_dit_to_cpu": true
+    },
+    "model": "acestep-v15-turbo"
+  },
+  {
+    "slug": "crypt-r2b",
+    "setting": "Crypt or haunted area",
+    "round": 2,
+    "take": 2,
+    "file": "round2/crypt-r2b-take2.mp3",
+    "seed": 351006755,
+    "tags": "dark ambient horror, haunted, ghostly choir, reversed piano, deep rumbling bass, metallic scrapes, heartbeat pulse, terrifying, instrumental",
+    "bpm": 70,
+    "duration_s": 156.0,
+    "generation_seconds": 185.3,
+    "mean_volume_db": -20.8,
+    "size_bytes": 1872710,
+    "acestep_version": "1.5.0",
+    "requested_duration_s": 160,
+    "settings": {
+      "dtype": "float32",
+      "inference_steps": 8,
+      "thinking": false,
+      "offload_to_cpu": true,
+      "offload_dit_to_cpu": true
+    },
+    "model": "acestep-v15-turbo"
+  },
+  {
+    "slug": "crypt-r2b",
+    "setting": "Crypt or haunted area",
+    "round": 2,
+    "take": 3,
+    "file": "round2/crypt-r2b-take3.mp3",
+    "seed": 161604159,
+    "tags": "dark ambient horror, haunted, ghostly choir, reversed piano, deep rumbling bass, metallic scrapes, heartbeat pulse, terrifying, instrumental",
+    "bpm": 70,
+    "duration_s": 156.0,
+    "generation_seconds": 182.7,
+    "mean_volume_db": -20.8,
+    "size_bytes": 1872710,
+    "acestep_version": "1.5.0",
+    "requested_duration_s": 160,
+    "settings": {
+      "dtype": "float32",
+      "inference_steps": 8,
+      "thinking": false,
+      "offload_to_cpu": true,
+      "offload_dit_to_cpu": true
+    },
+    "model": "acestep-v15-turbo"
+  },
+  {
     "slug": "deep-cavern",
     "setting": "Deep cavern or water level",
+    "round": 1,
     "take": 1,
     "file": "deep-cavern-take1.mp3",
     "seed": 2077074217,
@@ -232,6 +602,7 @@
   {
     "slug": "deep-cavern",
     "setting": "Deep cavern or water level",
+    "round": 1,
     "take": 2,
     "file": "deep-cavern-take2.mp3",
     "seed": 1121354361,
@@ -255,6 +626,7 @@
   {
     "slug": "deep-cavern",
     "setting": "Deep cavern or water level",
+    "round": 1,
     "take": 3,
     "file": "deep-cavern-take3.mp3",
     "seed": 1310464377,
@@ -278,6 +650,7 @@
   {
     "slug": "dungeon-corridor",
     "setting": "Dungeon corridor",
+    "round": 1,
     "take": 1,
     "file": "dungeon-corridor-take1.mp3",
     "seed": 1295606147,
@@ -301,6 +674,7 @@
   {
     "slug": "dungeon-corridor",
     "setting": "Dungeon corridor",
+    "round": 1,
     "take": 2,
     "file": "dungeon-corridor-take2.mp3",
     "seed": 1172194102,
@@ -324,6 +698,7 @@
   {
     "slug": "dungeon-corridor",
     "setting": "Dungeon corridor",
+    "round": 1,
     "take": 3,
     "file": "dungeon-corridor-take3.mp3",
     "seed": 1690576067,
@@ -347,6 +722,7 @@
   {
     "slug": "forest",
     "setting": "Forest or outdoors",
+    "round": 1,
     "take": 1,
     "file": "forest-take1.mp3",
     "seed": 2777431,
@@ -370,6 +746,7 @@
   {
     "slug": "forest",
     "setting": "Forest or outdoors",
+    "round": 1,
     "take": 2,
     "file": "forest-take2.mp3",
     "seed": 906459975,
@@ -393,6 +770,7 @@
   {
     "slug": "forest",
     "setting": "Forest or outdoors",
+    "round": 1,
     "take": 3,
     "file": "forest-take3.mp3",
     "seed": 1487724276,
@@ -416,6 +794,7 @@
   {
     "slug": "safe-room",
     "setting": "Safe room",
+    "round": 1,
     "take": 1,
     "file": "safe-room-take1.mp3",
     "seed": 1936935123,
@@ -439,6 +818,7 @@
   {
     "slug": "safe-room",
     "setting": "Safe room",
+    "round": 1,
     "take": 2,
     "file": "safe-room-take2.mp3",
     "seed": 1273610580,
@@ -462,6 +842,7 @@
   {
     "slug": "safe-room",
     "setting": "Safe room",
+    "round": 1,
     "take": 3,
     "file": "safe-room-take3.mp3",
     "seed": 831544497,
@@ -485,6 +866,7 @@
   {
     "slug": "show-time",
     "setting": "Show Time game-show stage",
+    "round": 1,
     "take": 1,
     "file": "show-time-take1.mp3",
     "seed": 2013570916,
@@ -508,6 +890,7 @@
   {
     "slug": "show-time",
     "setting": "Show Time game-show stage",
+    "round": 1,
     "take": 2,
     "file": "show-time-take2.mp3",
     "seed": 1875159940,
@@ -531,6 +914,7 @@
   {
     "slug": "show-time",
     "setting": "Show Time game-show stage",
+    "round": 1,
     "take": 3,
     "file": "show-time-take3.mp3",
     "seed": 1903578618,
@@ -554,6 +938,7 @@
   {
     "slug": "tavern",
     "setting": "Tavern or club",
+    "round": 1,
     "take": 1,
     "file": "tavern-take1.mp3",
     "seed": 657660850,
@@ -577,6 +962,7 @@
   {
     "slug": "tavern",
     "setting": "Tavern or club",
+    "round": 1,
     "take": 2,
     "file": "tavern-take2.mp3",
     "seed": 1250524913,
@@ -600,6 +986,7 @@
   {
     "slug": "tavern",
     "setting": "Tavern or club",
+    "round": 1,
     "take": 3,
     "file": "tavern-take3.mp3",
     "seed": 1536048303,
@@ -623,6 +1010,7 @@
   {
     "slug": "town",
     "setting": "Town or market",
+    "round": 1,
     "take": 1,
     "file": "town-take1.mp3",
     "seed": 618495264,
@@ -646,6 +1034,7 @@
   {
     "slug": "town",
     "setting": "Town or market",
+    "round": 1,
     "take": 2,
     "file": "town-take2.mp3",
     "seed": 1909746975,
@@ -669,6 +1058,7 @@
   {
     "slug": "town",
     "setting": "Town or market",
+    "round": 1,
     "take": 3,
     "file": "town-take3.mp3",
     "seed": 1102609478,
