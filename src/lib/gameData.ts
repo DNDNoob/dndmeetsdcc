@@ -933,6 +933,7 @@ export interface KnownSpell {
   castCount: number; // total casts, drives mastery level
   customSpell?: Spell; // full spell data for one-off tome spells that aren't in the library
   upgrades?: ItemUpgrade[]; // upgrades to this crawler's copy, applied on top of the library spell when read
+  upgradePath?: UpgradePath; // milestones reached, the trees offered and the one picked
 }
 
 // Mastery threshold: level N requires 5*N*(N+1) total casts (10, 30, 60, 100, ...)
@@ -999,6 +1000,7 @@ export interface InventoryItem {
   grantsLanguage?: string;   // While equipped, the crawler knows this language (a druid's charm grants Beast)
   armorData?: ArmorData;     // Armor rating, damage reduction, resistances and vulnerabilities (set by upgrades for now)
   upgrades?: ItemUpgrade[];  // Upgrades given to this crawler's copy, oldest first (see src/lib/upgrades.ts)
+  upgradePath?: UpgradePath; // Milestones reached, the trees the Dungeon AI offered and the one picked
 }
 
 export interface ArmorData {
@@ -1026,6 +1028,33 @@ export type UpgradeDrawback =
   | { type: 'locked' }
   | { type: 'cost'; hp?: number; mana?: number }
   | { type: 'strange'; text: string };
+
+/** One step of an upgrade tree: what the item gains when the step is claimed. */
+export interface UpgradeStep {
+  name: string;
+  flavor?: string;
+  newName?: string;
+  effects: UpgradeEffect[];
+  drawback?: UpgradeDrawback;
+}
+
+export interface UpgradeTree {
+  name: string;
+  pitch?: string;
+  steps: UpgradeStep[]; // 3 steps, claimed one milestone at a time
+}
+
+/** Where a crawler's copy of an item or spell is on its upgrade journey (see src/lib/upgradeTrees.ts). */
+export interface UpgradePath {
+  tiersUsed: number;    // milestones that have already started a meditation or unlocked a step
+  status?: 'meditating' | 'choosing' | 'ready'; // waiting on the Dungeon AI / player picks a tree / player claims the next step
+  trees?: UpgradeTree[]; // offered while choosing
+  tree?: UpgradeTree;    // the tree picked
+  stepsTaken?: number;   // steps of `tree` already applied
+  offeredAt?: number;    // tier the offered trees were written for (their step 1)
+  meditatingSince?: number; // epoch ms; 0 asks any DM tab to start now (re-roll)
+  log?: { at: string; source: 'ai' | 'preset'; model?: string; prompt?: string; reply?: string; error?: string }; // last request, for the DM
+}
 
 export interface ItemUpgrade {
   id: string;

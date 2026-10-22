@@ -1,8 +1,8 @@
 import React, { useState } from "react";
-import { Plus, Sparkles, Undo2, X } from "lucide-react";
+import { Dices, Plus, Sparkles, Undo2, X } from "lucide-react";
 import {
   DAMAGE_TYPES, SPELL_DAMAGE_TYPES, WEAPON_TYPES, getUpgradeKind, baseItemName,
-  type Crawler, type InventoryItem, type ItemUpgrade, type Spell, type StatModifiers, type UpgradeDrawback,
+  type Crawler, type InventoryItem, type ItemUpgrade, type Spell, type StatModifiers, type UpgradeDrawback, type UpgradePath,
   type UpgradeEffect, type UpgradeEffectType, type UpgradeKind, type WeaponDie,
 } from "@/lib/gameData";
 import {
@@ -20,7 +20,43 @@ interface UpgradeGiverProps {
   getCrawlerInventory: (crawlerId: string) => InventoryItem[];
   onGive: (crawlerId: string, target: UpgradeTarget, upgrade: ItemUpgrade) => Promise<void> | void;
   onUndo: (crawlerId: string, target: UpgradeTarget) => Promise<void> | void;
+  onReroll?: (crawlerId: string, target: UpgradeTarget) => Promise<void> | void;
 }
+
+const PATH_STATUS: Record<NonNullable<UpgradePath['status']>, string> = {
+  meditating: 'The Dungeon AI is writing upgrade trees',
+  choosing: 'Waiting for the player to choose a path',
+  ready: 'The next step is waiting to be claimed',
+};
+
+/** The selected item's upgrade tree: what was offered, what was picked, and the Dungeon AI's last request. */
+const PathPanel: React.FC<{ path: UpgradePath; onReroll?: () => void }> = ({ path, onReroll }) => (
+  <div className="border border-accent/40 p-2 space-y-1.5 text-xs">
+    <p className="font-display text-accent">Upgrade tree</p>
+    {path.status && <p className="text-primary">{PATH_STATUS[path.status]}{path.offeredAt ? ` (tier ${path.offeredAt})` : ''}.</p>}
+    {path.tree && <p>Path: <span className="text-accent">{path.tree.name}</span>, {path.stepsTaken ?? 0} of {path.tree.steps.length} steps taken.</p>}
+    {path.status === 'choosing' && path.trees?.length ? (
+      <ul className="list-disc pl-4 text-muted-foreground">
+        {path.trees.map((t, i) => <li key={i}><span className="text-foreground">{t.name}</span>: {t.steps.map(st => st.name).join(' → ')}</li>)}
+      </ul>
+    ) : null}
+    {path.log && (
+      <details className="text-[11px] text-muted-foreground">
+        <summary className="cursor-pointer">
+          {path.log.source === 'ai' ? `Written by ${path.log.model ?? 'the online model'}` : 'Preset trees'}
+          {path.log.error ? `: ${path.log.error}` : ''}
+        </summary>
+        {path.log.prompt && <pre className="whitespace-pre-wrap break-words bg-muted/50 p-1 mt-1 max-h-48 overflow-y-auto">{path.log.prompt}</pre>}
+        {path.log.reply && <pre className="whitespace-pre-wrap break-words bg-muted/50 p-1 mt-1 max-h-48 overflow-y-auto">{path.log.reply}</pre>}
+      </details>
+    )}
+    {onReroll && (path.status === 'choosing' || path.status === 'meditating') && (
+      <button onClick={onReroll} className="text-[11px] text-accent hover:underline flex items-center gap-1">
+        <Dices className="w-3 h-3" /> Re-roll trees (ask the Dungeon AI again)
+      </button>
+    )}
+  </div>
+);
 
 const inputCls = "bg-muted border border-border px-2 py-1 text-xs w-full";
 const STAT_KEYS: (keyof StatModifiers)[] = ['str', 'dex', 'con', 'int', 'cha', 'maxHP', 'maxMana', 'moveSpeed'];
@@ -197,7 +233,7 @@ const EffectFields: React.FC<{ effect: UpgradeEffect; kind: UpgradeKind; onChang
 };
 
 /** DM Console: give a crawler's item or known spell an upgrade by hand, or take back the latest one. */
-export const UpgradeGiver: React.FC<UpgradeGiverProps> = ({ crawlers, spells, getCrawlerInventory, onGive, onUndo }) => {
+export const UpgradeGiver: React.FC<UpgradeGiverProps> = ({ crawlers, spells, getCrawlerInventory, onGive, onUndo, onReroll }) => {
   const [crawlerId, setCrawlerId] = useState(crawlers[0]?.id ?? '');
   const [targetKey, setTargetKey] = useState('');
   const [name, setName] = useState('');
@@ -217,6 +253,12 @@ export const UpgradeGiver: React.FC<UpgradeGiverProps> = ({ crawlers, spells, ge
   const target: UpgradeTarget | null = item ? { kind: 'item', id: item.id } : knownSpell ? { kind: 'spell', id: knownSpell.spellId } : null;
   const kind: UpgradeKind = item ? getUpgradeKind(item) : knownSpell ? 'spell' : 'none';
   const existing = item?.upgrades ?? knownSpell?.upgrades ?? [];
+  const path = item?.upgradePath ?? knownSpell?.upgradePath;
+  // Every item or spell with a tree in progress, so the DM can jump to it
+  const inProgress = crawlers.flatMap(c => [
+    ...getCrawlerInventory(c.id).filter(i => i.upgradePath?.status).map(i => ({ c, key: `item:${i.id}`, name: baseItemName(i), status: i.upgradePath!.status! })),
+    ...(c.knownSpells ?? []).filter(k => k.upgradePath?.status).map(k => ({ c, key: `spell:${k.spellId}`, name: k.spellName, status: k.upgradePath!.status! })),
+  ]);
   const cleaned = effects.map(cleanEffect).filter((e): e is UpgradeEffect => !!e);
   const cleanedDrawback = cleanDrawback(drawback);
   const canGive = !!target && !!name.trim() && (cleaned.length > 0 || !!cleanedDrawback || !!newName.trim()) && !saving;
@@ -249,6 +291,20 @@ export const UpgradeGiver: React.FC<UpgradeGiverProps> = ({ crawlers, spells, ge
         <p className="text-xs text-muted-foreground">Upgrade one crawler's copy of an item or spell by hand. Number changes apply right away. On-hit chances, new actions and strange effects are written on the item for you to rule on.</p>
       </div>
 
+      {inProgress.length > 0 && (
+        <div className="text-xs space-y-1">
+          <p className="text-muted-foreground">Upgrade trees in progress:</p>
+          <div className="flex flex-wrap gap-1">
+            {inProgress.map(p => (
+              <button key={`${p.c.id}-${p.key}`} onClick={() => { setCrawlerId(p.c.id); setTargetKey(p.key); setEffects([]); setDrawback(undefined); }}
+                className="px-2 py-0.5 border border-accent/40 text-accent hover:bg-accent/10">
+                {p.c.name}: {p.name} ({p.status === 'meditating' ? 'meditating' : p.status === 'choosing' ? 'choosing' : 'step ready'})
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <label className="text-[10px] text-muted-foreground">Crawler
           <select value={crawlerId} onChange={(e) => { setCrawlerId(e.target.value); setTargetKey(''); }} className={inputCls}>
@@ -277,6 +333,9 @@ export const UpgradeGiver: React.FC<UpgradeGiverProps> = ({ crawlers, spells, ge
 
       {target && (
         <>
+          {path && (path.status || path.tree) && (
+            <PathPanel path={path} onReroll={onReroll && crawler ? () => onReroll(crawler.id, target) : undefined} />
+          )}
           {existing.length > 0 && (
             <div className="border border-border/60 p-2 space-y-2">
               <p className="text-xs">
