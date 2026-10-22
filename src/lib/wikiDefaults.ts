@@ -1087,6 +1087,8 @@ Show Time is the main gameplay view where the DM presents maps, mobs, and encoun
 
 If you refresh the page or visit another page (like the DM Console) during a game, Show Time picks up where you left off when you come back, and players stay in the game.
 
+Mob tokens get a letter badge (A, B, C) only when the same mob is on the current map more than once, so you can tell the copies apart. A character who appears on several maps, like a shopkeeper, shows no letter.
+
 ## For Players
 
 1. Navigate to Show Time

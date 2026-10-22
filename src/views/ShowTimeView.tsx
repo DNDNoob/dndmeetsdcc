@@ -1782,6 +1782,15 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     return counts;
   }, [selectedEpisode?.mobPlacements, runtimeMobPlacements]);
 
+  // Token letters only show when the same mob is on the current map more than once
+  const currentMapMobCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    [...(selectedEpisode?.mobPlacements ?? []), ...(runtimeMobPlacements ?? [])]
+      .filter(p => p.mapId === currentMapId)
+      .forEach(p => { counts[p.mobId] = (counts[p.mobId] ?? 0) + 1; });
+    return counts;
+  }, [selectedEpisode?.mobPlacements, runtimeMobPlacements, currentMapId]);
+
   // Handle removing a runtime mob from the map
   const handleRemoveRuntimeMob = useCallback((index: number) => {
     // Remove from combat if active
@@ -3451,7 +3460,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
               .slice(0, localIndex)
               .filter(p => p.mobId === placement.mobId).length;
             const letterIdx = placement.letterIndex ?? sameIdBefore;
-            const letter = totalSameId > 1 ? String.fromCharCode(65 + letterIdx) : '';
+            const letter = totalSameId > 1 && (currentMapMobCounts[placement.mobId] ?? 0) > 1 ? String.fromCharCode(65 + letterIdx) : '';
 
             const isDragging = draggingMobId === `${placement.mobId}-${globalIndex}`;
 
@@ -3739,7 +3748,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
               .filter(p => p.mobId === placement.mobId).length;
             const totalBefore = episodeMobCount + runtimeMobsBefore;
             const letterIdx = placement.letterIndex ?? totalBefore;
-            const letter = totalSameId > 1 ? String.fromCharCode(65 + letterIdx) : '';
+            const letter = totalSameId > 1 && (currentMapMobCounts[placement.mobId] ?? 0) > 1 ? String.fromCharCode(65 + letterIdx) : '';
             const isDragging = draggingRuntimeId === `mob-${index}`;
             const canInteract = isPointVisible(placement.x, placement.y);
 
