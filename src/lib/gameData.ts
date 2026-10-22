@@ -42,6 +42,7 @@ export interface Crawler {
   languages?: string[];   // Language ids this crawler knows; none set = Worldspeech only
   telepathic?: boolean;   // Needed to use Mindspeech (DM sets it)
   translateMode?: TranslateMode; // Translating chat lines for party members who don't know the language
+  translateModeHistory?: { mode: TranslateMode; at: number }[]; // When translateMode changed, so a change only affects later lines
   languageEffects?: LanguageEffect[]; // Spells like Speak with Animals: languages known for a while
   itemLanguages?: string[]; // Worked out from equipped items when crawlers load; not something to save
   backstory?: CrawlerBackstory; // Answers from the character creator; editable on the profile
@@ -240,6 +241,21 @@ export const getBarterScroogeReduction = (barterRank: number): number => Math.fl
 
 /** off: not translating. auto: lines pass on to the party as said. review: the translator passes each line on (or twists it) first. */
 export type TranslateMode = 'off' | 'auto' | 'review';
+
+/** The translator setting a crawler had when a line was said (crawlers without history: their current one). */
+export const translateModeAt = (c: { translateMode?: TranslateMode; translateModeHistory?: { mode: TranslateMode; at: number }[] }, at: number | undefined): TranslateMode => {
+  const history = c.translateModeHistory;
+  if (!history?.length || at === undefined) return c.translateMode ?? 'off';
+  let mode: TranslateMode = 'off';
+  for (const h of history) if (h.at <= at) mode = h.mode;
+  return mode;
+};
+
+/** The crawler fields to save when the translator setting changes: from now on only. */
+export const translateModeUpdate = (c: { translateMode?: TranslateMode; translateModeHistory?: { mode: TranslateMode; at: number }[] }, mode: TranslateMode, now = Date.now()) => {
+  const history = c.translateModeHistory?.length ? c.translateModeHistory : [{ mode: c.translateMode ?? 'off', at: 0 }];
+  return { translateMode: mode, translateModeHistory: [...history, { mode, at: now }].slice(-20) };
+};
 
 /**
  * A language a crawler knows for a while, from casting a spell. It ends when a countdown it has

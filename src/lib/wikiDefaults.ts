@@ -1579,6 +1579,7 @@ A crawler who knows a language can translate it for the party. Use the translate
 - **Not translating**: party members who don't know the language see gibberish.
 - **Translating**: everyone in the party sees lines in your languages, marked "translated by" you.
 - **Translating (check lines)**: the party sees "is translating…" until you act on each line. Tap **Pass on** to tell them exactly what was said, or **Twist** to tell them something else.
+- A change to this setting only affects lines said after it. Lines said before you started translating show **Pass on** and **Twist**, so you can pass them on one at a time, and switching translating off doesn't take back what the party already heard.
 
 A twisted translation looks just like an honest one to the party. Only the translator and the DM can see what was really said; the DM sees a **twisted** tag next to it. Party members who know the language themselves always see the real words, so they might catch you.
 
