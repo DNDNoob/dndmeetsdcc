@@ -858,7 +858,8 @@
         "xanax",
         "basementKey"
       ],
-      "defaultGold": 15
+      "defaultGold": 15,
+      "portrait": "creepy-neighbor.jpg"
     },
     {
       "id": "tutorial-mob-college-kid",
@@ -877,7 +878,8 @@
         "secret": "The neighbor keeps the cage key in his shirt pocket.",
         "revealWhen": "Someone talks to him with Speak with Animals and promises to get him out.",
         "attitude": "Desperate for help, trusts anyone who isn't the neighbor."
-      }
+      },
+      "portrait": "college-kid.jpg"
     },
     {
       "id": "tutorial-mob-senor-gringo",
@@ -947,7 +949,8 @@
             "quantity": 1
           }
         ]
-      }
+      },
+      "portrait": "senor-gringo.jpg"
     },
     {
       "id": "tutorial-mob-mr-wavos",
@@ -964,7 +967,8 @@
         "wants": "Help finding the right shade of beige.",
         "knows": "He saw a kid in a fursuit in the neighbor's window last week and thought it was a Halloween thing.",
         "attitude": "Warm toward anyone who answers him in Spanish."
-      }
+      },
+      "portrait": "mr-wavos.jpg"
     },
     {
       "id": "tutorial-mob-hipster",
@@ -1009,7 +1013,8 @@
             "quantity": 4
           }
         ]
-      }
+      },
+      "portrait": "ralph-nander.jpg"
     },
     {
       "id": "tutorial-mob-qwerty",
@@ -1026,7 +1031,8 @@
         "wants": "To start the DnD game already.",
         "knows": "Grandma's animal book is on the shelf, and it actually works.",
         "attitude": "Loyal friend of the party."
-      }
+      },
+      "portrait": "qwerty.jpg"
     },
     {
       "id": "tutorial-mob-chair-thing",
@@ -1036,7 +1042,8 @@
       "hitPoints": 6,
       "hidden": true,
       "silent": true,
-      "description": "TBD: Andrew to describe."
+      "description": "TBD: Andrew to describe.",
+      "portrait": "chair-thing.jpg"
     },
     {
       "id": "tutorial-mob-parrot",
@@ -1052,7 +1059,8 @@
         "voice": "Squawks and repeats phrases.",
         "knows": "It heard \"one suit for each of them\" through the wall.",
         "attitude": "Nosy."
-      }
+      },
+      "portrait": "parrot.jpg"
     },
     {
       "id": "tutorial-mob-squirrel",
@@ -1068,7 +1076,8 @@
         "voice": "Twitchy, rude, cheeks full of seeds.",
         "knows": "The man across the street never leaves his window.",
         "attitude": "Hostile to anyone near the feeder."
-      }
+      },
+      "portrait": "squirrel.jpg"
     },
     {
       "id": "tutorial-mob-pointy-hats",
@@ -1097,7 +1106,8 @@
           "damageType": "Fire"
         }
       ],
-      "defaultGold": 1
+      "defaultGold": 1,
+      "portrait": "white-hat.jpg"
     },
     {
       "id": "tutorial-mob-thephen-socking",

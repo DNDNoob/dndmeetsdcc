@@ -2,7 +2,8 @@
  * Builds the tutorial episode ("Tutorial: Rat Problem") as its own campaign, owned by one account.
  *
  * Everything the tutorial contains (maps, characters, merchant stock, items, quest, story text)
- * lives in scripts/tutorial/episode.json; the map pictures are in scripts/tutorial/maps/.
+ * lives in scripts/tutorial/episode.json; the map pictures are in scripts/tutorial/maps/ and the
+ * mob portraits in scripts/tutorial/portraits/.
  * Edit those and run the script again to rebuild: every document has a fixed `tutorial-` id,
  * so a re-run replaces the tutorial's own documents and never touches anything else.
  *
@@ -254,10 +255,15 @@ async function main() {
     writes.push({ path: `${room}/spells/${spell.id}`, data: { ...spell, roomId: campaignId, ...attribution } });
   }
 
-  for (const mob of content.mobs) {
+  for (const { portrait, ...mob } of content.mobs) {
     const kind = mob.kind ?? 'creature';
+    // Portraits are small JPEGs (well under the app's ~800 KB mob image size), stored inline like uploaded ones
+    const image = portrait
+      ? `data:image/jpeg;base64,${fs.readFileSync(path.join(TUTORIAL_DIR, 'portraits', portrait)).toString('base64')}`
+      : undefined;
     const data = {
       ...mob,
+      image,
       kind,
       boss: !!mob.boss,
       type: mob.boss ? 'boss' : kind === 'character' ? 'npc' : 'normal',
