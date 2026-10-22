@@ -1,5 +1,11 @@
 [
   {
+    "date": "2026-10-22",
+    "changes": [
+      "📖 New tutorial episode, Tutorial: Rat Problem: a starter campaign with 6 maps, 11 characters and creatures, a merchant, a quest and a basement boss fight that shows new players every part of the game. See the Tutorial Episode page in the wiki"
+    ]
+  },
+  {
     "date": "2026-10-21",
     "changes": [
       "🎭 The Stats tab also tracks fighting style (fights survived, feet per turn, times knocked out), talking and trading (NPC chats, Persuasion, haggles, gold earned and spent, gear swaps), progress (quests, loot boxes) and habits (turn time, undone turns, voice vs typed chat), plus a log of each crawler's 10 latest standout moments",
