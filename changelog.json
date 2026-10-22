@@ -2,6 +2,9 @@
   {
     "date": "2026-10-22",
     "changes": [
+      "🐛 Crawlers who know Spanish now read what Spanish-speaking NPCs mean, in English. Everyone else still sees the Spanish",
+      "🔊 NPC voice settings now say why a voice service stopped (for example Groq needing its Orpheus terms accepted, or an ElevenLabs key missing the Voices permission), and a used-up Gemini voice model hands the line to the next Gemini model before giving up",
+      "📡 When the Online NPC brain pauses because its keys failed or ran out, the chat shows why instead of just \"NPC voices offline\". With the Laptop brain picked it says the laptop isn't running",
       "🔤 Mob token letters (A, B, C) now only show when the same mob is on the current map more than once. A character placed on several maps no longer gets an A",
       "🧘 When an item or spell reaches a new upgrade tier, the Dungeon AI meditates on how you play and offers 3 upgrade trees of 3 steps each. Pick one with the new Choose your path button: you get its first step now, and each later tier unlocks the next step to Claim",
       "🏆 New achievement: Fully Evolved, for finishing all 3 steps of an upgrade tree. Trees can also rename the item",

@@ -224,7 +224,7 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
     : isAdmin && brain === "online" && npcKeys && !hasKey && !online
       ? "Add a key in settings"
       : !online
-        ? "NPC voices offline"
+        ? brain === "laptop" ? "NPC voices offline: laptop isn't running" : "NPC voices offline"
         : aiStatus?.busy
           ? "NPC voices offline: laptop busy"
           : laptopCovering
@@ -398,7 +398,8 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
               </div>
             )}
 
-            {online && enabled && aiStatus?.note && (
+            {/* Offline because the online models gave up for now: say why (key rejected, limit reached...) */}
+            {enabled && aiStatus?.note && (online || (brain === "online" && (aiStatus.onlineOutUntil ?? 0) > now)) && (
               <div className="px-3 py-1 text-[11px] text-accent border-b border-border">{aiStatus.note}</div>
             )}
 
