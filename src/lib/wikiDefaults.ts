@@ -775,6 +775,7 @@ Fog of War lets the DM hide portions of the map from players, revealing areas as
 - The DM paints to reveal areas using a circular brush
 - Revealed areas sync to all players in real time
 - Fog is per-map, meaning each map in an episode has its own fog state
+- When the DM starts Show Time or switches maps, players see "Loading map..." until that map's fog has loaded, so the map never shows uncovered for a moment
 
 ## Controls
 
