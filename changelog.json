@@ -13,6 +13,7 @@
       "🔒 Right-click Upgrade on a weapon (free editing) is now DM-only",
       "🌫️ Players no longer glimpse the map for a moment before its fog of war appears when the DM starts Show Time or switches maps. The map stays hidden behind \"Loading map...\" until its fog is ready",
       "🙈 DMs can hide the Item Library (Inventory page) and the Spell Library (Spells page) from players with a Shown to players / Hidden from players switch next to each library title. Players still see their own items and known spells",
+      "🧠 Forget everything and Save in an NPC's memory editor now work for creature copies on the map (like Goblin B). Before, the change was refused and the NPC kept its memories. Unlocking a creature copy's secret had the same problem and is fixed too",
       "🐛 NPCs speaking Base64 no longer post scrambled code that crawlers who know Base64 can't read. The model is told to write plain words, and a line it encodes anyway is decoded (or swapped for a readable line)"
     ]
   },
