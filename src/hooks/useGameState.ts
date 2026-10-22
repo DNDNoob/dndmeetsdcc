@@ -2592,7 +2592,7 @@ export const useGameState = () => {
       results: [],
       total: 0,
       upgradeNotification: {
-        line: `${crawler.name}'s ${targetName} gained ${upgrade.name}`,
+        line: `${crawler.name}'s ${targetName} gained ${upgrade.name}${upgrade.newName ? ` and is now called ${upgrade.newName}` : ''}`,
         flavor: upgrade.flavor,
         effects: upgrade.effects.map(describeUpgradeEffect),
         drawback: upgrade.drawback ? describeUpgradeDrawback(upgrade.drawback) : undefined,

@@ -202,6 +202,7 @@ export const UpgradeGiver: React.FC<UpgradeGiverProps> = ({ crawlers, spells, ge
   const [targetKey, setTargetKey] = useState('');
   const [name, setName] = useState('');
   const [flavor, setFlavor] = useState('');
+  const [newName, setNewName] = useState('');
   const [effects, setEffects] = useState<UpgradeEffect[]>([]);
   const [drawback, setDrawback] = useState<UpgradeDrawback | undefined>();
   const [saving, setSaving] = useState(false);
@@ -218,9 +219,9 @@ export const UpgradeGiver: React.FC<UpgradeGiverProps> = ({ crawlers, spells, ge
   const existing = item?.upgrades ?? knownSpell?.upgrades ?? [];
   const cleaned = effects.map(cleanEffect).filter((e): e is UpgradeEffect => !!e);
   const cleanedDrawback = cleanDrawback(drawback);
-  const canGive = !!target && !!name.trim() && (cleaned.length > 0 || !!cleanedDrawback) && !saving;
+  const canGive = !!target && !!name.trim() && (cleaned.length > 0 || !!cleanedDrawback || !!newName.trim()) && !saving;
 
-  const reset = () => { setName(''); setFlavor(''); setEffects([]); setDrawback(undefined); };
+  const reset = () => { setName(''); setFlavor(''); setNewName(''); setEffects([]); setDrawback(undefined); };
   const give = async () => {
     if (!canGive || !target) return;
     setSaving(true);
@@ -229,6 +230,7 @@ export const UpgradeGiver: React.FC<UpgradeGiverProps> = ({ crawlers, spells, ge
         id: crypto.randomUUID(),
         name: name.trim(),
         flavor: flavor.trim() || undefined,
+        newName: newName.trim() || undefined,
         effects: cleaned,
         drawback: cleanedDrawback,
         source: 'dm',
@@ -293,6 +295,9 @@ export const UpgradeGiver: React.FC<UpgradeGiverProps> = ({ crawlers, spells, ge
             </label>
             <label className="text-[10px] text-muted-foreground">Flavor text
               <input value={flavor} onChange={(e) => setFlavor(e.target.value)} className={inputCls} placeholder="e.g. It hums near the wounded." />
+            </label>
+            <label className="text-[10px] text-muted-foreground sm:col-span-2">Rename it to (optional)
+              <input value={newName} onChange={(e) => setNewName(e.target.value)} className={inputCls} placeholder={`e.g. Gravemaker (now ${item ? baseItemName(item) : knownSpell?.spellName ?? ''})`} />
             </label>
           </div>
 

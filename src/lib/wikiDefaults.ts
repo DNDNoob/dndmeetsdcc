@@ -357,7 +357,7 @@ Items without an equipment slot (potions, keys, junk) don't earn upgrade XP.
 
 ## Upgrades
 
-An upgrade changes one crawler's copy of an item or spell. Upgraded items show **Upgraded** after their name, and expanding the item lists each upgrade with its flavor text. Spells keep following the library spell, with the crawler's upgrades added on top.
+An upgrade changes one crawler's copy of an item or spell, and can give it a new name. Upgraded items show **Upgraded** after their name, and expanding the item lists each upgrade with its flavor text. Spells keep following the library spell, with the crawler's upgrades added on top.
 
 What an upgrade can do:
 
@@ -386,7 +386,7 @@ Every upgrade is posted to the dice log in gold, with any price in red, so the w
 
 ## Giving an upgrade (DM)
 
-Open the **DM Console** and the **Upgrades** tab. Pick the crawler and the item or spell, name the upgrade, add flavor text, and add one or more effects. Add a cursed bargain if you like, then click **Give**. **Take back the latest upgrade** undoes the most recent one, restoring the numbers it changed.`,
+Open the **DM Console** and the **Upgrades** tab. Pick the crawler and the item or spell, name the upgrade, add flavor text, optionally give the item a new name, and add one or more effects. Add a cursed bargain if you like, then click **Give**. **Take back the latest upgrade** undoes the most recent one, restoring the numbers it changed.`,
   },
   {
     id: 'inventory',

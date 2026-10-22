@@ -38,7 +38,7 @@ export const UPGRADE_EFFECTS_FOR: Record<UpgradeKind, UpgradeEffectType[]> = {
 };
 
 const DIE_STEPS = [4, 6, 8, 10, 12, 20];
-const UNDO_FIELDS = ['weaponData', 'statModifiers', 'effects', 'grantsLanguage', 'armorData', 'isUpgraded'] as const;
+const UNDO_FIELDS = ['name', 'weaponData', 'statModifiers', 'effects', 'grantsLanguage', 'armorData', 'isUpgraded'] as const;
 
 const dieText = (d: WeaponDie) => `${d.count}d${d.sides}`;
 const stepDie = (die: WeaponDie, step: number): WeaponDie => {
@@ -179,6 +179,7 @@ export const applyUpgradeToItem = (item: InventoryItem, upgrade: ItemUpgrade): I
   }
   if (upgrade.drawback?.type === 'statPenalty') next.statModifiers = addMods(next.statModifiers, upgrade.drawback.mods, true);
   if (!next.weaponData) delete next.weaponData;
+  if (upgrade.newName?.trim()) next.name = upgrade.newName.trim();
   return { ...next, isUpgraded: true, upgrades: [...(item.upgrades ?? []), { ...upgrade, before }] };
 };
 
@@ -227,7 +228,8 @@ export const applyUpgradesToSpell = (spell: Spell, upgrades?: ItemUpgrade[]): Sp
     }
     if (u.drawback?.type === 'cost' && u.drawback.mana) sd.manaCost += u.drawback.mana;
   }
-  return { ...spell, spellData: sd };
+  const renamed = [...upgrades].reverse().find(u => u.newName?.trim())?.newName?.trim();
+  return { ...spell, ...(renamed ? { name: renamed } : {}), spellData: sd };
 };
 
 /** The spell a crawler actually casts: library (or one-off) spell plus their upgrades. */

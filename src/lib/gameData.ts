@@ -1035,6 +1035,7 @@ export interface ItemUpgrade {
   drawback?: UpgradeDrawback;  // a cursed bargain
   source: 'dm' | 'ai' | 'preset';
   treeName?: string;
+  newName?: string;            // renames this crawler's copy ("Rusty Sword" -> "Gravemaker")
   appliedAt: string;           // ISO timestamp
   before?: Record<string, unknown>; // the item's changed fields before this upgrade, so the DM can undo it
 }

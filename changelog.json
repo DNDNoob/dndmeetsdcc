@@ -2,7 +2,7 @@
   {
     "date": "2026-10-21",
     "changes": [
-      "✨ DMs can give upgrades to a crawler's item or spell from the new Upgrades tab in the DM Console: bigger dice, more range, a new damage type, splash, stat bonuses, languages, defenses, on-hit effects, new actions or something strange. Each one is posted to the dice log",
+      "✨ DMs can give upgrades to a crawler's item or spell from the new Upgrades tab in the DM Console: bigger dice, more range, a new damage type, splash, stat bonuses, languages, defenses, on-hit effects, new actions or something strange, and can rename the item or spell. Each one is posted to the dice log",
       "💀 Upgrades can be cursed bargains: a stat penalty, an HP or mana cost on every use, an item that turns to dust when taken off, or one that can't be taken off. Cursed items get a red Cursed mark",
       "🏆 New achievements: Sharpened (first weapon upgrade), Hardened (first armor upgrade), Spellwright (first spell upgrade) and Deal With the Devil (first cursed bargain)",
       "⬆️ Weapons, armor, gear and spells now earn upgrade XP from how you use them: damage, kills and boss kills for weapons, casts, damage, healing and effects for spells, and rolls boosted by a ring or other gear. Once an item or spell earns some XP, a gold Tier bar under it shows progress, and tapping it shows where the XP came from",
