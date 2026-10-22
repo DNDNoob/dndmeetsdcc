@@ -103,10 +103,14 @@ import {
   type GameSettings,
   type ItemUpgrade,
   type UpgradeKind,
+  type UpgradePath,
+  type UpgradeTree,
+  type CrawlerStatsById,
   getUpgradeKind,
   baseItemName,
 } from "@/lib/gameData";
 import { applyUpgradeToItem, undoLastItemUpgrade, resolveKnownSpell, upgradeUseCost, describeUpgradeEffect, describeUpgradeDrawback, FIRST_UPGRADE_ACHIEVEMENTS, CURSED_BARGAIN_ACHIEVEMENT } from "@/lib/upgrades";
+import { FULLY_EVOLVED_ACHIEVEMENT, MEDITATING_TEXT, findDueUpgrades, nextTreeStep, stepToUpgrade, type DueUpgrade } from "@/lib/upgradeTrees";
 
 /** An item in a crawler's inventory or one of their known spells. */
 export type UpgradeTarget = { kind: 'item' | 'spell'; id: string };
@@ -2564,7 +2568,7 @@ export const useGameState = () => {
 
   /** Gives an upgrade to one crawler's copy of an item or known spell, announces it in the dice log
    *  and awards the first-upgrade achievements. */
-  const giveUpgrade = async (crawlerId: string, target: UpgradeTarget, upgrade: ItemUpgrade) => {
+  const giveUpgrade = async (crawlerId: string, target: UpgradeTarget, upgrade: ItemUpgrade, path?: UpgradePath) => {
     const crawler = crawlers.find(c => c.id === crawlerId);
     if (!crawler) return;
     let kind: UpgradeKind;
@@ -2575,14 +2579,17 @@ export const useGameState = () => {
       if (!item) return;
       kind = getUpgradeKind(item);
       targetName = baseItemName(item);
-      await updateCrawlerInventory(crawlerId, items.map(i => i.id === item.id ? applyUpgradeToItem(item, upgrade) : i));
+      const upgraded = applyUpgradeToItem(item, upgrade);
+      await updateCrawlerInventory(crawlerId, items.map(i => i.id === item.id ? (path ? { ...upgraded, upgradePath: path } : upgraded) : i));
     } else {
       const knownSpells = crawler.knownSpells ?? [];
       const ks = knownSpells.find(k => k.spellId === target.id);
       if (!ks) return;
       kind = 'spell';
       targetName = ks.spellName;
-      await updateCrawler(crawlerId, { knownSpells: knownSpells.map(k => k === ks ? { ...k, upgrades: [...(k.upgrades ?? []), upgrade] } : k) });
+      await updateCrawler(crawlerId, {
+        knownSpells: knownSpells.map(k => k === ks ? { ...k, upgrades: [...(k.upgrades ?? []), upgrade], ...(path ? { upgradePath: path } : {}) } : k),
+      });
     }
     await addDiceRoll({
       id: crypto.randomUUID(),
@@ -2601,14 +2608,24 @@ export const useGameState = () => {
     await addMoment(crawlerId, `${targetName} gained ${upgrade.name}`);
     // First upgrade of each kind, and the first cursed bargain, are one-time achievements (written together,
     // since two awardTrophy calls would each start from the same trophy list)
+    // Fully Evolved (finishing a tree) counts up each time
     const has = (name: string) => (crawler.trophies ?? []).some(t => t.name.toLowerCase() === name.toLowerCase());
+    const evolved = !!path?.tree && (path.stepsTaken ?? 0) >= path.tree.steps.length;
     const earned = [FIRST_UPGRADE_ACHIEVEMENTS[kind], upgrade.drawback ? CURSED_BARGAIN_ACHIEVEMENT : undefined]
       .filter((a): a is { name: string; description: string } => !!a && !has(a.name));
-    if (earned.length > 0) {
+    if (earned.length > 0 || evolved) {
       const awardedAt = new Date().toISOString();
-      const trophies: CrawlerTrophy[] = [...(crawler.trophies ?? []), ...earned.map(a => ({
+      const newTrophy = (a: { name: string; description: string }): CrawlerTrophy => ({
         id: `trophy-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, name: a.name, description: a.description, count: 1, awardedAt,
-      }))];
+      });
+      const trophies: CrawlerTrophy[] = [...(crawler.trophies ?? []), ...earned.map(newTrophy)];
+      if (evolved) {
+        const idx = trophies.findIndex(t => t.name === FULLY_EVOLVED_ACHIEVEMENT.name);
+        if (idx >= 0) trophies[idx] = { ...trophies[idx], count: trophies[idx].count + 1, awardedAt };
+        else trophies.push(newTrophy(FULLY_EVOLVED_ACHIEVEMENT));
+        earned.push(FULLY_EVOLVED_ACHIEVEMENT);
+        await addMoment(crawlerId, `${upgrade.newName ?? targetName} became Fully Evolved`);
+      }
       await writeCrawler(crawlerId, { trophies });
       for (const a of earned) toast.success(`🏆 ${crawler.name} earned "${a.name}"!`);
     }
@@ -2629,6 +2646,89 @@ export const useGameState = () => {
         knownSpells: knownSpells.map(k => k.spellId === target.id ? { ...k, upgrades: k.upgrades!.slice(0, -1) } : k),
       });
     }
+  };
+
+  // ---- Upgrade trees: milestones, the Dungeon AI's meditation, picking a path ----
+
+  const crawlerStatsById = useMemo(() => Object.fromEntries(crawlerStats.map(st => [st.id, st])) as CrawlerStatsById, [crawlerStats]);
+  /** Items and known spells whose milestone needs acting on, or whose trees are being written. */
+  const dueUpgrades = useMemo(
+    () => findDueUpgrades(crawlers, getCrawlerInventory, crawlerStatsById, spells),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [crawlers, inventory, crawlerStatsById, spells],
+  );
+
+  const getUpgradePath = (crawlerId: string, target: UpgradeTarget): UpgradePath | undefined =>
+    target.kind === 'item'
+      ? getCrawlerInventory(crawlerId).find(i => i.id === target.id)?.upgradePath
+      : crawlers.find(c => c.id === crawlerId)?.knownSpells?.find(k => k.spellId === target.id)?.upgradePath;
+
+  const setUpgradePath = async (crawlerId: string, target: UpgradeTarget, path: UpgradePath) => {
+    if (target.kind === 'item') {
+      const items = getCrawlerInventory(crawlerId);
+      if (!items.some(i => i.id === target.id)) return;
+      await updateCrawlerInventory(crawlerId, items.map(i => i.id === target.id ? { ...i, upgradePath: path } : i));
+    } else {
+      const knownSpells = crawlers.find(c => c.id === crawlerId)?.knownSpells ?? [];
+      if (!knownSpells.some(k => k.spellId === target.id)) return;
+      await updateCrawler(crawlerId, { knownSpells: knownSpells.map(k => k.spellId === target.id ? { ...k, upgradePath: path } : k) });
+    }
+  };
+
+  const upgradeLogLine = async (crawlerId: string, crawlerName: string, line: string, flavor?: string) => {
+    await addDiceRoll({
+      id: crypto.randomUUID(), crawlerName, crawlerId, timestamp: Date.now(), results: [], total: 0,
+      upgradeNotification: { line, flavor, effects: [] },
+    });
+  };
+
+  /** A new milestone: unlock the picked tree's next step, or start a meditation for new trees.
+   *  Returns the meditating path when the Dungeon AI now needs asking. */
+  const advanceUpgrade = async (due: DueUpgrade): Promise<UpgradePath | null> => {
+    const tier = due.path.tiersUsed + 1;
+    const step = nextTreeStep(due.path);
+    if (step) {
+      await setUpgradePath(due.crawlerId, due.target, { ...due.path, tiersUsed: tier, status: 'ready' });
+      await upgradeLogLine(due.crawlerId, due.crawlerName, `${due.crawlerName}'s ${due.targetName} reached Tier ${tier}. ${step.name} is ready to claim.`);
+      return null;
+    }
+    const path: UpgradePath = { ...due.path, tiersUsed: tier, status: 'meditating', offeredAt: tier, meditatingSince: Date.now(), trees: undefined };
+    await setUpgradePath(due.crawlerId, due.target, path);
+    await upgradeLogLine(due.crawlerId, due.crawlerName, `${due.crawlerName}'s ${due.targetName} reached Tier ${tier}.`, MEDITATING_TEXT);
+    return path;
+  };
+
+  /** The Dungeon AI's trees are in: the player picks one. Ignored if the meditation was re-rolled or finished meanwhile. */
+  const offerUpgradeTrees = async (due: DueUpgrade, trees: UpgradeTree[], log: NonNullable<UpgradePath['log']>) => {
+    const current = getUpgradePath(due.crawlerId, due.target);
+    if (current?.status !== 'meditating') return;
+    await setUpgradePath(due.crawlerId, due.target, { ...current, status: 'choosing', trees, log, meditatingSince: undefined });
+    await upgradeLogLine(due.crawlerId, due.crawlerName, `The Dungeon AI has finished meditating. ${due.crawlerName}, choose a path for your ${due.targetName}.`);
+  };
+
+  /** The player picks one of the offered trees and gets its first step. */
+  const chooseUpgradeTree = async (crawlerId: string, target: UpgradeTarget, treeIndex: number) => {
+    const path = getUpgradePath(crawlerId, target);
+    const tree = path?.status === 'choosing' ? path.trees?.[treeIndex] : undefined;
+    if (!path || !tree?.steps.length) return;
+    const upgrade = stepToUpgrade(tree.steps[0], tree.name, path.log?.source ?? 'preset');
+    await giveUpgrade(crawlerId, target, upgrade, { ...path, status: undefined, trees: undefined, tree, stepsTaken: 1 });
+  };
+
+  /** The player claims the picked tree's next step after a new milestone. */
+  const claimUpgradeStep = async (crawlerId: string, target: UpgradeTarget) => {
+    const path = getUpgradePath(crawlerId, target);
+    const step = path?.status === 'ready' ? nextTreeStep(path) : undefined;
+    if (!path?.tree || !step) return;
+    const upgrade = stepToUpgrade(step, path.tree.name, path.log?.source ?? 'preset');
+    await giveUpgrade(crawlerId, target, upgrade, { ...path, status: undefined, stepsTaken: (path.stepsTaken ?? 0) + 1 });
+  };
+
+  /** DM: throw away the offered trees and ask the Dungeon AI again. */
+  const rerollUpgradeTrees = async (crawlerId: string, target: UpgradeTarget) => {
+    const path = getUpgradePath(crawlerId, target);
+    if (path?.status !== 'choosing' && path?.status !== 'meditating') return;
+    await setUpgradePath(crawlerId, target, { ...path, status: 'meditating', trees: undefined, meditatingSince: 0 });
   };
 
   // Spend the spell's mana (after mastery discount) and increment its cast count.
@@ -3122,6 +3222,13 @@ export const useGameState = () => {
   return {
     giveUpgrade,
     undoLastUpgrade,
+    crawlerStatsById,
+    dueUpgrades,
+    advanceUpgrade,
+    offerUpgradeTrees,
+    chooseUpgradeTree,
+    claimUpgradeStep,
+    rerollUpgradeTrees,
     crawlers,
     crawlerStats,
     updateCrawler,
