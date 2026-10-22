@@ -101,7 +101,15 @@ import {
   type AbilityKey,
   type XPLogEntry,
   type GameSettings,
+  type ItemUpgrade,
+  type UpgradeKind,
+  getUpgradeKind,
+  baseItemName,
 } from "@/lib/gameData";
+import { applyUpgradeToItem, undoLastItemUpgrade, resolveKnownSpell, upgradeUseCost, describeUpgradeEffect, describeUpgradeDrawback, FIRST_UPGRADE_ACHIEVEMENTS, CURSED_BARGAIN_ACHIEVEMENT } from "@/lib/upgrades";
+
+/** An item in a crawler's inventory or one of their known spells. */
+export type UpgradeTarget = { kind: 'item' | 'spell'; id: string };
 import { useGame } from "@/contexts/GameContext";
 import { DEFAULT_LANGUAGE_ID, questionEffectFor } from "@/lib/languages";
 import type { BatchOperation } from "@/hooks/useFirebaseStore";
@@ -146,6 +154,13 @@ export interface DiceRollEntry {
   // For a player undoing their combat turn
   turnResetNotification?: {
     round: number;
+  };
+  // For an item or spell getting an upgrade
+  upgradeNotification?: {
+    line: string;         // e.g. "Vex's Rusty Sword gained Heavy Edge"
+    flavor?: string;
+    effects: string[];
+    drawback?: string;    // a cursed bargain's price, shown in red
   };
   // For XP being handed out
   xpNotification?: {
@@ -1228,6 +1243,19 @@ export const useGameState = () => {
   const addDiceRoll = async (entry: DiceRollEntry) => {
     await addItem('diceRolls', { ...entry } as Record<string, unknown>);
     await bumpCrawlerStats(entry.crawlerId, diceStatBumps(entry));
+    // A weapon with a cursed bargain costs HP or mana on every attack roll
+    if (!entry.mobRoll && entry.source?.kind === 'item' && entry.statRoll?.rollType === 'Attack roll') {
+      const weapon = getCrawlerInventory(entry.crawlerId).find(i => i.id === entry.source!.id);
+      const cost = upgradeUseCost(weapon?.upgrades);
+      const crawler = crawlers.find(c => c.id === entry.crawlerId);
+      if (crawler && (cost.hp || cost.mana)) {
+        await updateCrawler(crawler.id, {
+          ...(cost.hp ? { hp: Math.max(0, (crawler.hp ?? 0) - cost.hp) } : {}),
+          ...(cost.mana ? { mana: Math.max(0, (crawler.mana ?? 0) - cost.mana) } : {}),
+        });
+        toast(`${weapon!.name} took its price: ${[cost.hp ? `${cost.hp} HP` : '', cost.mana ? `${cost.mana} mana` : ''].filter(Boolean).join(' and ')}`, { icon: '🩸' });
+      }
+    }
     const roll = entry.statRoll;
     if (!entry.mobRoll && roll?.rollType === 'Attack roll' && roll.rawRoll === 20 && entry.results.some(r => r.dice.startsWith('D20'))) {
       await addMoment(entry.crawlerId, `Rolled a natural 20 attacking with ${entry.source?.name ?? roll.stat.replace(/ \(.*$/, '')}`);
@@ -2534,6 +2562,75 @@ export const useGameState = () => {
     await updateCrawler(crawlerId, { knownSpells: updated });
   };
 
+  /** Gives an upgrade to one crawler's copy of an item or known spell, announces it in the dice log
+   *  and awards the first-upgrade achievements. */
+  const giveUpgrade = async (crawlerId: string, target: UpgradeTarget, upgrade: ItemUpgrade) => {
+    const crawler = crawlers.find(c => c.id === crawlerId);
+    if (!crawler) return;
+    let kind: UpgradeKind;
+    let targetName: string;
+    if (target.kind === 'item') {
+      const items = getCrawlerInventory(crawlerId);
+      const item = items.find(i => i.id === target.id);
+      if (!item) return;
+      kind = getUpgradeKind(item);
+      targetName = baseItemName(item);
+      await updateCrawlerInventory(crawlerId, items.map(i => i.id === item.id ? applyUpgradeToItem(item, upgrade) : i));
+    } else {
+      const knownSpells = crawler.knownSpells ?? [];
+      const ks = knownSpells.find(k => k.spellId === target.id);
+      if (!ks) return;
+      kind = 'spell';
+      targetName = ks.spellName;
+      await updateCrawler(crawlerId, { knownSpells: knownSpells.map(k => k === ks ? { ...k, upgrades: [...(k.upgrades ?? []), upgrade] } : k) });
+    }
+    await addDiceRoll({
+      id: crypto.randomUUID(),
+      crawlerName: crawler.name,
+      crawlerId,
+      timestamp: Date.now(),
+      results: [],
+      total: 0,
+      upgradeNotification: {
+        line: `${crawler.name}'s ${targetName} gained ${upgrade.name}${upgrade.newName ? ` and is now called ${upgrade.newName}` : ''}`,
+        flavor: upgrade.flavor,
+        effects: upgrade.effects.map(describeUpgradeEffect),
+        drawback: upgrade.drawback ? describeUpgradeDrawback(upgrade.drawback) : undefined,
+      },
+    });
+    await addMoment(crawlerId, `${targetName} gained ${upgrade.name}`);
+    // First upgrade of each kind, and the first cursed bargain, are one-time achievements (written together,
+    // since two awardTrophy calls would each start from the same trophy list)
+    const has = (name: string) => (crawler.trophies ?? []).some(t => t.name.toLowerCase() === name.toLowerCase());
+    const earned = [FIRST_UPGRADE_ACHIEVEMENTS[kind], upgrade.drawback ? CURSED_BARGAIN_ACHIEVEMENT : undefined]
+      .filter((a): a is { name: string; description: string } => !!a && !has(a.name));
+    if (earned.length > 0) {
+      const awardedAt = new Date().toISOString();
+      const trophies: CrawlerTrophy[] = [...(crawler.trophies ?? []), ...earned.map(a => ({
+        id: `trophy-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, name: a.name, description: a.description, count: 1, awardedAt,
+      }))];
+      await writeCrawler(crawlerId, { trophies });
+      for (const a of earned) toast.success(`🏆 ${crawler.name} earned "${a.name}"!`);
+    }
+  };
+
+  /** DM: takes back the latest upgrade on a crawler's item or known spell. */
+  const undoLastUpgrade = async (crawlerId: string, target: UpgradeTarget) => {
+    if (target.kind === 'item') {
+      const items = getCrawlerInventory(crawlerId);
+      const item = items.find(i => i.id === target.id);
+      if (!item?.upgrades?.length) return;
+      await updateCrawlerInventory(crawlerId, items.map(i => i.id === item.id ? undoLastItemUpgrade(item) : i));
+    } else {
+      const crawler = crawlers.find(c => c.id === crawlerId);
+      const knownSpells = crawler?.knownSpells ?? [];
+      if (!knownSpells.some(k => k.spellId === target.id && k.upgrades?.length)) return;
+      await updateCrawler(crawlerId, {
+        knownSpells: knownSpells.map(k => k.spellId === target.id ? { ...k, upgrades: k.upgrades!.slice(0, -1) } : k),
+      });
+    }
+  };
+
   // Spend the spell's mana (after mastery discount) and increment its cast count.
   // Returns false without changing anything when the crawler can't afford it.
   const castSpell = async (crawlerId: string, spellId: string): Promise<boolean> => {
@@ -2543,7 +2640,7 @@ export const useGameState = () => {
     const idx = knownSpells.findIndex(ks => ks.spellId === spellId);
     if (idx === -1) return false;
     const prev = knownSpells[idx];
-    const spell = spells.find(s => s.id === spellId) ?? prev.customSpell;
+    const spell = resolveKnownSpell(prev, spells);
     const prevMastery = getSpellMasteryLevel(prev.castCount);
     const cost = spell ? getEffectiveManaCost(spell.spellData.manaCost, prevMastery) : 0;
     const currentMana = crawler.mana ?? 0;
@@ -2570,7 +2667,10 @@ export const useGameState = () => {
       };
       languageEffects = [...(crawler.languageEffects ?? []).filter(e => e.spellId !== spellId), effect];
     }
-    await updateCrawler(crawlerId, { knownSpells, mana: currentMana - cost, ...(languageEffects ? { languageEffects } : {}) });
+    // A cursed bargain can also cost HP per cast (its mana cost is already in the spell's cost)
+    const hpCost = upgradeUseCost(prev.upgrades).hp;
+    const hpAfter = hpCost ? { hp: Math.max(0, (crawler.hp ?? 0) - hpCost) } : {};
+    await updateCrawler(crawlerId, { knownSpells, mana: currentMana - cost, ...hpAfter, ...(languageEffects ? { languageEffects } : {}) });
     if (newMastery > prevMastery) {
       toast.success(`${crawler.name} leveled up ${prev.spellName} to mastery level ${newMastery}!`);
       await awardXP([{ crawlerId, amount: XP_REWARDS.masteryLevelUp, reason: `${prev.spellName} mastery ${newMastery}` }]);
@@ -3020,6 +3120,8 @@ export const useGameState = () => {
   };
 
   return {
+    giveUpgrade,
+    undoLastUpgrade,
     crawlers,
     crawlerStats,
     updateCrawler,

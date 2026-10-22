@@ -353,7 +353,40 @@ When creating or editing an item in the Item Library, or a spell in Vernon's Lib
 - **XP earned**: how much XP each action is worth.
 - **Reset to recommended values** puts everything back to the defaults above.
 
-Items without an equipment slot (potions, keys, junk) don't earn upgrade XP.`,
+Items without an equipment slot (potions, keys, junk) don't earn upgrade XP.
+
+## Upgrades
+
+An upgrade changes one crawler's copy of an item or spell, and can give it a new name. Upgraded items show **Upgraded** after their name, and expanding the item lists each upgrade with its flavor text. Spells keep following the library spell, with the crawler's upgrades added on top.
+
+What an upgrade can do:
+
+| Effect | Example | What happens |
+|--------|---------|--------------|
+| Dice change | Damage die d8 to d10, +1d4 to hit | Changes the dice rolled |
+| Weapon or spell property | +10 ft range, Fire damage, splash, longer duration | Changes the weapon or spell |
+| Stat bonus while equipped | +1 STR, +5 max HP | Added to the item's stat bonuses |
+| Language | Speak Beast while equipped | Works like any language item |
+| Defense | +1 armor rating, resists Bows, vulnerable to Fire | Saved on the item; counts in combat once armor rules arrive |
+| On-hit effect, new action, strange | 25% chance to set Burning, "Shatter Swing" once per combat | Written on the item for the DM to rule on |
+
+## Cursed bargains
+
+An upgrade can come with a price. The item gets a red **Cursed** mark, and the price shows under the upgrade.
+
+- **Stat penalty**: taken off the item's stat bonuses while equipped.
+- **HP or mana cost per use**: taken every time you attack with the weapon or cast the spell.
+- **Destroyed if unequipped**: taking it off (or swapping it out) turns it to dust, after a warning.
+- **Can't be unequipped**: it stays in its slot until the DM takes it off.
+- **Strange**: anything else, for the DM to rule on.
+
+## Announcements and achievements
+
+Every upgrade is posted to the dice log in gold, with any price in red, so the whole party sees it. A crawler's first weapon upgrade earns **Sharpened**, first armor upgrade **Hardened**, first spell upgrade **Spellwright**, and first cursed bargain **Deal With the Devil**.
+
+## Giving an upgrade (DM)
+
+Open the **DM Console** and the **Upgrades** tab. Pick the crawler and the item or spell, name the upgrade, add flavor text, optionally give the item a new name, and add one or more effects. Add a cursed bargain if you like, then click **Give**. **Take back the latest upgrade** undoes the most recent one, restoring the numbers it changed.`,
   },
   {
     id: 'inventory',

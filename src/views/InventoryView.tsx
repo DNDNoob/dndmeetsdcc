@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
 import { ItemName } from "@/components/ItemName";
+import { UpgradeList } from "@/components/UpgradeList";
 import { UpgradeXpEditor } from "@/components/UpgradeXpEditor";
 import { Crawler, InventoryItem, getUpgradeKind, type UpgradeXpSettings, getItemStackKey, stackItems, EquipmentSlot as SlotType, StatModifiers, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, Spell, SpellData, ITEM_RARITIES, ItemRarity, getItemRarityColor } from "@/lib/gameData";
 import { RarityBadge } from "@/components/ui/RarityBadge";
@@ -382,6 +383,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
           <span className="text-accent italic whitespace-pre-wrap">{item.effects}</span>
         </div>
       )}
+      <UpgradeList upgrades={item.upgrades} armorData={item.armorData} />
       {item.goldValue !== undefined && item.goldValue > 0 && (
         <div>
           <span className="text-muted-foreground">Value: </span>

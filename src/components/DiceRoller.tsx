@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DungeonButton } from "./ui/DungeonButton";
-import { Dices, ChevronUp, ChevronDown, Plus, X, Package, ScrollText, Undo2, Coins, Star } from "lucide-react";
+import { Dices, ChevronUp, ChevronDown, Plus, X, Package, ScrollText, Undo2, Coins, Star, Sparkles } from "lucide-react";
 import { getLootBoxTierColor } from "@/lib/gameData";
 import { DiceRollEntry } from "@/hooks/useGameState";
 import { useClickAway } from "@/hooks/useClickAway";
@@ -241,6 +241,20 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
                                 <span className="text-primary">{entry.mobLootNotification.partyItems.join(', ')}</span>
                               </span>
                             )}
+                          </div>
+                          <span className="text-[10px] text-muted-foreground/60 ml-auto">{formatTimestamp(entry.timestamp)}</span>
+                        </div>
+                      ) : entry.upgradeNotification ? (
+                        // An item or spell got an upgrade (a cursed bargain shows its price in red)
+                        <div className="flex items-start gap-2">
+                          <Sparkles className="w-4 h-4 flex-shrink-0 text-accent mt-0.5" />
+                          <div className="min-w-0">
+                            <span className="block font-display text-accent text-glow-gold">{entry.upgradeNotification.line}</span>
+                            {entry.upgradeNotification.flavor && <span className="block italic text-muted-foreground">{entry.upgradeNotification.flavor}</span>}
+                            {entry.upgradeNotification.effects.map(line => (
+                              <span key={line} className="block text-foreground">{line}</span>
+                            ))}
+                            {entry.upgradeNotification.drawback && <span className="block text-destructive">Price: {entry.upgradeNotification.drawback}</span>}
                           </div>
                           <span className="text-[10px] text-muted-foreground/60 ml-auto">{formatTimestamp(entry.timestamp)}</span>
                         </div>
