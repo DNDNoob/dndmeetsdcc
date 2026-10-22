@@ -22,6 +22,11 @@
       "file": "hardware-store.jpg"
     },
     {
+      "key": "thriftStore",
+      "name": "Sacred Stone Thrift Store",
+      "file": "thrift-store.jpg"
+    },
+    {
       "key": "streetNight",
       "name": "Neighborhood Street (Night)",
       "file": "street-night.jpg"
@@ -61,6 +66,116 @@
           "combatTurns": 10
         },
         "grantsLanguage": "beast"
+      },
+      "upgradeXp": {
+        "milestones": [
+          10,
+          30,
+          80,
+          160,
+          300
+        ]
+      }
+    },
+    {
+      "id": "tutorial-spell-spark",
+      "name": "Spark",
+      "description": "A snap of static from your fingertip.",
+      "tags": [
+        "tutorial",
+        "attack"
+      ],
+      "spellData": {
+        "manaCost": 1,
+        "spellLevel": 1,
+        "school": "Evocation",
+        "actionType": "Action",
+        "range": 30,
+        "canTargetSelf": false,
+        "target": "Single",
+        "damageDice": [
+          {
+            "count": 1,
+            "sides": 6
+          }
+        ],
+        "damageType": "Electric"
+      },
+      "upgradeXp": {
+        "milestones": [
+          10,
+          30,
+          80,
+          160,
+          300
+        ]
+      }
+    },
+    {
+      "id": "tutorial-spell-patch-up",
+      "name": "Patch Up",
+      "description": "Spit, a prayer and a Band-Aid.",
+      "tags": [
+        "tutorial",
+        "healing"
+      ],
+      "spellData": {
+        "manaCost": 1,
+        "spellLevel": 1,
+        "school": "Conjuration",
+        "actionType": "Action",
+        "range": "Touch",
+        "canTargetSelf": true,
+        "target": "Single",
+        "damageDice": [
+          {
+            "count": 1,
+            "sides": 6
+          }
+        ],
+        "damageType": "Healing"
+      },
+      "upgradeXp": {
+        "milestones": [
+          10,
+          30,
+          80,
+          160,
+          300
+        ]
+      }
+    },
+    {
+      "id": "tutorial-spell-bad-vibes",
+      "name": "Bad Vibes",
+      "description": "You radiate the energy of a Yelp review. One creature loses its nerve.",
+      "tags": [
+        "tutorial",
+        "control"
+      ],
+      "spellData": {
+        "manaCost": 1,
+        "spellLevel": 1,
+        "school": "Enchantment",
+        "actionType": "Action",
+        "range": 30,
+        "canTargetSelf": false,
+        "target": "Single",
+        "savingThrow": "CHA",
+        "effect": {
+          "condition": "Frightened",
+          "turns": 2,
+          "description": "Disadvantage on attacks; it tries to move away from you"
+        }
+      },
+      "upgradeXp": {
+        "milestones": [
+          10,
+          30,
+          80,
+          160,
+          300
+        ]
       }
     }
   ],
@@ -156,7 +271,16 @@
       "tags": [
         "armor",
         "costume"
-      ]
+      ],
+      "upgradeXp": {
+        "milestones": [
+          10,
+          40,
+          100,
+          200,
+          350
+        ]
+      }
     },
     "chicken": {
       "name": "One Live Chicken",
@@ -188,6 +312,15 @@
         "damageType": "Basic",
         "weaponType": "Heavy weapons",
         "isRanged": false
+      },
+      "upgradeXp": {
+        "milestones": [
+          10,
+          40,
+          100,
+          200,
+          350
+        ]
       }
     },
     "stapleGun": {
@@ -211,6 +344,15 @@
         "isRanged": true,
         "normalRange": 30,
         "maxRange": 60
+      },
+      "upgradeXp": {
+        "milestones": [
+          10,
+          40,
+          100,
+          200,
+          350
+        ]
       }
     },
     "tortillas": {
@@ -245,6 +387,15 @@
         "isRanged": true,
         "normalRange": 30,
         "maxRange": 60
+      },
+      "upgradeXp": {
+        "milestones": [
+          10,
+          40,
+          100,
+          200,
+          350
+        ]
       }
     },
     "xanax": {
@@ -277,6 +428,374 @@
       },
       "tags": [
         "trophy"
+      ]
+    },
+    "hammer": {
+      "name": "Claw Hammer",
+      "description": "A solid framing hammer. The price tag is still on it.",
+      "rarity": "Common",
+      "goldValue": 8,
+      "equipSlot": "weapon",
+      "tags": [
+        "weapon"
+      ],
+      "weaponData": {
+        "damageDice": [
+          {
+            "count": 1,
+            "sides": 6
+          }
+        ],
+        "damageType": "Basic",
+        "weaponType": "Light weapons",
+        "isRanged": false
+      },
+      "upgradeXp": {
+        "milestones": [
+          10,
+          40,
+          100,
+          200,
+          350
+        ]
+      }
+    },
+    "nails": {
+      "name": "Box of Nails",
+      "description": "Two hundred 3-inch nails.",
+      "rarity": "Common",
+      "goldValue": 2,
+      "effects": "Scatter them on the floor: anyone who walks through rolls DEX or takes 1d4 damage.",
+      "tags": [
+        "consumable",
+        "trap"
+      ]
+    },
+    "crowbar": {
+      "name": "Crowbar",
+      "description": "Opens doors, crates and conversations.",
+      "rarity": "Common",
+      "goldValue": 10,
+      "equipSlot": "weapon",
+      "tags": [
+        "weapon"
+      ],
+      "weaponData": {
+        "damageDice": [
+          {
+            "count": 1,
+            "sides": 6
+          }
+        ],
+        "damageType": "Basic",
+        "weaponType": "Improvised",
+        "isRanged": false
+      },
+      "upgradeXp": {
+        "milestones": [
+          10,
+          40,
+          100,
+          200,
+          350
+        ]
+      },
+      "effects": "Advantage on Athletics checks to force something open."
+    },
+    "ductTape": {
+      "name": "Duct Tape",
+      "description": "Fixes everything.",
+      "rarity": "Common",
+      "goldValue": 3,
+      "effects": "Use it to restrain a downed creature or patch armor (+1 HP to the wearer once).",
+      "tags": [
+        "consumable",
+        "tool"
+      ]
+    },
+    "flashlight": {
+      "name": "Heavy Flashlight",
+      "description": "A long metal police-style flashlight.",
+      "rarity": "Common",
+      "goldValue": 6,
+      "equipSlot": "leftHand",
+      "effects": "Lights a 30 ft cone: the DM reveals fog of war where you point it.",
+      "tags": [
+        "tool",
+        "light"
+      ],
+      "upgradeXp": {
+        "milestones": [
+          10,
+          40,
+          100,
+          200,
+          350
+        ]
+      }
+    },
+    "rope": {
+      "name": "Rope (50 ft)",
+      "description": "Nylon, bright orange.",
+      "rarity": "Common",
+      "goldValue": 3,
+      "tags": [
+        "tool"
+      ]
+    },
+    "nailGun": {
+      "name": "Nail Gun",
+      "description": "Cordless. The safety switch is taped down.",
+      "rarity": "Uncommon",
+      "goldValue": 25,
+      "equipSlot": "weapon",
+      "tags": [
+        "weapon"
+      ],
+      "weaponData": {
+        "damageDice": [
+          {
+            "count": 1,
+            "sides": 6
+          }
+        ],
+        "damageType": "Basic",
+        "weaponType": "Mechanical",
+        "isRanged": true,
+        "normalRange": 20,
+        "maxRange": 40
+      },
+      "upgradeXp": {
+        "milestones": [
+          10,
+          40,
+          100,
+          200,
+          350
+        ]
+      }
+    },
+    "bat": {
+      "name": "Baseball Bat",
+      "description": "Aluminum, dented, signed by a Little League team.",
+      "rarity": "Common",
+      "goldValue": 5,
+      "equipSlot": "weapon",
+      "tags": [
+        "weapon"
+      ],
+      "weaponData": {
+        "damageDice": [
+          {
+            "count": 1,
+            "sides": 6
+          }
+        ],
+        "damageType": "Basic",
+        "weaponType": "Improvised",
+        "isRanged": false
+      },
+      "upgradeXp": {
+        "milestones": [
+          10,
+          40,
+          100,
+          200,
+          350
+        ]
+      }
+    },
+    "fireExtinguisher": {
+      "name": "Fire Extinguisher",
+      "description": "Red, heavy, last inspected in 2014.",
+      "rarity": "Common",
+      "goldValue": 6,
+      "equipSlot": "weapon",
+      "tags": [
+        "weapon"
+      ],
+      "weaponData": {
+        "damageDice": [
+          {
+            "count": 1,
+            "sides": 4
+          }
+        ],
+        "damageType": "Basic",
+        "weaponType": "Improvised",
+        "isRanged": false
+      },
+      "upgradeXp": {
+        "milestones": [
+          10,
+          40,
+          100,
+          200,
+          350
+        ]
+      },
+      "effects": "Spray it instead of swinging: puts out fires and blinds one target until its next turn."
+    },
+    "nerfGun": {
+      "name": "Nerf Blaster",
+      "description": "Foam darts, surprisingly accurate.",
+      "rarity": "Common",
+      "goldValue": 2,
+      "equipSlot": "weapon",
+      "tags": [
+        "weapon"
+      ],
+      "weaponData": {
+        "damageDice": [
+          {
+            "count": 1,
+            "sides": 2
+          }
+        ],
+        "damageType": "Basic",
+        "weaponType": "Bows",
+        "isRanged": true,
+        "normalRange": 30,
+        "maxRange": 60
+      },
+      "upgradeXp": {
+        "milestones": [
+          10,
+          40,
+          100,
+          200,
+          350
+        ]
+      },
+      "effects": "Does almost nothing, but upgrades fast."
+    },
+    "tvRemote": {
+      "name": "TV Remote",
+      "description": "Missing the battery cover. The batteries are held in with tape.",
+      "rarity": "Common",
+      "goldValue": 0,
+      "tags": [
+        "junk"
+      ]
+    },
+    "diceBag": {
+      "name": "Bag of Dice",
+      "description": "Someone's lucky dice. Don't touch the d20.",
+      "rarity": "Uncommon",
+      "goldValue": 4,
+      "equipSlot": "ringFinger",
+      "statModifiers": {
+        "cha": 1
+      },
+      "effects": "Lucky charm: +1 CHA while carried in hand.",
+      "tags": [
+        "gear"
+      ],
+      "upgradeXp": {
+        "milestones": [
+          10,
+          40,
+          100,
+          200,
+          350
+        ]
+      }
+    },
+    "cheetos": {
+      "name": "Family Size Cheetos",
+      "description": "Orange dust gets on everything.",
+      "rarity": "Common",
+      "goldValue": 1,
+      "effects": "Eat: heal 1 HP.",
+      "tags": [
+        "consumable",
+        "food"
+      ]
+    },
+    "tomeSpark": {
+      "name": "Tome: Spark (Water-Damaged)",
+      "description": "A self-help paperback with a lightning bolt on the cover. Half the pages are stuck together.",
+      "rarity": "Uncommon",
+      "goldValue": 8,
+      "effects": "Read it to learn the spell.",
+      "tags": [
+        "tome"
+      ],
+      "isSpellTome": true,
+      "spellTomeData": {
+        "entries": [
+          {
+            "spellId": "tutorial-spell-spark"
+          }
+        ]
+      }
+    },
+    "tomePatchUp": {
+      "name": "Tome: Patch Up",
+      "description": "A 1970s first-aid pamphlet with pentagrams doodled in the margins.",
+      "rarity": "Uncommon",
+      "goldValue": 8,
+      "effects": "Read it to learn the spell.",
+      "tags": [
+        "tome"
+      ],
+      "isSpellTome": true,
+      "spellTomeData": {
+        "entries": [
+          {
+            "spellId": "tutorial-spell-patch-up"
+          }
+        ]
+      }
+    },
+    "tomeBadVibes": {
+      "name": "Tome: Bad Vibes",
+      "description": "A crystal-healing guide, read backwards.",
+      "rarity": "Uncommon",
+      "goldValue": 6,
+      "effects": "Read it to learn the spell.",
+      "tags": [
+        "tome"
+      ],
+      "isSpellTome": true,
+      "spellTomeData": {
+        "entries": [
+          {
+            "spellId": "tutorial-spell-bad-vibes"
+          }
+        ]
+      }
+    },
+    "crystal": {
+      "name": "Mystery Crystal",
+      "description": "Purple. Hums faintly. $3.",
+      "rarity": "Common",
+      "goldValue": 3,
+      "equipSlot": "ringFinger",
+      "statModifiers": {
+        "maxMana": 1
+      },
+      "tags": [
+        "gear",
+        "magic"
+      ],
+      "upgradeXp": {
+        "milestones": [
+          10,
+          40,
+          100,
+          200,
+          350
+        ]
+      }
+    },
+    "vinyl": {
+      "name": "Scratched Vinyl Record",
+      "description": "An album you've never heard of. Ralph says that's the point.",
+      "rarity": "Common",
+      "goldValue": 2,
+      "tags": [
+        "junk"
       ]
     }
   },
@@ -398,6 +917,34 @@
           {
             "item": "tortillas",
             "quantity": 10
+          },
+          {
+            "item": "hammer",
+            "quantity": 2
+          },
+          {
+            "item": "nails",
+            "quantity": 5
+          },
+          {
+            "item": "crowbar",
+            "quantity": 1
+          },
+          {
+            "item": "ductTape",
+            "quantity": 3
+          },
+          {
+            "item": "flashlight",
+            "quantity": 2
+          },
+          {
+            "item": "rope",
+            "quantity": 2
+          },
+          {
+            "item": "nailGun",
+            "quantity": 1
           }
         ]
       }
@@ -425,15 +972,43 @@
       "kind": "character",
       "level": 1,
       "hitPoints": 8,
-      "description": "A random hipster browsing hand tools ironically.",
+      "description": "A hipster browsing hand tools ironically. He runs the Sacred Stone thrift store and invites the party over.",
       "languages": [
         "worldspeech"
       ],
       "personality": {
         "voice": "Deadpan, ironic, name-drops bands nobody knows.",
-        "wants": "A vintage hammer, but not in a mainstream way.",
-        "knows": "The creepy neighbor posts weird Craigslist ads.",
+        "wants": "To get the party to come to his thrift store, the Sacred Stone, before it closes.",
+        "knows": "The creepy neighbor posts weird Craigslist ads. The old books at his store \"actually work, man.\"",
         "attitude": "Unhelpful, mildly amused."
+      },
+      "merchant": {
+        "enabled": true,
+        "startingGold": 30,
+        "scroogeFactor": 1,
+        "haggleDC": 10,
+        "stock": [
+          {
+            "item": "tomeSpark",
+            "quantity": 2
+          },
+          {
+            "item": "tomePatchUp",
+            "quantity": 2
+          },
+          {
+            "item": "tomeBadVibes",
+            "quantity": 1
+          },
+          {
+            "item": "crystal",
+            "quantity": 3
+          },
+          {
+            "item": "vinyl",
+            "quantity": 4
+          }
+        ]
       }
     },
     {
@@ -497,13 +1072,32 @@
     },
     {
       "id": "tutorial-mob-pointy-hats",
-      "name": "Men in White Pointy Hats",
+      "name": "White Hat",
       "kind": "creature",
-      "level": 2,
-      "hitPoints": 10,
+      "level": 1,
+      "hitPoints": 3,
       "hidden": true,
       "silent": true,
-      "description": "Robed figures chanting in the dark on the night of the storm."
+      "description": "Robed figures in tall white pointy hats, chanting in the dark. Cowards: as soon as one takes any damage, it flees (the DM moves it off the map or removes it).",
+      "weaknesses": "Flee the moment they're hurt.",
+      "strengths": "There are a lot of them.",
+      "attacks": [
+        {
+          "id": "torch",
+          "name": "Tiki torch",
+          "actionType": "Action",
+          "hitBonus": 1,
+          "damageDice": [
+            {
+              "count": 1,
+              "sides": 4
+            }
+          ],
+          "damageBonus": 0,
+          "damageType": "Fire"
+        }
+      ],
+      "defaultGold": 1
     },
     {
       "id": "tutorial-mob-thephen-socking",
@@ -573,27 +1167,6 @@
       "y": 46
     },
     {
-      "mob": "tutorial-mob-pointy-hats",
-      "map": "streetNight",
-      "x": 45,
-      "y": 6,
-      "hostile": false
-    },
-    {
-      "mob": "tutorial-mob-pointy-hats",
-      "map": "streetNight",
-      "x": 52,
-      "y": 6,
-      "hostile": false
-    },
-    {
-      "mob": "tutorial-mob-pointy-hats",
-      "map": "streetNight",
-      "x": 59,
-      "y": 6,
-      "hostile": false
-    },
-    {
       "mob": "tutorial-mob-creepy-neighbor",
       "map": "neighborHouse",
       "x": 55,
@@ -617,6 +1190,96 @@
       "x": 40,
       "y": 12,
       "hostile": true
+    },
+    {
+      "mob": "tutorial-mob-pointy-hats",
+      "map": "streetNight",
+      "x": 37,
+      "y": 32,
+      "hostile": true
+    },
+    {
+      "mob": "tutorial-mob-pointy-hats",
+      "map": "streetNight",
+      "x": 45,
+      "y": 32,
+      "hostile": true
+    },
+    {
+      "mob": "tutorial-mob-pointy-hats",
+      "map": "streetNight",
+      "x": 53,
+      "y": 32,
+      "hostile": true
+    },
+    {
+      "mob": "tutorial-mob-pointy-hats",
+      "map": "streetNight",
+      "x": 61,
+      "y": 32,
+      "hostile": true
+    },
+    {
+      "mob": "tutorial-mob-pointy-hats",
+      "map": "streetNight",
+      "x": 37,
+      "y": 47,
+      "hostile": true
+    },
+    {
+      "mob": "tutorial-mob-pointy-hats",
+      "map": "streetNight",
+      "x": 45,
+      "y": 47,
+      "hostile": true
+    },
+    {
+      "mob": "tutorial-mob-pointy-hats",
+      "map": "streetNight",
+      "x": 53,
+      "y": 47,
+      "hostile": true
+    },
+    {
+      "mob": "tutorial-mob-pointy-hats",
+      "map": "streetNight",
+      "x": 61,
+      "y": 47,
+      "hostile": true
+    },
+    {
+      "mob": "tutorial-mob-pointy-hats",
+      "map": "streetNight",
+      "x": 37,
+      "y": 62,
+      "hostile": true
+    },
+    {
+      "mob": "tutorial-mob-pointy-hats",
+      "map": "streetNight",
+      "x": 45,
+      "y": 62,
+      "hostile": true
+    },
+    {
+      "mob": "tutorial-mob-pointy-hats",
+      "map": "streetNight",
+      "x": 53,
+      "y": 62,
+      "hostile": true
+    },
+    {
+      "mob": "tutorial-mob-pointy-hats",
+      "map": "streetNight",
+      "x": 61,
+      "y": 62,
+      "hostile": true
+    },
+    {
+      "mob": "tutorial-mob-hipster",
+      "map": "thriftStore",
+      "x": 70,
+      "y": 60
     }
   ],
   "lootBoxTemplates": [
@@ -667,6 +1330,19 @@
         "fursuit",
         "fursuit"
       ]
+    },
+    {
+      "id": "tutorial-loot-living-room",
+      "name": "Living Room Odds and Ends",
+      "tier": "Dirt",
+      "items": [
+        "bat",
+        "fireExtinguisher",
+        "nerfGun",
+        "tvRemote",
+        "diceBag",
+        "cheetos"
+      ]
     }
   ],
   "quests": [
@@ -710,6 +1386,6 @@
   "episode": {
     "id": "tutorial-episode-rat-problem",
     "name": "Tutorial: Rat Problem",
-    "description": "READ ALOUD (Home, afternoon): You and your friends are throwing a DnD party tonight, and you're out of everything. QWERTY is beeping at the empty snack bowl and the parrot won't shut up. | STREET (afternoon): On the walk to the hardware store, a squirrel is robbing the bird feeder. Across the street, the blinds twitch. A poster on the telephone pole: MISSING. | HARDWARE STORE (late afternoon): Señor Gringo greets you with terrible Spanish. Stock up before the sun goes down. | THE KNOCK (back Home, night): The party is just starting when BANG BANG BANG. Your creepy neighbor is at the door, sweating: \"Rats! In my basement! Please, buddy, I need help!\" Give the quest Clear Out the Rats. The players choose: help him, or not. | DON'T HELP (switch to Street Night): A freak storm knocks out the power and a lightning strike sets your house on fire. Out in the cold, you hear chanting in the distance (reveal the Men in White Pointy Hats). The only house with lights on is the neighbor's. | HELP (Street Night, then his house): He leads you across the street and inside. \"Rats are downstairs. I'm gonna grab a Xanax, take the edge off.\" He leaves. BANGING from the basement door. Kitchen, upstairs, or basement? | BASEMENT: The banging stops the moment someone reaches the door. It's pitch black at the bottom of the stairs (fog of war). A college kid in a rat fursuit, gagged, squeaking. Spare fursuits on a rack, one for each of you. LIGHTNING. The neighbor is at the top of the stairs with a shotgun and a smile. Start combat."
+    "description": "READ ALOUD (Home, afternoon): You and your friends are throwing a DnD party tonight, and you're out of everything. QWERTY is beeping at the empty snack bowl and the parrot won't shut up. | STREET (afternoon): On the walk to the hardware store, a squirrel is robbing the bird feeder. Across the street, the blinds twitch. A poster on the telephone pole: MISSING. | HARDWARE STORE (late afternoon): Señor Gringo greets you with terrible Spanish. Stock up before the sun goes down. A hipster named Ralph Nander invites you to his thrift store, the Sacred Stone. | SACRED STONE THRIFT STORE: Ralph sells dusty old books he swears \"actually work, man.\" Each one teaches a spell. | THE KNOCK (back Home, night): The party is just starting when BANG BANG BANG. Your creepy neighbor is at the door, sweating: \"Rats! In my basement! Please, buddy, I need help!\" Give the quest Clear Out the Rats. The players choose: help him, or not. | DON'T HELP (switch to Street Night): A freak storm knocks out the power and a lightning strike sets your house on fire. Out in the cold, you hear chanting in the distance. The only house with lights on is the neighbor's. | HELP (Street Night, then his house): He leads you across the street and inside. \"Rats are downstairs. I'm gonna grab a Xanax, take the edge off.\" He leaves. BANGING from the basement door. Kitchen, upstairs, or basement? | BASEMENT: The banging stops the moment someone reaches the door. It's pitch black at the bottom of the stairs (fog of war). A college kid in a rat fursuit, gagged, squeaking. Spare fursuits on a rack, one for each of you. LIGHTNING. The neighbor is at the top of the stairs with a shotgun and a smile. Start combat. | AFTER THE FIGHT (Street Night): The chanting is right outside now. Twelve figures in tall white pointy hats fill the street with tiki torches. Reveal them and start combat. They're cowards: any one that takes damage flees."
   }
 }

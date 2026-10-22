@@ -17,7 +17,8 @@
  *
  * What it writes:
  *   campaigns/{id} (created once; a re-run only updates its name and description) + campaignInvites/{code}
- *   rooms/{id}/maps, mobs, spells, lootBoxTemplates, quests, episodes, gameClock/current (if missing)
+ *   rooms/{id}/maps, mobs, spells, lootBoxTemplates, quests, episodes, plus the Item Library
+ *   (inventory/shared-library) and gameClock/current when missing
  *   Storage maps/tutorial-*.jpg for the map pictures (too big to keep inside Firestore)
  */
 
@@ -120,7 +121,7 @@ async function getDoc(p) {
 /** Commits writes in chunks. `set` replaces the whole document (our own tutorial- docs only); `merge` updates the listed fields. */
 async function commit(writes) {
   for (let i = 0; i < writes.length; i += 400) {
-    const chunk = writes.slice(i, i + 400).map((w) => ({
+    const chunk = writes.slice(i, i + 400).map((w) => w.delete ? { delete: docName(w.path) } : ({
       update: { name: docName(w.path), fields: toFields(w.data) },
       ...(w.merge ? { updateMask: { fieldPaths: Object.keys(w.data).filter((k) => w.data[k] !== undefined).map((k) => `\`${k}\``) } } : {}),
       ...(w.mustNotExist ? { currentDocument: { exists: false } } : {}),
@@ -231,9 +232,15 @@ async function main() {
   }
 
   // Maps: doc ids sort in play order, so map index i is maps[i] in the app
+  // A map whose picture isn't in scripts/tutorial/maps yet is left out, with its tokens
+  const maps = content.maps.filter((m) => {
+    const ok = fs.existsSync(path.join(TUTORIAL_DIR, 'maps', m.file));
+    if (!ok) log(`⚠️ Skipping map "${m.name}": scripts/tutorial/maps/${m.file} is missing`);
+    return ok;
+  });
   const mapIndex = {};
   const mapDocs = [];
-  for (const [i, m] of content.maps.entries()) {
+  for (const [i, m] of maps.entries()) {
     mapIndex[m.key] = String(i);
     const file = path.join(TUTORIAL_DIR, 'maps', m.file);
     const storagePath = `maps/tutorial-${slug(m.key)}.jpg`;
@@ -284,19 +291,20 @@ async function main() {
   }
 
   const letters = {};
-  const mobPlacements = content.placements.map((p) => {
-    if (!(p.map in mapIndex)) throw new Error(`Unknown map "${p.map}" in placements`);
+  const mapKeys = new Set(content.maps.map((m) => m.key));
+  const mobPlacements = content.placements.filter((p) => p.map in mapIndex).map((p) => {
     const key = `${p.mob}@${p.map}`;
     letters[key] = (letters[key] ?? -1) + 1;
     return { mobId: p.mob, mapId: mapIndex[p.map], x: p.x, y: p.y, letterIndex: letters[key], ...(p.hostile !== undefined ? { hostile: p.hostile } : {}) };
   });
-  const mapSettings = Object.fromEntries(content.maps.map((m, i) => [String(i), { fogOfWar: { enabled: !!m.fogOfWar, revealedAreas: [] }, scale: 100 }]));
+  for (const p of content.placements) if (!mapKeys.has(p.map)) throw new Error(`Unknown map "${p.map}" in placements`);
+  const mapSettings = Object.fromEntries(maps.map((m, i) => [String(i), { fogOfWar: { enabled: !!m.fogOfWar, revealedAreas: [] }, scale: 100 }]));
   const startingGameTime = Date.parse(content.startingGameTime);
   writes.push({
     path: `${room}/episodes/${content.episode.id}`,
     data: {
       ...content.episode,
-      mapIds: content.maps.map((_, i) => String(i)),
+      mapIds: maps.map((_, i) => String(i)),
       mobPlacements,
       crawlerPlacements: [],
       mapSettings,
@@ -311,11 +319,27 @@ async function main() {
     },
   });
 
+  // Item Library: every tutorial item once, so the DM can hand them out. Only on the first run,
+  // so items the DM adds to the library later are never overwritten.
+  if (!(await getDoc(`${room}/inventory/shared-library`))) {
+    const libraryItem = makeItemFactory(content.items);
+    const items = Object.keys(content.items).map((key) => libraryItem(key, 'library'));
+    writes.push({ path: `${room}/inventory/shared-library`, data: { id: 'shared-library', crawlerId: '__shared__', items, roomId: campaignId } });
+  }
+
+  // Map docs from an earlier run whose id changed (a map was added or removed) would shift every map index
+  const keptMapIds = new Set(mapDocs.map((m) => m.id));
+  const existingMaps = (await api(`${FS_BASE}/${room}/maps?pageSize=300&mask.fieldPaths=name`))?.documents ?? [];
+  for (const d of existingMaps) {
+    const id = d.name.split('/').pop();
+    if (id.startsWith('tutorial-map-') && !keptMapIds.has(id)) writes.push({ path: `${room}/maps/${id}`, delete: true });
+  }
+
   if (!(await getDoc(`${room}/gameClock/current`))) {
     writes.push({ path: `${room}/gameClock/current`, data: { id: 'current', gameTime: startingGameTime, roomId: campaignId } });
   }
 
-  for (const w of writes) log(`${w.merge ? 'update' : 'set   '} ${w.path}`);
+  for (const w of writes) log(`${w.delete ? 'delete' : w.merge ? 'update' : 'set   '} ${w.path}`);
   log(`${writes.length} documents, ${mapDocs.length} map pictures, ${mobPlacements.length} tokens`);
   if (!COMMIT) {
     log('Dry run: nothing written. Add --commit to write.');

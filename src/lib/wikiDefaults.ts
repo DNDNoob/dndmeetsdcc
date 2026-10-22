@@ -1774,40 +1774,25 @@ Inside Account Settings, the **Decision History** panel shows a log of significa
     order: 6,
     content: `# Tutorial Episode: Rat Problem
 
-**Tutorial: Rat Problem** is a short starter adventure that shows a new group every part of the app in one evening of play. It comes as its own campaign, so it never mixes with your other games.
+**Tutorial: Rat Problem** is a short starter adventure that shows a new group the main parts of the app in one evening of play. It comes as its own campaign, so it never mixes with your other games.
 
-## The Story
+## The Setup
 
-You and your friends are throwing a DnD party tonight, and you're out of supplies. On the way to the hardware store, something is off about the neighbor across the street. Back home, he bangs on your door, begging for help with rats in his basement. Help him or not, everyone ends up in that basement.
-
-## Maps (in play order)
-
-1. **Home: DnD Party** — QWERTY (speaks Base64), the parrot and the Chair Thing. Party leftovers to loot, including a book that teaches **Speak with Animals**.
-2. **Neighborhood Street (Day)** — noncombat turns with a squirrel, a missing poster and the neighbor at his blinds.
-3. **Hardware Store** — trade with **Señor Gringo** the merchant, and meet Mr. Wavos, who only speaks Spanish.
-4. **Neighborhood Street (Night)** — the storm. Day and night are two copies of the street map; switch maps when night falls.
-5. **Creepy Neighbor's House** — fog of war on. Kitchen, upstairs or basement?
-6. **Creepy Neighbor's Basement** — pitch black (fog of war), a college kid in a rat fursuit who only speaks Beast, and a boss fight.
+You and your friends are throwing a DnD party tonight, and you're out of supplies. Time for a trip to the hardware store. The neighbor across the street has been acting strange lately...
 
 ## What It Teaches
 
 | Feature | Where |
 | --- | --- |
 | Character setup | Before play |
-| NPC chat and personalities | Every character |
-| Languages (Spanish, Base64, Beast) | Mr. Wavos, QWERTY, the college kid |
-| Trading and haggling | Señor Gringo |
-| Quests | Clear Out the Rats |
-| Noncombat turns | The street and the house |
-| Fog of war | The neighbor's house |
-| Combat and loot | The basement |
-
-## For the DM
-
-- The read-aloud story for each scene is in the episode's description on the Show Time episode list.
-- Five loot boxes are ready to send: Party Supply Money (20 gold each, for the hardware store), Party Leftovers, Telephone Pole Poster, Kitchen Drawer and Fursuit Rack.
-- Give the quest **Clear Out the Rats** when the neighbor knocks. Two of its steps and its reward are hidden until you reveal them.
-- Someone needs **Speak with Animals** (from Grandma's book) to understand the college kid.`,
+| NPC chat | Every character you meet |
+| Languages | Some people don't speak Worldspeech |
+| Trading and haggling | The hardware store and a thrift store |
+| Spells from tomes | The thrift store |
+| Quests | A neighbor needs help |
+| Noncombat turns | Around the neighborhood |
+| Fog of war | Dark places |
+| Combat, loot and upgrades | You'll find out |`,
   },
   {
     id: 'campaigns',
