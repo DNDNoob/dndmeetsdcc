@@ -1278,8 +1278,8 @@
     {
       "mob": "tutorial-mob-hipster",
       "map": "thriftStore",
-      "x": 70,
-      "y": 60
+      "x": 74,
+      "y": 52
     }
   ],
   "lootBoxTemplates": [
