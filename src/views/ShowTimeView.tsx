@@ -1259,6 +1259,11 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
 
   // Track if we've done the initial fog load for this map
   const fogInitialLoadDone = useRef<string | null>(null);
+  // Which episode-map's fog state has arrived. Players don't see the map until it matches the
+  // current map, so a map the DM just started (or switched to) never flashes before its fog covers it.
+  const [fogLoadedKey, setFogLoadedKey] = useState<string | null>(null);
+  const currentFogKey = selectedEpisode && currentMapId ? `${selectedEpisode.id}-${currentMapId}` : null;
+  const isFogReady = isAdmin || !db || (currentFogKey !== null && fogLoadedKey === currentFogKey);
 
   // Listen for fog of war updates
   useEffect(() => {
@@ -1275,6 +1280,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       if (!snapshot.exists()) {
         // No fog document exists - this is a fresh map
         fogInitialLoadDone.current = fogKey;
+        setFogLoadedKey(fogKey);
         return;
       }
 
@@ -1297,6 +1303,11 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
           setRevealedAreas(fogData.revealedAreas ?? []);
         }
       }
+      setFogLoadedKey(fogKey);
+    }, (error) => {
+      // Don't leave players staring at a hidden map forever if the fog can't be read
+      console.error('[ShowTime] Failed to load fog of war:', error);
+      setFogLoadedKey(fogKey);
     });
 
     return () => unsubscribe();
@@ -3355,6 +3366,12 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
           </div>
         )}
 
+        {!isFogReady && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <span className="text-muted-foreground font-display text-sm animate-pulse">Loading map...</span>
+          </div>
+        )}
+
         {/* Absolutely positioned so the map never stretches its container: the container's
             height must come from the screen, or a scaled-up map grows the container, which
             refits the map larger again (tall maps ballooned past their episode scale) */}
@@ -3364,6 +3381,8 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
           style={{
             transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${mapScale / 100})`,
             transformOrigin: 'center center',
+            // Hidden (not unmounted) so the image keeps loading and sizing while the fog arrives
+            visibility: isFogReady ? 'visible' : 'hidden',
           }}
           onMouseUp={handleMouseUp}
           onClick={handleMapClick}
