@@ -766,6 +766,15 @@ export const NpcChatPanel: React.FC<NpcChatPanelProps> = ({
                       {isAdmin && m.preset && (
                         <span className="ml-1.5 text-[10px] text-muted-foreground border border-border px-1" title="Nobody in the party speaks this language, so a preset line was used instead of asking the AI">preset</span>
                       )}
+                      {isAdmin && m.caughtTwist && (
+                        <span
+                          className="ml-1.5 text-[10px] text-destructive border border-destructive px-1"
+                          title={`${m.authorName} rolled ${m.caughtTwist.d20} (total ${m.caughtTwist.total}) against DC ${m.caughtTwist.dc} and caught ${m.caughtTwist.by} twisting its words`}
+                          data-testid="caught-twist"
+                        >
+                          caught {m.caughtTwist.by}'s twist ({m.caughtTwist.total} vs DC {m.caughtTwist.dc})
+                        </span>
+                      )}
                       <span className="text-[10px] text-muted-foreground ml-1.5">{formatTime(m.createdAt)}{m.viaVoice ? " 🎙" : ""}</span>
                       {line.languageName && (
                         <span

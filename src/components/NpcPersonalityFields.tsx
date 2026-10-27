@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { ChevronDown, ChevronRight, MessageSquare } from "lucide-react";
-import type { NpcPersonality } from "@/lib/gameData";
+import type { NpcPersonality, NpcTwistSense } from "@/lib/gameData";
 
 interface NpcPersonalityFieldsProps {
   value: NpcPersonality | undefined;
@@ -84,6 +84,33 @@ export const NpcPersonalityFields: React.FC<NpcPersonalityFieldsProps> = ({ valu
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+const TWIST_SENSE_OPTIONS: { value: NpcTwistSense; label: string; hint: string }[] = [
+  { value: "sharp", label: "Sharp", hint: "Often catches it, and can read faces even without knowing the language." },
+  { value: "normal", label: "Normal", hint: "Can catch it only if it understands the language the translator used." },
+  { value: "gullible", label: "Gullible", hint: "Never notices." },
+];
+
+/** DM-only: how well a mob notices a translator twisting its words. */
+export const TwistSenseSelect: React.FC<{ value: NpcTwistSense | undefined; onChange: (next: NpcTwistSense | undefined) => void }> = ({ value, onChange }) => {
+  const current = TWIST_SENSE_OPTIONS.find(o => o.value === (value ?? "normal"));
+  return (
+    <div className="mt-2">
+      <label className="flex items-center gap-2 text-xs text-muted-foreground">
+        Catches twisted translations
+        <select
+          value={value ?? "normal"}
+          onChange={(e) => onChange(e.target.value === "normal" ? undefined : e.target.value as NpcTwistSense)}
+          className="bg-muted border border-border px-2 py-0.5 text-sm text-foreground"
+          data-testid="mob-twist-sense"
+        >
+          {TWIST_SENSE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+      </label>
+      <p className="text-[11px] text-muted-foreground mt-0.5">{current?.hint}</p>
     </div>
   );
 };
