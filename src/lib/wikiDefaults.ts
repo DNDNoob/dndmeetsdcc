@@ -1356,7 +1356,7 @@ In the DM Console, open a mob (new or existing) and expand **NPC Personality**. 
 | Attitude toward the party | Friendly, grumpy, scared, hostile... |
 | Persuasion DC | How hard they are to talk into giving up the secret (optional) |
 
-Players never see this card.
+Players never see this card. Under the mob's languages, **Catches twisted translations** sets how well it notices a translator changing its words (see [Languages](/wiki/languages)).
 
 ### Auto-generated personalities
 
@@ -1374,11 +1374,18 @@ NPCs listen as soon as the DM opens an episode in Show Time (you do not need to 
 - **Spoken to by name**: "Grimble, where's the key?" gets an answer. You can also type **@** in the chat box to pick who you're talking to from a list. After that, your messages keep going to that mob (the chat shows **Talking to …** above the box) until you pick someone else or tap the ✕
 - **Within 20 feet**: players can only talk to mobs within 20 ft of their crawler (measured like the Ruler). The @ list only shows mobs in range, with how far away they are, and mobs farther away don't answer. The DM can talk to any mob
 - **Someone talks nearby**: the closest NPC may chime in
+- **Overheard**: NPCs up to 40 ft from a crawler overhear what the crawler says to someone else. Now and then one butts in, if it has a reason to
 - **A crawler walks up** to them
 - **A crawler gets badly hurt**, a **fight breaks out**, a **mob dies**, or a **loot box is opened** nearby
 - **Quiet moments**: after about a minute of silence, an NPC near the party may mutter something
 
 Each line appears in a speech bubble over the NPC's head on the map, fades after a few seconds, and is saved in the Game Chat. A "…" bubble shows while the NPC is thinking. An NPC waits about 20 seconds between lines so it doesn't hog the conversation.
+
+## How NPCs Talk
+
+NPCs hold a conversation rather than reciting their card. They answer what you actually asked first, in their own voice, and can chat about anything someone like them would know: themselves, the place, rumours, the show, other crawlers. They may make up small harmless details, but never loot, shortcuts or secrets. Their wants and knowledge colour what they say without every line turning back to them. Answers to questions can run up to about 40 words; other lines vary from a few words to a couple of sentences.
+
+To keep dialogue varied, each line gets a random angle (ask something back, get side-tracked, be blunt, overshare, crack a joke, react with feeling first...), and the NPC is shown its own last few lines so it doesn't repeat itself.
 
 ## Memory
 
@@ -1388,7 +1395,8 @@ NPCs remember the party. When a conversation with an NPC has been quiet for abou
 - **Creature copies** (like Goblin B) each remember their own conversations, but only for the episode they were made in.
 - Locked secrets never go into memory, since the AI doesn't know them.
 - Animals that speak **Beast** and plants that speak **Plant** show body language to crawlers who don't know the language. Corpses that speak **Dead** only answer crawlers using Speak with Dead, and **Silent** mobs never talk. See [Languages](/wiki/languages).
-- NPCs only know what they could have heard: messages players sent while the NPC was within 20 ft, your narration (unless you @ someone else), and other NPCs talking close by on the same map. Each reply uses the last 25 messages the NPC heard, and nothing from other maps or out of earshot goes into its replies or its memory.
+- NPCs only know what they could have heard: messages players sent while the NPC was within 40 ft, your narration (unless you @ someone else), and other NPCs talking close by on the same map. Lines said to someone else are marked as overheard, so the NPC knows they weren't meant for it.
+- NPCs that only overheard a conversation remember it too (the two closest bystanders), keeping just what they'd find useful or juicy: plans, names, deals, gossip, and anything said about them. So talk about Bob behind his back and Bob may know. Each reply uses the last 25 messages the NPC heard, and nothing from other maps or out of earshot goes into its replies or its memory.
 
 DMs can see and change what an NPC remembers: open the Game Chat settings and tap the brain icon next to the NPC. The number on it is how many notes it has. Edit the notes (one per line) and tap **Save**, or tap **Forget everything** to wipe its memory and feelings.
 
@@ -1583,6 +1591,13 @@ A crawler who knows a language can translate it for the party. Use the translate
 - A change to this setting only affects lines said after it. Lines said before you started translating show **Pass on** and **Twist**, so you can pass them on one at a time, and switching translating off doesn't take back what the party already heard.
 
 A twisted translation looks just like an honest one to the party. Only the translator and the DM can see what was really said; the DM sees a **twisted** tag next to it. Party members who know the language themselves always see the real words, so they might catch you.
+
+The NPC might catch you too. When you twist an NPC's line within 40 ft of it, it rolls d20 + half its level (+2 for bosses) against your DC of 10 + your CHA modifier + your Deception rank. A natural 20 always catches you and a natural 1 never does. How well it does depends on its **Catches twisted translations** setting in the DM Console:
+- **Sharp**: +5, and it can read your face even if it doesn't speak your language (at -5)
+- **Normal** (the default): it can only catch you if it understands the language you translated into (bosses can read faces like Sharp ones)
+- **Gullible**: never notices
+
+If it catches you (and the twist really changed the meaning, not just the wording), it calls you out in the chat, remembers it, and likes you a little less. The DM sees a **caught …'s twist** tag with the roll.
 
 ## Items and Notes
 

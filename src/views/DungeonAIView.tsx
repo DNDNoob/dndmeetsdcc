@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
-import NpcPersonalityFields from "@/components/NpcPersonalityFields";
+import NpcPersonalityFields, { TwistSenseSelect } from "@/components/NpcPersonalityFields";
 import { LanguagePicker } from "@/components/LanguagePicker";
 import MerchantFields from "@/components/MerchantFields";
 import MobCombatFields from "@/components/MobCombatFields";
@@ -938,6 +938,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                       />
                       Silent: never talks in Game Chat (oozes, constructs)
                     </label>
+                    <TwistSenseSelect value={newMob.twistSense} onChange={(twistSense) => setNewMob({ ...newMob, twistSense })} />
                   </div>
                   <NpcPersonalityFields
                     value={newMob.personality}
@@ -1163,6 +1164,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
                             />
                             Silent: never talks in Game Chat (oozes, constructs)
                           </label>
+                          <TwistSenseSelect value={editedMob.twistSense} onChange={(twistSense) => setEditedMobData(prev => prev ? { ...prev, twistSense } : prev)} />
                         </div>
 
                         <div className="mt-3">
