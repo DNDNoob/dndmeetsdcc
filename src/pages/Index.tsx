@@ -27,6 +27,7 @@ import { useMyContent } from "@/hooks/useMyContent";
 import { useIconLibrary } from "@/hooks/useIconLibrary";
 import { useNpcBrain } from "@/hooks/useNpcBrain";
 import { useUpgradeMeditation } from "@/hooks/useUpgradeMeditation";
+import { useUpgradeIcons } from "@/hooks/useUpgradeIcons";
 import { useNpcSpeechMaker } from "@/hooks/useNpcSpeechMaker";
 import { toast } from "sonner";
 import { getNoChildLeftBehindBump, rollD20, rollsWithDisadvantage, isCheckSuccess, skillForLabel, SKILL_XP_PER_SUCCESS, translateModeUpdate } from "@/lib/gameData";
@@ -214,6 +215,8 @@ const Index = () => {
     chooseUpgradeTree,
     claimUpgradeStep,
     rerollUpgradeTrees,
+    pendingUpgradeIcons,
+    setUpgradeIcon,
     applyNoChildLeftBehind,
     revokeTrophy,
     overrideMobHealth,
@@ -335,6 +338,8 @@ const Index = () => {
   // Pixel-art icons: every new item or spell gets one generated (Cloudflare Workers AI), or, once
   // the free daily quota is used up, the best-matching icon from the shared icon library.
   const { iconImages, assignIcon, regenerateIcon, generateMobImage } = useIconLibrary(user, isAuthenticated);
+  // Upgraded items and spells get their icon redrawn, in the DM's browser
+  useUpgradeIcons({ roomId, isDm: isAdmin, isLoaded, pending: pendingUpgradeIcons, regenerateIcon, setUpgradeIcon });
   // Icons arrive seconds after the save, so they're applied to the latest library state
   const sharedInventoryRef = useRef({ getSharedInventory, updateSharedInventory });
   sharedInventoryRef.current = { getSharedInventory, updateSharedInventory };

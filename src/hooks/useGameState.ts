@@ -110,10 +110,19 @@ import {
   baseItemName,
 } from "@/lib/gameData";
 import { applyUpgradeToItem, undoLastItemUpgrade, resolveKnownSpell, upgradeUseCost, describeUpgradeEffect, describeUpgradeDrawback, FIRST_UPGRADE_ACHIEVEMENTS, CURSED_BARGAIN_ACHIEVEMENT } from "@/lib/upgrades";
+import type { IconSubject } from "@/lib/iconGen";
 import { FULLY_EVOLVED_ACHIEVEMENT, MEDITATING_TEXT, findDueUpgrades, nextTreeStep, stepToUpgrade, type DueUpgrade } from "@/lib/upgradeTrees";
 
 /** An item in a crawler's inventory or one of their known spells. */
 export type UpgradeTarget = { kind: 'item' | 'spell'; id: string };
+export interface PendingUpgradeIcon {
+  key: string;
+  crawlerId: string;
+  target: UpgradeTarget;
+  subject: IconSubject;
+  baseName: string; // the name before any upgrade renamed it
+  upgrades: ItemUpgrade[];
+}
 import { useGame } from "@/contexts/GameContext";
 import { DEFAULT_LANGUAGE_ID, questionEffectFor } from "@/lib/languages";
 import type { BatchOperation } from "@/hooks/useFirebaseStore";
@@ -2585,7 +2594,8 @@ export const useGameState = () => {
       if (!item) return;
       kind = getUpgradeKind(item);
       targetName = baseItemName(item);
-      const upgraded = applyUpgradeToItem(item, upgrade);
+      // The DM's browser redraws the icon to match (see useUpgradeIcons)
+      const upgraded = { ...applyUpgradeToItem(item, upgrade), upgradeIconPending: true };
       await updateCrawlerInventory(crawlerId, items.map(i => i.id === item.id ? (path ? { ...upgraded, upgradePath: path } : upgraded) : i));
     } else {
       const knownSpells = crawler.knownSpells ?? [];
@@ -2594,7 +2604,7 @@ export const useGameState = () => {
       kind = 'spell';
       targetName = ks.spellName;
       await updateCrawler(crawlerId, {
-        knownSpells: knownSpells.map(k => k === ks ? { ...k, upgrades: [...(k.upgrades ?? []), upgrade], ...(path ? { upgradePath: path } : {}) } : k),
+        knownSpells: knownSpells.map(k => k === ks ? { ...k, upgrades: [...(k.upgrades ?? []), upgrade], upgradeIconPending: true, ...(path ? { upgradePath: path } : {}) } : k),
       });
     }
     await addDiceRoll({
@@ -2728,6 +2738,41 @@ export const useGameState = () => {
     if (!path?.tree || !step) return;
     const upgrade = stepToUpgrade(step, path.tree.name, path.log?.source ?? 'preset');
     await giveUpgrade(crawlerId, target, upgrade, { ...path, status: undefined, stepsTaken: (path.stepsTaken ?? 0) + 1 });
+  };
+
+  // The name before any upgrade renamed it
+  const originalItemName = (item: InventoryItem) => {
+    const before = item.upgrades?.find(u => typeof u.before?.name === 'string')?.before?.name as string | undefined;
+    return before ? baseItemName({ name: before, isUpgraded: true }) : baseItemName(item);
+  };
+  /** Upgraded items and spells whose icon hasn't been redrawn yet. */
+  const pendingUpgradeIcons = useMemo((): PendingUpgradeIcon[] => crawlers.flatMap(c => [
+    ...getCrawlerInventory(c.id).filter(i => i.upgradeIconPending && i.upgrades?.length).map((item): PendingUpgradeIcon => ({
+      key: `${c.id}|item|${item.id}`, crawlerId: c.id, target: { kind: 'item', id: item.id },
+      subject: { kind: 'item', item: { ...item, name: baseItemName(item) } }, baseName: originalItemName(item), upgrades: item.upgrades!,
+    })),
+    ...(c.knownSpells ?? []).filter(k => k.upgradeIconPending && k.upgrades?.length).flatMap((ks): PendingUpgradeIcon[] => {
+      const spell = resolveKnownSpell(ks, spells);
+      return spell ? [{
+        key: `${c.id}|spell|${ks.spellId}`, crawlerId: c.id, target: { kind: 'spell', id: ks.spellId },
+        subject: { kind: 'spell', spell }, baseName: ks.spellName, upgrades: ks.upgrades!,
+      }] : [];
+    }),
+  ]),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [crawlers, inventory, spells]);
+
+  /** Saves the redrawn icon on the crawler's copy (only theirs; the library item keeps its icon). */
+  const setUpgradeIcon = async (crawlerId: string, target: UpgradeTarget, iconId: string) => {
+    if (target.kind === 'item') {
+      const items = getCrawlerInventory(crawlerId);
+      if (!items.some(i => i.id === target.id)) return;
+      await updateCrawlerInventory(crawlerId, items.map(i => i.id === target.id ? { ...i, iconId, upgradeIconPending: undefined } : i));
+    } else {
+      const knownSpells = crawlers.find(c => c.id === crawlerId)?.knownSpells ?? [];
+      if (!knownSpells.some(k => k.spellId === target.id)) return;
+      await updateCrawler(crawlerId, { knownSpells: knownSpells.map(k => k.spellId === target.id ? { ...k, iconId, upgradeIconPending: undefined } : k) });
+    }
   };
 
   /** DM: throw away the offered trees and ask the Dungeon AI again. */
@@ -3253,6 +3298,8 @@ export const useGameState = () => {
     chooseUpgradeTree,
     claimUpgradeStep,
     rerollUpgradeTrees,
+    pendingUpgradeIcons,
+    setUpgradeIcon,
     crawlers,
     crawlerStats,
     updateCrawler,

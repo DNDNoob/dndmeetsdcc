@@ -394,8 +394,9 @@ When it's done, a glowing **Choose your path** button appears on the item (in In
 - At most one step across all trees is a cursed bargain, which is stronger than the rest.
 - Every step is checked against power limits for its tier before you see it, so the AI can't hand out anything game-breaking.
 - Only the crawler's player or the DM can pick a path or claim a step.
+- Each upgrade redraws the item's or spell's pixel icon to match, on that crawler's copy only. Until the new icon arrives the old one has a gold frame; if the day's free icons are used up, it tries again later.
 
-The Dungeon AI uses the DM's free Groq or Gemini key from the NPC settings, so the DM's browser needs to be open on the campaign for meditations to finish. If there's no key, or the AI answers badly twice, ready-made trees are offered instead.
+The Dungeon AI uses the DM's free Groq or Gemini key from the NPC settings, so the DM's browser needs to be open on the campaign for meditations and icon redraws to finish. If there's no key, or the AI answers badly twice, ready-made trees are offered instead.
 
 ## Giving an upgrade (DM)
 

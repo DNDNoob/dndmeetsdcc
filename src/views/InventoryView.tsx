@@ -1407,6 +1407,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                                 src={getItemIconSrc(item)}
                                 alt={item.name}
                                 className="w-8 h-8"
+                                upgraded={item.upgradeIconPending}
                                 fallback={item.isSpellTome
                                   ? <Wand2 className="w-4 h-4 shrink-0 text-primary" />
                                   : getEquipmentIcon(item.equipSlot)}
