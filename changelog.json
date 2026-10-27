@@ -1,8 +1,9 @@
 [
   {
     "date": "2026-10-27",
-    "changes": [
+    "features": [
       "🎨 Upgrading an item or spell now redraws its pixel icon to match the upgrade (flames for a Fire upgrade, runes for a stat boost, a red glow for a cursed bargain), on that crawler's copy only. The old icon wears a gold frame until the new one is ready",
+      "📜 The changelog now splits each day into New features and Bug fixes",
       "🕵️ NPCs can catch a translator twisting their words: they roll against the translator's CHA and Deception, then call it out in the chat and remember it. Each mob has a Catches twisted translations setting (Sharp, Normal or Gullible) in the DM Console",
       "👂 NPCs within 40 ft overhear what crawlers say to other NPCs. Now and then one butts in, and the closest bystanders remember juicy gossip for later",
       "🎲 NPC dialogue is more varied: each line takes a random angle and length, and NPCs no longer repeat their own recent lines",
@@ -11,25 +12,27 @@
   },
   {
     "date": "2026-10-22",
-    "changes": [
+    "features": [
+      "🧘 When an item or spell reaches a new upgrade tier, the Dungeon AI meditates on how you play and offers 3 upgrade trees of 3 steps each. Pick one with the new Choose your path button: you get its first step now, and each later tier unlocks the next step to Claim",
+      "🏆 New achievement: Fully Evolved, for finishing all 3 steps of an upgrade tree. Trees can also rename the item",
+      "🎲 DMs can see every upgrade tree in progress in the DM Console's Upgrades tab, read what the AI wrote, and Re-roll trees to ask again. If the AI is unavailable, ready-made trees are offered instead",
+      "🔒 Right-click Upgrade on a weapon (free editing) is now DM-only",
+      "🙈 DMs can hide the Item Library (Inventory page) and the Spell Library (Spells page) from players with a Shown to players / Hidden from players switch next to each library title. Players still see their own items and known spells"
+    ],
+    "fixes": [
       "🗣️ Changing your translator setting now only affects new chat lines. Older lines keep how they were shown, and a translator can pass older lines on one at a time",
       "🐛 Crawlers who know Spanish now read what Spanish-speaking NPCs mean, in English. Everyone else still sees the Spanish",
       "🔊 NPC voice settings now say why a voice service stopped (for example Groq needing its Orpheus terms accepted, or an ElevenLabs key missing the Voices permission), and a used-up Gemini voice model hands the line to the next Gemini model before giving up",
       "📡 When the Online NPC brain pauses because its keys failed or ran out, the chat shows why instead of just \"NPC voices offline\". With the Laptop brain picked it says the laptop isn't running",
       "🔤 Mob token letters (A, B, C) now only show when the same mob is on the current map more than once. A character placed on several maps no longer gets an A",
-      "🧘 When an item or spell reaches a new upgrade tier, the Dungeon AI meditates on how you play and offers 3 upgrade trees of 3 steps each. Pick one with the new Choose your path button: you get its first step now, and each later tier unlocks the next step to Claim",
-      "🏆 New achievement: Fully Evolved, for finishing all 3 steps of an upgrade tree. Trees can also rename the item",
-      "🎲 DMs can see every upgrade tree in progress in the DM Console's Upgrades tab, read what the AI wrote, and Re-roll trees to ask again. If the AI is unavailable, ready-made trees are offered instead",
-      "🔒 Right-click Upgrade on a weapon (free editing) is now DM-only",
       "🌫️ Players no longer glimpse the map for a moment before its fog of war appears when the DM starts Show Time or switches maps. The map stays hidden behind \"Loading map...\" until its fog is ready",
-      "🙈 DMs can hide the Item Library (Inventory page) and the Spell Library (Spells page) from players with a Shown to players / Hidden from players switch next to each library title. Players still see their own items and known spells",
       "🧠 Forget everything and Save in an NPC's memory editor now work for creature copies on the map (like Goblin B). Before, the change was refused and the NPC kept its memories. Unlocking a creature copy's secret had the same problem and is fixed too",
       "🐛 NPCs speaking Base64 no longer post scrambled code that crawlers who know Base64 can't read. The model is told to write plain words, and a line it encodes anyway is decoded (or swapped for a readable line)"
     ]
   },
   {
     "date": "2026-10-21",
-    "changes": [
+    "features": [
       "✨ DMs can give upgrades to a crawler's item or spell from the new Upgrades tab in the DM Console: bigger dice, more range, a new damage type, splash, stat bonuses, languages, defenses, on-hit effects, new actions or something strange, and can rename the item or spell. Each one is posted to the dice log",
       "💀 Upgrades can be cursed bargains: a stat penalty, an HP or mana cost on every use, an item that turns to dust when taken off, or one that can't be taken off. Cursed items get a red Cursed mark",
       "🏆 New achievements: Sharpened (first weapon upgrade), Hardened (first armor upgrade), Spellwright (first spell upgrade) and Deal With the Devil (first cursed bargain)",
@@ -44,10 +47,8 @@
       "📊 The game now keeps count of how each crawler plays: attacks, hits, damage, kills and best hit for every weapon and spell, damage types, the mobs you kill most, boss kills, healing done and received, friendly fire, damage to neutral mobs and NPCs, and dice luck (natural 20s and 1s, average d20, checks passed, rolls per ability). It's all on the Stats tab",
       "📊 The profile's Activity section now shows just the 5 stats where each crawler stands out most compared with the party. A new Stats tab lists every stat with the crawler's party rank and their Looting level",
       "🎲 Skill checks roll against Easy, Medium or Hard DCs that rise 2 per dungeon floor, which the DM sets. A natural 1 always fails and a natural 20 always succeeds, haggling included",
-      "🎨 A \"free icons used up\" answer now only pauses icon generation for 30 minutes instead of the rest of the day, so a one-off hiccup can't switch icons off until tomorrow",
       "🎨 Regenerate icon: when editing an item in the Item Library or a spell in the Spell Library, click Regenerate icon for a fresh pixel icon made from its current name and description",
       "🎨 Generated item and spell icons now have no background and fill their space, so they sit on the page like the other icons instead of in a dark box",
-      "🎨 If a pixel icon can't be made, a short message now says why (daily limit used up, or a generator problem) instead of failing silently",
       "⭐ Crawlers now earn XP: damage and killing blows on hostile mobs, finishing a fight, surviving it, coming back from near death, finishing quests, and spell mastery or Looting level-ups. Each grant shows in the dice history",
       "📈 Levels come from XP with no cap. Each level gives 5% more max HP and max mana (rounded up), a skill point and an ability point, and an XP bar on the profile shows how far you are from the next one",
       "🎯 New Skills tab with six skills: Barter, Athletics, Stealth, Perception, Medicine and Intimidation. Spend skill points on ranks and roll skill checks, which use an action like other rolls",
@@ -60,13 +61,17 @@
       "🩸 Spell effects can deal damage or heal at the start of each of the target's turns, rolled automatically and posted to the dice history",
       "🎯 Effect-only spells open a target picker when cast in combat, and effects show as badges under each portrait in the combat order bar. The DM can remove one early with its ✕",
       "🎨 Pixel-art icons and mob portraits are now switched on: the free image generator is live, so new items, spells and mobs get their own pictures",
+      "🗣️ Mobs the party hasn't encountered yet can be talked to in Game Chat when you're within 20 ft"
+    ],
+    "fixes": [
+      "🎨 A \"free icons used up\" answer now only pauses icon generation for 30 minutes instead of the rest of the day, so a one-off hiccup can't switch icons off until tomorrow",
+      "🎨 If a pixel icon can't be made, a short message now says why (daily limit used up, or a generator problem) instead of failing silently",
       "🔒 Players can no longer pick Dungeon AI (DM Access) on the identity screen. Only the campaign's DM gets it",
       "⚔️ Starting combat now only ticks the hostile mobs on the map you're on. Mobs on the episode's other maps are listed as other map and left unticked",
       "⚔️ Dead mobs no longer get turns: Next Turn skips any mob at 0 HP",
       "🎲 A natural 1 on an attack is a miss, so the damage window no longer opens after it",
       "🐛 The crawler who lands the killing blow now gets their Mobs Looted credit (it was being overwritten)",
       "🗺️ Deleting the map a game is running on now moves every player to the episode's next map, instead of leaving them on the deleted one",
-      "🗣️ Mobs the party hasn't encountered yet can be talked to in Game Chat when you're within 20 ft",
       "🗺️ Show Time maps now open fitted to the screen on phones instead of zoomed into the top-left corner, and the map tools show icons only on phones so they take less room",
       "🗺️ Mobs and crawlers added to an episode go to the first free spot near the middle, so crawlers no longer land on top of mobs",
       "🧾 Editing HP on a profile (like when setting up a new crawler) no longer counts as HP Lost",
@@ -75,8 +80,7 @@
   },
   {
     "date": "2026-10-20",
-    "changes": [
-      "🐛 Weapon attack and damage rolls now add the ability modifier (STR 14 adds +2) including gear bonuses, instead of the whole ability score",
+    "features": [
       "⚔️ Upgraded weapons show Upgraded once, in gold after the name, and only when you actually changed something",
       "⚔️ The weapon upgrade window can now also change the weapon's description and its stat bonuses while equipped",
       "⚔️ Mobs can have attacks and spells: open Attacks & Spells in the mob creator to add claws, bites and other attacks with their own to-hit bonus and damage dice, and pick spells from the spell library",
@@ -84,8 +88,6 @@
       "🎲 Mob rolls now show in the dice log under the mob's name in red, so every player sees them. Mobs the party hasn't met show as ???",
       "🎨 New items and spells now get a pixel-art icon automatically, made by a free AI image generator from the item's name and description. When the daily free limit runs out, the app picks the closest matching icon from every icon made before",
       "🧌 DMs can auto-generate a pixel-art portrait for new mob types: leave Auto-generate pixel portrait ticked when adding a mob, or click Generate on an existing one. When the daily limit runs out, the closest earlier portrait is used",
-      "🔒 Campaigns are now private: only the DM and players who joined can see or change a campaign's data. Before, anyone signed in with Google could edit any campaign",
-      "🔒 Wiki links now only work for web, email and wiki addresses, which closes a hole that let a wiki page run code in other players' browsers",
       "🧑 New character creator: tap New on the Profiles page to make a crawler step by step, with a name, a backstory, ability points and languages",
       "📜 Backstories have five parts: profession, an accomplishment, a hobby, where you were when the world ended, and the most important person, thing or animal to you. Pick a suggestion or write your own, and edit it later on your profile",
       "🎲 New crawlers spend 10 ability points (up to 5 in one ability). Each point is +1 to rolls, and abilities left at 0 roll with disadvantage",
@@ -96,44 +98,44 @@
       "🪦 A mob at 0 HP is now dead in Game Chat: it stops talking, and only Speak with Dead gets answers out of it",
       "✨ Spells can grant a language for their duration, like Speak with Animals (Beast) or Speak with Dead (Dead, with a limit of questions per casting). It counts down by noncombat turns and combat rounds and ends on its own",
       "💍 Items can grant a language while equipped, like a druid's charm that lets you speak Beast",
-      "🔈 NPC voice clips are now saved as small MP3s in the game's database instead of file storage, whose free daily allowance was running out, so spoken lines reach every player again",
-      "🧠 A DM window without NPC keys no longer switches off NPC replies from another DM window that has them",
       "🇪🇸 NPCs who speak Spanish now answer in Spanish, and everyone sees and hears the Spanish words",
       "💤 When nobody in the party knows the language an NPC answers in, the game uses a short preset line instead of asking the AI, and makes one voice clip instead of two",
       "🤖 Base64 lines sound like a little droid: beeps and whistles instead of a voice reading letters",
       "💀 The DM can @ a corpse and get an answer, without Speak with Dead",
       "🔇 Players can mute one NPC's voice by tapping the speaker next to its name in Game Chat",
-      "✂️ The burst of static some voices left after the last word is now cut off",
       "💻 The Laptop brain's Fast setting now uses qwen3:4b-instruct-2507, the quickest model on the DM laptop, and Best quality uses qwen3:8b, falling back to Fast if it can't load",
-      "🐛 The item library on the Inventory page saves again in a campaign that had no library yet. Before, Firebase refused the save, so new library items vanished and the library stayed empty",
-      "💬 Scrolling over the Game Chat now scrolls the chat instead of zooming the map, and the same goes for the dice roller, game clock and map tools",
       "👆 The Game Chat and the dice roller close when you click or tap anywhere else",
       "🪟 Pop-up boxes (new spell, send gold, weapon upgrade, heal and damage targets) close when you click outside them, and now sit above the top menu so their tops aren't hidden",
       "💀 The Mobs page and the DM Console mob list are split into Bosses, Mobs and Characters tabs",
       "📐 More room between the backstory and the Activity section on profiles",
-      "🧭 Show Time's hidden top menu now slides down when you move the mouse anywhere along the top edge, for players too, and no longer pops open over the map tools when you reach for their buttons",
       "📜 The DM can hand out any quest from Show Time, not only quests linked to the episode first",
-      "📜 The give-quest list now shows every crawler in the campaign, all selected by default, so picking everyone makes a Party Quest even when some crawlers aren't on the map",
+      "📜 The give-quest list now shows every crawler in the campaign, all selected by default, so picking everyone makes a Party Quest even when some crawlers aren't on the map"
+    ],
+    "fixes": [
+      "🐛 Weapon attack and damage rolls now add the ability modifier (STR 14 adds +2) including gear bonuses, instead of the whole ability score",
+      "🔒 Campaigns are now private: only the DM and players who joined can see or change a campaign's data. Before, anyone signed in with Google could edit any campaign",
+      "🔒 Wiki links now only work for web, email and wiki addresses, which closes a hole that let a wiki page run code in other players' browsers",
+      "🔈 NPC voice clips are now saved as small MP3s in the game's database instead of file storage, whose free daily allowance was running out, so spoken lines reach every player again",
+      "🧠 A DM window without NPC keys no longer switches off NPC replies from another DM window that has them",
+      "✂️ The burst of static some voices left after the last word is now cut off",
+      "🐛 The item library on the Inventory page saves again in a campaign that had no library yet. Before, Firebase refused the save, so new library items vanished and the library stayed empty",
+      "💬 Scrolling over the Game Chat now scrolls the chat instead of zooming the map, and the same goes for the dice roller, game clock and map tools",
+      "🧭 Show Time's hidden top menu now slides down when you move the mouse anywhere along the top edge, for players too, and no longer pops open over the map tools when you reach for their buttons",
       "📜 Each quest handout keeps its own checkmarks, revealed items, claimed rewards and notes, so two groups on the same quest no longer share progress or read each other's notes",
       "🐛 Players now get the New Quest popup for the first quest in a campaign, which was being skipped"
     ]
   },
   {
     "date": "2026-10-18",
-    "changes": [
+    "features": [
       "🐉 Creature sounds for NPC voices: Goblin, Tiny, Giant, Dragon and Ghost effects, picked from the NPC's notes or chosen in the chat settings",
       "🎭 NPCs can get an ElevenLabs character voice from your ElevenLabs account, and are then read by ElevenLabs first",
-      "🔊 Gemini voices now get only a mood tag, like [annoyance], in front of the line, so they stop reading their directions aloud",
-      "🩺 The Spoken voices settings now say why a line wasn't voiced for players, or if another game tab is making the voices",
-      "🔊 Spoken voices no longer read their directions out loud, only the NPC's line",
-      "▶️ NPC lines now play by themselves when the voice clip is ready, even if it takes a little longer, and a clip the browser holds back plays on your next tap",
       "💰 Mob loot: when a hostile mob goes down in combat, its gold and items are looted automatically and shared by every crawler in the fight",
       "🧪 Gold is split evenly. Items a mob has several copies of, like potions, are dealt out evenly, and anything left over goes to the party inventory",
       "🎒 New party inventory on the Profiles page holds unclaimed loot. Any crawler can Take what they need, and the DM can take for a crawler or discard items",
       "📜 Each kill posts a Looted line to the dice history showing who got what",
       "💥 Some loot gets smashed: each coin and each copy of a stackable item has a chance to be destroyed when a mob is looted (25% by default, set per mob in the DM Console). Single items are never smashed",
       "🧤 New Looting level on each crawler's profile: every mob you help loot counts, and each level makes your loot a tenth less likely to be smashed (level 10 never loses anything)",
-      "📦 Copies of the same item now always stack (Health Potion x3) in the Show Time inventory panel, loot boxes, merchant sell lists and mob item lists, not just on profiles",
       "🗣️ Languages: crawlers and mobs now know languages (Worldspeech, Dervish, Vernonacular, Mindspeech, Ward sign, Mewmew, Base64 and Kra Kow). Lines in a language you don't know show up as gibberish in Game Chat and speech bubbles",
       "🧠 Mindspeech only works for crawlers the DM has marked Telepathic",
       "🐉 Mobs have a Languages picker in the DM Console. NPCs answer in the language they're spoken to in, and can't understand languages they don't know",
@@ -153,10 +155,6 @@
       "🎲 Each copy of a creature on the map now has its own AI personality and talks as itself in Game Chat (\"Goblin B\"), so no two goblins feel the same",
       "⚔️ Tokens can be friendly or hostile, and the DM can flip them mid-scene from the right-click menu. Hostile tokens are pre-ticked when combat starts; friendly ones can still be pulled in",
       "📖 Mob Profiles now show encountered Creatures, Bosses and Characters in separate sections. A character can be linked to its creature (Grimble is a Goblin), and meeting them reveals both",
-      "🔐 Accounts are now Google only: the email and password sign-up and sign-in options are gone, since those accounts couldn't save a profile",
-      "👤 The Set Up Profile box now shows which account you're signed in with and has a Sign out button, so you're no longer stuck in it",
-      "🐛 In Show Time, reaching for the red X or other map tools at the top right no longer pops open the top menu and shoves the tools panel down. The menu now opens only when you rest your mouse at the top-left edge for a moment",
-      "🐛 If a profile can't be saved because you're not signed in with Google, the message now says so instead of just \"Failed to save profile\"",
       "🧠 Laptop NPC brain now always uses the local AI model on the DM's computer, never Groq or Gemini. Online stays the fast option that runs in the DM's tab",
       "🐾 New Beast language for animals: crawlers who know Beast (Speak with Animals) read what the creature means, everyone else sees what it does, like *squeaks twice and backs toward the hole*",
       "🤐 Silent checkbox on mobs: oozes, constructs and the like never talk in Game Chat and can't be @ mentioned",
@@ -170,13 +168,22 @@
       "🎭 NPC voices sound much more natural: lines are now read by Gemini voices, told who the NPC is and how they talk, so a gruff dwarf sounds gruff. When Gemini's free use runs out, Groq takes over, then ElevenLabs, then the Kokoro voices in the DM's browser",
       "🔑 Add an ElevenLabs key next to the Groq and Gemini keys in the Game Chat settings. The settings show which voice service is in use and when the others are back",
       "🎚️ The Kokoro backup voices now use the full-quality model"
+    ],
+    "fixes": [
+      "🔊 Gemini voices now get only a mood tag, like [annoyance], in front of the line, so they stop reading their directions aloud",
+      "🩺 The Spoken voices settings now say why a line wasn't voiced for players, or if another game tab is making the voices",
+      "🔊 Spoken voices no longer read their directions out loud, only the NPC's line",
+      "▶️ NPC lines now play by themselves when the voice clip is ready, even if it takes a little longer, and a clip the browser holds back plays on your next tap",
+      "📦 Copies of the same item now always stack (Health Potion x3) in the Show Time inventory panel, loot boxes, merchant sell lists and mob item lists, not just on profiles",
+      "🔐 Accounts are now Google only: the email and password sign-up and sign-in options are gone, since those accounts couldn't save a profile",
+      "👤 The Set Up Profile box now shows which account you're signed in with and has a Sign out button, so you're no longer stuck in it",
+      "🐛 In Show Time, reaching for the red X or other map tools at the top right no longer pops open the top menu and shoves the tools panel down. The menu now opens only when you rest your mouse at the top-left edge for a moment",
+      "🐛 If a profile can't be saved because you're not signed in with Google, the message now says so instead of just \"Failed to save profile\""
     ]
   },
   {
     "date": "2026-10-17",
-    "changes": [
-      "💬 After you @ a mob, the chat remembers who you're talking to, so you don't need to @ them every message. The \"No one by that name\" popup no longer appears once a name is picked",
-      "🐛 NPCs now listen as soon as the DM opens an episode in Show Time, instead of waiting for the game to be started",
+    "features": [
       "🗣️ Every mob can now talk in Game Chat, not just ones with a personality card. Hidden mobs stay quiet",
       "🎲 Mobs without a personality get one written by the AI from their name, description, abilities and items, plus random traits so no two are alike. It includes a secret and a Persuasion DC",
       "💬 Type @ in Game Chat to pick who you're talking to from a list",
@@ -186,17 +193,23 @@
       "🔑 DMs paste their free Groq and Gemini keys in the chat settings; keys stay in the DM's browser and are never shared",
       "🖱️ Laptop NPC voices now has one-click NPC Voices ON / OFF desktop shortcuts instead of always running at sign-in; OFF frees the model's memory",
       "💬 The Game Chat header now says which brain is answering, and the settings panel scrolls on phones"
+    ],
+    "fixes": [
+      "💬 After you @ a mob, the chat remembers who you're talking to, so you don't need to @ them every message. The \"No one by that name\" popup no longer appears once a name is picked",
+      "🐛 NPCs now listen as soon as the DM opens an episode in Show Time, instead of waiting for the game to be started"
     ]
   },
   {
     "date": "2026-10-16",
-    "changes": [
+    "features": [
       "💬 New Game Chat in Show Time: players chat as their crawler and the DM as the DM, with a hold-to-talk microphone that turns speech into text",
       "🗣️ Talking NPCs: give a mob a personality in the DM Console and it speaks for itself in Show Time, with lines in speech bubbles over its head and in the chat",
       "🤫 NPC secrets stay hidden from the AI until the DM unlocks them; the DM gets an Unlock / Not yet prompt when a player meets the reveal condition",
       "🎲 NPCs can have a Persuasion DC: a crawler who rolls Persuasion high enough next to them gets the DM an Unlock / Not yet prompt for the secret",
       "⚙️ DM chat settings: turn NPC voices on or off, pick Best quality or Fast, mute NPCs, lock secrets and clear the chat",
-      "👾 Unencountered mobs can now join combat, and players see them in the turn order. The DM can reveal a mob from the combat panel or by right-clicking its token in Show Time (Mark Encountered)",
+      "👾 Unencountered mobs can now join combat, and players see them in the turn order. The DM can reveal a mob from the combat panel or by right-clicking its token in Show Time (Mark Encountered)"
+    ],
+    "fixes": [
       "🎬 Show Time no longer resets when the DM refreshes or visits another page during a game; it picks up the running episode and players stay in the game",
       "🐛 Refreshing the DM Console no longer sends the DM back to the main menu",
       "👤 Crawler Profiles and Vernon's Library now open on your own crawler instead of the first one",
@@ -209,17 +222,12 @@
   },
   {
     "date": "2026-10-15",
-    "changes": [
-      "🗺️ Fixed maps looking squished in the DM's Map Designer — the map scale was stretching only the width. Maps now keep their shape at every scale",
-      "🗺️ Fixed tall maps in Show Time growing far past their episode scale (150% now really means 1.5x)",
+    "features": [
       "🎲 DMs can now force an initiative roll from the Show Time panel, rolling d20 + DEX for every crawler still waiting so combat can start",
       "🧹 Removed the one-time \"Import old content\" button from the DM Console now that the old content has been brought into the campaign",
       "👣 Feet left to move is now visible to everyone: in combat the current crawler's token shows a feet-left badge with a bar for the DM and all players, the DM sees every crawler's badge during noncombat turns, and the Game Clock panel lists feet left next to each crawler",
       "↩️ New Undo Turn button: in combat, if you move your token by accident or click the wrong action, undo your turn to put your token, movement, actions, HP and mana back to how they were when it started. Each undo shows in the dice log",
       "🐢 New automatic trophy, This Is For You, Bud, No Child Left Behind: when one crawler is the slowest in the campaign, their speed is raised to match the second slowest crawler (ties for slowest do nothing)",
-      "🗺️ Fixed wide maps getting squished in Show Time when an episode starts; maps now keep their shape and fit the screen",
-      "🎯 The gold selection ring on map tokens now hugs the round portrait and grows with it, instead of wrapping the health bar too",
-      "🐛 Fixed selecting or deleting a crawler token sometimes picking the wrong crawler",
       "🪄 The Spells tab on crawler profiles is finished: see your mana and every spell you know, grouped by Action, Bonus Action and Reaction, with costs, dice, range and mastery progress",
       "🔮 Casting a spell now spends its mana (after the mastery discount) and is blocked when you don't have enough",
       "🎯 Damage spells roll a spell attack and let you pick targets and apply damage in combat; healing spells let you pick who to heal, capped at their max HP",
@@ -229,22 +237,29 @@
       "📊 New Activity section on crawler profiles: feet moved, damage dealt, killing blows, fight finishers, HP lost and near-death moments are tracked automatically",
       "🏆 DMs can award trophies on a crawler's profile for things that can't be measured, like great roleplay. Awarding the same trophy again counts it up",
       "🥾 Items can now have a Speed modifier that changes a crawler's movement speed",
-      "⚔️ Fixed splash damage on several targets sometimes only keeping the last target's damage",
       "🌐 DMs can now share maps, mob types and whole episodes with the community from the DM Console (Public/Private toggle)",
       "📜 Shared episodes are complete custom adventures — maps, mob types, mob placements, map settings and loot boxes — that other DMs can add to their campaign in one click",
       "👥 New Community Maps, Community Mobs and Community Episodes sections in the DM Console (requires Show Public Content)",
-      "🗺️ Fixed newly uploaded maps sometimes shifting existing episodes onto the wrong map",
       "📜 Shared episodes now include their quests (rewards and action items) — quest progress, assignments and player notes are not shared",
       "🌐 New \"Share all my content\" button in the DM Console shares every item, spell, map, mob type and episode you made in the campaign at once, including older items and spells that had no creator yet",
-      "🐛 Fixed items disappearing from the item library when two people saved it at the same time — each save now only changes the items that person touched",
       "📦 New \"Import old content\" button in the DM Console copies items, crawlers, mobs, maps and episodes made before campaigns existed into your campaign",
       "👤 Maps, mobs, episodes, quests and loot boxes you create are now linked to your profile, like items and spells already were",
       "🔖 New My Content: keep your own items and spells on your profile, outside any campaign, and add them to any campaign you play in"
+    ],
+    "fixes": [
+      "🗺️ Fixed maps looking squished in the DM's Map Designer — the map scale was stretching only the width. Maps now keep their shape at every scale",
+      "🗺️ Fixed tall maps in Show Time growing far past their episode scale (150% now really means 1.5x)",
+      "🗺️ Fixed wide maps getting squished in Show Time when an episode starts; maps now keep their shape and fit the screen",
+      "🎯 The gold selection ring on map tokens now hugs the round portrait and grows with it, instead of wrapping the health bar too",
+      "🐛 Fixed selecting or deleting a crawler token sometimes picking the wrong crawler",
+      "⚔️ Fixed splash damage on several targets sometimes only keeping the last target's damage",
+      "🗺️ Fixed newly uploaded maps sometimes shifting existing episodes onto the wrong map",
+      "🐛 Fixed items disappearing from the item library when two people saved it at the same time — each save now only changes the items that person touched"
     ]
   },
   {
     "date": "2026-10-14",
-    "changes": [
+    "fixes": [
       "🐛 Fixed new email/password accounts failing to save their profile (username setup) — missing avatar was sent to Firebase as an invalid value",
       "🐛 Fixed sharing items/spells publicly and other saves failing when optional fields were empty",
       "🐛 Fixed edits to the sample crawlers in a brand-new campaign not saving — the crawler is now saved to the campaign on first save",
@@ -253,7 +268,7 @@
   },
   {
     "date": "2026-03-22",
-    "changes": [
+    "features": [
       "⚔️ Combat Turn Timer — configurable countdown or stopwatch timer displayed in the combat order bar during active combat",
       "⏱️ DM can toggle between countdown mode (30s/60s/90s/120s presets) and stopwatch mode from the PingPanel",
       "🔔 Audio alert beep plays when countdown timer expires; timer flashes red to signal time's up",
@@ -262,7 +277,7 @@
   },
   {
     "date": "2026-03-21",
-    "changes": [
+    "features": [
       "🧙 Renamed Spells page to Vernon's Library — a themed name for the spell management system",
       "📖 Added Vernon's Library button to the Main Menu grid for quick access",
       "📚 Added dedicated Spells wiki section with pages for Overview, Learning Spells, Casting & Mastery, Spell Properties, Spell Tomes, and Sharing Spells"
@@ -270,14 +285,10 @@
   },
   {
     "date": "2026-03-19",
-    "changes": [
+    "features": [
       "🏠 New cinematic landing page — immersive hero section, feature showcase, combat mockup, map visualization, and animated scroll-reveal sections",
       "🔒 Authentication required — all app content is now gated behind sign-in; anonymous access to game features is no longer allowed",
       "🛤️ New /app route — the app now lives under /app/* with the landing page at /; authenticated users are auto-redirected to the app",
-      "🐛 Fixed crash when clicking Short Rest / Long Rest — PingPanel TDZ error resolved (playerCrawlers was referenced before its useMemo declaration)",
-      "🐛 Fixed health bars showing NaN when max HP/mana is 0 — HealthBar now guards against division by zero",
-      "🐛 Fixed effective HP/Mana stats not updating in real-time while editing a crawler's equipped items in ProfilesView",
-      "🐛 Fixed empty paragraph rendering in Mobs list when a mob has no description",
       "🔒 Content privacy system — inventory items and spells in the shared library are now linked to the account that created them, private by default",
       "🌐 Public content toggle — item and spell creators can mark their content as public to share with the community; a globe/lock badge shows the current status",
       "👥 Community Items — when public content is enabled, a Community Items section appears in Inventory showing public items from other players that can be copied to your campaign library",
@@ -289,11 +300,17 @@
       "🕐 Decision history panel — Account Settings now includes a collapsible Decision History section showing a timestamped log of past decisions",
       "✖️ Added X close button to the Dice Roller panel header for easy dismissal on mobile",
       "⚡ Added Reaction as a spell action type — reaction spells show a Reaction Trigger field to describe when they fire (e.g. 'when you are hit by an attack')"
+    ],
+    "fixes": [
+      "🐛 Fixed crash when clicking Short Rest / Long Rest — PingPanel TDZ error resolved (playerCrawlers was referenced before its useMemo declaration)",
+      "🐛 Fixed health bars showing NaN when max HP/mana is 0 — HealthBar now guards against division by zero",
+      "🐛 Fixed effective HP/Mana stats not updating in real-time while editing a crawler's equipped items in ProfilesView",
+      "🐛 Fixed empty paragraph rendering in Mobs list when a mob has no description"
     ]
   },
   {
     "date": "2026-03-18",
-    "changes": [
+    "features": [
       "✨ Added Spell System — crawlers can now learn and cast spells with mana costs, damage dice, schools, durations, and special effects",
       "📖 Added Spell Library — DMs can create reusable spells with full stat configuration (damage type, dice, hit modifiers, AoE, saving throws, etc.)",
       "🧙 Added Spell Tomes — consumable inventory items that teach crawlers a spell when used; supports both library spells and embedded custom one-off spells",
@@ -305,25 +322,20 @@
   },
   {
     "date": "2026-03-11",
-    "changes": [
+    "features": [
       "🐛 Added confirmation dialog before deleting maps — prevents accidental deletion with a single misclick",
       "♿ Added aria-labels to map edit and delete icon buttons for screen reader accessibility",
       "🗺️ Episode cards in Show Time now display loot box and quest counts alongside map and mob counts",
-      "♿ Added aria-label to the Add Action Item button in quest creation form",
+      "♿ Added aria-label to the Add Action Item button in quest creation form"
+    ],
+    "fixes": [
       "⚔️ New mobs and crawlers placed on episode maps now spread out in a grid pattern instead of all stacking at center (50%, 50%)"
     ]
   },
   {
     "date": "2026-03-07",
-    "changes": [
-      "🐛 Fixed changelog modal — now closes on Escape key, outside click, and route changes",
-      "🐛 Fixed page refresh losing campaign context — session now persists across reloads",
+    "features": [
       "🔗 Added deep linking support — campaign ID is preserved in URL for bookmarking and sharing",
-      "🐛 Fixed identity selection — DMs and players now skip splash screen when re-entering a campaign",
-      "🐛 Fixed display name showing Google auth name instead of user-configured name",
-      "🐛 Removed debug 'roomId' text from Sound Effects page",
-      "🐛 Fixed broken markdown links in Wiki — internal links now navigate correctly",
-      "🐛 Fixed stray scissors icon on Show Time page — replaced PinOff icon with dimmed Pin icon",
       "📱 Added responsive hamburger menu for mobile devices",
       "♿ Added skip navigation link for keyboard users",
       "♿ Added focus-visible outlines on all interactive elements",
@@ -334,11 +346,20 @@
       "👥 Friends list — view accepted friends with option to remove them",
       "👥 Pending requests badge — incoming friend requests show a notification count on the Friends section",
       "👥 Friends section on Campaign screen — collapsible panel with add friend form, incoming/sent requests, and friend list"
+    ],
+    "fixes": [
+      "🐛 Fixed changelog modal — now closes on Escape key, outside click, and route changes",
+      "🐛 Fixed page refresh losing campaign context — session now persists across reloads",
+      "🐛 Fixed identity selection — DMs and players now skip splash screen when re-entering a campaign",
+      "🐛 Fixed display name showing Google auth name instead of user-configured name",
+      "🐛 Removed debug 'roomId' text from Sound Effects page",
+      "🐛 Fixed broken markdown links in Wiki — internal links now navigate correctly",
+      "🐛 Fixed stray scissors icon on Show Time page — replaced PinOff icon with dimmed Pin icon"
     ]
   },
   {
     "date": "2026-03-06",
-    "changes": [
+    "features": [
       "🏰 MAJOR: Added Campaign System — create, join, copy, and manage campaigns with isolated game data",
       "🏰 Campaign-based DM access — the campaign creator is automatically the DM with full DM Console access (replaces old password system)",
       "🏰 Invite links — DMs can share invite codes/links to let players join their campaign (max 10 players per campaign)",
@@ -354,13 +375,15 @@
   },
   {
     "date": "2026-02-25",
-    "changes": [
+    "features": [
       "🔐 Added Google Sign-In — users can now sign in with their Google account to enable write access (anonymous users can still browse read-only)",
       "🔐 Sign In / Sign Out button available on Splash Screen, Main Menu, and Navigation bar",
       "🔐 Firestore security rules updated to allow anonymous reads but require Google auth for writes",
       "🔐 Added email/password account creation — users can create a password-protected account using their email (or continue with Google)",
       "🔐 New auth modal with Sign In / Create Account tabs, accessible from any screen",
-      "🔐 Write access now works for any authenticated user (Google or email/password), not just Google",
+      "🔐 Write access now works for any authenticated user (Google or email/password), not just Google"
+    ],
+    "fixes": [
       "🐛 Fixed: anonymous users could still edit data client-side — writes now blocked with a toast message when not signed in",
       "🐛 Fixed Google sign-in popup closing immediately — now handles auth errors (unauthorized domain, popup closed) gracefully with user-friendly messages",
       "🐛 Fixed Main Menu layout — moved sign-in button next to the player selector instead of displacing it"
@@ -368,7 +391,7 @@
   },
   {
     "date": "2026-02-24",
-    "changes": [
+    "fixes": [
       "🐛 Fixed race condition in loot box claiming — inventory, gold, and loot box updates are now properly awaited to prevent data loss",
       "🐛 Fixed Firebase listener leak when switching rooms — listeners created during async auth initialization are now properly cleaned up",
       "🐛 Fixed item consolidation mismatch between Profiles and Inventory views — identical items now group consistently across both views",
@@ -378,7 +401,7 @@
   },
   {
     "date": "2026-02-23",
-    "changes": [
+    "features": [
       "📜 MAJOR: Added Quest system — DMs can create quests with action items, tiered rewards, and descriptions",
       "📜 New Quests tab in the DM Console for creating and managing premade quests",
       "📜 Quest action items can be shown/hidden to players with eye toggle (hidden by default)",
@@ -391,22 +414,26 @@
       "📜 Quest assignment, action reveal/completion, and reward reveal push notifications to the dice menu",
       "📜 Toast notifications appear for players when they receive a new quest",
       "📜 DMs can link quests to episodes in the episode builder (similar to loot boxes)",
-      "🐛 Fixed blank ShowTime page caused by TDZ variable ordering issue in quest code",
-      "🐛 Fixed additional ShowTime TDZ crash — allPlacementsMobCounts was referenced before declaration in combat mob removal callbacks",
       "📜 Added drag-to-reorder for quest action items and rewards on the DM console Quests tab",
       "📜 Quest rewards can now be claimed — when a DM completes all action items and reveals the reward, players see a 'Claim' button to add it to their inventory"
+    ],
+    "fixes": [
+      "🐛 Fixed blank ShowTime page caused by TDZ variable ordering issue in quest code",
+      "🐛 Fixed additional ShowTime TDZ crash — allPlacementsMobCounts was referenced before declaration in combat mob removal callbacks"
     ]
   },
   {
     "date": "2026-02-22",
-    "changes": [
-      "⚔️ Mob token letters are now stable — deleting a token no longer reorders other tokens of the same type (e.g., deleting Flurg B leaves Flurg C and Flurg D unchanged)",
+    "features": [
       "⚔️ Deleting a mob from the map during active combat now automatically removes it from the combat turn order"
+    ],
+    "fixes": [
+      "⚔️ Mob token letters are now stable — deleting a token no longer reorders other tokens of the same type (e.g., deleting Flurg B leaves Flurg C and Flurg D unchanged)"
     ]
   },
   {
     "date": "2026-02-21",
-    "changes": [
+    "features": [
       "👤 Player identity switcher dropdown now available on the Main Menu screen",
       "👤 Dungeon AI (DM) login option added to the player switcher dropdown on all pages",
       "Crawlers can now switch to DM mode directly from the navigation bar without returning to the main menu",
@@ -419,19 +446,21 @@
   },
   {
     "date": "2026-02-19",
-    "changes": [
+    "features": [
       "📖 MAJOR: Added Wiki system accessible from the main navigation bar",
       "Wiki features: full-text search, category navigation, table of contents, and subpage structure",
       "Any user can edit wiki pages directly from the browser (content saves to Firebase in real-time)",
       "Wiki ships with pre-written documentation covering all game features and mechanics",
       "📋 Added expandable item details on the inventory page (click any item name to see full stats, weapon data, and modifiers)",
-      "🎲 Fixed weapon dice display in dice roller: now shows actual weapon dice instead of always 'd20'",
-      "Individual die results are broken out for multi-die weapon rolls (e.g., d12 5, d12 7 instead of 2d12 12)",
-      "Attack rolls labeled 'Attack roll:' and damage rolls labeled 'Damage:' instead of generic 'Check:'",
       "⚔️ Added splash damage checkbox to weapon configuration in item library",
       "👤 Player identity switcher moved to top-right corner of navigation bar for easier access",
       "🌫️ Increased fog of war precision: consolidation threshold raised from 1000 to 3000 circles",
-      "🌫️ Fog brush minimum size increased to match crawler/mob icon size on the map",
+      "🌫️ Fog brush minimum size increased to match crawler/mob icon size on the map"
+    ],
+    "fixes": [
+      "🎲 Fixed weapon dice display in dice roller: now shows actual weapon dice instead of always 'd20'",
+      "Individual die results are broken out for multi-die weapon rolls (e.g., d12 5, d12 7 instead of 2d12 12)",
+      "Attack rolls labeled 'Attack roll:' and damage rolls labeled 'Damage:' instead of generic 'Check:'",
       "🐛 Added null checks to all Firebase Firestore calls to prevent crashes when db is unavailable",
       "🐛 Removed direct useFirebaseStore() call from ShowTimeView (now receives roomId as a prop)",
       "🐛 Fixed stale closure in player showtime listener that could miss episode changes",
@@ -451,7 +480,7 @@
   },
   {
     "date": "2026-02-18",
-    "changes": [
+    "features": [
       "⚔️ Added equip/unequip system for mob inventory items (double-click or right-click to equip)",
       "Right-click context menu on mob inventory items with equip, expand details, and remove options",
       "Expandable item detail panels for mob inventory showing description, gold value, slot, tags, stat modifiers, and weapon data",
@@ -460,35 +489,39 @@
   },
   {
     "date": "2026-02-17",
-    "changes": [
+    "features": [
       "👤 Added player identity switching via dropdown in the navigation bar",
       "🎮 Added Play the Game / Game Over button for DMs in the game clock panel",
       "Players see a waiting screen until the DM clicks Play the Game",
       "Game start/stop notifications pushed to dice roll history and as toast notifications",
+      "Hidden scrollbar in game clock panel for cleaner appearance",
+      "📏 Rounded zoom percentage display to whole numbers"
+    ],
+    "fixes": [
       "🔧 Fixed game clock panel mouse scrolling (no longer blocked by map zoom handler)",
       "🔧 Fixed changelog window scrolling with same native wheel handler approach",
-      "Hidden scrollbar in game clock panel for cleaner appearance",
-      "📏 Rounded zoom percentage display to whole numbers",
       "🐛 Fixed TDZ (Temporal Dead Zone) error causing blank page in production builds"
     ]
   },
   {
     "date": "2026-02-16",
-    "changes": [
+    "features": [
       "❤️ Health bars on all map icons: mob and crawler icons now always display green/red health bars with currentHP/maxHP text",
       "🛡️ Crawler health bars show equipment modifier bonus as orange bar portion (matching profile view)",
-      "🐛 Fixed independent mob health tracking: duplicate mobs (Greg A, Greg B) now take damage independently instead of sharing HP",
       "🎲 Mob initiative rolls now appear in the dice panel so players can see what each mob rolled",
       "📦 Players can now edit inventory items (name, description) on the inventory page — edit button accessible to all users",
       "⚔️ Weapon upgrade modal now lets players edit the weapon name during upgrade",
-      "🎯 Weapon ATTACK button now auto-rolls damage dice alongside the d20 attack roll when outside of combat",
+      "🎯 Weapon ATTACK button now auto-rolls damage dice alongside the d20 attack roll when outside of combat"
+    ],
+    "fixes": [
+      "🐛 Fixed independent mob health tracking: duplicate mobs (Greg A, Greg B) now take damage independently instead of sharing HP",
       "🐛 Fixed DM overlay panels getting pushed off screen: DiceRoller, MapToolsMenu, and mob display cards now clamp to viewport",
       "🐛 Fixed runtime mob combat ID matching so duplicate runtime mobs display correct per-instance health"
     ]
   },
   {
     "date": "2026-02-15",
-    "changes": [
+    "features": [
       "🎮 Runtime-added mobs and crawlers (placed during ShowTime) now appear in combat setup and rest selection",
       "➕ New 'Add to Combat' button allows adding combatants mid-combat during both initiative and combat phases",
       "⚔️ Mobs auto-roll initiative when added to combat; crawlers wait for player roll"
@@ -496,20 +529,22 @@
   },
   {
     "date": "2026-02-14",
-    "changes": [
+    "features": [
       "⚔️ MAJOR: Full weapon system with configurable damage types and weapon types",
       "Weapon config UI in item library: hit die, damage dice, stat modifiers, ranged/melee, range, special effects",
       "Equipped weapons appear as attack cards in crawler Attacks tab with ATTACK and DAMAGE buttons",
       "Right-click weapon attack for advantage/disadvantage rolls (2d20 take highest/lowest)",
       "Weapon upgrade system: right-click weapon in inventory to upgrade stats, marked with 'Upgraded' label",
       "⚔️ Combat turn counter displayed next to noncombat turn counter",
-      "Cancel combat button during both initiative and combat phases",
+      "Cancel combat button during both initiative and combat phases"
+    ],
+    "fixes": [
       "🐛 Fixed React error #310: moved useMemo before early return to fix hooks ordering"
     ]
   },
   {
     "date": "2026-02-12",
-    "changes": [
+    "features": [
       "⚔️ MAJOR: Combat system with initiative, turn order, and damage",
       "DM starts combat from PingPanel: select crawlers and mobs to enter combat",
       "Initiative phase: crawlers roll d20 for initiative, mobs auto-roll",
@@ -523,16 +558,18 @@
   },
   {
     "date": "2026-02-10",
-    "changes": [
-      "🐛 Fixed DM view panel visibility: overlays raised above footer, PingPanel shows with noncombat turns",
-      "🐛 Fixed map blocker scoped to map container only (no longer blocks entire screen)",
+    "features": [
       "🗺️ Client-side URL routing: browser back/forward works without reload",
       "📦 Firebase Storage for large map uploads: bypasses Firestore 1MB field limit"
+    ],
+    "fixes": [
+      "🐛 Fixed DM view panel visibility: overlays raised above footer, PingPanel shows with noncombat turns",
+      "🐛 Fixed map blocker scoped to map container only (no longer blocks entire screen)"
     ]
   },
   {
     "date": "2026-02-07",
-    "changes": [
+    "features": [
       "📦 MAJOR: Loot box system — DM creates templates, sends to crawlers, unlocks when ready, players claim items",
       "Loot box tiers: Dirt, Copper, Silver, Gold with tier-colored UI",
       "Dedicated 'Loot Boxes' tab in DM Console with quantity selector",
@@ -543,70 +580,84 @@
       "🎴 Mob cards sync to all players via Firebase, simplified expand/collapse UI",
       "💰 Gold field added to loot boxes (create/send/claim)",
       "📦 Consolidated duplicate inventory items with count badges (×3)",
-      "✏️ Added edit functionality for inventory library items",
+      "✏️ Added edit functionality for inventory library items"
+    ],
+    "fixes": [
       "🐛 Fixed map container not expanding with scale"
     ]
   },
   {
     "date": "2026-02-04",
-    "changes": [
+    "features": [
       "🗺️ Full-screen map designer popout for episode editor with drag positioning",
       "💰 Send gold and items between crawlers from profile page",
       "🎒 Inventory improvements: library-only item creation, consolidated count badges",
-      "🔒 Hidden loot box gold until DM unlocks",
+      "🔒 Hidden loot box gold until DM unlocks"
+    ],
+    "fixes": [
       "🐛 Fixed noncombat button crash caused by React event leaking into Firebase",
       "🐛 Fixed map container width fallback when image not yet loaded"
     ]
   },
   {
     "date": "2026-02-03",
-    "changes": [
-      "⏰ Game clock is now episode-dependent",
+    "features": [
+      "⏰ Game clock is now episode-dependent"
+    ],
+    "fixes": [
       "🐛 Fixed noncombat rolls, episode close, equipment slots, inventory panel, and image limit issues",
       "🐛 Fixed inventory duplicate items and cleaned up unused imports"
     ]
   },
   {
     "date": "2026-02-02",
-    "changes": [
+    "features": [
       "📏 Ruler tool now visible to all players in real-time - users can see each other's measurements",
-      "🐛 Fixed ruler dismiss click being blocked by invisible bounding box of triangle shape effects",
       "🏷️ Added editable name labels below all crawler and mob icons on the map (per-episode, synced in real-time)",
       "🎨 Removed blue circle level indicator from crawler icons for cleaner appearance",
       "📋 Mob type labels (BOSS/NPC/NORMAL) now appear under the mob image on the Mobs page instead of to the side",
       "🔍 Decreased mouse scroll zoom sensitivity on the map for finer control",
-      "📏 Added ruler tool to ShowTime map for measuring distance in feet",
+      "📏 Added ruler tool to ShowTime map for measuring distance in feet"
+    ],
+    "fixes": [
+      "🐛 Fixed ruler dismiss click being blocked by invisible bounding box of triangle shape effects",
       "🐛 Fixed map zoom triggering when scrolling dice roller on showtime page"
     ]
   },
   {
     "date": "2026-02-01",
-    "changes": [
+    "features": [
       "🎲 Synced dice rolls across all connected players in real-time",
       "Clickable stat rolls - click a stat to auto-roll d20 + modifier",
       "Dice roller UI improvements: collapsible options, full-height panel, relative timestamps, auto-scroll",
       "📦 Added shared item library with per-crawler search in inventory",
       "⚔️ Added HP/Mana modifiers and stat modifiers to inventory items",
-      "Equipment layout improvements with expand/collapse and full-width UI",
+      "Equipment layout improvements with expand/collapse and full-width UI"
+    ],
+    "fixes": [
       "🐛 Fixed triangle shape border, click-off flash, and placement over triangles"
     ]
   },
   {
     "date": "2026-01-31",
-    "changes": [
+    "features": [
       "🗺️ Map base scale now uses CSS transform for proper scaling of all overlays",
-      "Fixed map rendering: consistent base size, auto width, zoom down to 1%",
       "Icons and shapes counter-scale to maintain consistent sizes across map scales",
-      "🐛 Fixed fog consolidation causing visible jumps on large maps",
       "🎨 Added shape borders, doubled max shape size, added fog paint brush",
-      "Shape controls now persist until clicking away, stick to shape edges",
+      "Shape controls now persist until clicking away, stick to shape edges"
+    ],
+    "fixes": [
+      "Fixed map rendering: consistent base size, auto width, zoom down to 1%",
+      "🐛 Fixed fog consolidation causing visible jumps on large maps",
       "Fixed rotation jerk on first move, deselect shape after placement"
     ]
   },
   {
     "date": "2026-01-31",
-    "changes": [
-      "🧹 Removed Lovable and Netlify dependencies - project now fully hosted on GitHub Pages with Firebase",
+    "features": [
+      "🧹 Removed Lovable and Netlify dependencies - project now fully hosted on GitHub Pages with Firebase"
+    ],
+    "fixes": [
       "🔊 Fixed Freesound sound effects search - searches now pull results directly from Freesound API",
       "Added 10-minute client-side cache for sound searches to prevent rate limiting (429 errors)",
       "Sound results no longer disappear when API rate limit is hit - existing results are preserved",
@@ -618,14 +669,16 @@
   },
   {
     "date": "2026-01-29",
-    "changes": [
+    "features": [
       "🗺️ Episode map scale now changes physical map size instead of viewport zoom",
       "At 200% scale, the map image is twice as large, making icons/effects appear relatively smaller",
       "Map scale settings sync in real-time from DM console to ShowTime view via JSON deep comparison",
       "🔧 Reduced scroll zoom sensitivity by 50% for finer control",
-      "🐛 Fixed map persisting from previous episode when switching episodes",
       "📌 Ping panel now snaps below navigation pane and shifts to top when nav collapses",
-      "Navigation pane hover trigger limited to left 60% of screen to avoid accidental triggers near ping panel",
+      "Navigation pane hover trigger limited to left 60% of screen to avoid accidental triggers near ping panel"
+    ],
+    "fixes": [
+      "🐛 Fixed map persisting from previous episode when switching episodes",
       "Fixed pin button on navigation pane appearing disabled",
       "🐛 Fixed cross-episode state bleeding - shapes, fog, icons, and crawlers fully reset on episode switch",
       "🐛 Fixed cross-map state bleeding - all per-map state resets when switching maps within an episode",
@@ -635,60 +688,72 @@
   },
   {
     "date": "2026-01-28",
-    "changes": [
-      "⚡ MAJOR: Fixed real-time sync lag with Firebase batch writes, debouncing, and optimistic updates",
+    "features": [
       "🎨 Added smooth CSS transitions for mob/crawler icons, shapes, and fog of war",
       "Shapes and fog of war changes now animate smoothly for all connected players",
-      "🌫️ Fixed fog of war circle consolidation - fog no longer reappears after extensive clearing",
-      "Replaced array trimming with intelligent merging algorithm that combines overlapping circles",
-      "Added Gaussian blur filter for softer fog edges",
       "🌫️ Fog of war state now persists across sessions (enabled/disabled + revealed areas saved to Firebase)",
       "🔍 Zoom level now always defaults to 100% on page load"
+    ],
+    "fixes": [
+      "⚡ MAJOR: Fixed real-time sync lag with Firebase batch writes, debouncing, and optimistic updates",
+      "🌫️ Fixed fog of war circle consolidation - fog no longer reappears after extensive clearing",
+      "Replaced array trimming with intelligent merging algorithm that combines overlapping circles",
+      "Added Gaussian blur filter for softer fog edges"
     ]
   },
   {
     "date": "2026-01-27",
-    "changes": [
-      "🎒 Inventory improvements: added weapon slot to equipment system",
+    "features": [
+      "🎒 Inventory improvements: added weapon slot to equipment system"
+    ],
+    "fixes": [
       "🔧 Fixed ShowTime UI positioning and optimized drag performance"
     ]
   },
   {
     "date": "2026-01-26",
-    "changes": [
-      "🎮 ShowTime UI improvements and interaction enhancements",
+    "features": [
+      "🎮 ShowTime UI improvements and interaction enhancements"
+    ],
+    "fixes": [
       "Fixed various ShowTime UI issues"
     ]
   },
   {
     "date": "2026-01-24",
-    "changes": [
+    "features": [
       "📡 MAJOR: Real-time sync for DM episode/map selection to all players",
       "Players automatically see the map the DM selects without manual refresh",
+      "🎨 Expanded character profile UI with more detail"
+    ],
+    "fixes": [
       "🔧 Fixed icon scaling to maintain consistent sizes across zoom levels",
-      "🎨 Expanded character profile UI with more detail",
       "🐛 Fixed mob icon dragging with proper cursor and event handling"
     ]
   },
   {
     "date": "2026-01-23",
-    "changes": [
-      "🎛️ Consolidated DM controls into MapToolsMenu for cleaner UI",
+    "features": [
+      "🎛️ Consolidated DM controls into MapToolsMenu for cleaner UI"
+    ],
+    "fixes": [
       "Fixed episode tab, user controls, and naming issues",
       "Fixed DM controls z-index to prevent overlap with tools panel"
     ]
   },
   {
     "date": "2026-01-22",
-    "changes": [
+    "features": [
       "🖱️ Added cursor follower effect on ShowTime map",
-      "🔍 Added zoom +/- button controls for map viewing",
+      "🔍 Added zoom +/- button controls for map viewing"
+    ],
+    "fixes": [
       "Fixed ShowTimeView initialization order bug"
     ]
   },
   {
     "date": "2026-01-22",
-    "changes": [
+    "features": [
       "📍 MAJOR: Added Ping system for map communication",
       "All users can ping any location on the map to draw attention",
       "Pings appear as animated ripple effects visible to all players",
@@ -730,7 +795,7 @@
   },
   {
     "date": "2026-01-21",
-    "changes": [
+    "features": [
       "🌫️ MAJOR: Enhanced Fog of War system",
       "Fog of War is now map-dependent - each map in an episode has its own fog settings",
       "Added separate Eraser toggle - DM can enable/disable eraser without affecting fog visibility",
@@ -745,19 +810,21 @@
       "Mobs placed on a map only appear on that specific map",
       "When editing episodes, mob placements are per-map",
       "Map navigation shows correct mobs for each map",
-      "🎴 Fixed Mob Card visibility on ShowTime page",
-      "Mob cards now render outside the map container",
-      "Cards no longer affected by map scaling transform",
-      "Cards appear correctly at bottom-right of screen",
       "🔧 Technical improvements",
       "Added mapId field to EpisodeMobPlacement for per-map tracking",
       "Backwards compatible - old episodes default mobs to first map",
       "Per-map settings UI in episode editor shows current map name and settings"
+    ],
+    "fixes": [
+      "🎴 Fixed Mob Card visibility on ShowTime page",
+      "Mob cards now render outside the map container",
+      "Cards no longer affected by map scaling transform",
+      "Cards appear correctly at bottom-right of screen"
     ]
   },
   {
     "date": "2026-01-21",
-    "changes": [
+    "features": [
       "🌫️ Added Fog of War system for maps",
       "Fog of War overlay covers the entire map with semi-transparent darkness",
       "DM can reveal areas by clicking/dragging with adjustable brush size",
@@ -767,17 +834,19 @@
       "🔍 Added Map Scale controls",
       "DM can zoom in/out on maps (25% to 200% scale)",
       "Scale setting syncs to all players in real-time",
+      "📜 Updated changelog with all changes since January 12"
+    ],
+    "fixes": [
       "🎴 Fixed Mob Card display issues",
       "Mob cards now appear to the LEFT of the dice menu (no more overlap)",
       "Multiple mob cards stack horizontally",
       "Fixed card jumping when resizing - smooth transitions now",
-      "Cards can be freely dragged anywhere on screen",
-      "📜 Updated changelog with all changes since January 12"
+      "Cards can be freely dragged anywhere on screen"
     ]
   },
   {
     "date": "2026-01-20",
-    "changes": [
+    "features": [
       "🎨 MAJOR: Enhanced Crawler Profile UI with equipment slot system",
       "Added equipment slot system: Head, Chest, Left Hand, Right Hand, Ring, Legs, Feet",
       "Equipment slots arranged anatomically (head on top, hands flanking chest, feet on bottom)",
@@ -786,20 +855,22 @@
       "Expanded inventory view with toggleable item descriptions",
       "Larger inventory items with better spacing and readability",
       "Item tooltips showing full names on hover",
-      "Fixed inventory Firebase persistence - items now save correctly using document IDs",
       "Added inline inventory management on crawler profile page",
+      "🖼️ Improved avatar upload with image resizing and 500KB limit",
+      "Added custom map names display in Episodes tab"
+    ],
+    "fixes": [
+      "Fixed inventory Firebase persistence - items now save correctly using document IDs",
       "🔧 Fixed Freesound API rate limiting by creating Firebase Cloud Function proxy",
       "Disabled direct Freesound API calls from client to prevent token exposure",
       "Added 1-hour caching to reduce API calls",
       "Falls back to local sound filtering when proxy unavailable",
-      "🖼️ Improved avatar upload with image resizing and 500KB limit",
-      "Fixed Firestore write stream exhaustion on avatar upload",
-      "Added custom map names display in Episodes tab"
+      "Fixed Firestore write stream exhaustion on avatar upload"
     ]
   },
   {
     "date": "2026-01-19",
-    "changes": [
+    "features": [
       "🎮 Real-time mob dragging synchronization in ShowTime",
       "Mob icons follow cursor smoothly during drag operations",
       "Throttled Firestore broadcasts to prevent rate limiting",
@@ -814,7 +885,7 @@
   },
   {
     "date": "2026-01-14",
-    "changes": [
+    "fixes": [
       "Fixed map upload and display issues",
       "Fixed DungeonAIView: Rebuilt component with proper state management",
       "Simplified Episodes tab with unified create/edit form",
@@ -824,7 +895,7 @@
   },
   {
     "date": "2026-01-13",
-    "changes": [
+    "features": [
       "🎨 MAJOR: Enhanced Episode system with visual mob placement and map management",
       "Added visual drag-and-drop mob placement editor: DMs can now drag mob icons directly onto maps to position them",
       "Created MobIcon component: circular mob tokens with head-centered positioning and HP indicators",
@@ -840,7 +911,7 @@
   },
   {
     "date": "2026-01-12",
-    "changes": [
+    "features": [
       "🎬 MAJOR: Added Episode system for D&D session management",
       "Episodes feature: DMs can now create named episodes with descriptions, predefined maps, and positioned mobs",
       "Episode Creator in Dungeon AI console: intuitive form to create episodes with map selection (checkboxes) and mob positioning (0-100% X/Y sliders)",
@@ -856,17 +927,19 @@
   },
   {
     "date": "2026-01-11",
-    "changes": [
-      "Hardened Firebase mob persistence: strip undefined fields, diff adds/updates/deletes, and raise image size guard",
-      "Added client-side mob image resize/compress with oversize protection to prevent Firestore rejects",
-      "Fixed Dungeon AI console render break by aliasing lucide Image icon",
+    "features": [
       "Documented end-to-end Firebase persistence testing steps (FIREBASE_PERSISTENCE_TEST.md)",
       "Added scripts for Firebase CRUD smoke tests and deployment diagnostics"
+    ],
+    "fixes": [
+      "Hardened Firebase mob persistence: strip undefined fields, diff adds/updates/deletes, and raise image size guard",
+      "Added client-side mob image resize/compress with oversize protection to prevent Firestore rejects",
+      "Fixed Dungeon AI console render break by aliasing lucide Image icon"
     ]
   },
   {
     "date": "2026-01-10",
-    "changes": [
+    "features": [
       "🔥 MAJOR: Migrated from file-based storage to Firebase Firestore for cloud persistence and real-time multiplayer",
       "Added real-time synchronization - changes instantly sync across all players in the same room",
       "Implemented room-based multiplayer system with invite links and room codes",
@@ -876,42 +949,46 @@
       "Added data migration script (scripts/migrate-to-firebase.js) to transfer existing data to Firestore",
       "Removed dependency on backend server - app now runs on any static host (GitHub Pages, Netlify, Vercel)",
       "Implemented universal data persistence system - all user-created data (crawlers, mobs, maps, inventory) automatically saves",
-      "Fixed server API endpoints that were incorrectly nested, making game data loading/saving functional",
-      "Fixed CORS issues by configuring Vite proxy for seamless API communication",
       "Created generic DataStore hook (useDataStore/useFirebaseStore) that automatically persists any data type",
       "Added GameContext provider for global data access throughout the app",
       "Increased server payload limit to 50MB to support large map images",
-      "Optimized localStorage to exclude large data (maps) and prevent quota errors",
       "Added comprehensive documentation (DATA_PERSISTENCE.md) with usage examples and best practices",
       "Added GitHub Copilot instructions file to guide AI assistants in using correct data patterns",
       "Added TypeScript types for collection names with autocomplete support",
       "Enhanced logging system with detailed [FirebaseStore] console messages for debugging",
       "Made data persistence extensible - new data types (quests, NPCs, spells, etc.) can be added with zero configuration"
+    ],
+    "fixes": [
+      "Fixed server API endpoints that were incorrectly nested, making game data loading/saving functional",
+      "Fixed CORS issues by configuring Vite proxy for seamless API communication",
+      "Optimized localStorage to exclude large data (maps) and prevent quota errors"
     ]
   },
   {
     "date": "2026-01-09",
-    "changes": [
-      "Fixed Dungeon AI login persistence across navigations (localStorage + in-memory state)",
+    "features": [
       "When logged into the Dungeon AI, the main crawler field now switches to the Dungeon AI profile (and restores previous player on logout)",
-      "Dice Roller: controls are pinned and visible when panel is expanded (no more hidden button controls)",
-      "DM page: allow content to wrap and resize so controls (Hide / Trash) remain visible on narrow windows",
       "Dice Roller: moved roll history to the top; panel now grows up to the top of the viewport and becomes scrollable when full",
       "Dice Roller: grouped multi-dice rolls into collapsible entries showing per-die results and a roll total",
       "Added new Sound Effects system: searchable library (Freesound API integration via server proxy), recent and favorites boxes, upload support, and server-backed broadcast for site-wide playback",
       "Added server proxy endpoint `/api/sounds/search` with caching and basic rate limiting",
-      "Fixed Dungeon AI page layout and overflow issues so boxes no longer extend past the main container",
       "Made active navigation buttons' borders thicker to better indicate current page",
       "When signed in as Dungeon AI, the top-right player field now displays 'DUNGEON AI'",
       "Persist Dungeon AI login in browser (localStorage) and added a LOGOUT button on the main menu",
       "Dice Roller: added full roll history with crawler name identification and expanded history capacity",
       "Crawler name now displays on the Main Menu's top-left corner",
       "Added Show Time and Sound Effects buttons to the Main Menu and adjusted the grid layout"
+    ],
+    "fixes": [
+      "Fixed Dungeon AI login persistence across navigations (localStorage + in-memory state)",
+      "Dice Roller: controls are pinned and visible when panel is expanded (no more hidden button controls)",
+      "DM page: allow content to wrap and resize so controls (Hide / Trash) remain visible on narrow windows",
+      "Fixed Dungeon AI page layout and overflow issues so boxes no longer extend past the main container"
     ]
   },
   {
     "date": "2026-01-08",
-    "changes": [
+    "features": [
       "Added player selection dropdown on splash screen (includes all crawlers, Dungeon AI, and NPC option)",
       "Added player identity display in top left corner of main page",
       "Made dice roller configurable - can now add multiple dice before rolling",
