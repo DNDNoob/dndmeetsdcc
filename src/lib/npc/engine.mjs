@@ -27,12 +27,16 @@ import {
   formatTranscript, isYes, cleanLine, undoEncodedLine, parseGestureLine, parseRealLanguageLine, hasGestureStyle, presetLine,
   rollPersonalityTraits, buildPersonalityPrompt, parsePersonality, defaultPersuasionDC, PERSONALITY_SYSTEM_PROMPT,
   MEMORY_SYSTEM_PROMPT, buildMemoryPrompt, parseMemory,
+  rollLineStyle, asksQuestion, twistCatchBonus, twistDC, buildTwistCheckPrompt,
 } from './brain.mjs';
-import { mobLanguageIds, languageName, crawlerUnderstands, DEAD_LANGUAGE_ID, REAL_LANGUAGES } from '../languageList.mjs';
+import { mobLanguageIds, languageName, crawlerUnderstands, DEAD_LANGUAGE_ID, DEFAULT_LANGUAGE_ID, REAL_LANGUAGES } from '../languageList.mjs';
 import { mapSpeakers, getMobKind } from './speakers.mjs';
 
 export const DEFAULT_NPC_CONFIG = {
   nearDistance: 12,          // map-% units
+  earshotDistance: 24,       // map-% units: NPCs this close overhear lines not said to them
+  chimeInChance: 0.3,        // a bystander who overheard a crawler may jump in (still asks the model first)
+  overhearMemoryMax: 2,      // bystanders per message who remember what they overheard
   npcCooldownMs: 20_000,
   globalGapMs: 4_000,
   idleSilenceMs: 60_000,
@@ -301,13 +305,17 @@ export class NpcRoom {
     return memory;
   }
 
-  /** A crawler is talking with a speaker: remember the conversation so it can be saved once it ends. */
-  noteConvo(mob, crawlerId) {
+  /**
+   * A crawler is talking with a speaker (or, with `overheard`, near it): remember the conversation so
+   * it can be saved once it ends.
+   */
+  noteConvo(mob, crawlerId, overheard = false) {
     const now = Date.now();
     const convo = this.convos.get(mob.id) ?? {
       since: now, crawlerIds: new Set(), name: mob.name, episodeId: this.showtime?.episodeId,
-      creature: getMobKind(mob) === 'creature',
+      creature: getMobKind(mob) === 'creature', overheard,
     };
+    if (!overheard) convo.overheard = false; // it was talked to after all
     convo.lastAt = now;
     if (crawlerId) convo.crawlerIds.add(crawlerId);
     this.convos.set(mob.id, convo);
@@ -398,15 +406,28 @@ export class NpcRoom {
    * NPCs' lines spoken on this map close by. Nothing from other maps or out of earshot.
    */
   heardBy(m, speakerId, placement) {
+    return !!this.hearsAs(m, speakerId, placement);
+  }
+
+  /**
+   * How a speaker took in a chat message: 'heard' (said to it, or to everyone close by), 'overheard'
+   * (said within earshot to someone else), or null. Players' apps record who was in talking range
+   * (nearMobIds) and who was within earshot (earshotMobIds) when they spoke.
+   */
+  hearsAs(m, speakerId, placement) {
     if (m.authorType === 'npc') {
-      if (m.authorId === speakerId) return true;
-      return !!placement && m.mapId === this.currentMapId && typeof m.x === 'number' && typeof m.y === 'number'
-        && distance(m, placement) <= this.config.nearDistance;
+      if (m.authorId === speakerId) return 'heard';
+      if (!placement || m.mapId !== this.currentMapId || typeof m.x !== 'number' || typeof m.y !== 'number') return null;
+      const d = distance(m, placement);
+      return d <= this.config.nearDistance ? 'heard' : d <= this.config.earshotDistance ? 'overheard' : null;
     }
     const to = m.toMobIds || [];
-    if (m.authorType === 'dm') return !to.length || to.includes(speakerId);
-    if (to.includes(speakerId)) return true;
-    return Array.isArray(m.nearMobIds) ? m.nearMobIds.includes(speakerId) : true;
+    if (m.authorType === 'dm') return !to.length || to.includes(speakerId) ? 'heard' : null;
+    if (to.includes(speakerId)) return 'heard';
+    const aimedElsewhere = to.length > 0 || this.npcPlacements().some((n) => n.mobId !== speakerId && mentionsName(m.text, n.mob.name));
+    if (!Array.isArray(m.nearMobIds)) return aimedElsewhere ? 'overheard' : 'heard';
+    if (m.nearMobIds.includes(speakerId)) return aimedElsewhere ? 'overheard' : 'heard';
+    return (m.earshotMobIds || []).includes(speakerId) ? 'overheard' : null;
   }
 
   /**
@@ -415,9 +436,13 @@ export class NpcRoom {
    */
   transcript(mob, placement) {
     const epId = this.showtime?.episodeId;
-    return this.formatFor(mob, this.state.chat
-      .filter((m) => !m.translationOf && (!m.episodeId || m.episodeId === epId) && this.heardBy(m, mob.id, placement))
-      .slice(-this.config.transcriptLines));
+    const lines = [];
+    for (const m of this.state.chat) {
+      if (m.translationOf || (m.episodeId && m.episodeId !== epId)) continue;
+      const how = this.hearsAs(m, mob.id, placement);
+      if (how) lines.push(how === 'overheard' ? { ...m, overheard: true } : m);
+    }
+    return this.formatFor(mob, lines.slice(-this.config.transcriptLines));
   }
 
   formatFor(mob, lines) {
@@ -475,11 +500,12 @@ export class NpcRoom {
       if (change.type !== 'added') continue;
       const m = { ...change.doc.data(), id: change.doc.id };
       if (priming && (m.createdAt ?? 0) < Date.now() - 15_000) continue;
-      if (m.authorType === 'npc' || m.translationOf) continue;
+      if (m.authorType === 'npc') continue;
       if (m.episodeId && m.episodeId !== this.showtime?.episodeId) continue;
       if ((m.createdAt ?? 0) < Date.now() - 120_000) continue;
       this.lastActivityAt = Date.now();
-      this.handlePlayerMessage(m);
+      if (m.translationOf) this.handleTranslation(m);
+      else this.handlePlayerMessage(m);
     }
   }
 
@@ -523,14 +549,67 @@ export class NpcRoom {
       for (const mob of listeners) this.noteConvo(mob, m.authorId);
     }
 
+    const asked = asksQuestion(m.text);
     if (named.length) {
       for (const mob of named.slice(0, 2)) {
-        this.enqueue({ kind: 'line', mobId: mob.id, direct: true, fromDm: m.authorType === 'dm', near: speakerSpot, ...this.hearing(mob, m, `${m.authorName} spoke to you`) });
+        this.enqueue({ kind: 'line', mobId: mob.id, direct: true, asked, fromDm: m.authorType === 'dm', near: speakerSpot, ...this.hearing(mob, m, `${m.authorName} spoke to you`) });
       }
     } else if (nearSpeaker.length) {
       const n = nearSpeaker[0];
-      this.enqueue({ kind: 'line', mobId: n.mobId, gated: true, near: speakerSpot, ...this.hearing(n.mob, m, `${m.authorName} said this right next to you`) });
+      this.enqueue({ kind: 'line', mobId: n.mobId, gated: true, asked, near: speakerSpot, ...this.hearing(n.mob, m, `${m.authorName} said this right next to you`) });
     }
+    if (m.authorType === 'crawler' && named.length) this.overhear(m, named, speakerSpot);
+  }
+
+  /**
+   * NPCs within earshot of a crawler talking to someone else: the closest few remember it, and now
+   * and then one jumps in (the model still decides whether it would).
+   */
+  overhear(m, named, speakerSpot) {
+    if (!Array.isArray(m.earshotMobIds)) return; // sent by an older app that didn't record who was in earshot
+    const talkingTo = new Set(named.map((mob) => mob.id));
+    const seen = new Set();
+    const bystanders = this.npcPlacements()
+      .filter((n) => !talkingTo.has(n.mobId) && this.hearsAs(m, n.mobId, n) === 'overheard' && !seen.has(n.mobId) && seen.add(n.mobId))
+      .sort((a, b) => (speakerSpot ? distance(a, speakerSpot) - distance(b, speakerSpot) : 0));
+    if (!bystanders.length) return;
+    for (const n of bystanders.slice(0, this.config.overhearMemoryMax)) {
+      if (this.mobKnows(n.mob, m.language)) this.noteConvo(n.mob, m.authorId, true);
+    }
+    if (Math.random() >= this.config.chimeInChance) return;
+    const n = bystanders.find((b) => this.mobKnows(b.mob, m.language));
+    if (!n) return;
+    const who = named.map((mob) => mob.name).join(' and ');
+    this.enqueue({
+      kind: 'line', mobId: n.mobId, gated: true, near: speakerSpot, heard: m.language,
+      trigger: `You overheard ${m.authorName} say to ${who}: "${m.text}". It was not said to you, so only butt in if you have a real reason to.`,
+    });
+  }
+
+  /**
+   * A translator passed an NPC's line on to the party. If they changed it, the NPC (if it is close
+   * enough to hear them) may catch it: d20 + its bonus against 10 + the translator's CHA mod + Deception.
+   */
+  handleTranslation(t) {
+    const original = this.state.chat.find((x) => x.id === t.translationOf);
+    if (!original || original.authorType !== 'npc' || t.authorType !== 'crawler') return;
+    const said = (original.meaning || original.text || '').trim();
+    const told = (t.text || '').trim();
+    if (!said || !told || told === said || told === (original.text || '').trim()) return;
+    const mob = this.mobById(original.authorId);
+    const placement = mob && this.placementFor(mob.id);
+    const spot = this.crawlerPlacementsOnMap().find((p) => p.crawlerId === t.authorId);
+    if (!placement || !spot || distance(spot, placement) > this.config.earshotDistance) return;
+    const understands = mobLanguageIds(mob).includes(DEFAULT_LANGUAGE_ID);
+    const bonus = twistCatchBonus(mob, understands);
+    if (bonus === null) return;
+    const translator = this.state.crawlers.find((c) => c.id === t.authorId);
+    const dc = twistDC(translator);
+    const d20 = 1 + Math.floor(Math.random() * 20);
+    const total = d20 + bonus;
+    this.log(`[${this.name}] ${mob.name} vs ${t.authorName}'s twist: ${d20}${bonus >= 0 ? '+' : ''}${bonus} = ${total} vs DC ${dc}`);
+    if (d20 !== 20 && (d20 === 1 || total < dc)) return;
+    this.enqueue({ kind: 'twist-check', mobId: mob.id, said, told, understands, near: spot, translator: { id: t.authorId, name: t.authorName }, roll: { d20, total, dc } });
   }
 
   onSecrets(data) {
@@ -737,6 +816,7 @@ export class NpcRoom {
         if (job.kind !== 'memory' && Date.now() - job.createdAt > this.config.jobMaxAgeMs) continue;
         try {
           if (job.kind === 'secret-check') await this.runSecretCheck(job);
+          else if (job.kind === 'twist-check') await this.runTwistCheck(job);
           else if (job.kind === 'persona') await this.runPersona(job);
           else if (job.kind === 'memory') await this.runMemory(job);
           else await this.runLine(job);
@@ -816,7 +896,8 @@ export class NpcRoom {
     const lines = this.state.chat.filter((m) => (m.createdAt ?? 0) >= convo.since - 5_000
       && !m.translationOf && (!m.episodeId || m.episodeId === convo.episodeId)
       && this.heardBy(m, job.mobId, placement));
-    if (!lines.some((m) => m.authorType === 'npc' && m.authorId === job.mobId)) { this.convos.delete(job.mobId); return; }
+    const spoke = lines.some((m) => m.authorType === 'npc' && m.authorId === job.mobId);
+    if (!spoke && !convo.overheard) { this.convos.delete(job.mobId); return; }
     const tier = await this.prepare();
     if (!tier) return; // try again on a later tick
     this.convos.delete(job.mobId);
@@ -826,7 +907,7 @@ export class NpcRoom {
     let raw;
     try {
       raw = await this.ask(tier, MEMORY_SYSTEM_PROMPT, buildMemoryPrompt({
-        mob, memory: prev, transcript: this.formatFor(mob, lines.slice(-30)), crawlerNames: crawlers.map((c) => c.name),
+        mob, memory: prev, transcript: this.formatFor(mob, lines.slice(-30)), crawlerNames: crawlers.map((c) => c.name), overheardOnly: !spoke,
       }), { maxTokens: 400, temperature: 0.3, json: true });
     } catch (err) {
       if (err instanceof NpcLlmUnavailable) this.convos.set(job.mobId, convo); // save it once the model is back
@@ -856,6 +937,50 @@ export class NpcRoom {
     await setDoc(doc(this.db, `${this.path}/npcAi/secrets`), {
       [mob.id]: { state: 'pending', reason: `${job.message.authorName}: "${job.message.text.slice(0, 120)}"`, at: Date.now() },
     }, { merge: true });
+  }
+
+  /**
+   * The NPC won its roll against a twisted translation: check the twist really changed the meaning,
+   * then have it call the translator out and remember it.
+   */
+  async runTwistCheck(job) {
+    const tier = await this.prepare();
+    if (!tier) return;
+    const reply = await this.ask(tier, null, buildTwistCheckPrompt({ original: job.said, told: job.told }), { maxTokens: 4, temperature: 0 });
+    if (!isYes(reply)) return;
+    const mob = this.mobById(job.mobId);
+    if (!mob) return;
+    const who = job.translator.name;
+    this.log(`[${this.name}] ${mob.name} caught ${who} twisting its words`);
+    const trigger = job.understands
+      ? `${who} was translating your words for the party. You said: "${job.said}". But ${who} told them: "${job.told}". You understood that, and you know ${who} twisted your words. Call it out, your way.`
+      : `${who} was translating your words for the party. You don't speak their language, but from ${who}'s tone and the others' faces you can tell that is not what you said. Call it out, your way.`;
+    this.enqueue({ kind: 'line', mobId: mob.id, direct: true, near: job.near, trigger, caughtTwist: { by: who, ...job.roll } });
+    await this.rememberTwist(mob, job.translator, job.understands ? `Caught ${who} twisting my words when translating for the party.` : `${who} seemed to twist my words when translating for the party.`);
+  }
+
+  /** Note a caught twist in the speaker's memory and like the translator a little less. */
+  async rememberTwist(mob, translator, note) {
+    const convoCreature = getMobKind(mob) === 'creature';
+    const prev = this.memoryFor(mob);
+    const was = prev?.feelings?.[translator.id]?.score ?? 0;
+    const entry = {
+      notes: [...(prev?.notes || []), note].slice(-8),
+      feelings: { ...(prev?.feelings || {}), [translator.id]: { name: translator.name, score: Math.max(-3, was - 1) } },
+      name: mob.name, updatedAt: Date.now(),
+      ...(convoCreature ? { episodeId: this.showtime?.episodeId } : {}),
+    };
+    this.memories = { ...this.memories, [mob.id]: entry };
+    await setDoc(doc(this.db, `${this.path}/npcAi/memories`), { [mob.id]: entry }, { mergeFields: [new FieldPath(mob.id)] });
+  }
+
+  /** What this speaker said most recently (so it can avoid repeating itself). */
+  ownRecentLines(mobId, count = 4) {
+    return this.state.chat
+      .filter((m) => m.authorType === 'npc' && m.authorId === mobId && !m.preset)
+      .slice(-count)
+      .map((m) => (m.meaning || m.text || '').trim())
+      .filter(Boolean);
   }
 
   async runLine(job) {
@@ -896,12 +1021,16 @@ export class NpcRoom {
     let meaning = '';
     try {
       const secretUnlocked = this.secrets[mob.id]?.state === 'unlocked';
+      const { angle, wordCap } = rollLineStyle(!!job.asked);
       const system = buildSystemPrompt({
         mob, secretUnlocked, scene: this.scene(placement), memory: this.memoryFor(mob),
         speaking: this.languageName(language), knownLanguages: known.map((id) => this.languageName(id)), gesture: gestureStyle,
-        realLanguage: REAL_LANGUAGES[language],
+        realLanguage: REAL_LANGUAGES[language], wordCap,
       });
-      const raw = await this.ask(tier, system, buildLinePrompt({ mob, transcript, trigger: job.trigger }), { maxTokens: gestureStyle || REAL_LANGUAGES[language] ? 110 : 80, temperature: 0.8 });
+      const user = buildLinePrompt({ mob, transcript, trigger: job.trigger, angle: job.caughtTwist ? null : angle, ownRecent: this.ownRecentLines(mob.id) });
+      // Room for the longest line allowed (about 2 tokens a word, twice over for a translation or gesture)
+      const maxTokens = Math.round(wordCap * 2 * (gestureStyle || REAL_LANGUAGES[language] ? 2 : 1)) + 30;
+      const raw = await this.ask(tier, system, user, { maxTokens, temperature: 0.9 });
       if (gestureStyle) ({ text: line, gesture } = parseGestureLine(raw, mob.name));
       else if (REAL_LANGUAGES[language]) ({ text: line, meaning } = parseRealLanguageLine(raw, mob.name));
       else line = undoEncodedLine(cleanLine(raw, mob.name));
@@ -910,11 +1039,11 @@ export class NpcRoom {
     }
     // The model sent code instead of words: say something readable rather than post the blob
     if (!line && !gestureStyle) line = presetLine(language);
-    await this.postLine(mob, placement, { text: line, language, gesture, meaning, mapId });
+    await this.postLine(mob, placement, { text: line, language, gesture, meaning, mapId, caughtTwist: job.caughtTwist });
   }
 
   /** Put an NPC line in the chat (unless NPCs were muted while it was being written). */
-  async postLine(mob, placement, { text, language, gesture, meaning, preset = false, mapId = this.currentMapId }) {
+  async postLine(mob, placement, { text, language, gesture, meaning, preset = false, mapId = this.currentMapId, caughtTwist }) {
     const muted = this.settings.mutedMobIds || [];
     if (!text || !this.live || !this.enabled || this.settings.mutedAll || muted.includes(mob.id) || muted.includes(mob.sourceMobId)) return;
 
@@ -929,6 +1058,7 @@ export class NpcRoom {
       ...(gesture ? { gesture } : {}),
       ...(meaning ? { meaning } : {}),
       ...(preset ? { preset: true } : {}),
+      ...(caughtTwist ? { caughtTwist } : {}),
       createdAt: Date.now(),
       episodeId: this.showtime?.episodeId,
       mapId,
