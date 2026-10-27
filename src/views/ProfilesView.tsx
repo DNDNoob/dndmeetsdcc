@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { ItemName } from "@/components/ItemName";
 import type { DiceRollEntry } from "@/hooks/useGameState";
 import UndoTurnButton, { canUndoCombatTurn } from "@/components/UndoTurnButton";
+import { getCrawlerArmor } from "@/lib/armor";
 import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Backpack, HardHat, Package, Lock, Unlock, ChevronDown, ChevronUp, Check, Search, Send, BookOpen, Filter, X, Gem, Footprints, Shirt, Hand, Target, Swords, RefreshCw, Timer, ScrollText, Eye, EyeOff, CheckSquare, Trophy, Skull, HeartCrack, Crown, Minus, Wand2, Star, BarChart3 } from "lucide-react";
 
 const NO_CRAWLER_STATS: CrawlerStats[] = [];
@@ -1550,9 +1551,29 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
         {/* Stats and Achievements row */}
         <div className="grid md:grid-cols-2 gap-8 mb-8">
           <div>
-            <h3 className="font-display text-primary text-xl mb-4 flex items-center gap-2">
-              <Shield className="w-6 h-6 shrink-0" /> STATS
-            </h3>
+            <div className="mb-4 flex items-center justify-between gap-2">
+              <h3 className="font-display text-primary text-xl flex items-center gap-2">
+                <Shield className="w-6 h-6 shrink-0" /> STATS
+              </h3>
+              {(() => {
+                // Armor DC: the attack roll needed to hit this crawler (0 with no armor)
+                const armor = getCrawlerArmor(selected, inventory);
+                const title = [
+                  armor.dc === 0 ? 'No armor: any attack roll hits' : `Attack rolls of ${armor.dc} or more hit`,
+                  ...armor.pieces.map(p => `${p.name}: ${[p.data.rating ? `+${p.data.rating} DC` : '', p.data.reduction ? `-${p.data.reduction} damage per hit` : ''].filter(Boolean).join(', ') || 'no rating'}`),
+                  armor.resist.length ? `Resists ${armor.resist.join(', ')} (half damage)` : '',
+                  armor.vulnerable.length ? `Vulnerable to ${armor.vulnerable.join(', ')} (double damage)` : '',
+                ].filter(Boolean).join('\n');
+                return (
+                  <span className="text-sm text-muted-foreground text-right" title={title}>
+                    Armor DC <span className="text-foreground font-bold">{armor.dc}</span>
+                    {armor.reduction > 0 && <span className="text-xs"> · -{armor.reduction} per hit</span>}
+                    {armor.resist.length > 0 && <span className="block text-xs text-primary">Resists {armor.resist.join(', ')}</span>}
+                    {armor.vulnerable.length > 0 && <span className="block text-xs text-destructive">Weak to {armor.vulnerable.join(', ')}</span>}
+                  </span>
+                );
+              })()}
+            </div>
             <div className="grid grid-cols-2 gap-4">
               {[
                 { key: "str", label: "STR", icon: Zap },

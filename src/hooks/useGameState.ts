@@ -109,12 +109,15 @@ import {
   getUpgradeKind,
   baseItemName,
 } from "@/lib/gameData";
+import { applyArmorToHit, getCrawlerArmor } from "@/lib/armor";
 import { applyUpgradeToItem, undoLastItemUpgrade, resolveKnownSpell, upgradeUseCost, describeUpgradeEffect, describeUpgradeDrawback, FIRST_UPGRADE_ACHIEVEMENTS, CURSED_BARGAIN_ACHIEVEMENT } from "@/lib/upgrades";
 import type { IconSubject } from "@/lib/iconGen";
 import { FULLY_EVOLVED_ACHIEVEMENT, MEDITATING_TEXT, findDueUpgrades, nextTreeStep, stepToUpgrade, type DueUpgrade } from "@/lib/upgradeTrees";
 
 /** An item in a crawler's inventory or one of their known spells. */
 export type UpgradeTarget = { kind: 'item' | 'spell'; id: string };
+/** One target of an attack. damageType / weaponType let the target's armor resist it (else the attacker's weapon or spell is used). */
+export interface CombatHit { targetId: string; targetType: 'crawler' | 'mob'; damage: number; damageType?: string; weaponType?: string }
 export interface PendingUpgradeIcon {
   key: string;
   crawlerId: string;
@@ -2099,7 +2102,7 @@ export const useGameState = () => {
   // Apply damage to one or more combat targets in a single pass, so splash hits don't
   // overwrite each other, and credit the attacking crawler's activity stats.
   const applyCombatDamageBatch = async (
-    hits: { targetId: string; targetType: 'crawler' | 'mob'; damage: number }[],
+    hits: CombatHit[],
     attackerId?: string,
     source?: StatSource,
   ) => {
@@ -2127,11 +2130,39 @@ export const useGameState = () => {
     let hostileDamage = 0;
     const xpReasons: { amount: number; reason: string }[] = [];
 
-    for (const { targetId, targetType, damage } of hits) {
+    // Armor on crawlers that were hit: damage it absorbed (armor upgrade XP) and a note for the DM
+    const absorbedBumps = new Map<string, StatBump[]>();
+    const armorNotes: string[] = [];
+
+    for (const hit of hits) {
+      const { targetId, targetType } = hit;
+      let { damage } = hit;
       let dealt = 0;
       if (targetType === 'crawler') {
         const crawler = crawlers.find(c => c.id === targetId);
         if (!crawler) continue;
+        const armor = getCrawlerArmor(crawler, getCrawlerInventory(crawler.id));
+        const kinds = { damageType: hit.damageType ?? source?.damageType, weaponType: hit.weaponType ?? source?.weaponType };
+        const armored = applyArmorToHit(damage, armor, kinds);
+        if (armored.damage !== damage) {
+          // e.g. "Vex took 15 damage: 9 rolled, doubled (weak to Fire), 3 absorbed by Paper Stack Armor and Trash Can Lid"
+          const kindIn = (list: string[]) => [kinds.damageType, kinds.weaponType].find(k => k && list.includes(k));
+          const afterTypes = armored.vulnerable ? damage * 2 : armored.resisted ? Math.floor(damage / 2) : damage;
+          const reducedBy = armor.pieces.filter(p => p.data.reduction && armored.absorbed.some(a => a.id === p.id)).map(p => p.name);
+          const parts = [
+            `${damage} rolled`,
+            armored.vulnerable ? `doubled (weak to ${kindIn(armor.vulnerable)})` : '',
+            armored.resisted ? `halved (resists ${kindIn(armor.resist)})` : '',
+            afterTypes > armored.damage ? `${afterTypes - armored.damage} absorbed by ${reducedBy.join(' and ')}` : '',
+          ].filter(Boolean);
+          armorNotes.push(`${crawler.name} took ${armored.damage} damage: ${parts.join(', ')}`);
+          const bumps = absorbedBumps.get(targetId) ?? [];
+          for (const a of armored.absorbed) {
+            bumps.push({ path: ['items', statKey(a.id), 'damageAbsorbed'], inc: a.amount }, { path: ['items', statKey(a.id), 'name'], set: a.name });
+          }
+          absorbedBumps.set(targetId, bumps);
+          damage = armored.damage;
+        }
         const oldHP = crawlerHP.get(targetId) ?? crawler.hp ?? 0;
         const newHP = Math.max(0, oldHP - damage);
         crawlerHP.set(targetId, newHP);
@@ -2208,6 +2239,8 @@ export const useGameState = () => {
     if (combatantsChanged) {
       await updateItem('combatState', 'current', { combatants } as Record<string, unknown>);
     }
+    for (const [id, bumps] of absorbedBumps) if (bumps.length) await bumpCrawlerStats(id, bumps);
+    for (const note of armorNotes) toast.info(`🛡️ ${note}`);
     if (attackerIsCrawler && attackerId) {
       // One weapon proficiency hit per attack, however many targets it splashed
       const profHit = !!sourceCounts.hits && !!source?.weaponType;

@@ -8,7 +8,9 @@ import { DungeonButton } from "@/components/ui/DungeonButton";
 import { ItemName } from "@/components/ItemName";
 import { UpgradeList } from "@/components/UpgradeList";
 import { UpgradeXpEditor } from "@/components/UpgradeXpEditor";
-import { Crawler, InventoryItem, getUpgradeKind, type UpgradeXpSettings, getItemStackKey, stackItems, EquipmentSlot as SlotType, StatModifiers, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, Spell, SpellData, ITEM_RARITIES, ItemRarity, getItemRarityColor } from "@/lib/gameData";
+import { ArmorEditor } from "@/components/ArmorEditor";
+import { canWearArmor } from "@/lib/armor";
+import { Crawler, InventoryItem, getUpgradeKind, type UpgradeXpSettings, getItemStackKey, stackItems, EquipmentSlot as SlotType, StatModifiers, WeaponData, type ArmorData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, Spell, SpellData, ITEM_RARITIES, ItemRarity, getItemRarityColor } from "@/lib/gameData";
 import { RarityBadge } from "@/components/ui/RarityBadge";
 import { Coins, Package, Sword, Shield, Plus, Trash2, Edit2, Save, HardHat, Search, BookOpen, Gem, Footprints, Shirt, Hand, Crosshair, ChevronDown, ChevronUp, Wand2, Globe, Lock, Users, Bookmark } from "lucide-react";
 import { SpellDataEditor } from "@/views/SpellsView";
@@ -147,6 +149,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     goldValue?: number;
     statModifiers?: StatModifiers;
     weaponData?: WeaponData;
+    armorData?: ArmorData;
     isSpellTome?: boolean;
     spellTomeData?: { entries: Array<{ spellId?: string; customSpell?: Spell }> };
     language?: string;
@@ -228,6 +231,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
       goldValue: item.goldValue,
       statModifiers: item.statModifiers,
       weaponData: item.weaponData,
+      armorData: item.armorData,
       isSpellTome: item.isSpellTome,
       spellTomeData: item.spellTomeData,
       language: item.language,
@@ -253,6 +257,10 @@ const InventoryView: React.FC<InventoryViewProps> = ({
       ? { weaponData: newLibraryItem.weaponData }
       : { weaponData: undefined };
 
+    const armorFields = newLibraryItem.armorData && canWearArmor(newLibraryItem)
+      ? { armorData: newLibraryItem.armorData }
+      : { armorData: undefined };
+
     const spellTomeFields = newLibraryItem.isSpellTome
       ? { isSpellTome: true as const, spellTomeData: newLibraryItem.spellTomeData }
       : { isSpellTome: undefined, spellTomeData: undefined };
@@ -277,6 +285,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
               ...(newLibraryItem.iconId ? { iconId: newLibraryItem.iconId } : {}),
               ...(mods && Object.keys(mods).length > 0 ? { statModifiers: mods } : { statModifiers: undefined }),
               ...weaponFields,
+              ...armorFields,
               ...spellTomeFields,
               upgradeXp: newLibraryItem.upgradeXp,
             }
@@ -309,6 +318,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 ...(newLibraryItem.iconId ? { iconId: newLibraryItem.iconId } : {}),
                 ...(mods && Object.keys(mods).length > 0 ? { statModifiers: mods } : { statModifiers: undefined }),
                 ...weaponFields,
+                ...armorFields,
                 ...spellTomeFields,
                 upgradeXp: newLibraryItem.upgradeXp,
               };
@@ -334,6 +344,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
         ...(newLibraryItem.effects?.trim() ? { effects: newLibraryItem.effects.trim() } : {}),
         ...(mods && Object.keys(mods).length > 0 ? { statModifiers: mods } : {}),
         ...weaponFields,
+        ...(armorFields.armorData ? armorFields : {}),
         ...spellTomeFields,
         ...(newLibraryItem.upgradeXp ? { upgradeXp: newLibraryItem.upgradeXp } : {}),
         ...(currentUserId ? { createdBy: currentUserId, createdByUsername: currentUsername } : {}),
@@ -1012,6 +1023,13 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 </div>
               )}
             </div>
+          )}
+
+          {canWearArmor(newLibraryItem) && (
+            <ArmorEditor
+              value={newLibraryItem.armorData}
+              onChange={(armorData) => setNewLibraryItem({ ...newLibraryItem, armorData })}
+            />
           )}
 
           {getUpgradeKind(newLibraryItem) !== 'none' && (

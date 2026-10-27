@@ -23,6 +23,7 @@ import MobActionsOverlay from "@/components/MobActionsOverlay";
 import NpcChatPanel, { type NpcChatAuthor, type NpcChatMentionable } from "@/components/NpcChatPanel";
 import NpcSpeechBubbles from "@/components/ui/NpcSpeechBubbles";
 import type { NpcOnlineKeys } from "@/lib/npc/onlineLlm.mjs";
+import type { CombatHit } from "@/hooks/useGameState";
 import { useLanguages } from "@/contexts/LanguagesContext";
 import { readChatLine, usableLanguageIds, crawlerUnderstands, languageEffectLeft, DEFAULT_LANGUAGE_ID } from "@/lib/languages";
 import { useNpcSpeechPlayer } from "@/hooks/useNpcSpeechPlayer";
@@ -98,7 +99,7 @@ interface ShowTimeViewProps {
   onResolveMerchantHaggle?: (mob: Mob, crawlerId: string, approve: boolean) => Promise<boolean>;
   // DM mob actions in combat
   spells?: import("@/lib/gameData").Spell[];
-  onApplyCombatDamageBatch?: (hits: { targetId: string; targetType: 'crawler' | 'mob'; damage: number }[]) => Promise<void>;
+  onApplyCombatDamageBatch?: (hits: CombatHit[]) => Promise<void>;
   onRecordCombatAction?: (combatantId: string, actionType: 'action' | 'bonus') => Promise<void>;
   onOverrideMobHealth?: (combatantId: string, newHP: number) => Promise<void>;
   onHealCrawler?: (crawlerId: string, amount: number) => Promise<void>;

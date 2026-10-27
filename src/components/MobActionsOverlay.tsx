@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronUp, Dices, Heart, Shield, Sparkles, Swords, X } from "lucide-react";
+import { getCrawlerArmor } from "@/lib/armor";
 import {
   formatDamageDice,
   getEquippedModifiers,
@@ -13,7 +14,7 @@ import {
   type Spell,
   type WeaponDie,
 } from "@/lib/gameData";
-import type { DiceRollEntry } from "@/hooks/useGameState";
+import type { CombatHit, DiceRollEntry } from "@/hooks/useGameState";
 
 interface MobActionsOverlayProps {
   combatState: CombatState;
@@ -22,7 +23,7 @@ interface MobActionsOverlayProps {
   spells: Spell[];
   getCrawlerInventory?: (crawlerId: string) => InventoryItem[];
   addDiceRoll?: (entry: DiceRollEntry) => Promise<void>;
-  onApplyDamage?: (hits: { targetId: string; targetType: 'crawler' | 'mob'; damage: number }[]) => Promise<void>;
+  onApplyDamage?: (hits: CombatHit[]) => Promise<void>;
   onRecordAction?: (combatantId: string, actionType: 'action' | 'bonus') => Promise<void>;
   onOverrideMobHealth?: (combatantId: string, newHP: number) => Promise<void>;
   onHealCrawler?: (crawlerId: string, amount: number) => Promise<void>;
@@ -97,11 +98,13 @@ export const MobActionsOverlay: React.FC<MobActionsOverlayProps> = ({
       const cr = crawlers.find(x => x.id === c.id);
       if (!cr) return null;
       const mods = getEquippedModifiers(cr, getCrawlerInventory?.(cr.id) ?? []);
-      return { hp: cr.hp ?? 0, max: (cr.maxHP ?? 0) + (mods.maxHP ?? 0), con: (cr.con ?? 0) + (mods.con ?? 0) };
+      const inventory = getCrawlerInventory?.(cr.id) ?? [];
+      // DC = the armor ratings of everything worn; 0 without armor, so any roll hits
+      return { hp: cr.hp ?? 0, max: (cr.maxHP ?? 0) + (mods.maxHP ?? 0), dc: getCrawlerArmor(cr, inventory).dc as number | undefined };
     }
     const m = mobs.find(x => x.id === (c.sourceId || c.id));
     const max = m?.hitPoints ?? 0;
-    return { hp: c.currentHP ?? max, max, con: undefined as number | undefined };
+    return { hp: c.currentHP ?? max, max, dc: undefined as number | undefined };
   };
 
   const takeAction = async (action: MobCombatAction) => {
@@ -167,7 +170,7 @@ export const MobActionsOverlay: React.FC<MobActionsOverlayProps> = ({
           }
         }
       } else {
-        await onApplyDamage?.(targets.map(t => ({ targetId: t.id, targetType: t.type, damage: amount })));
+        await onApplyDamage?.(targets.map(t => ({ targetId: t.id, targetType: t.type, damage: amount, damageType: action.damageType, weaponType: action.weaponType })));
       }
       setPending(null);
     } finally {
@@ -246,7 +249,10 @@ export const MobActionsOverlay: React.FC<MobActionsOverlayProps> = ({
                     >
                       <span className={c.type === 'crawler' ? 'text-primary' : 'text-destructive'}>{c.name}</span>
                       <span className="text-[10px] text-muted-foreground">
-                        {hp ? `${hp.hp}/${hp.max} HP` : ''}{hp?.con !== undefined ? ` · CON ${hp.con}` : ''}
+                        {hp ? `${hp.hp}/${hp.max} HP` : ''}{hp?.dc !== undefined ? ` · DC ${hp.dc}` : ''}
+                        {hp?.dc !== undefined && pending.hitTotal !== undefined && (
+                          <span className={pending.hitTotal >= hp.dc ? 'text-accent' : 'text-muted-foreground'}>{pending.hitTotal >= hp.dc ? ' · hits' : ' · misses'}</span>
+                        )}
                       </span>
                     </button>
                   );
