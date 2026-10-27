@@ -950,6 +950,8 @@ export interface KnownSpell {
   customSpell?: Spell; // full spell data for one-off tome spells that aren't in the library
   upgrades?: ItemUpgrade[]; // upgrades to this crawler's copy, applied on top of the library spell when read
   upgradePath?: UpgradePath; // milestones reached, the trees offered and the one picked
+  iconId?: string; // this crawler's redrawn icon after an upgrade (else the library spell's)
+  upgradeIconPending?: boolean; // upgraded since the icon was last redrawn
 }
 
 // Mastery threshold: level N requires 5*N*(N+1) total casts (10, 30, 60, 100, ...)
@@ -1017,6 +1019,7 @@ export interface InventoryItem {
   armorData?: ArmorData;     // Armor rating, damage reduction, resistances and vulnerabilities (set by upgrades for now)
   upgrades?: ItemUpgrade[];  // Upgrades given to this crawler's copy, oldest first (see src/lib/upgrades.ts)
   upgradePath?: UpgradePath; // Milestones reached, the trees the Dungeon AI offered and the one picked
+  upgradeIconPending?: boolean; // Upgraded since the icon was last redrawn (the DM's browser redraws it)
 }
 
 export interface ArmorData {

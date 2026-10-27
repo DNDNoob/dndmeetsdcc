@@ -1,5 +1,5 @@
 import { toast } from 'sonner';
-import type { IconLibraryEntry, InventoryItem, Mob, Spell } from '@/lib/gameData';
+import type { IconLibraryEntry, InventoryItem, ItemUpgrade, Mob, Spell } from '@/lib/gameData';
 
 /**
  * Pixel-art icon helpers: prompt building, descriptor tags, library matching and the
@@ -159,10 +159,11 @@ export function getIconTags(subject: IconSubject): Map<string, number> {
   return weights;
 }
 
-/** Text prompt for the image model, built from everything known about the item or spell. */
-export function buildIconPrompt(subject: IconSubject): string {
+/** Text prompt for the image model, built from everything known about the item or spell.
+ *  `extra` (an upgrade's look) goes after the description; the description is shortened to make room. */
+export function buildIconPrompt(subject: IconSubject, extra = ''): string {
   const target = subjectTarget(subject);
-  const desc = (target.description || '').replace(/\s+/g, ' ').trim().slice(0, 220).replace(/([^.!?])$/, '$1.');
+  const desc = (target.description || '').replace(/\s+/g, ' ').trim().slice(0, extra ? 110 : 220).replace(/([^.!?])$/, '$1.');
   let detail = '';
   if (subject.kind === 'mob') {
     const { mob } = subject;
@@ -182,8 +183,33 @@ export function buildIconPrompt(subject: IconSubject): string {
     const sd = subject.spell.spellData;
     detail = ` (${[sd?.school, sd?.damageType && sd.damageType !== 'Basic' ? sd.damageType : '', 'spell effect'].filter(Boolean).join(' ').toLowerCase()})`;
   }
-  return `16-bit pixel art RPG inventory icon of ${target.name}${detail}. ${desc} ` +
+  return `16-bit pixel art RPG inventory icon of ${target.name}${detail}. ${desc} ${extra ? `${extra} ` : ''}` +
     'Single centered object, clean outline, limited color palette, crisp pixels, plain flat solid black background, no text, no border.';
+}
+
+const UPGRADE_DAMAGE_LOOK: Record<string, string> = {
+  Fire: 'wreathed in flames', Electric: 'crackling with lightning', Poison: 'dripping green poison', Disease: 'oozing sickly green',
+  Radiation: 'glowing radioactive green', Spiritual: 'with a ghostly spectral aura', Emotional: 'with a swirling pink psychic aura',
+  Healing: 'with a soft green healing glow',
+};
+
+/** What an item's upgrades look like, for redrawing its icon: the same object, visibly improved. */
+export function describeUpgradeLook(baseName: string, upgrades: ItemUpgrade[]): string {
+  const looks = new Set<string>();
+  for (const u of upgrades) {
+    for (const e of u.effects) {
+      if (e.type === 'property' && e.damageType && UPGRADE_DAMAGE_LOOK[e.damageType]) looks.add(UPGRADE_DAMAGE_LOOK[e.damageType]);
+      else if (e.type === 'dice') looks.add('bigger and more menacing');
+      else if (e.type === 'stat') looks.add('inlaid with glowing runes');
+      else if (e.type === 'defense') looks.add('reinforced with thick plates');
+      else if (e.type === 'onHit' && e.condition) looks.add(`with a faint ${e.condition.toLowerCase()} aura`);
+      else if (e.type === 'action') looks.add('ornate');
+    }
+    if (u.drawback) looks.add('a sinister dark red cursed glow');
+  }
+  if (upgrades.length >= 3) looks.add('elaborate and legendary looking');
+  const list = [...looks].slice(0, 4).join(', ');
+  return `An upgraded ${baseName}${list ? `: ${list}` : ''}, still clearly the same ${baseName}.`.slice(0, 220);
 }
 
 /**

@@ -33,9 +33,9 @@ export function useIconLibrary(user: User | null, canGenerate: boolean) {
   }, [icons]);
 
   // Generate a new image and add it to the library; null when generation is unavailable
-  const generateEntry = useCallback(async (subject: IconSubject, size?: number): Promise<IconLibraryEntry | null> => {
+  const generateEntry = useCallback(async (subject: IconSubject, size?: number, extra?: string): Promise<IconLibraryEntry | null> => {
     if (!canGenerate || !user || !db) return null;
-    const prompt = buildIconPrompt(subject);
+    const prompt = buildIconPrompt(subject, extra);
     // Item and spell icons lose their background so they sit on the page like the line icons;
     // mob portraits keep theirs
     const image = await generateIconImage(prompt, await user.getIdToken(), size, subject.kind !== 'mob');
@@ -64,9 +64,9 @@ export function useIconLibrary(user: User | null, canGenerate: boolean) {
     return matchLibraryIcon(subject, iconsRef.current)?.id;
   }, [generateEntry]);
 
-  /** A fresh icon for an item or spell being edited, with no library fallback. */
-  const regenerateIcon = useCallback(async (subject: IconSubject): Promise<{ id: string; image: string } | null> => {
-    const entry = await generateEntry(subject);
+  /** A fresh icon for an item or spell being edited (or upgraded: `extra` describes the new look), with no library fallback. */
+  const regenerateIcon = useCallback(async (subject: IconSubject, extra?: string): Promise<{ id: string; image: string } | null> => {
+    const entry = await generateEntry(subject, undefined, extra);
     return entry ? { id: entry.id, image: entry.image } : null;
   }, [generateEntry]);
 

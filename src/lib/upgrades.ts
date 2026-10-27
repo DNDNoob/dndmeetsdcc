@@ -235,7 +235,9 @@ export const applyUpgradesToSpell = (spell: Spell, upgrades?: ItemUpgrade[]): Sp
 /** The spell a crawler actually casts: library (or one-off) spell plus their upgrades. */
 export const resolveKnownSpell = (ks: KnownSpell, library: Spell[]): Spell | undefined => {
   const base = library.find(s => s.id === ks.spellId) ?? ks.customSpell;
-  return base && applyUpgradesToSpell(base, ks.upgrades);
+  if (!base) return undefined;
+  const spell = applyUpgradesToSpell(base, ks.upgrades);
+  return ks.iconId ? { ...spell, iconId: ks.iconId } : spell;
 };
 
 /** Achievements for a crawler's first upgrade of each kind, and their first cursed bargain. */
