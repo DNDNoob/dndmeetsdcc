@@ -2,7 +2,8 @@
   {
     "date": "2026-10-27",
     "changes": [
-      "🎨 Upgrading an item or spell now redraws its pixel icon to match the upgrade (flames for a Fire upgrade, runes for a stat boost, a red glow for a cursed bargain), on that crawler's copy only. The old icon wears a gold frame until the new one is ready"
+      "🎨 Upgrading an item or spell now redraws its pixel icon to match the upgrade (flames for a Fire upgrade, runes for a stat boost, a red glow for a cursed bargain), on that crawler's copy only. The old icon wears a gold frame until the new one is ready",
+      "🗺️ The map zoom percentage now shows at most 2 decimal places instead of a long string of digits"
     ]
   },
   {
