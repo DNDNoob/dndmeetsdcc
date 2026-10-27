@@ -776,7 +776,7 @@ During Show Time, the DM has access to map tools:
 - **Ping**: Click to send a colored ping visible to all players
 - **Grid Overlay**: Toggle a grid on the map for positioning reference
 - **Ruler**: Measure distance in feet between two points
-- **Place Crawlers/Mobs**: Click to add characters to the map during gameplay`,
+- **Place Crawlers/Mobs**: Pick **+Crawler** or **+Mob**, choose who to add, then click the map to place them. You stay in placement mode so you can drop several tokens; clicking any other button (or pressing Escape) ends it`,
   },
   {
     id: 'fog-of-war',

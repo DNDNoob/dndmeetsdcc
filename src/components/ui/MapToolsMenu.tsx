@@ -314,6 +314,7 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
               variant={isAddCrawlerMode ? "admin" : "default"}
               size="sm"
               onClick={handleAddCrawlerModeToggle}
+              data-keep-placement
               title="Add crawler to map"
             >
               <User className="w-4 h-4 sm:mr-1" />
@@ -327,6 +328,7 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
               variant={isAddMobMode ? "admin" : "default"}
               size="sm"
               onClick={handleAddMobModeToggle}
+              data-keep-placement
               title="Add mob to map"
             >
               <Skull className="w-4 h-4 sm:mr-1" />
@@ -407,6 +409,7 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
           {/* Expand toggle */}
           <button
             onClick={() => setIsExpanded(!isExpanded)}
+            data-keep-placement
             className="p-1 hover:bg-muted rounded transition-colors"
           >
             {isExpanded ? (
@@ -425,6 +428,7 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               className="border-t border-border overflow-hidden"
+              data-keep-placement
             >
               <div className="p-3 space-y-3 max-h-80 overflow-y-auto">
                 {/* Color picker */}

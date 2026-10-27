@@ -1892,6 +1892,33 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     return () => window.removeEventListener('click', handleClick);
   }, [contextMenu]);
 
+  // Leave crawler/mob placement when any other button is clicked (or Escape is pressed),
+  // so the DM doesn't have to click the placement tool again to stop adding tokens.
+  // Clicks on the map itself and on controls marked data-keep-placement don't count.
+  useEffect(() => {
+    if (!isAddCrawlerMode && !isAddMobMode) return;
+    const exitPlacement = () => {
+      setIsAddCrawlerMode(false);
+      setIsAddMobMode(false);
+    };
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as Element | null;
+      if (!target?.closest) return;
+      if (mapContainerRef.current?.contains(target)) return;
+      if (target.closest('[data-keep-placement]')) return;
+      if (target.closest('button, [role="button"], [role="tab"], [role="menuitem"], a, select')) exitPlacement();
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') exitPlacement();
+    };
+    document.addEventListener('click', handleClick);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('click', handleClick);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isAddCrawlerMode, isAddMobMode]);
+
   // Handle map click for ping/box/crawlers/mobs
   const handleMapClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (!mapImageRef.current) return;
