@@ -202,7 +202,7 @@ export const MapToolsMenu: React.FC<MapToolsMenuProps> = ({
                 {episodeName}
               </span>
               <span className="text-xs text-muted-foreground">
-                Map {(currentMapIndex ?? 0) + 1}/{totalMaps ?? 1} | {mapScale ?? 100}%
+                Map {(currentMapIndex ?? 0) + 1}/{totalMaps ?? 1} | {Number((mapScale ?? 100).toFixed(2))}%
               </span>
             </div>
             <div className="flex items-center gap-1">

@@ -8,6 +8,9 @@
       "👂 NPCs within 40 ft overhear what crawlers say to other NPCs. Now and then one butts in, and the closest bystanders remember juicy gossip for later",
       "🎲 NPC dialogue is more varied: each line takes a random angle and length, and NPCs no longer repeat their own recent lines",
       "💬 NPCs answer what you actually asked instead of steering every line back to their card, can chat about anything they'd plausibly know, and get up to about 40 words to answer a question"
+    ],
+    "fixes": [
+      "🐛 The map zoom percentage now shows at most 2 decimal places instead of a long string of digits"
     ]
   },
   {

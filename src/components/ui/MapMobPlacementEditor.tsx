@@ -207,7 +207,7 @@ const MapMobPlacementEditor: React.FC<MapMobPlacementEditorProps> = ({
         {/* Scale preview indicator */}
         {mapScale !== 100 && (
           <div className="absolute top-2 left-2 bg-background/80 border border-primary rounded px-2 py-1 text-xs z-10">
-            <span className="text-primary font-bold">{mapScale}%</span>
+            <span className="text-primary font-bold">{Number(mapScale.toFixed(2))}%</span>
             <span className="text-muted-foreground ml-1">scale</span>
             <div className="mt-1 text-muted-foreground text-[10px]">
               Map will be {mapScale > 100 ? 'larger' : 'smaller'} in ShowTime

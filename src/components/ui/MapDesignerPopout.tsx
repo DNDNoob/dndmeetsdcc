@@ -215,7 +215,7 @@ const MapDesignerPopout: React.FC<MapDesignerPopoutProps> = ({
         <div className="flex items-center gap-4">
           <h2 className="font-display text-xl text-primary">Map Designer</h2>
           <span className="text-sm text-muted-foreground">
-            Base Scale: {mapScale}% | Zoom: {viewZoom}%
+            Base Scale: {Number(mapScale.toFixed(2))}% | Zoom: {Number(viewZoom.toFixed(2))}%
           </span>
         </div>
         <div className="flex items-center gap-2">
