@@ -1134,6 +1134,7 @@ export interface Mob {
   personality?: NpcPersonality; // DM-only: drives AI dialogue for talking NPCs
   languages?: string[];      // Language ids it speaks, native first; none set = Worldspeech
   silent?: boolean;          // Never talks in Game Chat (oozes, constructs...)
+  twistSense?: NpcTwistSense; // How well it catches a translator twisting its words (none set = normal)
   merchant?: MerchantConfig;  // NPCs that buy and sell items with crawlers
   attacks?: MobAttack[];     // Natural attacks the DM rolls in combat (claws, bites...)
   spellIds?: string[];       // Spells from the campaign spell library this mob can cast
@@ -1479,6 +1480,9 @@ export const merchantItemKey = (item: InventoryItem): string => {
 // ======== Talking NPCs (local AI) ========
 
 /** DM-only personality card. The secret is never sent to the AI until the DM unlocks it. */
+/** Sharp: catches twisted translations often, even through a language it doesn't know. Gullible: never does. */
+export type NpcTwistSense = 'sharp' | 'normal' | 'gullible';
+
 export interface NpcPersonality {
   voice?: string;      // Voice and manner
   wants?: string;
@@ -1515,11 +1519,13 @@ export interface ChatMessage {
   viaVoice?: boolean;   // Sent with the hold-to-talk mic
   toMobIds?: string[];  // Mobs picked with @ in the chat box
   nearMobIds?: string[]; // Player messages: mobs within talking range of the crawler when sent
+  earshotMobIds?: string[]; // Player messages: mobs farther off but close enough to overhear
   language?: string;     // Spoken in this language (none = everyone understands, e.g. the DM narrating)
   translationOf?: string; // A translator's version of another line, shown to party members who can't read it
   gesture?: string;      // Beast, Plant and Dead lines: the sounds and body language seen by those who don't know the language
   meaning?: string;      // Lines in a real language (Spanish): the English meaning, shown to those who know the language
   preset?: boolean;      // NPC line picked from presets (nobody in the party knew its language), not written by the AI
+  caughtTwist?: { by: string; d20: number; total: number; dc: number }; // NPC line calling out a translator who twisted its words (DM sees the roll)
   // NPC lines read aloud (made in the DM's browser, short-lived clips in Firestore npcClips/)
   audioUrl?: string;          // the real words
   audioScrambledUrl?: string; // the scrambled words, for players who don't know the language (may be the same clip)
@@ -1527,6 +1533,9 @@ export interface ChatMessage {
 
 /** Players can only talk to mobs this close to their crawler. */
 export const NPC_TALK_RANGE_FEET = 20;
+
+/** Mobs this close (but out of talking range) overhear what a crawler says to someone else. */
+export const NPC_EARSHOT_FEET = 40;
 
 /** A personality the AI wrote for a mob that had none: rooms/{roomId}/npcAi/personalities → { [mobId]: ... } */
 export interface NpcGeneratedPersonality extends NpcPersonality {

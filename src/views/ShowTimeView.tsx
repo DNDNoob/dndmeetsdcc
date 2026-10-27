@@ -29,7 +29,7 @@ import { readChatLine, usableLanguageIds, crawlerUnderstands, languageEffectLeft
 import { useNpcSpeechPlayer } from "@/hooks/useNpcSpeechPlayer";
 import MerchantPanel, { MerchantHagglePrompts } from "@/components/MerchantPanel";
 import { isMerchant, getHaggleBlocker, MERCHANT_TRADE_RANGE_FEET, type MerchantState } from "@/lib/gameData";
-import { withNpcPersonality, speakerAsMob, mapSpeakers, baseMobId, isPlacementHostile, NPC_TALK_RANGE_FEET, type TranslateMode, type ChatMessage, type NpcAiSettings, type NpcAiStatus, type NpcSecretEntry, type NpcSecretState, type NpcGeneratedPersonality, type NpcMemory } from "@/lib/gameData";
+import { withNpcPersonality, speakerAsMob, mapSpeakers, baseMobId, isPlacementHostile, NPC_TALK_RANGE_FEET, NPC_EARSHOT_FEET, type TranslateMode, type ChatMessage, type NpcAiSettings, type NpcAiStatus, type NpcSecretEntry, type NpcSecretState, type NpcGeneratedPersonality, type NpcMemory } from "@/lib/gameData";
 
 const NO_GENERATED_PERSONALITIES: Record<string, NpcGeneratedPersonality> = {};
 const NO_NPC_MEMORIES: Record<string, NpcMemory> = {};
@@ -2433,12 +2433,24 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
     return crawler ? { type: 'crawler', id: crawler.id, name: crawler.name } : null;
   }, [isAdmin, currentPlayerId, crawlers]);
 
+  // Mobs past talking range but close enough to overhear the player's crawler
+  const npcsInEarshot = useMemo((): string[] => {
+    if (isAdmin || !myCrawlerSpot) return [];
+    const ids = new Set<string>();
+    for (const s of npcSpeakers) {
+      const feet = mapDistanceFeet(myCrawlerSpot, s.placement);
+      if (feet > NPC_TALK_RANGE_FEET && feet <= NPC_EARSHOT_FEET) ids.add(s.id);
+    }
+    return [...ids];
+  }, [isAdmin, myCrawlerSpot, npcSpeakers, mapDistanceFeet]);
+
   const handleSendChat = useCallback(async (text: string, viaVoice: boolean, toMobIds: string[] = [], language?: string) => {
     if (!chatAuthor || !onSendChatMessage) return;
-    // Players: note which mobs are in talking range, so only those answer
+    // Players: note which mobs are in talking range, so only those answer, and which can overhear
     const nearMobIds = chatAuthor.type === 'crawler'
       ? chatMentionables.filter(m => m.kind === 'npc').map(m => m.id)
       : null;
+    const earshotMobIds = nearMobIds ? npcsInEarshot.filter(id => !nearMobIds.includes(id)) : null;
     await onSendChatMessage({
       authorType: chatAuthor.type,
       authorId: chatAuthor.id,
@@ -2448,9 +2460,10 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
       ...(viaVoice ? { viaVoice: true } : {}),
       ...(toMobIds.length ? { toMobIds } : {}),
       ...(nearMobIds ? { nearMobIds } : {}),
+      ...(earshotMobIds ? { earshotMobIds } : {}),
       ...(chatAuthor.type === 'crawler' && language ? { language } : {}),
     });
-  }, [chatAuthor, onSendChatMessage, selectedEpisode, chatMentionables]);
+  }, [chatAuthor, onSendChatMessage, selectedEpisode, chatMentionables, npcsInEarshot]);
 
   // A translator passes a line on to the party, as said or twisted
   const handleTranslate = useCallback(async (m: ChatMessage, text: string) => {

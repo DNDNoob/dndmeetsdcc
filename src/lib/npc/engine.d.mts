@@ -11,6 +11,9 @@ export interface NpcLlmAdapter {
 
 export interface NpcEngineConfig {
   nearDistance: number;
+  earshotDistance: number;
+  chimeInChance: number;
+  overhearMemoryMax: number;
   npcCooldownMs: number;
   globalGapMs: number;
   idleSilenceMs: number;

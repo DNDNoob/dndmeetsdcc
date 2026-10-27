@@ -81,9 +81,9 @@ export const MEMORY_SYSTEM_PROMPT = [
 
 /**
  * Prompt to fold a finished conversation into an NPC's memory.
- * @param {{ mob: object, memory?: object, transcript: string, crawlerNames: string[] }} opts
+ * @param {{ mob: object, memory?: object, transcript: string, crawlerNames: string[], overheardOnly?: boolean }} opts
  */
-export const buildMemoryPrompt = ({ mob, memory, transcript, crawlerNames }) => {
+export const buildMemoryPrompt = ({ mob, memory, transcript, crawlerNames, overheardOnly = false }) => {
   const notes = (memory?.notes || []).filter(Boolean);
   const feelings = memory?.feelings || {};
   const current = crawlerNames.map((name) => {
@@ -97,6 +97,7 @@ export const buildMemoryPrompt = ({ mob, memory, transcript, crawlerNames }) => 
     notes.length ? `What ${mob.name} already remembers:\n${notes.map((n) => `- ${n}`).join('\n')}` : `${mob.name} has no memories of the party yet.`,
     '',
     `The conversation that just ended:\n${transcript}`,
+    overheardOnly ? `${mob.name} did not take part: they only overheard this from nearby, and the crawlers may not know they were listening. Only keep what ${mob.name} would find useful or juicy (plans, names, deals, gossip, anything said about them). Feelings move at most 1 point.` : null,
     '',
     `Update ${mob.name}'s memory. Keep what still matters, add what is new, merge repeats, drop trivia.`,
     `- At most ${MEMORY_MAX_NOTES} notes, each under 20 words, written from ${mob.name}'s point of view, naming who did what.`,
@@ -154,11 +155,46 @@ const GESTURE_STYLES = {
   },
 };
 
+/** How an NPC holds a conversation: answer what was asked, treat the card as background, not a script. */
+export const CONVERSATION_RULES = [
+  'How to talk:',
+  '- React to what was actually said. If someone asked you something, answer it first, in your own voice.',
+  '- You are someone with a life, not a quest-giver reading a script. What you want and know is background: let it colour what you say, but do not steer every line back to it.',
+  '- Talk about anything someone like you would know or have an opinion on: yourself, this place, the crawlers, rumours, the show. Small harmless details you make up are fine if they fit the facts above, but never invent loot, shortcuts or secrets.',
+  '- If you do not know something, say so in character, or guess and admit it is a guess.',
+];
+
+/**
+ * Ways to come at a line, one picked at random per line so an NPC doesn't say the same kind of thing
+ * every time. Most of them still answer first.
+ */
+export const LINE_ANGLES = [
+  'Answer plainly, then add a small personal detail or opinion.',
+  'Answer, then ask them a question back.',
+  'Be short and blunt.',
+  'Get a little side-tracked by something on your mind, then come back to the point.',
+  'Let your speech quirk or temperament show strongly.',
+  'Overshare a little more than you should (but never your secret).',
+  'Be wary or suspicious about why they are asking.',
+  'Use a joke, a jab or an odd comparison.',
+  'React with feeling first (surprise, annoyance, delight), then answer.',
+  'Mention something you notice about one of the crawlers right now.',
+];
+
+/** Word caps for a line: questions get room for a real answer, other lines vary in length. */
+const WORD_CAPS = [12, 20, 25, 25, 35];
+
+/** A random angle and length for one line. `asked`: someone just asked the NPC a question. */
+export const rollLineStyle = (asked, rand = Math.random) => ({
+  angle: LINE_ANGLES[Math.floor(rand() * LINE_ANGLES.length) % LINE_ANGLES.length],
+  wordCap: asked ? 40 : WORD_CAPS[Math.floor(rand() * WORD_CAPS.length) % WORD_CAPS.length],
+});
+
 /**
  * System prompt for one NPC line. The secret is only included when the DM has unlocked it,
  * so the model can't leak what it hasn't been told.
  */
-export const buildSystemPrompt = ({ mob, secretUnlocked, scene, memory, speaking, knownLanguages, gesture, realLanguage }) => {
+export const buildSystemPrompt = ({ mob, secretUnlocked, scene, memory, speaking, knownLanguages, gesture, realLanguage, wordCap = 25 }) => {
   const p = mob.personality || {};
   const style = gesture ? GESTURE_STYLES[gesture] : null;
   const lines = [
@@ -167,7 +203,7 @@ export const buildSystemPrompt = ({ mob, secretUnlocked, scene, memory, speaking
   if (mob.description) lines.push(`Who you are: ${mob.description}`);
   if (p.voice) lines.push(`Voice and manner: ${p.voice}`);
   if (p.wants) lines.push(`What you want: ${p.wants}`);
-  if (p.knows) lines.push(`What you know: ${p.knows}`);
+  if (p.knows) lines.push(`Something you know (share it when it fits or someone asks): ${p.knows}`);
   if (p.attitude) lines.push(`Your attitude toward the party: ${p.attitude}`);
   if (p.secret) {
     if (secretUnlocked) {
@@ -195,15 +231,16 @@ export const buildSystemPrompt = ({ mob, secretUnlocked, scene, memory, speaking
   if (scene.farther.length) lines.push(`- Crawlers farther away: ${scene.farther.map(describeCrawler).join('; ')}`);
   lines.push('');
   if (style) {
-    lines.push('Rules: Reply with ONE line in this exact form: what you mean, in plain words (25 words or fewer) || what the crawlers see and hear you do (15 words or fewer, third person, no name).');
+    lines.push(`Rules: Reply with ONE line in this exact form: what you mean, in plain words (${wordCap} words or fewer) || what the crawlers see and hear you do (15 words or fewer, third person, no name).`);
     lines.push(`Example: ${style.example}`);
     lines.push('Stay in character. No quotation marks, no name prefix.');
   } else if (realLanguage) {
-    lines.push(`Rules: Reply with ONE line in this exact form: your spoken line in ${realLanguage} (25 words or fewer) || the same line in English. Stay in character.`);
+    lines.push(`Rules: Reply with ONE line in this exact form: your spoken line in ${realLanguage} (${wordCap} words or fewer) || the same line in English. Stay in character.`);
   } else {
-    lines.push('Rules: Reply with ONE line of spoken dialogue, 25 words or fewer. Stay in character.');
+    lines.push(`Rules: Reply with ONE line of spoken dialogue, ${wordCap} words or fewer. Stay in character.`);
     lines.push('No narration, no stage directions, no actions in asterisks, no quotation marks, no name prefix.');
   }
+  lines.push('', ...CONVERSATION_RULES);
   lines.push('Never speak or decide for the players.');
   return lines.join('\n');
 };
@@ -214,20 +251,25 @@ export const buildSystemPrompt = ({ mob, secretUnlocked, scene, memory, speaking
  */
 export const formatTranscript = (messages, understands, nameOf) =>
   messages.map((m) => {
-    const who = `${m.authorName}${m.authorType === 'dm' ? ' (narrator)' : ''}`;
+    const who = `${m.overheard ? '(overheard) ' : ''}${m.authorName}${m.authorType === 'dm' ? ' (narrator)' : ''}`;
     if (understands && m.language && !understands(m.language)) {
       return `${who}: (says something in ${nameOf ? nameOf(m.language) : 'a language'} you don't understand)`;
     }
     return `${who}: ${m.text}`;
   }).join('\n');
 
-export const buildLinePrompt = ({ mob, transcript, trigger }) =>
+export const buildLinePrompt = ({ mob, transcript, trigger, angle, ownRecent = [] }) =>
   [
-    transcript ? `Recent conversation:\n${transcript}` : 'Nobody has said anything yet.',
+    transcript ? `Recent conversation (lines marked "overheard" were not said to you):\n${transcript}` : 'Nobody has said anything yet.',
     '',
+    ownRecent.length ? `Your last lines (do not repeat their wording, jokes or openings):\n${ownRecent.map((l) => `- ${l}`).join('\n')}\n` : null,
     `What just happened: ${trigger}`,
+    angle ? `This time: ${angle}` : null,
     `Say ${mob.name}'s next line.`,
-  ].join('\n');
+  ].filter((l) => l !== null).join('\n');
+
+/** True when a message reads like a question. */
+export const asksQuestion = (text) => /\?\s*$|\?["')\]]?\s/.test(text || '') || /^\s*(who|what|where|when|why|how|which|do|does|did|is|are|can|could|will|would|have|has)\b/i.test(text || '');
 
 export const buildShouldSpeakPrompt = ({ mob, transcript, trigger }) =>
   [
@@ -246,6 +288,43 @@ export const buildSecretCheckPrompt = ({ condition, speaker, text, transcript })
     'Taken together with the conversation, did this new message just meet the reveal condition (for example, an actual offer of payment if the condition is a payment)? Asking about the secret is NOT enough.',
     'Answer with only YES or NO.',
   ].filter(Boolean).join('\n\n');
+
+// ── Twisted translations: can an NPC tell a translator changed its words? ──
+
+/** How good a speaker is at catching a twisted translation (set per mob by the DM). */
+export const TWIST_SENSES = ['sharp', 'normal', 'gullible'];
+
+/**
+ * The speaker's bonus to catch a twisted translation, or null if it can't catch one at all.
+ * Gullible speakers never notice. Speakers who don't understand the translator's language only
+ * read faces and tone, so only sharp ones and bosses get a (harder) roll.
+ */
+export const twistCatchBonus = (mob, understandsTranslator) => {
+  const sense = mob?.twistSense ?? 'normal';
+  if (sense === 'gullible') return null;
+  const boss = isBossMob(mob);
+  if (!understandsTranslator && sense !== 'sharp' && !boss) return null;
+  return Math.floor((mob?.level ?? 1) / 2) + (boss ? 2 : 0) + (sense === 'sharp' ? 5 : 0) + (understandsTranslator ? 0 : -5);
+};
+
+/** A crawler's Deception rank from skill XP (25·N·(N+1) per rank, as in gameData), or bought ranks on old crawlers. */
+const deceptionRank = (crawler) => {
+  const xp = crawler?.skillXP?.deception ?? 25 * (crawler?.skills?.deception ?? 0) * ((crawler?.skills?.deception ?? 0) + 1);
+  let rank = 0;
+  while (rank < 10 && xp >= 25 * (rank + 1) * (rank + 2)) rank++;
+  return rank;
+};
+
+/** The DC a speaker has to beat to catch a translator's twist: 10 + CHA modifier + Deception rank. */
+export const twistDC = (crawler) => 10 + Math.floor(((crawler?.cha ?? 10) - 10) / 2) + deceptionRank(crawler);
+
+export const buildTwistCheckPrompt = ({ original, told }) =>
+  [
+    `What a character actually said: "${original}"`,
+    `What a translator told their friends it meant: "${told}"`,
+    'Does the translator\'s version change the meaning in a way that matters (a lie, a changed fact, a different tone or intent)? Rewording that keeps the meaning does NOT count.',
+    'Answer with only YES or NO.',
+  ].join('\n\n');
 
 export const isYes = (reply) => /^\W*yes\b/i.test(stripThinking(reply).trim());
 
