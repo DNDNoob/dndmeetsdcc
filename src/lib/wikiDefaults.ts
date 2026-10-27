@@ -260,7 +260,24 @@ Equipped items can modify any combination of stats: STR, DEX, CON, INT, CHA, HP,
 
 ## Effective Stats
 
-All game mechanics (rest healing, combat rolls, etc.) use your "effective" stats, which are your base stats plus all equipment modifiers. This means equipping a +5 Max HP ring before resting will let you heal to a higher maximum.`,
+All game mechanics (rest healing, combat rolls, etc.) use your "effective" stats, which are your base stats plus all equipment modifiers. This means equipping a +5 Max HP ring before resting will let you heal to a higher maximum.
+
+## Armor
+
+Head, chest, legs and feet items, and non-weapon hand items like shields, can carry armor. The DM sets it in the Item Library under **Armor**:
+
+| Field | What it does |
+|-------|--------------|
+| Armor rating | Added to the wearer's **DC**, the attack roll needed to hit them |
+| Damage reduction | Taken off every hit the wearer takes |
+| Resists | Damage or weapon types that do half damage (rounded down) |
+| Vulnerable to | Damage or weapon types that do double damage |
+
+- **DC**: the armor ratings of everything you wear add up. With no armor your DC is 0, so any roll hits you. An attack roll that meets or beats your DC hits. Your DC shows on your profile and in the DM's target list.
+- **Resist and vulnerable** can name a damage type (Fire, Poison) or a weapon type (Bows, Crossbows). Paper Stack Armor might resist Bows and Crossbows but be vulnerable to Fire. If your armor resists and is vulnerable to the same hit, they cancel out.
+- **Reduction** comes off after resistance or vulnerability. A hit always does at least 1 damage.
+- When armor changes a hit, a note shows what happened, such as "Vex took 15 damage: 9 rolled, doubled (weak to Fire), 3 absorbed by Paper Stack Armor and Trash Can Lid".
+- Damage your armor takes off a hit counts as **damage absorbed**, which earns that piece upgrade XP.`,
   },
   {
     id: 'weapons',
@@ -335,10 +352,10 @@ These are the recommended amounts. The DM can change them for any item or spell.
 |------|---------------|
 | Weapons | 1 per point of damage, 10 per kill, 25 per boss kill |
 | Spells | 5 per cast, 1 per point of damage or healing, 5 per effect left on a target, 10 per kill, 25 per boss kill |
-| Armor (head, chest, legs, feet) | 1 per point of damage absorbed |
+| Armor (head, chest, legs, feet, shields) | 1 per point of damage absorbed |
 | Other gear (rings, hand slots) | 5 per roll that uses a stat the item raises |
 
-Only hostile kills count. Damage to friendly crawlers or neutral mobs earns nothing. Armor can't earn XP yet: absorbed damage starts counting once armor blocks damage in combat.
+Only hostile kills count. Damage to friendly crawlers or neutral mobs earns nothing. Armor earns XP for every point of damage its reduction or resistances take off a hit. See [Equipment System](/wiki/equipment#armor).
 
 ## Tiers
 
@@ -367,7 +384,7 @@ What an upgrade can do:
 | Weapon or spell property | +10 ft range, Fire damage, splash, longer duration | Changes the weapon or spell |
 | Stat bonus while equipped | +1 STR, +5 max HP | Added to the item's stat bonuses |
 | Language | Speak Beast while equipped | Works like any language item |
-| Defense | +1 armor rating, resists Bows, vulnerable to Fire | Saved on the item; counts in combat once armor rules arrive |
+| Defense | +1 armor rating, resists Bows, vulnerable to Fire | Adds to the item's armor: raises your DC and changes damage you take |
 | On-hit effect, new action, strange | 25% chance to set Burning, "Shatter Swing" once per combat | Written on the item for the DM to rule on |
 
 ## Cursed bargains
@@ -608,7 +625,7 @@ During combat the DM sees a **mob actions panel** in the top left of the Show Ti
 - **Weapons** it has equipped from its default inventory
 - **Spells** picked for it from the spell library
 
-Tap one to roll it. The to-hit roll (d20 plus the attack's bonus) goes to the dice log under the mob's name in red, so every player sees it. Mobs the party hasn't met show as **???**. Then pick the target (each crawler shows their HP and CON), tap **Roll damage**, and the target's health goes down on its own. Tap **Missed** if the attack didn't land. Splash weapons and area spells let you pick several targets. Healing spells skip the to-hit roll and heal the target instead.
+Tap one to roll it. The to-hit roll (d20 plus the attack's bonus) goes to the dice log under the mob's name in red, so every player sees it. Mobs the party hasn't met show as **???**. Then pick the target (each crawler shows their HP and armor DC, marked **hits** or **misses** for the roll), tap **Roll damage**, and the target's health goes down on its own. Tap **Missed** if the attack didn't land. Splash weapons and area spells let you pick several targets. Healing spells skip the to-hit roll and heal the target instead.
 
 Mobs follow the same rules as crawlers: one action and one bonus action on their turn, and only reactions when it isn't their turn. The panel crosses out the action and bonus action once they're used. To use a mob's reaction on someone else's turn, pick the mob from the menu at the top of the panel. Tap the arrow to fold the panel out of the way.
 
@@ -658,6 +675,8 @@ When you attack a target:
 4. Damage is applied to the target's HP automatically
 
 Splash damage weapons can target multiple enemies at once.
+
+Armor on a crawler can reduce, halve or double the damage they take. See [Equipment System](/wiki/equipment#armor).
 
 ## Health Tracking
 

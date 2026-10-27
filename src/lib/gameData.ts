@@ -402,7 +402,7 @@ export interface SourceStats {
   friendlyFire?: number;  // damage to other crawlers
   neutralDamage?: number; // damage to mobs that aren't hostile, NPCs included
   neutralKills?: number;
-  damageAbsorbed?: number; // armor: for when a damage-reduction rule exists
+  damageAbsorbed?: number; // armor: damage its reduction and resistances took off hits
   hitsDeflected?: number;
   boostedRolls?: number;   // rings and other stat gear: rolls made with an ability the item raises while equipped
 }
@@ -444,9 +444,10 @@ export const DEFAULT_UPGRADE_XP: Record<Exclude<UpgradeKind, 'none'>, Partial<Re
 const ARMOR_SLOTS: EquipmentSlot[] = ['head', 'chest', 'legs', 'feet'];
 
 /** What kind of upgradeable thing an item is: weapons, armor, other equippable gear, or nothing (consumables). */
-export const getUpgradeKind = (item: Pick<InventoryItem, 'weaponData' | 'equipSlot'>): UpgradeKind => {
+export const getUpgradeKind = (item: Pick<InventoryItem, 'weaponData' | 'equipSlot' | 'armorData'>): UpgradeKind => {
   if (item.weaponData) return 'weapon';
   if (!item.equipSlot) return 'none';
+  if (item.armorData) return 'armor'; // e.g. a shield in a hand slot
   return ARMOR_SLOTS.includes(item.equipSlot) ? 'armor' : 'gear';
 };
 
@@ -1165,6 +1166,7 @@ export interface MobCombatAction {
   damageDice: WeaponDie[];
   damageBonus: number;
   damageType?: string;
+  weaponType?: string; // equipped weapons only, so armor can resist it
   healing: boolean;
   splash: boolean;
   range?: number | string;
@@ -1201,6 +1203,7 @@ export function getMobCombatActions(mob: Mob, spells: Spell[]): MobCombatAction[
       damageDice: wd.damageDice ?? [],
       damageBonus: 0,
       damageType: wd.damageType,
+      weaponType: wd.weaponType,
       healing: false,
       splash: !!wd.splashDamage,
       range: wd.isRanged ? wd.normalRange : undefined,

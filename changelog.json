@@ -3,6 +3,7 @@
     "date": "2026-10-27",
     "features": [
       "🎨 Upgrading an item or spell now redraws its pixel icon to match the upgrade (flames for a Fire upgrade, runes for a stat boost, a red glow for a cursed bargain), on that crawler's copy only. The old icon wears a gold frame until the new one is ready",
+      "🛡️ Armor works in combat. Armor pieces (and shields) get an armor rating, damage reduction, and types they resist (half damage) or are vulnerable to (double damage). Ratings add up to the crawler's DC: an attack roll that meets or beats it hits, and with no armor any roll hits. The DM's target list shows each crawler's DC and whether the roll hits, and damage absorbed earns the armor upgrade XP",
       "📜 The changelog now splits each day into New features and Bug fixes",
       "🕵️ NPCs can catch a translator twisting their words: they roll against the translator's CHA and Deception, then call it out in the chat and remember it. Each mob has a Catches twisted translations setting (Sharp, Normal or Gullible) in the DM Console",
       "👂 NPCs within 40 ft overhear what crawlers say to other NPCs. Now and then one butts in, and the closest bystanders remember juicy gossip for later",
