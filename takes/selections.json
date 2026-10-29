@@ -1,30 +1,111 @@
 {
-  "picked_by": "Andrew",
-  "picked_on": "2026-10-21",
-  "settings": [
-    { "setting": "Dungeon corridor", "slug": "dungeon-corridor", "file": "dungeon-corridor-take3.mp3" },
-    { "setting": "Combat", "slug": "combat", "file": "combat-take2.mp3", "note": "Works for now, but wants something more animated (round 2: combat-r2)." },
-    { "setting": "Boss fight", "slug": "boss-fight", "file": null, "note": "None picked: not exciting enough, needs to be much faster-paced (round 2: boss-fight-r2a / r2b)." },
-    { "setting": "Safe room", "slug": "safe-room", "file": "safe-room-take1.mp3" },
-    { "setting": "Tavern or club", "slug": "tavern", "file": "tavern-take3.mp3" },
-    { "setting": "Town or market", "slug": "town", "file": "town-take1.mp3" },
-    { "setting": "Forest or outdoors", "slug": "forest", "file": "forest-take1.mp3" },
-    { "setting": "Crypt or haunted area", "slug": "crypt", "file": null, "note": "None picked: not spooky enough (round 2: crypt-r2a / r2b)." },
-    { "setting": "Deep cavern or water level", "slug": "deep-cavern", "file": "deep-cavern-take1.mp3" },
-    { "setting": "Show Time game-show stage", "slug": "show-time", "file": "show-time-take1.mp3" }
-  ],
-  "themes": [
-    { "theme": "Royal encounter", "file": "combat-take3.mp3" },
-    { "theme": "Desert streets", "file": "combat-take1.mp3" },
-    { "theme": "Safe room (alternate)", "file": "dungeon-corridor-take2.mp3" },
-    { "theme": "Grassy meadows", "file": "dungeon-corridor-take1.mp3" },
-    { "theme": "Home screen intro", "file": "boss-fight-take1.mp3" },
-    { "theme": "Temple", "file": "boss-fight-take2.mp3" },
-    { "theme": "Island", "file": "tavern-take1.mp3" },
-    { "theme": "Farm", "file": "tavern-take2.mp3" },
-    { "theme": "Forest", "file": "town-take3.mp3" },
-    { "theme": "Forest at dusk", "file": "forest-take1.mp3" },
-    { "theme": "Eerie desert", "file": "round2/crypt-r2a-take3.mp3", "picked_on": "2026-10-29" },
-    { "theme": "Haunted temple", "file": "round2/crypt-r2b-take1.mp3", "picked_on": "2026-10-29" }
-  ]
+    "picked_by":  "Andrew",
+    "picked_on":  "2026-10-21",
+    "settings":  [
+                     {
+                         "setting":  "Dungeon corridor",
+                         "slug":  "dungeon-corridor",
+                         "file":  "dungeon-corridor-take3.mp3"
+                     },
+                     {
+                         "setting":  "Combat",
+                         "slug":  "combat",
+                         "file":  "round2/combat-r2-take3.mp3",
+                         "note":  "Picked from round 2 (2026-10-29); replaces round-1 combat-take2."
+                     },
+                     {
+                         "setting":  "Boss fight",
+                         "slug":  "boss-fight",
+                         "file":  "round2/boss-fight-r2b-take1.mp3",
+                         "note":  "Picked from round 2 (2026-10-29)."
+                     },
+                     {
+                         "setting":  "Safe room",
+                         "slug":  "safe-room",
+                         "file":  "safe-room-take1.mp3"
+                     },
+                     {
+                         "setting":  "Tavern or club",
+                         "slug":  "tavern",
+                         "file":  "tavern-take3.mp3"
+                     },
+                     {
+                         "setting":  "Town or market",
+                         "slug":  "town",
+                         "file":  "town-take1.mp3"
+                     },
+                     {
+                         "setting":  "Forest or outdoors",
+                         "slug":  "forest",
+                         "file":  "forest-take1.mp3"
+                     },
+                     {
+                         "setting":  "Crypt or haunted area",
+                         "slug":  "crypt",
+                         "file":  "round2/crypt-r2a-take1.mp3",
+                         "note":  "Picked from round 2 (2026-10-29)."
+                     },
+                     {
+                         "setting":  "Deep cavern or water level",
+                         "slug":  "deep-cavern",
+                         "file":  "deep-cavern-take1.mp3"
+                     },
+                     {
+                         "setting":  "Show Time game-show stage",
+                         "slug":  "show-time",
+                         "file":  "show-time-take1.mp3"
+                     }
+                 ],
+    "themes":  [
+                   {
+                       "theme":  "Royal encounter",
+                       "file":  "combat-take3.mp3"
+                   },
+                   {
+                       "theme":  "Desert streets",
+                       "file":  "combat-take1.mp3"
+                   },
+                   {
+                       "theme":  "Safe room (alternate)",
+                       "file":  "dungeon-corridor-take2.mp3"
+                   },
+                   {
+                       "theme":  "Grassy meadows",
+                       "file":  "dungeon-corridor-take1.mp3"
+                   },
+                   {
+                       "theme":  "Home screen intro",
+                       "file":  "boss-fight-take1.mp3"
+                   },
+                   {
+                       "theme":  "Temple",
+                       "file":  "boss-fight-take2.mp3"
+                   },
+                   {
+                       "theme":  "Island",
+                       "file":  "tavern-take1.mp3"
+                   },
+                   {
+                       "theme":  "Farm",
+                       "file":  "tavern-take2.mp3"
+                   },
+                   {
+                       "theme":  "Forest",
+                       "file":  "town-take3.mp3"
+                   },
+                   {
+                       "theme":  "Forest at dusk",
+                       "file":  "forest-take1.mp3"
+                   },
+                   {
+                       "theme":  "Eerie desert",
+                       "file":  "round2/crypt-r2a-take3.mp3",
+                       "picked_on":  "2026-10-29"
+                   },
+                   {
+                       "theme":  "Haunted temple",
+                       "file":  "round2/crypt-r2b-take1.mp3",
+                       "picked_on":  "2026-10-29"
+                   }
+               ]
 }
