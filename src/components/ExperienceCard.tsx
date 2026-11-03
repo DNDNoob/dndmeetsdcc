@@ -40,7 +40,7 @@ export const ExperienceCard: React.FC<ExperienceCardProps> = ({
   const abilityPoints = crawler.abilityPoints ?? 0;
   const unspent = [
     skillXPToSpend > 0 ? `${skillXPToSpend} skill XP` : "",
-    abilityPoints > 0 ? `${abilityPoints} ability point${abilityPoints === 1 ? "" : "s"}` : "",
+    abilityPoints > 0 ? `${abilityPoints} stat point${abilityPoints === 1 ? "" : "s"}` : "",
   ].filter(Boolean).join(" + ");
   const log = crawler.xpLog ?? [];
   const realCrawlers = crawlers.filter(c => c.id !== "dungeonai");

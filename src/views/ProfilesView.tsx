@@ -1163,7 +1163,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
               <Sparkles className="w-5 h-5" />
               <span className="hidden xl:inline text-sm font-medium">Skills</span>
               {(getSkillXPToSpend(selected) > 0 || (selected?.abilityPoints ?? 0) > 0) && (
-                <span className="bg-accent/20 text-accent text-xs px-1.5 py-0.5 rounded-full" title="Skill XP or ability points to spend">!</span>
+                <span className="bg-accent/20 text-accent text-xs px-1.5 py-0.5 rounded-full" title="Skill XP or stat points to spend">!</span>
               )}
             </button>
             <button
@@ -1609,7 +1609,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                     <span className="text-muted-foreground text-base group-hover:text-primary transition-colors">
                       {label}
                       {rollsWithDisadvantage(selected, base + mod) && (
-                        <span className="ml-2 text-xs text-destructive" title="0 ability points: rolls with disadvantage">DIS</span>
+                        <span className="ml-2 text-xs text-destructive" title="0 stat points: rolls with disadvantage">DIS</span>
                       )}
                     </span>
                     {mod !== 0 ? (
@@ -3854,7 +3854,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 {/* Hit Stat Modifiers */}
                 <div>
                   <label className="text-[10px] text-muted-foreground block mb-0.5">Hit Roll Stat Modifiers</label>
-                  <p className="text-[9px] text-muted-foreground/60 mb-1">Adds the crawler&apos;s ability modifier (with gear) to the hit roll</p>
+                  <p className="text-[9px] text-muted-foreground/60 mb-1">Adds the crawler&apos;s stat modifier (with gear) to the hit roll</p>
                   <div className="flex gap-3">
                     {(['str', 'dex', 'con', 'int', 'cha'] as const).map((stat) => (
                       <label key={stat} className="flex items-center gap-1 text-[10px] cursor-pointer">
@@ -3870,7 +3870,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 {/* Damage Stat Modifiers */}
                 <div>
                   <label className="text-[10px] text-muted-foreground block mb-0.5">Damage Stat Modifiers</label>
-                  <p className="text-[9px] text-muted-foreground/60 mb-1">Adds the crawler&apos;s ability modifier (with gear) to the damage roll</p>
+                  <p className="text-[9px] text-muted-foreground/60 mb-1">Adds the crawler&apos;s stat modifier (with gear) to the damage roll</p>
                   <div className="flex gap-3">
                     {(['str', 'dex', 'con', 'int', 'cha'] as const).map((stat) => (
                       <label key={stat} className="flex items-center gap-1 text-[10px] cursor-pointer">

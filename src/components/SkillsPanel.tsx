@@ -159,9 +159,9 @@ export const SkillsPanel: React.FC<SkillsPanelProps> = ({
       {abilityPoints > 0 && (
         <div className="border border-accent/50 bg-accent/10 rounded-lg p-3">
           <p className="text-sm font-display text-accent mb-2">
-            {abilityPoints} ability point{abilityPoints === 1 ? "" : "s"} to spend
+            {abilityPoints} stat point{abilityPoints === 1 ? "" : "s"} to spend
           </p>
-          <p className="text-xs text-muted-foreground mb-2">Each point is +1 to that ability's rolls (+2 to the score).</p>
+          <p className="text-xs text-muted-foreground mb-2">Each point is +1 to that stat's rolls (+2 to the score).</p>
           <div className="flex flex-wrap gap-2">
             {ABILITY_KEYS.map(key => (
               <button

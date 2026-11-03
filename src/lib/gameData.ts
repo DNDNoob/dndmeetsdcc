@@ -927,12 +927,62 @@ export interface Spell {
   upgradeXp?: UpgradeXpSettings; // How this spell earns upgrade XP (unset fields use the spell defaults)
 }
 
+// ======== Abilities ========
+// Reusable rule cards (Fireball, Speak with Animals, Unlock a Door, Dodge) kept in one library.
+// Items, spells, races and classes will link to them later; for now they're made and browsed on the
+// Abilities page. Campaign abilities live in rooms/{roomId}/abilities, personal ones in
+// userContent/{uid}/abilities.
+
+/** What using it costs in combat. Passive abilities are always on. */
+export const ABILITY_ACTIVATIONS = ['Action', 'Bonus Action', 'Reaction', 'Passive'] as const;
+export type AbilityActivation = typeof ABILITY_ACTIVATIONS[number];
+
+export const ABILITY_USES = [
+  { id: 'atWill', label: 'At will' },
+  { id: 'perCombat', label: 'Per combat' },
+  { id: 'perDay', label: 'Per day' },
+  { id: 'perRest', label: 'Per rest' },
+] as const;
+export type AbilityUses = typeof ABILITY_USES[number]['id'];
+
+/** One thing an ability does. The same menu will be shared by items, spells and upgrades. */
+export type AbilityEffect =
+  | { type: 'dice'; purpose: 'attack' | 'damage' | 'healing'; dice: WeaponDie[]; damageType?: string }
+  | { type: 'stat'; mods: StatModifiers }
+  | { type: 'condition'; condition: string; turns: number; description?: string }
+  | { type: 'language'; language: string }
+  | { type: 'defense'; armorRating?: number; resist?: string[]; vulnerable?: string[] }
+  | { type: 'movement'; feet: number }
+  | { type: 'text'; text: string };
+export type AbilityEffectType = AbilityEffect['type'];
+
+export interface Ability {
+  id: string;
+  name: string;
+  description: string;
+  tags?: string[];
+  iconId?: string;
+  activation: AbilityActivation;
+  trigger?: string;          // Reactions: what sets it off ("when an attack would hit you")
+  uses: AbilityUses;
+  usesCount?: number;        // per combat/day/rest: how many times (1 when missing)
+  cost?: { mana?: number; hp?: number };
+  range?: number | 'Self' | 'Touch'; // feet or keyword; missing = not relevant
+  /** The check the user rolls: d20 + stat modifier (+ skill rank) against a DC */
+  roll?: { ability: AbilityKey; skill?: SkillId; difficulty?: CheckDifficultyId };
+  save?: AbilityKey;         // Targets roll this stat to resist it
+  effects: AbilityEffect[];
+  copiedFrom?: string;       // id of the ability this one was copied from ("Make my own copy")
+  createdBy?: string;        // Firebase uid of creator (absent = made in this campaign by its DM)
+  createdByUsername?: string;
+}
+
 /** A pixel-art icon in the global `iconLibrary` collection, shared by every campaign. */
 export interface IconLibraryEntry {
   id: string;
   image: string;       // small PNG data URL (48x48 icon, or 128x128 mob portrait)
   tags: string[];      // normalized descriptor tags used to match icons to new items/spells/mobs
-  kind: 'item' | 'spell' | 'mob';
+  kind: 'item' | 'spell' | 'mob' | 'ability';
   sourceName: string;  // name of the item or spell the icon was generated for
   prompt?: string;
   createdAt: string;

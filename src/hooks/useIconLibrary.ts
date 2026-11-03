@@ -45,7 +45,7 @@ export function useIconLibrary(user: User | null, canGenerate: boolean) {
       image,
       tags: [...getIconTags(subject).keys()],
       kind: subject.kind,
-      sourceName: subject.kind === 'item' ? subject.item.name : subject.kind === 'spell' ? subject.spell.name : subject.mob.name,
+      sourceName: subject.kind === 'item' ? subject.item.name : subject.kind === 'spell' ? subject.spell.name : subject.kind === 'ability' ? subject.ability.name : subject.mob.name,
       prompt,
       createdAt: new Date().toISOString(),
       createdBy: user.uid,
