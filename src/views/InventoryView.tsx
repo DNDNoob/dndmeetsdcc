@@ -14,7 +14,9 @@ import { Crawler, InventoryItem, getUpgradeKind, type UpgradeXpSettings, getItem
 import { RarityBadge } from "@/components/ui/RarityBadge";
 import { Coins, Package, Sword, Shield, Plus, Trash2, Edit2, Save, HardHat, Search, BookOpen, Gem, Footprints, Shirt, Hand, Crosshair, ChevronDown, ChevronUp, Wand2, Globe, Lock, Users, Bookmark } from "lucide-react";
 import { SpellDataEditor } from "@/views/SpellsView";
-import { LibraryVisibilityToggle, HiddenLibraryNotice } from "@/components/LibraryVisibilityToggle";
+import { LibraryModePicker, HiddenLibraryNotice, NothingEncounteredNotice } from "@/components/LibraryVisibilityToggle";
+import { DiscoveryControls, SeenBadge, SharedTranslation, UnknownDetails, type DiscoveryActions } from "@/components/DiscoveryControls";
+import { itemDiscoveryKey, KNOWN, SEEN, type DiscoveryView, type LibraryMode } from "@/lib/discoveries";
 
 // Inline SVG for legs/pants slot
 const LegsIcon: React.FC<{ className?: string }> = ({ className = "w-4 h-4" }) => (
@@ -63,8 +65,10 @@ interface InventoryViewProps {
   onConsumeSpellTome?: (crawlerId: string, itemId: string) => Promise<void>;
   onPromoteSpellToLibrary?: (spell: Spell) => Promise<void>;
   isAdmin?: boolean;
-  libraryHidden?: boolean; // DM switch: hide the Item Library from players
-  onSetLibraryHidden?: (hidden: boolean) => void; // DM only
+  libraryMode?: LibraryMode; // DM setting: what players see in the Item Library
+  onSetLibraryMode?: (mode: LibraryMode) => void; // DM only
+  discoveryView?: DiscoveryView; // what the viewer has encountered
+  discoveryActions?: DiscoveryActions;
   currentUserId?: string;
   currentUsername?: string;
   publicItems?: InventoryItem[];
@@ -99,8 +103,10 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   onConsumeSpellTome,
   onPromoteSpellToLibrary,
   isAdmin = false,
-  libraryHidden = false,
-  onSetLibraryHidden,
+  libraryMode = 'full',
+  onSetLibraryMode,
+  discoveryView,
+  discoveryActions = {},
   currentUserId,
   currentUsername,
   publicItems = [],
@@ -376,25 +382,52 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     onUpdateInventory(crawlerId, [...items, ...newItems]);
   };
 
-  const libraryItems = getSharedInventory();
+  const allLibraryItems = getSharedInventory();
   // Players can't browse (or add from) the library while the DM has it hidden
-  const libraryLocked = libraryHidden && !isAdmin;
+  const libraryLocked = libraryMode === 'hidden' && !isAdmin;
+  // "Encountered only": players see just the items they've come across, Seen ones with limited details
+  const encounteredOnly = libraryMode === 'encountered' && !isAdmin && !!discoveryView;
+  const itemLevel = (item: InventoryItem) => (encounteredOnly ? discoveryView!.levelOf('items', itemDiscoveryKey(item)) : KNOWN);
+  const isLimited = (item: InventoryItem) => itemLevel(item) === SEEN;
+  const libraryItems = useMemo(
+    () => (encounteredOnly ? allLibraryItems.filter(li => itemLevel(li) >= SEEN) : allLibraryItems),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allLibraryItems, encounteredOnly, discoveryView]
+  );
+  // Players only add items they know to their own inventory
+  const addableLibraryItems = encounteredOnly ? libraryItems.filter(li => itemLevel(li) >= KNOWN) : libraryItems;
 
   // Crawler copies made before the library item got its icon fall back to the library item's icon
   const getItemIconSrc = (item: InventoryItem): string | undefined => {
-    const iconId = item.iconId ?? libraryItems.find(li => li.name === item.name)?.iconId;
+    const iconId = item.iconId ?? allLibraryItems.find(li => li.name === item.name)?.iconId;
     return iconId ? iconImages[iconId] : undefined;
   };
 
   // Shared renderer for expanded item details (used by both library and crawler items)
-  const renderExpandedItemDetails = (item: InventoryItem) => (
+  const renderExpandedItemDetails = (item: InventoryItem, limited = false) => (
     <div className="mt-2 space-y-1.5 text-xs border-l-2 border-primary/30 pl-3">
       {item.description && (
         <div>
           <span className="text-muted-foreground">Description: </span>
           <ForeignText text={item.description} language={item.language} className="text-foreground" />
+          <SharedTranslation view={discoveryView} entryKey={itemDiscoveryKey(item)} language={item.language} />
         </div>
       )}
+      {limited ? (<>
+        {item.equipSlot && <div><span className="text-muted-foreground">Slot: </span><span className="text-foreground">{item.equipSlot}</span></div>}
+        {item.weaponData && (
+          <div><span className="text-muted-foreground">Weapon: </span>{item.weaponData.weaponType} · <span className="text-destructive">{item.weaponData.damageType}</span></div>
+        )}
+        {item.tags && item.tags.length > 0 && (
+          <div className="flex items-center gap-1 flex-wrap">
+            <span className="text-muted-foreground">Tags: </span>
+            {item.tags.map(tag => (
+              <span key={tag} className="bg-primary/10 text-primary px-1.5 py-0.5 rounded text-[10px]">{tag}</span>
+            ))}
+          </div>
+        )}
+        <UnknownDetails kind="items" />
+      </>) : (<>
       {item.effects && (
         <div>
           <span className="text-muted-foreground">Effects: </span>
@@ -481,6 +514,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
           )}
         </div>
       )}
+      </>)}
     </div>
   );
 
@@ -560,9 +594,9 @@ const InventoryView: React.FC<InventoryViewProps> = ({
               <BookOpen className="w-5 h-5" />
               ITEM LIBRARY
             </h3>
-            {onSetLibraryHidden && <LibraryVisibilityToggle hidden={libraryHidden} onChange={onSetLibraryHidden} />}
+            {onSetLibraryMode && <LibraryModePicker mode={libraryMode} onChange={onSetLibraryMode} />}
           </div>
-          {libraryLocked ? <HiddenLibraryNotice kind="items" /> : (<>
+          {libraryLocked ? <HiddenLibraryNotice kind="items" /> : encounteredOnly && libraryItems.length === 0 ? <NothingEncounteredNotice kind="items" /> : (<>
           {/* Search and filters */}
           <div className="flex flex-col sm:flex-row gap-2 mb-3">
             <div className="relative flex-1">
@@ -612,6 +646,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 {filteredLibraryItems.map((item, idx) => {
                   const expansionKey = `library:${item.id}`;
                   const isExpanded = expandedItems.has(expansionKey);
+                  const limited = isLimited(item);
                   const isSearchHighlight = librarySearchQuery.trim() && idx < 10 && (
                     item.name.toLowerCase().includes(librarySearchQuery.toLowerCase()) ||
                     item.description?.toLowerCase().includes(librarySearchQuery.toLowerCase()) ||
@@ -638,6 +673,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                               )}
                             </button>
                             <RarityBadge rarity={item.rarity} />
+                            {limited && <SeenBadge />}
                             {item.equipSlot && (
                               <span className="text-xs bg-accent/20 text-accent px-1.5 py-0.5 rounded">
                                 {item.equipSlot === 'weapon' ? 'Weapon' :
@@ -647,7 +683,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                                  item.equipSlot.charAt(0).toUpperCase() + item.equipSlot.slice(1)}
                               </span>
                             )}
-                            {item.goldValue !== undefined && item.goldValue > 0 && (
+                            {!limited && item.goldValue !== undefined && item.goldValue > 0 && (
                               <span className="text-xs bg-accent/10 text-accent px-1.5 py-0.5 rounded flex items-center gap-0.5">
                                 <Coins className="w-3 h-3" /> {item.goldValue}G
                               </span>
@@ -656,7 +692,8 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                           {!isExpanded && item.description && (
                             <ForeignText text={`(${item.description})`} language={item.language} className="text-muted-foreground text-xs block" />
                           )}
-                          {!isExpanded && item.statModifiers && Object.keys(item.statModifiers).length > 0 && (
+                          {!isExpanded && item.description && <SharedTranslation view={discoveryView} entryKey={itemDiscoveryKey(item)} language={item.language} />}
+                          {!isExpanded && !limited && item.statModifiers && Object.keys(item.statModifiers).length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-1">
                               {Object.entries(item.statModifiers).filter(([,v]) => v !== 0).map(([stat, val]) => (
                                 <span key={stat} className={`text-xs px-1 rounded ${(val as number) > 0 ? 'text-green-400 bg-green-400/10' : 'text-red-400 bg-red-400/10'}`}>
@@ -665,7 +702,20 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                               ))}
                             </div>
                           )}
-                          {isExpanded && renderExpandedItemDetails(item)}
+                          {isExpanded && renderExpandedItemDetails(item, limited)}
+                          {isExpanded && libraryMode === 'encountered' && discoveryView && (
+                            <div className="mt-2">
+                              <DiscoveryControls
+                                kind="items"
+                                entryKey={itemDiscoveryKey(item)}
+                                name={item.name}
+                                view={discoveryView}
+                                actions={discoveryActions}
+                                description={item.description}
+                                language={item.language}
+                              />
+                            </div>
+                          )}
                         </div>
                         <div className="flex flex-col gap-1 shrink-0 items-end">
                           {/* Creator attribution */}
@@ -1220,7 +1270,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
         </div>
 
         {/* My Content: personal items not tied to a campaign */}
-        {myItems.some(mi => !libraryItems.some(li => li.id === mi.id)) && (
+        {myItems.some(mi => !allLibraryItems.some(li => li.id === mi.id)) && (
           <div className="border border-accent/20 bg-accent/5 p-4 mb-6">
             <h3 className="font-display text-lg text-accent flex items-center gap-2 mb-4">
               <Bookmark className="w-5 h-5" />
@@ -1228,7 +1278,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
               <span className="text-xs text-muted-foreground font-normal ml-1">from your profile</span>
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-64 overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin' }}>
-              {myItems.filter(mi => !libraryItems.some(li => li.id === mi.id)).map((item) => (
+              {myItems.filter(mi => !allLibraryItems.some(li => li.id === mi.id)).map((item) => (
                 <div key={item.id} className="flex items-start gap-2 text-sm py-2 px-3 border border-accent/20 bg-background/50">
                   {getEquipmentIcon(item.equipSlot, "w-4 h-4 shrink-0 mt-0.5")}
                   <div className="flex-1 min-w-0">
@@ -1264,7 +1314,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
               <span className="text-xs text-muted-foreground font-normal ml-1">from other players</span>
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-64 overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin' }}>
-              {publicItems.filter(pi => !libraryItems.some(li => li.id === pi.id)).map((item) => (
+              {publicItems.filter(pi => !allLibraryItems.some(li => li.id === pi.id)).map((item) => (
                 <div key={item.id} className="flex flex-col text-sm py-2 px-3 border border-primary/20 bg-background/50">
                   <div className="flex items-start gap-2">
                     {getEquipmentIcon(item.equipSlot, "w-4 h-4 shrink-0 mt-0.5")}
@@ -1351,7 +1401,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 </div>
 
                 {/* Search library items */}
-                {editMode && !libraryLocked && libraryItems.length > 0 && (
+                {editMode && !libraryLocked && addableLibraryItems.length > 0 && (
                   <div className="mb-3">
                     <div className="relative">
                       <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -1365,7 +1415,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                     </div>
                     {searchQueries[crawler.id] && (
                       <div className="border border-border bg-background mt-1 max-h-48 overflow-y-auto">
-                        {libraryItems
+                        {addableLibraryItems
                           .filter(li => li.name.toLowerCase().includes(searchQueries[crawler.id].toLowerCase()))
                           .map(li => (
                             <div key={li.id} className="flex items-center justify-between px-3 py-2 text-sm hover:bg-muted/50 border-b border-border/30 last:border-0">
@@ -1400,7 +1450,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                               </div>
                             </div>
                           ))}
-                        {libraryItems.filter(li => li.name.toLowerCase().includes(searchQueries[crawler.id].toLowerCase())).length === 0 && (
+                        {addableLibraryItems.filter(li => li.name.toLowerCase().includes(searchQueries[crawler.id].toLowerCase())).length === 0 && (
                           <p className="text-muted-foreground text-xs italic px-3 py-2">No matching items</p>
                         )}
                       </div>

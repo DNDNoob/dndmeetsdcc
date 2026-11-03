@@ -14,6 +14,7 @@ import {
   type Spell,
   type WeaponDie,
 } from "@/lib/gameData";
+import { itemDiscoveryKey } from "@/lib/discoveries";
 import type { CombatHit, DiceRollEntry } from "@/hooks/useGameState";
 
 interface MobActionsOverlayProps {
@@ -27,6 +28,8 @@ interface MobActionsOverlayProps {
   onRecordAction?: (combatantId: string, actionType: 'action' | 'bonus') => Promise<void>;
   onOverrideMobHealth?: (combatantId: string, newHP: number) => Promise<void>;
   onHealCrawler?: (crawlerId: string, amount: number) => Promise<void>;
+  /** The crawlers in the fight have now seen this spell or weapon */
+  onActionSeen?: (kind: 'items' | 'spells', key: string) => void;
 }
 
 interface PendingAction {
@@ -60,6 +63,7 @@ export const MobActionsOverlay: React.FC<MobActionsOverlayProps> = ({
   onRecordAction,
   onOverrideMobHealth,
   onHealCrawler,
+  onActionSeen,
 }) => {
   const current = combatState.combatants[combatState.currentTurnIndex];
   const mobCombatants = combatState.combatants.filter(c => c.type === 'mob');
@@ -110,6 +114,8 @@ export const MobActionsOverlay: React.FC<MobActionsOverlayProps> = ({
   const takeAction = async (action: MobCombatAction) => {
     if (!combatant || !mob || blockedReason(action)) return;
     const name = feedName(combatant, mob);
+    if (action.source === 'spell') onActionSeen?.('spells', action.key.slice('spell:'.length));
+    if (action.source === 'weapon') onActionSeen?.('items', itemDiscoveryKey({ name: action.name }));
     let hitTotal: number | undefined;
     if (!action.healing) {
       const raw = rollDie(20);

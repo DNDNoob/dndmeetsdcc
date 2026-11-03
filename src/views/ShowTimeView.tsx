@@ -93,6 +93,10 @@ interface ShowTimeViewProps {
   // Merchants
   merchants?: MerchantState[];
   onBuyFromMerchant?: (mob: Mob, crawlerId: string, item: InventoryItem) => Promise<boolean>;
+  /** A player opened a merchant: their crawler has now seen the stock */
+  onSeeMerchantStock?: (crawlerId: string, items: InventoryItem[]) => void;
+  /** A mob used a spell or weapon in combat: every crawler in the fight has seen it */
+  onSeeCombatAction?: (kind: 'items' | 'spells', key: string) => void;
   onSellToMerchant?: (mob: Mob, crawlerId: string, itemId: string, minGold: number) => Promise<boolean>;
   onHaggleWithMerchant?: (mob: Mob, crawler: Crawler) => Promise<unknown>;
   onRestockMerchant?: (mob: Mob) => Promise<boolean>;
@@ -763,7 +767,7 @@ const InventoryPanel: React.FC<{
   );
 };
 
-const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock, noncombatTurnState, resetNoncombatTurns, combatState, onRemoveCombatant, onRemoveCombatCondition, onRuntimePlacementsChange, onGameActiveChange, onRegisterGameToggle, roomId, quests = [], assignedQuests = [], onAssignQuest, onUpdateAssignedQuest, onAwardQuestXP, onDeleteAssignedQuest, currentPlayerId, onRecordCrawlerMove, onSetMobEncountered, chatMessages = [], npcAiSettings = null, npcAiStatus = null, npcSecrets = {}, npcPersonalities = NO_GENERATED_PERSONALITIES, npcMemories = NO_NPC_MEMORIES, onSetNpcMemory, onSendChatMessage, onClearChat, onUpdateNpcAiSettings, onSetNpcSecretState, npcKeys, onChangeNpcKeys, merchants = NO_MERCHANTS, onBuyFromMerchant, onSellToMerchant, onHaggleWithMerchant, onRestockMerchant, onResolveMerchantHaggle, onSetTranslateMode, spells = NO_SPELLS, onApplyCombatDamageBatch, onRecordCombatAction, onOverrideMobHealth, onHealCrawler }) => {
+const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock, noncombatTurnState, resetNoncombatTurns, combatState, onRemoveCombatant, onRemoveCombatCondition, onRuntimePlacementsChange, onGameActiveChange, onRegisterGameToggle, roomId, quests = [], assignedQuests = [], onAssignQuest, onUpdateAssignedQuest, onAwardQuestXP, onDeleteAssignedQuest, currentPlayerId, onRecordCrawlerMove, onSetMobEncountered, chatMessages = [], npcAiSettings = null, npcAiStatus = null, npcSecrets = {}, npcPersonalities = NO_GENERATED_PERSONALITIES, npcMemories = NO_NPC_MEMORIES, onSetNpcMemory, onSendChatMessage, onClearChat, onUpdateNpcAiSettings, onSetNpcSecretState, npcKeys, onChangeNpcKeys, merchants = NO_MERCHANTS, onBuyFromMerchant, onSeeMerchantStock, onSeeCombatAction, onSellToMerchant, onHaggleWithMerchant, onRestockMerchant, onResolveMerchantHaggle, onSetTranslateMode, spells = NO_SPELLS, onApplyCombatDamageBatch, onRecordCombatAction, onOverrideMobHealth, onHealCrawler }) => {
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
   const selectedEpisodeIdRef = useRef<string | null>(null);
   const [currentMapIndex, setCurrentMapIndex] = useState(0);
@@ -2454,6 +2458,14 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
   const myCrawler = currentPlayerId ? crawlers.find(c => c.id === currentPlayerId) : undefined;
   const openMerchantMob = openMerchantId ? shopMob(openMerchantId) : undefined;
 
+  // Browsing a merchant counts as seeing what's for sale
+  const openMerchantStock = openMerchantId ? merchants.find(m => m.id === openMerchantId)?.stock : undefined;
+  useEffect(() => {
+    if (isAdmin || !myCrawler || !openMerchantStock?.length) return;
+    onSeeMerchantStock?.(myCrawler.id, openMerchantStock.map(e => e.item));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, myCrawler?.id, openMerchantStock]);
+
   const chatAuthor = useMemo((): NpcChatAuthor | null => {
     if (isAdmin) return { type: 'dm', id: 'dm', name: 'DM' };
     const crawler = currentPlayerId ? crawlers.find(c => c.id === currentPlayerId) : undefined;
@@ -3317,6 +3329,7 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             onRecordAction={onRecordCombatAction}
             onOverrideMobHealth={onOverrideMobHealth}
             onHealCrawler={onHealCrawler}
+            onActionSeen={onSeeCombatAction}
           />
         )}
         {/* Cursor follower for ping/box/crawler/mob mode */}

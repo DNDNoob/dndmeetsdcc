@@ -135,6 +135,7 @@ import { ref as storageRef, deleteObject } from "firebase/storage";
 import { logger } from "@/lib/logger";
 import { toast } from "sonner";
 import { sortableMapIds, planEpisodeImport } from "@/lib/publicContent";
+import { PARTY_DISCOVERY_ID, getOwnedDiscoveries, type DiscoveryDoc, type LibraryKind, type LibraryMode, type ItemTranslation } from "@/lib/discoveries";
 
 export interface DiceRollEntry {
   id: string;
@@ -733,6 +734,80 @@ export const useGameState = () => {
     const field = library === 'items' ? 'hideItemLibrary' : 'hideSpellLibrary';
     if (gameSettings) await updateItem('gameSettings', 'current', { [field]: hidden } as Record<string, unknown>);
     else await addItem('gameSettings', { id: 'current', [field]: hidden } as Record<string, unknown>);
+  };
+
+  const setLibraryMode = async (library: LibraryKind, mode: LibraryMode) => {
+    // The hide switch is kept in step for anything that still reads it
+    const updates = library === 'items'
+      ? { itemLibraryMode: mode, hideItemLibrary: mode === 'hidden' }
+      : { spellLibraryMode: mode, hideSpellLibrary: mode === 'hidden' };
+    if (gameSettings) await updateItem('gameSettings', 'current', updates as Record<string, unknown>);
+    else await addItem('gameSettings', { id: 'current', ...updates } as Record<string, unknown>);
+  };
+
+  // --- Encountered items and spells (see lib/discoveries.ts) ---
+  const discoveries = useMemo(() => getStableCollection<DiscoveryDoc>('discoveries'), [getCollection, isLoaded]);
+
+  /** Raise these crawlers' level for the entries (never lowers it). */
+  const markDiscovered = async (crawlerIds: string[], kind: LibraryKind, keys: string[], level: number) => {
+    const live = keys.filter(Boolean);
+    if (live.length === 0) return;
+    await Promise.all([...new Set(crawlerIds)].map(id => {
+      const saved = discoveries.find(d => d.id === id)?.[kind];
+      const bumps = live.filter(key => (saved?.[key] ?? 0) < level).map(key => ({ path: [kind, key], max: level }));
+      return bumps.length > 0 ? bumpCounters('discoveries', id, bumps) : undefined;
+    }));
+  };
+
+  /** Seen by every crawler in the current combat, e.g. a spell a mob or crawler cast. */
+  const markSeenInCombat = async (kind: LibraryKind, keys: string[], exceptId?: string) => {
+    if (!combatState?.active) return;
+    const ids = combatState.combatants.filter(c => c.type === 'crawler' && c.id !== exceptId).map(c => c.id);
+    await markDiscovered(ids, kind, keys, 1);
+  };
+
+  /** Save what these crawlers hold now, so items they later sell or use up stay Known. */
+  const syncOwnedDiscoveries = (crawlerIds: string[]) => {
+    for (const id of crawlerIds) {
+      const crawler = crawlers.find(c => c.id === id);
+      if (!crawler) continue;
+      const owned = getOwnedDiscoveries(crawler, getCrawlerInventory(id));
+      const saved = discoveries.find(d => d.id === id);
+      const bumps = (['items', 'spells'] as const).flatMap(kind =>
+        Object.entries(owned[kind])
+          .filter(([key, level]) => (saved?.[kind]?.[key] ?? 0) < level)
+          .map(([key, level]) => ({ path: [kind, key], max: level })));
+      if (bumps.length > 0) void bumpCounters('discoveries', id, bumps);
+    }
+  };
+
+  /** A crawler shares what they know about an entry with the party. */
+  const shareDiscovery = async (crawler: Crawler, kind: LibraryKind, key: string, level: number) => {
+    await bumpCounters('discoveries', PARTY_DISCOVERY_ID, [
+      { path: [kind, key], max: level },
+      { path: ['sharedBy', `${kind}:${key}`], set: crawler.name },
+    ]);
+  };
+
+  /** A crawler who reads an item's language shares their translation (twisted if they changed it). */
+  const shareItemTranslation = async (crawler: Crawler, key: string, text: string, twisted: boolean, level: number) => {
+    const translation: ItemTranslation = { text, byId: crawler.id, byName: crawler.name, twisted, at: Date.now() };
+    await bumpCounters('discoveries', PARTY_DISCOVERY_ID, [
+      { path: ['items', key], max: level },
+      { path: ['sharedBy', `items:${key}`], set: crawler.name },
+      { path: ['translations', key], set: translation },
+    ]);
+  };
+
+  /** DM: show an entry to the whole party at a level, or hide it again (0) from the party and every crawler. */
+  const revealDiscovery = async (kind: LibraryKind, key: string, level: number) => {
+    if (level > 0) {
+      await bumpCounters('discoveries', PARTY_DISCOVERY_ID, [{ path: [kind, key], set: level }]);
+      return;
+    }
+    const ids = [PARTY_DISCOVERY_ID, ...crawlers.map(c => c.id)]
+      .filter(id => (discoveries.find(d => d.id === id)?.[kind]?.[key] ?? 0) > 0);
+    await Promise.all(ids.map(id => bumpCounters('discoveries', id, [{ path: [kind, key], set: 0 }])));
   };
 
   const setDungeonFloor = async (dungeonFloor: number) => {
@@ -2855,6 +2930,7 @@ export const useGameState = () => {
     const hpCost = upgradeUseCost(prev.upgrades).hp;
     const hpAfter = hpCost ? { hp: Math.max(0, (crawler.hp ?? 0) - hpCost) } : {};
     await updateCrawler(crawlerId, { knownSpells, mana: currentMana - cost, ...hpAfter, ...(languageEffects ? { languageEffects } : {}) });
+    if (spells.some(s => s.id === spellId)) void markSeenInCombat('spells', [spellId], crawlerId);
     if (newMastery > prevMastery) {
       toast.success(`${crawler.name} leveled up ${prev.spellName} to mastery level ${newMastery}!`);
       await awardXP([{ crawlerId, amount: XP_REWARDS.masteryLevelUp, reason: `${prev.spellName} mastery ${newMastery}` }]);
@@ -3413,6 +3489,14 @@ export const useGameState = () => {
     setXPScale,
     setDungeonFloor,
     setLibraryHidden,
+    setLibraryMode,
+    discoveries,
+    markDiscovered,
+    markSeenInCombat,
+    syncOwnedDiscoveries,
+    shareDiscovery,
+    shareItemTranslation,
+    revealDiscovery,
     awardCrawlerXP,
     spendSkillXP,
     awardSkillXP,
