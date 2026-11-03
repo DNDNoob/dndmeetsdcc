@@ -1,24 +1,13 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { Suspense, lazy, useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import SplashScreen from "@/components/SplashScreen";
 import MainMenu from "@/components/MainMenu";
 import Navigation from "@/components/Navigation";
 import DiceRoller from "@/components/DiceRoller";
-import PingPanel from "@/components/PingPanel";
 import ChangelogViewer from "@/components/ChangelogViewer";
-import CampaignSelectView from "@/views/CampaignSelectView";
-import ProfilesView from "@/views/ProfilesView";
-import MapsView from "@/views/MapsView";
-import InventoryView from "@/views/InventoryView";
-import MobsView from "@/views/MobsView";
-import DungeonAIView from "@/views/DungeonAIView";
-import ShowTimeView from "@/views/ShowTimeView";
-import SoundEffectsView from "@/views/SoundEffectsView";
 import MusicBar from "@/components/MusicBar";
 import { useMusic } from "@/hooks/useMusic";
-import WikiView from "@/views/WikiView";
-import SpellsView from "@/views/SpellsView";
 
 import { useGameState, DiceRollEntry } from "@/hooks/useGameState";
 import { useAuth } from "@/contexts/AuthContext";
@@ -38,6 +27,25 @@ import type { DiscoveryActions } from "@/components/DiscoveryControls";
 import type { Episode, Campaign, CrawlerPlacement, EpisodeMobPlacement, Mob, PublicMap, PublicMob, PublicEpisode, InventoryItem, Spell } from "@/lib/gameData";
 import { publicDocId, buildEpisodeBundle } from "@/lib/publicContent";
 import { LanguagesProvider } from "@/contexts/LanguagesContext";
+
+// Screens load on demand so the first page only downloads what it shows
+const PingPanel = lazy(() => import("@/components/PingPanel"));
+const CampaignSelectView = lazy(() => import("@/views/CampaignSelectView"));
+const ProfilesView = lazy(() => import("@/views/ProfilesView"));
+const MapsView = lazy(() => import("@/views/MapsView"));
+const InventoryView = lazy(() => import("@/views/InventoryView"));
+const MobsView = lazy(() => import("@/views/MobsView"));
+const DungeonAIView = lazy(() => import("@/views/DungeonAIView"));
+const ShowTimeView = lazy(() => import("@/views/ShowTimeView"));
+const SoundEffectsView = lazy(() => import("@/views/SoundEffectsView"));
+const WikiView = lazy(() => import("@/views/WikiView"));
+const SpellsView = lazy(() => import("@/views/SpellsView"));
+
+const ViewFallback = () => (
+  <div className="flex items-center justify-center py-24 text-primary font-display text-glow-cyan animate-pulse">
+    Loading...
+  </div>
+);
 
 type AppScreen = "splash" | "menu" | "game";
 type GameView = "profiles" | "maps" | "inventory" | "mobs" | "dungeonai" | "showtime" | "sounds" | "wiki" | "spells";
@@ -1052,35 +1060,37 @@ const Index = () => {
   // If authenticated and no campaign selected, show campaign selection
   if (showCampaignSelect) {
     return (
-      <CampaignSelectView
-        myCampaigns={myCampaigns}
-        joinedCampaigns={joinedCampaigns}
-        loading={campaignsLoading}
-        userProfile={userProfile}
-        onCreateCampaign={(name, desc) => createCampaign(name, desc, userProfile ?? undefined)}
-        onDeleteCampaign={deleteCampaign}
-        onCopyCampaign={(sourceId, newName) => copyCampaign(sourceId, newName, userProfile ?? undefined)}
-        onJoinCampaign={joinCampaignByCode}
-        onLeaveCampaign={leaveCampaign}
-        onRegenerateInviteCode={regenerateInviteCode}
-        onSelectCampaign={handleSelectCampaign}
-        onSignOut={signOut}
-        friends={friends}
-        pendingReceived={pendingReceived}
-        pendingSent={pendingSent}
-        onSendFriendRequest={(username) => sendFriendRequest(username, userProfile!)}
-        onAcceptFriendRequest={acceptFriendRequest}
-        onDeclineFriendRequest={declineFriendRequest}
-        onRemoveFriend={removeFriend}
-        onCancelFriendRequest={cancelFriendRequest}
-        onUpdateUserProfile={updateUserProfile}
-        onLogDecision={logDecision}
-        myItems={myItems}
-        mySpells={mySpells}
-        onSaveMyItem={handleSaveMyItem}
-        onDeleteMyItem={deleteMyItem}
-        onDeleteMySpell={deleteMySpell}
-      />
+      <Suspense fallback={<ViewFallback />}>
+        <CampaignSelectView
+          myCampaigns={myCampaigns}
+          joinedCampaigns={joinedCampaigns}
+          loading={campaignsLoading}
+          userProfile={userProfile}
+          onCreateCampaign={(name, desc) => createCampaign(name, desc, userProfile ?? undefined)}
+          onDeleteCampaign={deleteCampaign}
+          onCopyCampaign={(sourceId, newName) => copyCampaign(sourceId, newName, userProfile ?? undefined)}
+          onJoinCampaign={joinCampaignByCode}
+          onLeaveCampaign={leaveCampaign}
+          onRegenerateInviteCode={regenerateInviteCode}
+          onSelectCampaign={handleSelectCampaign}
+          onSignOut={signOut}
+          friends={friends}
+          pendingReceived={pendingReceived}
+          pendingSent={pendingSent}
+          onSendFriendRequest={(username) => sendFriendRequest(username, userProfile!)}
+          onAcceptFriendRequest={acceptFriendRequest}
+          onDeclineFriendRequest={declineFriendRequest}
+          onRemoveFriend={removeFriend}
+          onCancelFriendRequest={cancelFriendRequest}
+          onUpdateUserProfile={updateUserProfile}
+          onLogDecision={logDecision}
+          myItems={myItems}
+          mySpells={mySpells}
+          onSaveMyItem={handleSaveMyItem}
+          onDeleteMyItem={deleteMyItem}
+          onDeleteMySpell={deleteMySpell}
+        />
+      </Suspense>
     );
   }
 
@@ -1154,6 +1164,7 @@ const Index = () => {
           />
 
           <main id="main-content" className="pb-16 sm:pb-12">
+            <Suspense fallback={<ViewFallback />}>
             {currentView === "profiles" && (
               <ProfilesView
                 crawlers={crawlers}
@@ -1398,6 +1409,7 @@ const Index = () => {
                 playerName={currentPlayer.name}
               />
             )}
+          </Suspense>
           </main>
 
           <DiceRoller
@@ -1409,6 +1421,7 @@ const Index = () => {
           />
 
           {isShowtimeActive && (
+            <Suspense fallback={null}>
             <PingPanel
               isAdmin={isAdmin}
               noncombatTurnState={noncombatTurnState}
@@ -1467,6 +1480,7 @@ const Index = () => {
               currentPlayerId={currentPlayer?.id}
               onUndoCombatTurn={undoCombatTurn}
             />
+            </Suspense>
           )}
 
           <ChangelogViewer
