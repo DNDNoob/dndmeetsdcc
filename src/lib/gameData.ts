@@ -2053,7 +2053,7 @@ export interface UserProfile {
   username: string;       // Unique tag e.g. "DragonSlayer42"
   displayName: string;    // Freeform display name
   avatarUrl?: string;     // Optional avatar (from Google or uploaded)
-  email?: string;         // Stored for reference (populated from auth)
+  email?: string;         // Legacy: no longer saved (profiles are public); removed from old profiles on sign-in
   createdAt: number;      // Epoch ms
   updatedAt: number;
   showPublicContent?: boolean; // Whether to show public content from other players

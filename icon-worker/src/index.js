@@ -7,7 +7,11 @@
  *   429 { error: "quota", detail } when the Workers AI free allocation is used up for the day
  *   503 { error: "busy", detail } when Workers AI is rate limiting; 502 for other failures
  *
- * No API key lives in the app: the Workers AI binding is attached to this Worker.
+ * GET /freesound?q=...  with the same Authorization header: searches Freesound with the Worker's
+ *   FREESOUND_API_KEY secret (npx wrangler secret put FREESOUND_API_KEY) and answers
+ *   200 { results: [{ id, name, url, tags }] }
+ *
+ * No API key lives in the app: the Workers AI binding and the Freesound key stay in this Worker.
  */
 
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
@@ -21,7 +25,8 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
 
     const url = new URL(request.url);
-    if (url.pathname !== '/icon' || request.method !== 'POST') {
+    const isFreesound = url.pathname === '/freesound' && request.method === 'GET';
+    if (!isFreesound && (url.pathname !== '/icon' || request.method !== 'POST')) {
       return json({ error: 'not found' }, 404, cors);
     }
 
@@ -30,6 +35,8 @@ export default {
     if (!claims || claims.firebase?.sign_in_provider !== 'google.com') {
       return json({ error: 'unauthorized' }, 401, cors);
     }
+
+    if (isFreesound) return searchFreesound(url, env, cors);
 
     let prompt = '';
     try {
@@ -58,6 +65,26 @@ export default {
     }
   },
 };
+
+async function searchFreesound(url, env, cors) {
+  const query = (url.searchParams.get('q') || '').slice(0, 100).trim();
+  if (!query) return json({ error: 'q required' }, 400, cors);
+  if (!env.FREESOUND_API_KEY) return json({ error: 'freesound not configured' }, 503, cors);
+  const api = new URL('https://freesound.org/apiv2/search/text/');
+  api.search = new URLSearchParams({ query, fields: 'id,name,previews,tags', page_size: '60' }).toString();
+  const res = await fetch(api, { headers: { Authorization: `Token ${env.FREESOUND_API_KEY}` } });
+  if (!res.ok) return json({ error: 'freesound failed', status: res.status }, res.status === 429 ? 429 : 502, cors);
+  const data = await res.json();
+  const results = (data.results || [])
+    .map((r) => ({
+      id: `freesound-${r.id}`,
+      name: r.name,
+      url: r.previews?.['preview-hq-mp3'] || r.previews?.['preview-lq-mp3'] || '',
+      tags: r.tags || [],
+    }))
+    .filter((r) => r.url);
+  return json({ results }, 200, cors);
+}
 
 function corsHeaders(request, env) {
   const origin = request.headers.get('Origin') || '';

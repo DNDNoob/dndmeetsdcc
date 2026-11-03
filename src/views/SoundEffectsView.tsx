@@ -7,7 +7,8 @@ import { useFirebaseStore } from "@/hooks/useFirebaseStore";
 import { logger } from "@/lib/logger";
 import MusicPanel from "@/components/MusicPanel";
 import type { MusicControls } from "@/hooks/useMusic";
-import { storage, db } from "@/lib/firebase";
+import { storage, db, auth } from "@/lib/firebase";
+import { ICON_API_URL as SOUND_SEARCH_URL } from "@/lib/iconGen";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { collection, query, where, onSnapshot, serverTimestamp, addDoc, Timestamp } from "firebase/firestore";
 
@@ -38,7 +39,6 @@ const LOCAL_SOUNDS: SoundEffect[] = [
   { id: "5", name: "Coin Drop", url: "https://assets.mixkit.co/active_storage/sfx/1997/1997.wav", tags: ["treasure", "gold", "money"], source: "local" },
 ];
 
-const FREESOUND_KEY = (import.meta.env.VITE_FREESOUND_API_KEY as string) || "";
 
 // Cache Freesound results to avoid rate limiting (429 errors)
 const FREESOUND_CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
@@ -169,9 +169,9 @@ const SoundEffectsView: React.FC<SoundEffectsViewProps> = ({ music, isDm }) => {
         }
       }
 
-      // Try Freesound API directly if API key is available
-      const freesoundKey = import.meta.env.VITE_FREESOUND_API_KEY as string;
-      if (freesoundKey) {
+      // Freesound search goes through the Worker, which holds the API key and checks sign-in
+      const idToken = await auth?.currentUser?.getIdToken().catch(() => null);
+      if (idToken) {
         // Check cache first
         const cached = freesoundCache.get(q);
         if (cached && Date.now() - cached.timestamp < FREESOUND_CACHE_DURATION) {
@@ -181,25 +181,26 @@ const SoundEffectsView: React.FC<SoundEffectsViewProps> = ({ music, isDm }) => {
         }
 
         try {
-          const fsUrl = `https://freesound.org/apiv2/search/text/?query=${encodeURIComponent(q)}&fields=id,name,previews,tags&page_size=60&token=${freesoundKey}`;
-          const res = await fetch(fsUrl);
-          if (!res.ok) throw new Error(`Freesound API ${res.status}`);
+          const res = await fetch(`${SOUND_SEARCH_URL}/freesound?q=${encodeURIComponent(q)}`, {
+            headers: { Authorization: `Bearer ${idToken}` },
+          });
+          if (!res.ok) throw new Error(`Freesound search ${res.status}`);
           const json = await res.json();
           if (!active) return;
           const mapped: SoundEffect[] = (json.results || []).map((r: SoundSearchResult) => ({
-            id: `freesound-${r.id}`,
+            id: String(r.id),
             name: r.name,
-            url: r.previews?.['preview-hq-mp3'] || r.previews?.['preview-lq-mp3'] || '',
+            url: r.url || '',
             tags: r.tags || [],
             source: 'freesound'
           })).filter((s: SoundEffect) => s.url);
-          logger.log('[SoundEffects] Got', mapped.length, 'results from Freesound API');
+          logger.log('[SoundEffects] Got', mapped.length, 'results from Freesound');
           // Cache results
           freesoundCache.set(q, { results: mapped, timestamp: Date.now() });
           setResults([...uploaded, ...mapped]);
           return;
         } catch (e) {
-          console.warn('[SoundEffects] Freesound API error:', e);
+          console.warn('[SoundEffects] Freesound search error:', e);
           // On rate limit or error, keep existing results instead of clearing them
           return;
         }

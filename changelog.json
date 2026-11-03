@@ -11,7 +11,12 @@
       "🧐 Identify: roll Perception (items) or Arcana (spells) against a Medium DC to learn every detail of something you've only seen",
       "👁️ DMs can reveal any library entry to the party as Seen or Known, hide it again, and see which crawlers know it"
     ],
-    "fixes": []
+    "fixes": [
+      "🔒 Your email address is no longer saved in your public profile where other signed-in players could read it, and existing ones are removed the next time you sign in",
+      "🔒 Only Google accounts can upload maps and sound effects now, maps must be images and sounds must be audio, and an uploaded map can no longer be replaced",
+      "🔒 Sound effect search now runs through the secure service instead of putting the Freesound key in the website. Sound search needs you signed in",
+      "🔒 Updated libraries with known security problems"
+    ]
   },
   {
     "date": "2026-10-29",
