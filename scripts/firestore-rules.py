@@ -3,6 +3,8 @@
 Usage:
   python3 -I scripts/firestore-rules.py get OUT_FILE
   python3 -I scripts/firestore-rules.py publish RULES_FILE
+  python3 -I scripts/firestore-rules.py get-storage OUT_FILE
+  python3 -I scripts/firestore-rules.py publish-storage RULES_FILE   (Firebase Storage rules)
 
 Reads VITE_FIREBASE_PROJECT_ID, VITE_FIREBASE_CLIENT_EMAIL and
 VITE_FIREBASE_PRIVATE_KEY from the environment. Never prints credentials.
@@ -79,8 +81,24 @@ def main():
         call(token, "PATCH", "/" + release,
              {"release": {"name": release, "rulesetName": ruleset["name"]}})
         print("Published", ruleset["name"])
+    elif action in ("get-storage", "publish-storage"):
+        bucket = os.environ["VITE_FIREBASE_STORAGE_BUCKET"]
+        release = f"projects/{project}/releases/firebase.storage/{bucket}"
+        if action == "get-storage":
+            ruleset = call(token, "GET", "/" + call(token, "GET", "/" + release)["rulesetName"])
+            with open(path, "w") as f:
+                f.write(ruleset["source"]["files"][0]["content"])
+            print("Saved live Storage rules to", path)
+        else:
+            with open(path) as f:
+                content = f.read()
+            ruleset = call(token, "POST", f"/projects/{project}/rulesets",
+                           {"source": {"files": [{"name": "storage.rules", "content": content}]}})
+            call(token, "PATCH", "/" + release,
+                 {"release": {"name": release, "rulesetName": ruleset["name"]}})
+            print("Published", ruleset["name"])
     else:
-        sys.exit("action must be get or publish")
+        sys.exit("action must be get, publish, get-storage or publish-storage")
 
 
 if __name__ == "__main__":

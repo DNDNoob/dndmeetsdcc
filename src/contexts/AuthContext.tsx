@@ -14,6 +14,7 @@ import {
   getDocs,
   setDoc,
   updateDoc,
+  deleteField,
   onSnapshot,
   query,
   where,
@@ -87,6 +88,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsubscribe = onSnapshot(profileRef, (snapshot) => {
       if (snapshot.exists()) {
         const profile = { id: snapshot.id, ...snapshot.data() } as UserProfile;
+        // Profiles are readable by every signed-in player, so email addresses don't belong in them
+        if ('email' in profile) {
+          updateDoc(profileRef, { email: deleteField() }).catch(err => console.warn('[Auth] Could not remove email from profile:', err));
+        }
         setUserProfile(profile);
         setNeedsUsername(false);
       } else {
@@ -213,7 +218,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           displayName,
           // Email/password accounts have no photoURL; never write undefined to Firestore
           ...(user.photoURL ? { avatarUrl: user.photoURL } : {}),
-          ...(user.email ? { email: user.email } : {}),
           createdAt: now,
           updatedAt: now,
         };
