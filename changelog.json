@@ -9,9 +9,13 @@
       "🔍 New Encountered library mode (now the default): players see only the items and spells their crawler has come across. Things they've only glimpsed (a merchant's stock, a spell cast in a fight, a spell tome they carry) show their name and description, with stats as ??? until they own or learn them. The DM picks Full, Encountered or Hidden next to each library title",
       "🤝 Crawlers can Share with party what they know about an item or spell, and Share translation of an item written in a language they read, twisting its meaning if they like (only they and the DM know)",
       "🧐 Identify: roll Perception (items) or Arcana (spells) against a Medium DC to learn every detail of something you've only seen",
-      "👁️ DMs can reveal any library entry to the party as Seen or Known, hide it again, and see which crawlers know it"
+      "👁️ DMs can reveal any library entry to the party as Seen or Known, hide it again, and see which crawlers know it",
+      "⚡ Faster first load: each page (Profiles, Show Time, Dungeon AI, Wiki and the rest) now downloads when you open it instead of all at once, so the app starts with about 40% less to download"
     ],
-    "fixes": []
+    "fixes": [
+      "💬 Chat history keeps only the newest 300 lines per campaign, so the page loads faster and the free database quota lasts longer (older lines are deleted automatically)",
+      "🧹 Removed unused code and packages (33 unused UI parts, old notes and scripts) so the app builds smaller and lint is clean"
+    ]
   },
   {
     "date": "2026-10-29",

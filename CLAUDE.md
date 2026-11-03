@@ -12,6 +12,12 @@
 
 ---
 
+## Keep New Code Out of the Giant Files
+
+`useGameState.ts`, `ShowTimeView.tsx`, `ProfilesView.tsx`, `DungeonAIView.tsx` and `gameData.ts` are each thousands of lines and grow with every feature. For new features, put the logic in its own hook under `src/hooks/` or module under `src/lib/` and only add the wiring (a call, a prop, a tab entry) to the big files. Every new screen or heavy library should load on demand (`React.lazy` / dynamic `import()`), as the views in `Index.tsx` do.
+
+---
+
 ## Project Architecture
 
 ```
@@ -130,8 +136,11 @@ const { addItem } = useGame(); // Only Index.tsx should use this
 Defined in `useFirebaseStore.ts`:
 ```
 crawlers, mobs, maps, inventory, episodes, soundEffects, diceRolls,
-lootBoxes, lootBoxTemplates, noncombatTurns, gameClock, combatState, wiki
+lootBoxes, lootBoxTemplates, noncombatTurns, gameClock, combatState, wiki,
+quests, assignedQuests, spells, chatMessages, npcAi, merchants, languages,
+gameSettings, crawlerStats, discoveries
 ```
+(The `collections` array in `useFirebaseStore.ts` is the source of truth — check it if this list looks stale.)
 
 ### Adding a New Collection
 

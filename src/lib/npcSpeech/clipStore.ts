@@ -1,6 +1,5 @@
 // Spoken NPC voice clips live in Firestore as small MP3s (rooms/{roomId}/npcClips/{id}), not in
 // Storage: Storage's free daily download allowance is shared with the maps and runs out.
-import { Mp3Encoder } from '@breezystack/lamejs';
 import { collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
@@ -29,13 +28,15 @@ export async function compressClip(clip: Blob): Promise<string> {
     pcm[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
   }
   for (const kbps of [40, 24, 16]) {
-    const b64 = toBase64(encodeMp3(pcm, kbps));
+    const b64 = toBase64(await encodeMp3(pcm, kbps));
     if (b64.length <= MAX_BASE64) return b64;
   }
   throw new Error('That line is too long to save as a voice clip');
 }
 
-function encodeMp3(pcm: Int16Array, kbps: number): Uint8Array {
+async function encodeMp3(pcm: Int16Array, kbps: number): Promise<Uint8Array> {
+  // The encoder is only needed when a clip is saved, so it loads then instead of with the app
+  const { Mp3Encoder } = await import('@breezystack/lamejs');
   const encoder = new Mp3Encoder(1, CLIP_RATE, kbps);
   const parts: Uint8Array[] = [];
   for (let i = 0; i < pcm.length; i += 1152) parts.push(encoder.encodeBuffer(pcm.subarray(i, i + 1152)));

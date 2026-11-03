@@ -33,6 +33,17 @@ export default defineConfig(({ mode }) => ({
     },
   },
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      output: {
+        // Big libraries that rarely change get their own files so browsers keep them cached between releases
+        manualChunks: {
+          firebase: ["firebase/app", "firebase/auth", "firebase/firestore", "firebase/storage"],
+          motion: ["framer-motion"],
+        },
+      },
+    },
+  },
   // The voice engine worker (Kokoro) loads its runtime in pieces, which needs module workers
   worker: { format: "es" },
   resolve: {
