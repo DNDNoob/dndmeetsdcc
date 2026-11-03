@@ -10,6 +10,8 @@ import {
   GameClockState,
   CombatState,
   CombatantEntry,
+  IncomingAttack,
+  getDodgeBonus,
   isPlacementHostile,
   splitMobLoot,
   getLootingLevel,
@@ -167,6 +169,11 @@ export interface DiceRollEntry {
     shares: string[]; // one line per crawler, e.g. "Vex: 5 gold, Health Potion ×2"
     partyItems: string[]; // what went to the party inventory
     destroyed?: string[]; // what got smashed while looting
+  };
+  // For a default combat action with no dice (Help, Ready, Use Item)
+  combatActionNotification?: {
+    line: string;    // e.g. "helps Brom"
+    detail?: string; // e.g. the readied trigger or the item's effects
   };
   // For a player undoing their combat turn
   turnResetNotification?: {
@@ -1711,6 +1718,7 @@ export const useGameState = () => {
         currentHP: c.currentHP,
         hasUsedAction: c.hasUsedAction,
         hasUsedBonusAction: c.hasUsedBonusAction,
+        hasUsedReaction: c.hasUsedReaction ?? false,
         feetMovedThisTurn: c.feetMovedThisTurn,
         conditions: c.conditions ?? [],
       })),
@@ -1753,6 +1761,8 @@ export const useGameState = () => {
       return c;
     });
     const newIndex = nextIndex % count;
+    // The combatant whose turn starts gets its reaction back
+    resetCombatants = resetCombatants.map((c, i) => (i === newIndex && c.hasUsedReaction ? { ...c, hasUsedReaction: false } : c));
     // The crawler whose turn ended: how far they moved, whether they did anything, and how long it took
     const ended = combatState.combatants[combatState.currentTurnIndex];
     if (ended?.type === 'crawler') {
@@ -1912,6 +1922,7 @@ export const useGameState = () => {
         currentHP: s.currentHP,
         hasUsedAction: s.hasUsedAction,
         hasUsedBonusAction: s.hasUsedBonusAction,
+        hasUsedReaction: s.hasUsedReaction ?? false,
         feetMovedThisTurn: s.feetMovedThisTurn ?? 0,
         conditions: s.conditions ?? [],
       };
@@ -1971,6 +1982,7 @@ export const useGameState = () => {
 
     await updateItem('combatState', 'current', {
       combatants: restoredCombatants,
+      incomingAttacks: [], // attacks still waiting for a Dodge are dropped with the turn
       turnSnapshot: { ...snap, startPosition: null },
     } as Record<string, unknown>);
 
@@ -2000,8 +2012,13 @@ export const useGameState = () => {
     await updateItem('combatState', 'current', updates);
   };
 
-  const recordCombatAction = async (combatantId: string, actionType: 'action' | 'bonus') => {
+  const recordCombatAction = async (combatantId: string, actionType: 'action' | 'bonus' | 'reaction') => {
     if (!combatState) return;
+    // Reactions happen on other combatants' turns, so read the latest combat state first
+    if (actionType === 'reaction') {
+      await updateCombatantsFresh(combatants => combatants.map(c => (c.id === combatantId ? { ...c, hasUsedReaction: true } : c)));
+      return;
+    }
     const updatedCombatants = combatState.combatants.map(c => {
       if (c.id === combatantId) {
         if (actionType === 'action') {
@@ -2012,6 +2029,85 @@ export const useGameState = () => {
       return c;
     });
     await updateItem('combatState', 'current', { combatants: updatedCombatants } as Record<string, unknown>);
+  };
+
+  // --- Dodge ---
+  // The DM's mob attack would hit: each target crawler gets to Dodge or take it (see IncomingAttack).
+  const sendIncomingAttacks = async (attacks: IncomingAttack[]) => {
+    if (attacks.length === 0) return;
+    const attackIds = new Set(attacks.map(a => a.attackId));
+    await transact([{ collection: 'combatState', id: 'current' }], ([doc]) => {
+      if (!doc) throw new Error('Combat has ended');
+      const existing = ((doc.incomingAttacks as IncomingAttack[] | undefined) ?? []).filter(a => !attackIds.has(a.attackId));
+      return [{ type: 'update', collection: 'combatState', id: 'current', data: { incomingAttacks: [...existing, ...attacks] } }];
+    });
+  };
+
+  /** Removes a finished attack (the DM's browser has applied its damage). */
+  const clearIncomingAttack = async (attackId: string) => {
+    await transact([{ collection: 'combatState', id: 'current' }], ([doc]) => {
+      if (!doc) return [];
+      const left = ((doc.incomingAttacks as IncomingAttack[] | undefined) ?? []).filter(a => a.attackId !== attackId);
+      return [{ type: 'update', collection: 'combatState', id: 'current', data: { incomingAttacks: left } }];
+    });
+  };
+
+  /**
+   * The target answers an incoming attack. Dodge spends their reaction on d20 + DEX modifier +
+   * Acrobatics rank; meeting or beating the attack roll makes it miss. 'take' lets the hit land.
+   * Returns false if the attack was already answered or the reaction is already used.
+   */
+  const answerIncomingAttack = async (attackId: string, targetId: string, choice: 'dodge' | 'take'): Promise<boolean> => {
+    const crawler = crawlers.find(c => c.id === targetId);
+    let roll: ReturnType<typeof rollD20> | null = null;
+    let bonus = 0;
+    if (choice === 'dodge') {
+      if (!crawler) return false;
+      const dexMod = getEquippedModifiers(crawler, getCrawlerInventory(crawler.id)).dex ?? 0;
+      bonus = getDodgeBonus(crawler, dexMod);
+      roll = rollD20(rollsWithDisadvantage(crawler, (crawler.dex ?? 10) + dexMod));
+    }
+    const total = roll ? roll.rawRoll + bonus : undefined;
+    let answered: IncomingAttack | undefined;
+    const ok = await transact([{ collection: 'combatState', id: 'current' }], ([doc]) => {
+      if (!doc) throw new Error('Combat has ended');
+      const attacks = (doc.incomingAttacks as IncomingAttack[] | undefined) ?? [];
+      const attack = attacks.find(a => a.attackId === attackId && a.targetId === targetId);
+      if (!attack || attack.status !== 'waiting') throw new Error('That attack was already settled');
+      const combatants = (doc.combatants as CombatantEntry[] | undefined) ?? [];
+      if (choice === 'dodge' && combatants.find(c => c.id === targetId)?.hasUsedReaction) {
+        throw new Error('You already used your reaction this round');
+      }
+      const dodged = total !== undefined && total >= attack.hitTotal;
+      answered = { ...attack, status: dodged ? 'dodged' : 'taken', ...(total !== undefined ? { dodgeTotal: total } : {}) };
+      const data: Record<string, unknown> = {
+        incomingAttacks: attacks.map(a => (a === attack ? answered : a)),
+      };
+      if (choice === 'dodge') data.combatants = combatants.map(c => (c.id === targetId ? { ...c, hasUsedReaction: true } : c));
+      return [{ type: 'update', collection: 'combatState', id: 'current', data }];
+    });
+    if (!ok || !answered) return false;
+    if (roll && crawler && total !== undefined) {
+      const dodged = answered.status === 'dodged';
+      await addDiceRoll({
+        id: crypto.randomUUID(),
+        crawlerName: crawler.name,
+        crawlerId: crawler.id,
+        timestamp: Date.now(),
+        results: roll.results,
+        total,
+        statRoll: {
+          stat: `Dodge (${answered.attackerName}'s ${answered.actionName})`,
+          modifier: bonus,
+          rawRoll: roll.rawRoll,
+          diceLabel: roll.diceLabel,
+          rollType: 'Reaction',
+          dc: answered.hitTotal,
+          success: dodged,
+        },
+      });
+    }
+    return true;
   };
 
   // --- Mob loot ---
@@ -3480,6 +3576,9 @@ export const useGameState = () => {
     confirmInitiative,
     advanceCombatTurn,
     recordCombatAction,
+    sendIncomingAttacks,
+    answerIncomingAttack,
+    clearIncomingAttack,
     applyCombatDamage,
     applyCombatDamageBatch,
     recordCrawlerMove,

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DungeonButton } from "./ui/DungeonButton";
-import { Dices, ChevronUp, ChevronDown, Plus, X, Package, ScrollText, Undo2, Coins, Star, Sparkles } from "lucide-react";
+import { Dices, ChevronUp, ChevronDown, Plus, X, Package, ScrollText, Undo2, Coins, Star, Sparkles, Swords } from "lucide-react";
 import { getLootBoxTierColor } from "@/lib/gameData";
 import { DiceRollEntry } from "@/hooks/useGameState";
 import { useClickAway } from "@/hooks/useClickAway";
@@ -269,6 +269,19 @@ const DiceRoller: React.FC<DiceRollerProps> = ({ crawlerName = "Unknown", crawle
                             {entry.xpNotification.lines.map(line => (
                               <span key={line} className="block text-foreground">{line}</span>
                             ))}
+                          </div>
+                          <span className="text-[10px] text-muted-foreground/60 ml-auto">{formatTimestamp(entry.timestamp)}</span>
+                        </div>
+                      ) : entry.combatActionNotification ? (
+                        // Help, Ready or Use Item (no dice)
+                        <div className="flex items-start gap-2">
+                          <Swords className="w-4 h-4 flex-shrink-0 text-accent mt-0.5" />
+                          <div className="min-w-0">
+                            <span className="font-display text-primary">{entry.crawlerName}</span>
+                            <span className="text-foreground"> {entry.combatActionNotification.line}</span>
+                            {entry.combatActionNotification.detail && (
+                              <span className="block text-muted-foreground italic">{entry.combatActionNotification.detail}</span>
+                            )}
                           </div>
                           <span className="text-[10px] text-muted-foreground/60 ml-auto">{formatTimestamp(entry.timestamp)}</span>
                         </div>

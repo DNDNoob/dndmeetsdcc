@@ -28,7 +28,7 @@ import { useLanguages } from "@/contexts/LanguagesContext";
 import { readChatLine, usableLanguageIds, crawlerUnderstands, languageEffectLeft, DEFAULT_LANGUAGE_ID } from "@/lib/languages";
 import { useNpcSpeechPlayer } from "@/hooks/useNpcSpeechPlayer";
 import MerchantPanel, { MerchantHagglePrompts } from "@/components/MerchantPanel";
-import { isMerchant, getHaggleBlocker, MERCHANT_TRADE_RANGE_FEET, type MerchantState } from "@/lib/gameData";
+import { type IncomingAttack, isMerchant, getHaggleBlocker, MERCHANT_TRADE_RANGE_FEET, type MerchantState } from "@/lib/gameData";
 import { withNpcPersonality, speakerAsMob, mapSpeakers, baseMobId, isPlacementHostile, NPC_TALK_RANGE_FEET, NPC_EARSHOT_FEET, type TranslateMode, type ChatMessage, type NpcAiSettings, type NpcAiStatus, type NpcSecretEntry, type NpcSecretState, type NpcGeneratedPersonality, type NpcMemory } from "@/lib/gameData";
 
 const NO_GENERATED_PERSONALITIES: Record<string, NpcGeneratedPersonality> = {};
@@ -104,7 +104,10 @@ interface ShowTimeViewProps {
   // DM mob actions in combat
   spells?: import("@/lib/gameData").Spell[];
   onApplyCombatDamageBatch?: (hits: CombatHit[]) => Promise<void>;
-  onRecordCombatAction?: (combatantId: string, actionType: 'action' | 'bonus') => Promise<void>;
+  onRecordCombatAction?: (combatantId: string, actionType: 'action' | 'bonus' | 'reaction') => Promise<void>;
+  onSendIncomingAttacks?: (attacks: IncomingAttack[]) => Promise<void>;
+  onAnswerIncomingAttack?: (attackId: string, targetId: string, choice: 'dodge' | 'take') => Promise<boolean>;
+  onClearIncomingAttack?: (attackId: string) => Promise<void>;
   onOverrideMobHealth?: (combatantId: string, newHP: number) => Promise<void>;
   onHealCrawler?: (crawlerId: string, amount: number) => Promise<void>;
 }
@@ -767,7 +770,7 @@ const InventoryPanel: React.FC<{
   );
 };
 
-const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock, noncombatTurnState, resetNoncombatTurns, combatState, onRemoveCombatant, onRemoveCombatCondition, onRuntimePlacementsChange, onGameActiveChange, onRegisterGameToggle, roomId, quests = [], assignedQuests = [], onAssignQuest, onUpdateAssignedQuest, onAwardQuestXP, onDeleteAssignedQuest, currentPlayerId, onRecordCrawlerMove, onSetMobEncountered, chatMessages = [], npcAiSettings = null, npcAiStatus = null, npcSecrets = {}, npcPersonalities = NO_GENERATED_PERSONALITIES, npcMemories = NO_NPC_MEMORIES, onSetNpcMemory, onSendChatMessage, onClearChat, onUpdateNpcAiSettings, onSetNpcSecretState, npcKeys, onChangeNpcKeys, merchants = NO_MERCHANTS, onBuyFromMerchant, onSeeMerchantStock, onSeeCombatAction, onSellToMerchant, onHaggleWithMerchant, onRestockMerchant, onResolveMerchantHaggle, onSetTranslateMode, spells = NO_SPELLS, onApplyCombatDamageBatch, onRecordCombatAction, onOverrideMobHealth, onHealCrawler }) => {
+const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, mobs, crawlers, isAdmin, onUpdateEpisode, isNavVisible = false, isDiceExpanded = false, lootBoxes = [], lootBoxTemplates = [], sendLootBox, unlockLootBox, deleteLootBox, addDiceRoll, onEndEpisode: onEndEpisodeCallback, onShowtimeActiveChange, getCrawlerInventory, onUpdateCrawlerInventory, getSharedInventory, onSetGameClock, noncombatTurnState, resetNoncombatTurns, combatState, onRemoveCombatant, onRemoveCombatCondition, onRuntimePlacementsChange, onGameActiveChange, onRegisterGameToggle, roomId, quests = [], assignedQuests = [], onAssignQuest, onUpdateAssignedQuest, onAwardQuestXP, onDeleteAssignedQuest, currentPlayerId, onRecordCrawlerMove, onSetMobEncountered, chatMessages = [], npcAiSettings = null, npcAiStatus = null, npcSecrets = {}, npcPersonalities = NO_GENERATED_PERSONALITIES, npcMemories = NO_NPC_MEMORIES, onSetNpcMemory, onSendChatMessage, onClearChat, onUpdateNpcAiSettings, onSetNpcSecretState, npcKeys, onChangeNpcKeys, merchants = NO_MERCHANTS, onBuyFromMerchant, onSeeMerchantStock, onSeeCombatAction, onSellToMerchant, onHaggleWithMerchant, onRestockMerchant, onResolveMerchantHaggle, onSetTranslateMode, spells = NO_SPELLS, onApplyCombatDamageBatch, onRecordCombatAction, onSendIncomingAttacks, onAnswerIncomingAttack, onClearIncomingAttack, onOverrideMobHealth, onHealCrawler }) => {
   const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
   const selectedEpisodeIdRef = useRef<string | null>(null);
   const [currentMapIndex, setCurrentMapIndex] = useState(0);
@@ -3327,6 +3330,9 @@ const ShowTimeView: React.FC<ShowTimeViewProps> = ({ maps, mapNames, episodes, m
             addDiceRoll={addDiceRoll}
             onApplyDamage={onApplyCombatDamageBatch}
             onRecordAction={onRecordCombatAction}
+            onSendIncomingAttacks={onSendIncomingAttacks}
+            onAnswerIncomingAttack={onAnswerIncomingAttack}
+            onClearIncomingAttack={onClearIncomingAttack}
             onOverrideMobHealth={onOverrideMobHealth}
             onHealCrawler={onHealCrawler}
             onActionSeen={onSeeCombatAction}

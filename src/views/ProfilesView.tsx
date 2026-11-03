@@ -16,17 +16,19 @@ import { SkillsPanel, CheckDifficultyPicker } from "@/components/SkillsPanel";
 import { usableLanguageIds } from "@/lib/languages";
 import { HealthBar } from "@/components/ui/HealthBar";
 import { EquipmentSlot } from "@/components/ui/EquipmentSlot";
-import { Crawler, getQuestProgress, Mob, InventoryItem, getItemStackKey, stackItems, getLootingLevel, getLootsUntilNextLevel, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery, getInitialCrawlerId, rollD20, rollsWithDisadvantage, ABILITY_KEYS, baseItemName, type SpellEffect, describeSpellEffect, getSkillRank, getSkillXPToSpend, getWeaponProficiency, HAND_TO_HAND, getCheckDC, SKILLS, type SkillDef, type CheckDifficultyId, getCrawlerXP, type SkillId, type AbilityKey, getCrawlerStatValue, getHighlightStats, type StatSource, type CrawlerStats, type CrawlerStatsById, getUpgradeKind, resolveUpgradeXp, getUpgradeXp, getUpgradeTier, statKey, type UpgradeXpBreakdown, type EquippedItems } from "@/lib/gameData";
+import { Crawler, getQuestProgress, Mob, InventoryItem, getItemStackKey, stackItems, getLootingLevel, getLootsUntilNextLevel, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery, getInitialCrawlerId, rollD20, rollsWithDisadvantage, ABILITY_KEYS, baseItemName, type SpellEffect, describeSpellEffect, getSkillRank, getSkillXPToSpend, getWeaponProficiency, HAND_TO_HAND, getCheckDC, SKILLS, type SkillDef, type CheckDifficultyId, getCrawlerXP, type SkillId, type AbilityKey, getCrawlerStatValue, getHighlightStats, type StatSource, type CrawlerStats, type CrawlerStatsById, getUpgradeKind, resolveUpgradeXp, getUpgradeXp, getUpgradeTier, statKey, type UpgradeXpBreakdown, type EquippedItems, getDodgeBonus } from "@/lib/gameData";
 import { UpgradeXpBar } from "@/components/UpgradeXpBar";
 import { UpgradeList } from "@/components/UpgradeList";
 import { UpgradePathPrompt } from "@/components/UpgradePathPrompt";
+import { CombatActionCards, UseItemCard } from "@/components/DefaultActionCards";
+import { getDefaultAbility } from "@/lib/defaultAbilities";
 import { resolveKnownSpell, hasDrawback } from "@/lib/upgrades";
 import { toast } from "sonner";
 import { ItemName } from "@/components/ItemName";
 import type { DiceRollEntry } from "@/hooks/useGameState";
 import UndoTurnButton, { canUndoCombatTurn } from "@/components/UndoTurnButton";
 import { getCrawlerArmor } from "@/lib/armor";
-import { Shield, Zap, Heart, Brain, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Backpack, HardHat, Package, Lock, Unlock, ChevronDown, ChevronUp, Check, Search, Send, BookOpen, Filter, X, Gem, Footprints, Shirt, Hand, Target, Swords, RefreshCw, Timer, ScrollText, Eye, EyeOff, CheckSquare, Trophy, Skull, HeartCrack, Crown, Minus, Wand2, Star, BarChart3 } from "lucide-react";
+import { Shield, Zap, Heart, Brain, Wind, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Backpack, HardHat, Package, Lock, Unlock, ChevronDown, ChevronUp, Check, Search, Send, BookOpen, Filter, X, Gem, Footprints, Shirt, Hand, Target, Swords, RefreshCw, Timer, ScrollText, Eye, EyeOff, CheckSquare, Trophy, Skull, HeartCrack, Crown, Minus, Wand2, Star, BarChart3 } from "lucide-react";
 
 const NO_CRAWLER_STATS: CrawlerStats[] = [];
 
@@ -117,7 +119,7 @@ interface ProfilesViewProps {
   isShowtimeActive?: boolean;
   combatState?: CombatState | null;
   onRecordCombatInitiative?: (combatantId: string, roll: number) => Promise<void>;
-  onRecordCombatAction?: (combatantId: string, actionType: 'action' | 'bonus') => Promise<void>;
+  onRecordCombatAction?: (combatantId: string, actionType: 'action' | 'bonus' | 'reaction') => Promise<void>;
   onUndoCombatTurn?: () => Promise<boolean>;
   onApplyCombatDamage?: (targetId: string, targetType: 'crawler' | 'mob', damage: number, attackerId?: string, source?: StatSource) => Promise<void>;
   onApplyCombatDamageBatch?: (hits: { targetId: string; targetType: 'crawler' | 'mob'; damage: number }[], attackerId?: string, source?: StatSource) => Promise<void>;
@@ -2326,6 +2328,62 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                   </div>
                 ))}
 
+                {/* Help, Ready, Grapple, Shove: actions every character has in combat */}
+                {isCombatActive && (() => {
+                  const strTotal = selected.str + (equippedMods.str ?? 0);
+                  const athleticsBonus = Math.floor((strTotal - 10) / 2) + getSkillRank(selected, 'athletics');
+                  const canCombatAct = !!isMyTurn && !hasUsedAction && !!myCombatant;
+                  const allies = (combatState?.combatants ?? []).filter(c => c.type === 'crawler' && c.id !== selected.id).map(c => ({ id: c.id, name: c.name }));
+                  const logLine = (line: string, detail?: string) => addDiceRoll?.({
+                    id: crypto.randomUUID(),
+                    crawlerName: selected.name,
+                    crawlerId: selected.id,
+                    timestamp: Date.now(),
+                    results: [],
+                    total: 0,
+                    combatActionNotification: { line, ...(detail ? { detail } : {}) },
+                  });
+                  return (
+                    <div>
+                      <h3 className="font-display text-base text-accent mb-3 flex flex-wrap items-baseline gap-2">
+                        <Swords className="w-4 h-4 self-center" /> Default Actions
+                        <span className="text-xs text-muted-foreground font-sans">Every character can do these on their combat turn. Each uses your action.</span>
+                      </h3>
+                      <CombatActionCards
+                        enabled={canCombatAct}
+                        allies={allies}
+                        athleticsBonus={athleticsBonus}
+                        onHelp={async (allyId) => {
+                          const ally = allies.find(a => a.id === allyId);
+                          await onApplyCombatConditions?.([allyId], { condition: 'Helped', turns: 1, description: `Advantage on the next roll (helped by ${selected.name})` }, 'Help', selected.name, selected.id);
+                          await logLine(`helps ${ally?.name ?? 'an ally'}`, 'Advantage on their next roll');
+                          onRecordCombatAction?.(selected.id, 'action');
+                        }}
+                        onReady={async (trigger) => {
+                          // Lasts through the rest of this round (it wears off at the end of your next turn)
+                          await onApplyCombatConditions?.([selected.id], { condition: 'Readied', turns: 2, description: trigger }, 'Ready', selected.name, selected.id);
+                          await logLine('readies an action', trigger);
+                          onRecordCombatAction?.(selected.id, 'action');
+                        }}
+                        onAthletics={(id) => {
+                          const ability = getDefaultAbility(id)!;
+                          const { rawRoll, results, diceLabel } = rollD20(rollsWithDisadvantage(selected, strTotal));
+                          addDiceRoll?.({
+                            id: crypto.randomUUID(),
+                            crawlerName: selected.name,
+                            crawlerId: selected.id,
+                            timestamp: Date.now(),
+                            results,
+                            total: rawRoll + athleticsBonus,
+                            statRoll: { stat: `${ability.name} (Athletics vs target's Athletics or Acrobatics)`, modifier: athleticsBonus, rawRoll, diceLabel },
+                          });
+                          onRecordCombatAction?.(selected.id, 'action');
+                        }}
+                      />
+                    </div>
+                  );
+                })()}
+
                 <CheckDifficultyPicker difficulty={checkDifficulty} onChange={setCheckDifficulty} dungeonFloor={dungeonFloor} />
 
                 {([
@@ -2480,6 +2538,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
               const myCombatant = combatState?.combatants.find(c => c.id === selected.id);
               const hasUsedAction = myCombatant?.hasUsedAction ?? false;
               const hasUsedBonusAction = myCombatant?.hasUsedBonusAction ?? false;
+              const hasUsedReaction = myCombatant?.hasUsedReaction ?? false;
               const combatTargets = combatState?.combatants.filter(c => c.id !== selected.id) ?? [];
 
               const knownSpells = selected.knownSpells ?? [];
@@ -2490,7 +2549,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
 
               // Same turn rules as the Attacks, Bonus Actions and Reactions tabs
               const getLockedReason = (actionType: SpellActionType): string | null => {
-                if (actionType === 'Reaction' || !isAnyCombatActive) return null;
+                if (actionType === 'Reaction') return isAnyCombatActive && myCombatant && hasUsedReaction ? 'Reaction used this round' : null;
+                if (!isAnyCombatActive) return null;
                 if (combatState?.phase === 'initiative') return 'Rolling initiative';
                 if (!isMyTurn) return 'Not your turn';
                 if (actionType === 'Action' && hasUsedAction) return 'Action used';
@@ -2529,7 +2589,9 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 const cast = await onCastSpell?.(selected.id, ks.spellId);
                 if (!cast) return;
 
-                if (isCombatPhaseLocal && isMyTurn && sd.actionType !== 'Reaction') {
+                if (isCombatPhaseLocal && sd.actionType === 'Reaction') {
+                  onRecordCombatAction?.(selected.id, 'reaction');
+                } else if (isCombatPhaseLocal && isMyTurn) {
                   onRecordCombatAction?.(selected.id, sd.actionType === 'Action' ? 'action' : 'bonus');
                 }
 
@@ -2694,9 +2756,16 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
 
             {/* Reactions Tab */}
             {activeTab === 'reactions' && (() => {
-              // Reactions are ALWAYS clickable, regardless of turn
+              // Reactions work on anyone's turn; in combat you get one per round, back at the start of your turn
+              const isCombatPhaseLocal = combatState?.active && combatState.phase === 'combat';
+              const myCombatant = combatState?.combatants.find(c => c.id === selected.id);
+              const reactionUsed = !!isCombatPhaseLocal && !!myCombatant?.hasUsedReaction;
+              const isMyTurn = isCombatPhaseLocal && combatState?.combatants[combatState.currentTurnIndex]?.id === selected.id;
+              const dodgeBonus = getDodgeBonus(selected, equippedMods.dex ?? 0);
+              const fmt = (n: number) => `${n >= 0 ? '+' : ''}${n}`;
               const handleReactionRoll = (actionName: string, stat: 'str' | 'dex' | 'con' | 'int' | 'cha') => {
-                const baseStat = (selected as Record<string, unknown>)[stat] as number;
+                if (reactionUsed) return;
+                const baseStat = (selected as unknown as Record<string, unknown>)[stat] as number;
                 const mod = equippedMods[stat as keyof StatModifiers] ?? 0;
                 const total = baseStat + mod;
                 const modifier = Math.floor((total - 10) / 2);
@@ -2711,26 +2780,62 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                     timestamp: Date.now(),
                     results,
                     total: rollTotal,
-                    statRoll: { stat: actionName, modifier, rawRoll, diceLabel },
+                    statRoll: { stat: actionName, modifier, rawRoll, diceLabel, rollType: 'Reaction' },
                   });
                 }
+                if (isCombatPhaseLocal && myCombatant) onRecordCombatAction?.(selected.id, 'reaction');
               };
+              const card = (enabled: boolean) => `flex flex-col items-center gap-2 p-4 border-2 rounded-lg transition-colors group text-center ${
+                enabled ? 'border-accent/50 bg-accent/5 hover:bg-accent/20 hover:border-accent' : 'border-border/50 bg-muted/20 opacity-50 cursor-not-allowed'
+              }`;
 
               return (
                 <div className="space-y-6">
                   <h2 className="font-display text-xl text-primary flex items-center gap-2">
                     <RefreshCw className="w-6 h-6" /> REACTIONS
                   </h2>
-                  <p className="text-xs text-muted-foreground">Reactions can be used at any time, even when it is not your turn.</p>
+                  <p className="text-xs text-muted-foreground">
+                    Reactions can be used at any time, even when it is not your turn. In combat you get one reaction per round; it comes back at the start of your turn.
+                  </p>
+
+                  {isCombatPhaseLocal && myCombatant && (
+                    <div className={`border-2 rounded-lg px-4 py-2 ${reactionUsed ? 'border-border bg-muted/30' : 'border-accent bg-accent/10'}`}>
+                      <span className={`text-sm font-display ${reactionUsed ? 'text-muted-foreground' : 'text-accent'}`}>
+                        {reactionUsed ? 'Reaction used. It comes back at the start of your turn.' : 'REACTION READY'}
+                      </span>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {/* Dodge: asked automatically when a mob's attack would hit */}
+                    <div className={card(!reactionUsed).replace('hover:bg-accent/20 hover:border-accent', '')} title={getDefaultAbility('dodge')!.description}>
+                      <Wind className={`w-8 h-8 ${reactionUsed ? 'text-muted-foreground' : 'text-accent'}`} />
+                      <span className={`text-sm font-display ${reactionUsed ? 'text-muted-foreground' : 'text-accent'}`}>Dodge</span>
+                      <span className="text-[10px] text-muted-foreground">d20 {fmt(dodgeBonus)} vs the attack roll</span>
+                      <span className="text-[10px] text-primary">Asked when a hit comes in</span>
+                    </div>
+
+                    {/* Opportunity Attack: attack from the Attacks tab off your turn */}
+                    <button
+                      onClick={() => setActiveTab('attacks')}
+                      disabled={reactionUsed || !!isMyTurn}
+                      className={card(!reactionUsed && !isMyTurn)}
+                      title={getDefaultAbility('opportunity-attack')!.description}
+                    >
+                      <Swords className={`w-8 h-8 ${!reactionUsed && !isMyTurn ? 'text-accent group-hover:scale-110 transition-transform' : 'text-muted-foreground'}`} />
+                      <span className={`text-sm font-display ${!reactionUsed && !isMyTurn ? 'text-accent' : 'text-muted-foreground'}`}>Opportunity Attack</span>
+                      <span className="text-[10px] text-muted-foreground">Enemy leaves your reach? Attack once</span>
+                    </button>
+
                     {/* Trip Reaction */}
                     <button
                       onClick={() => handleReactionRoll('Trip', 'dex')}
-                      className="flex flex-col items-center gap-2 p-4 border-2 border-accent/50 rounded-lg bg-accent/5 hover:bg-accent/20 hover:border-accent transition-colors group"
+                      disabled={reactionUsed}
+                      className={card(!reactionUsed)}
+                      title={getDefaultAbility('trip')!.description}
                     >
-                      <Footprints className="w-8 h-8 text-accent group-hover:scale-110 transition-transform" />
-                      <span className="text-sm font-display text-accent">Trip</span>
+                      <Footprints className={`w-8 h-8 ${reactionUsed ? 'text-muted-foreground' : 'text-accent group-hover:scale-110 transition-transform'}`} />
+                      <span className={`text-sm font-display ${reactionUsed ? 'text-muted-foreground' : 'text-accent'}`}>Trip</span>
                       <span className="text-[10px] text-muted-foreground">DEX check (d20 + modifier)</span>
                     </button>
                   </div>
@@ -2745,7 +2850,15 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
               const isMyTurn = isCombatPhaseLocal && combatState && combatState.combatants[combatState.currentTurnIndex]?.id === selected.id;
               const myCombatant = combatState?.combatants.find(c => c.id === selected.id);
               const hasUsedAction = myCombatant?.hasUsedAction ?? false;
-              const canAttack = !isAnyCombatActive || (isMyTurn && !hasUsedAction);
+              // Off your turn, an attack is an Opportunity Attack and uses your reaction
+              const hasUsedReaction = myCombatant?.hasUsedReaction ?? false;
+              const isOpportunity = !!isCombatPhaseLocal && !isMyTurn && !!myCombatant && !hasUsedReaction;
+              const canAttack = !isAnyCombatActive || (isMyTurn && !hasUsedAction) || isOpportunity;
+              const attackLabel = isOpportunity ? 'Opportunity Attack' : 'Attack';
+              const recordAttackUse = () => {
+                if (isCombatPhaseLocal && isMyTurn) onRecordCombatAction?.(selected.id, 'action');
+                else if (isOpportunity) onRecordCombatAction?.(selected.id, 'reaction');
+              };
 
               const combatTargets = combatState?.combatants.filter(c => c.id !== selected.id) ?? [];
 
@@ -2786,7 +2899,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                     timestamp: Date.now(),
                     results,
                     total: rollTotal,
-                    statRoll: { stat: `${attackName} (Attack)`, modifier, rawRoll, rollType: 'Attack roll', diceLabel },
+                    statRoll: { stat: `${attackName} (${attackLabel})`, modifier, rawRoll, rollType: 'Attack roll', diceLabel },
                     source,
                   });
                 }
@@ -2799,9 +2912,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                   setSplashTargetIds([]);
                 }
 
-                if (isCombatPhaseLocal && isMyTurn) {
-                  onRecordCombatAction?.(selected.id, 'action');
-                }
+                recordAttackUse();
               };
 
               const handleWeaponAttackRoll = (weapon: InventoryItem, chosenAdvantage?: 'advantage' | 'disadvantage') => {
@@ -2845,7 +2956,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                     timestamp: Date.now(),
                     results,
                     total: rollTotal,
-                    statRoll: { stat: `${weapon.name} (Attack)`, modifier: hitDieResult + hitStatMod, rawRoll, rollType: 'Attack roll' },
+                    statRoll: { stat: `${weapon.name} (${attackLabel})`, modifier: hitDieResult + hitStatMod, rawRoll, rollType: 'Attack roll' },
                     source: weaponSource(weapon),
                   });
                 }
@@ -2860,9 +2971,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 // Splash damage: player clicks DAMAGE button to select targets & roll per-mob
                 // Non-splash: damage target modal opened above
 
-                if (isCombatPhaseLocal && isMyTurn) {
-                  onRecordCombatAction?.(selected.id, 'action');
-                }
+                recordAttackUse();
               };
 
               const handleWeaponDamageRoll = (weapon: InventoryItem) => {
@@ -2916,12 +3025,14 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
 
                   {isAnyCombatActive && (
                     <div className={`border-2 rounded-lg px-4 py-2 ${
-                      isMyTurn && !hasUsedAction ? 'border-accent bg-accent/10' : 'border-border bg-muted/30'
+                      isMyTurn && !hasUsedAction ? 'border-accent bg-accent/10' : isOpportunity ? 'border-primary/60 bg-primary/10' : 'border-border bg-muted/30'
                     }`}>
-                      <span className={`text-sm font-display ${isMyTurn && !hasUsedAction ? 'text-accent' : 'text-muted-foreground'}`}>
+                      <span className={`text-sm font-display ${isMyTurn && !hasUsedAction ? 'text-accent' : isOpportunity ? 'text-primary' : 'text-muted-foreground'}`}>
                         {combatState?.phase === 'initiative'
                           ? 'Rolling initiative — attacks locked'
-                          : isMyTurn ? (hasUsedAction ? 'Action already used this turn' : 'YOUR TURN — Select an attack') : 'Waiting for your turn...'}
+                          : isMyTurn ? (hasUsedAction ? 'Action already used this turn' : 'YOUR TURN — Select an attack')
+                          : isOpportunity ? 'OPPORTUNITY ATTACK — an enemy leaves your reach? Attacking now uses your reaction'
+                          : 'Waiting for your turn... (reaction used this round)'}
                       </span>
                     </div>
                   )}
@@ -3134,6 +3245,26 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                       <span className={`text-sm font-display ${canUseBonus ? 'text-accent' : 'text-muted-foreground'}`}>Hide</span>
                       <span className="text-[10px] text-muted-foreground">DEX stealth check</span>
                     </button>
+
+                    {/* Use Item */}
+                    <UseItemCard
+                      enabled={canUseBonus}
+                      items={inventory.filter(i => !i.equipSlot && !Object.values(selected.equippedItems ?? {}).includes(i.id))}
+                      onUse={async (item, usedUp) => {
+                        if (!canUseBonus) return;
+                        await addDiceRoll?.({
+                          id: crypto.randomUUID(),
+                          crawlerName: selected.name,
+                          crawlerId: selected.id,
+                          timestamp: Date.now(),
+                          results: [],
+                          total: 0,
+                          combatActionNotification: { line: `uses ${item.name}${usedUp ? ' (used up)' : ''}`, ...(item.effects ? { detail: item.effects } : {}) },
+                        });
+                        if (usedUp) onUpdateCrawlerInventory(selected.id, inventory.filter(i => i.id !== item.id));
+                        if (isCombatPhaseLocal && isMyTurn) onRecordCombatAction?.(selected.id, 'bonus');
+                      }}
+                    />
                   </div>
                 </div>
               );
@@ -3548,6 +3679,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
 
           if (isCombatPhaseLocal && isMyTurn) {
             onRecordCombatAction?.(selected.id, 'action');
+          } else if (isCombatPhaseLocal) {
+            onRecordCombatAction?.(selected.id, 'reaction'); // Opportunity Attack
           }
           setWeaponAdvMenu(null);
         };

@@ -2,6 +2,10 @@
   {
     "date": "2026-11-03",
     "features": [
+      "💨 Dodge: every character can dodge. When a mob's attack would hit you, an Incoming Attack box asks you to Dodge (d20 + DEX + Acrobatics; meet or beat the attack roll and it misses) or take it. The DM's mob panel waits for your answer, and the DM can roll it for you or skip if you're away",
+      "🔁 Reactions are now limited to one per round, usable on anyone's turn, and come back at the start of your own turn. Dodge, Opportunity Attack, Trip and reaction spells all use it, and mobs follow the same rule",
+      "⚔️ Opportunity Attack: off your turn, the Attacks tab lets you attack once with your reaction when an enemy leaves your reach",
+      "🤝 New default combat actions for every character: Help (an ally gets advantage on their next roll), Ready (hold your action for a trigger), Grapple and Shove (Athletics checks) on the Actions tab, and Use Item (bonus action) on the Bonus Actions tab",
       "🔍 New Encountered library mode (now the default): players see only the items and spells their crawler has come across. Things they've only glimpsed (a merchant's stock, a spell cast in a fight, a spell tome they carry) show their name and description, with stats as ??? until they own or learn them. The DM picks Full, Encountered or Hidden next to each library title",
       "🤝 Crawlers can Share with party what they know about an item or spell, and Share translation of an item written in a language they read, twisting its meaning if they like (only they and the DM know)",
       "🧐 Identify: roll Perception (items) or Arcana (spells) against a Medium DC to learn every detail of something you've only seen",
