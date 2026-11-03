@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { ChevronDown, ChevronUp, Dices, Heart, Shield, Sparkles, Swords, X } from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDown, ChevronUp, Dices, Heart, Hourglass, Shield, Sparkles, Swords, Wind, X } from "lucide-react";
 import { getCrawlerArmor } from "@/lib/armor";
 import {
   formatDamageDice,
@@ -7,6 +7,7 @@ import {
   getMobCombatActions,
   type CombatState,
   type CombatantEntry,
+  type IncomingAttack,
   type Crawler,
   type InventoryItem,
   type Mob,
@@ -25,7 +26,11 @@ interface MobActionsOverlayProps {
   getCrawlerInventory?: (crawlerId: string) => InventoryItem[];
   addDiceRoll?: (entry: DiceRollEntry) => Promise<void>;
   onApplyDamage?: (hits: CombatHit[]) => Promise<void>;
-  onRecordAction?: (combatantId: string, actionType: 'action' | 'bonus') => Promise<void>;
+  onRecordAction?: (combatantId: string, actionType: 'action' | 'bonus' | 'reaction') => Promise<void>;
+  /** Dodge: hits on crawlers wait for the target to Dodge or take them */
+  onSendIncomingAttacks?: (attacks: IncomingAttack[]) => Promise<void>;
+  onAnswerIncomingAttack?: (attackId: string, targetId: string, choice: 'dodge' | 'take') => Promise<boolean>;
+  onClearIncomingAttack?: (attackId: string) => Promise<void>;
   onOverrideMobHealth?: (combatantId: string, newHP: number) => Promise<void>;
   onHealCrawler?: (crawlerId: string, amount: number) => Promise<void>;
   /** The crawlers in the fight have now seen this spell or weapon */
@@ -35,6 +40,16 @@ interface MobActionsOverlayProps {
 interface PendingAction {
   action: MobCombatAction;
   hitTotal?: number; // absent for healing
+}
+
+/** A hit sent to the targets, waiting for each crawler to Dodge or take it */
+interface AwaitingDodge {
+  attackId: string;
+  action: MobCombatAction;
+  attackerId: string;
+  attackerName: string;
+  targetIds: string[];
+  seen: boolean; // the attack has shown up in the synced combat state
 }
 
 const rollDie = (sides: number) => Math.floor(Math.random() * sides) + 1;
@@ -61,6 +76,9 @@ export const MobActionsOverlay: React.FC<MobActionsOverlayProps> = ({
   addDiceRoll,
   onApplyDamage,
   onRecordAction,
+  onSendIncomingAttacks,
+  onAnswerIncomingAttack,
+  onClearIncomingAttack,
   onOverrideMobHealth,
   onHealCrawler,
   onActionSeen,
@@ -72,6 +90,8 @@ export const MobActionsOverlay: React.FC<MobActionsOverlayProps> = ({
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [targetIds, setTargetIds] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [awaiting, setAwaiting] = useState<AwaitingDodge | null>(null);
+  const finishing = useRef<string | null>(null);
 
   // Follow the turn order: when a mob's turn starts, show that mob
   useEffect(() => {
@@ -83,14 +103,12 @@ export const MobActionsOverlay: React.FC<MobActionsOverlayProps> = ({
   const mob = combatant ? mobs.find(m => m.id === (combatant.sourceId || combatant.id)) : undefined;
   const actions = useMemo(() => (mob ? getMobCombatActions(mob, spells) : []), [mob, spells]);
 
-  if (mobCombatants.length === 0) return null;
-
   const isTheirTurn = !!combatant && current?.id === combatant.id;
   // Players can't see a mob's name until they have met it
   const feedName = (c: CombatantEntry, m?: Mob) => (m && (m.hidden || !m.encountered) ? '???' : c.name);
 
   const blockedReason = (action: MobCombatAction): string | null => {
-    if (action.actionType === 'Reaction') return null;
+    if (action.actionType === 'Reaction') return combatant?.hasUsedReaction ? 'Reaction used this round' : null;
     if (!isTheirTurn) return 'Not its turn (only reactions)';
     if (action.actionType === 'Action' && combatant?.hasUsedAction) return 'Action used';
     if (action.actionType === 'Bonus Action' && combatant?.hasUsedBonusAction) return 'Bonus action used';
@@ -133,7 +151,9 @@ export const MobActionsOverlay: React.FC<MobActionsOverlayProps> = ({
         mobRoll: true,
       });
     }
-    if (isTheirTurn && action.actionType !== 'Reaction') {
+    if (action.actionType === 'Reaction') {
+      await onRecordAction?.(combatant.id, 'reaction');
+    } else if (isTheirTurn) {
       await onRecordAction?.(combatant.id, action.actionType === 'Action' ? 'action' : 'bonus');
     }
     if (action.damageDice.length > 0 || action.damageBonus) {
@@ -142,47 +162,106 @@ export const MobActionsOverlay: React.FC<MobActionsOverlayProps> = ({
     }
   };
 
+  // Rolls the action's damage or healing once and applies it to the targets
+  const rollAndApply = async (action: MobCombatAction, attackerId: string, attackerName: string, targets: CombatantEntry[]) => {
+    const results = rollDice(action.damageDice);
+    const amount = Math.max(0, results.reduce((s, r) => s + r.result, 0) + action.damageBonus);
+    const targetLabel = targets.map(t => t.name).join(', ');
+    await addDiceRoll?.({
+      id: crypto.randomUUID(),
+      crawlerName: attackerName,
+      crawlerId: attackerId,
+      timestamp: Date.now(),
+      results,
+      total: amount,
+      statRoll: {
+        stat: `${action.name} (${action.healing ? 'Healing' : 'Damage'} → ${targetLabel})`,
+        modifier: action.damageBonus,
+        rawRoll: amount - action.damageBonus,
+        diceLabel: formatDamageDice(action.damageDice),
+        rollType: action.healing ? 'Healing' : 'Damage',
+      },
+      mobRoll: true,
+    });
+    if (action.healing) {
+      for (const t of targets) {
+        if (t.type === 'crawler') await onHealCrawler?.(t.id, amount);
+        else {
+          const hp = getHP(t);
+          if (hp) await onOverrideMobHealth?.(t.id, Math.min(hp.max, hp.hp + amount));
+        }
+      }
+    } else {
+      await onApplyDamage?.(targets.map(t => ({ targetId: t.id, targetType: t.type, damage: amount, damageType: action.damageType, weaponType: action.weaponType })));
+    }
+  };
+
   const resolve = async () => {
     if (!pending || !combatant || targetIds.length === 0) return;
-    const { action } = pending;
+    const { action, hitTotal } = pending;
     setBusy(true);
     try {
-      const results = rollDice(action.damageDice);
-      const amount = Math.max(0, results.reduce((s, r) => s + r.result, 0) + action.damageBonus);
       const targets = combatState.combatants.filter(c => targetIds.includes(c.id));
-      const targetLabel = targets.map(t => t.name).join(', ');
-      await addDiceRoll?.({
-        id: crypto.randomUUID(),
-        crawlerName: feedName(combatant, mob),
-        crawlerId: combatant.id,
-        timestamp: Date.now(),
-        results,
-        total: amount,
-        statRoll: {
-          stat: `${action.name} (${action.healing ? 'Healing' : 'Damage'} → ${targetLabel})`,
-          modifier: action.damageBonus,
-          rawRoll: amount - action.damageBonus,
-          diceLabel: formatDamageDice(action.damageDice),
-          rollType: action.healing ? 'Healing' : 'Damage',
-        },
-        mobRoll: true,
+      const attackerName = feedName(combatant, mob);
+      // Crawlers this would hit who still have their reaction get to Dodge first
+      const dodgers = action.healing || hitTotal === undefined || !onSendIncomingAttacks ? [] : targets.filter(t => {
+        if (t.type !== 'crawler' || t.hasUsedReaction) return false;
+        const hp = getHP(t);
+        return !!hp && hp.hp > 0 && hitTotal >= (hp.dc ?? 0);
       });
-      if (action.healing) {
-        for (const t of targets) {
-          if (t.type === 'crawler') await onHealCrawler?.(t.id, amount);
-          else {
-            const hp = getHP(t);
-            if (hp) await onOverrideMobHealth?.(t.id, Math.min(hp.max, hp.hp + amount));
-          }
-        }
+      if (dodgers.length > 0 && hitTotal !== undefined) {
+        const attackId = crypto.randomUUID();
+        const at = Date.now();
+        await onSendIncomingAttacks?.(dodgers.map(t => ({
+          attackId,
+          targetId: t.id,
+          attackerId: combatant.id,
+          attackerName,
+          actionName: action.name,
+          hitTotal,
+          dc: getHP(t)?.dc ?? 0,
+          at,
+          status: 'waiting' as const,
+        })));
+        setAwaiting({ attackId, action, attackerId: combatant.id, attackerName, targetIds: targets.map(t => t.id), seen: false });
       } else {
-        await onApplyDamage?.(targets.map(t => ({ targetId: t.id, targetType: t.type, damage: amount, damageType: action.damageType, weaponType: action.weaponType })));
+        await rollAndApply(action, combatant.id, attackerName, targets);
       }
       setPending(null);
     } finally {
       setBusy(false);
     }
   };
+
+  // When every target has answered, roll damage once for those who didn't dodge
+  const awaitingEntries = useMemo(
+    () => (awaiting ? (combatState.incomingAttacks ?? []).filter(a => a.attackId === awaiting.attackId) : []),
+    [awaiting, combatState.incomingAttacks]
+  );
+  useEffect(() => {
+    if (!awaiting) return;
+    if (awaitingEntries.length === 0) {
+      // Not synced yet, or cleared elsewhere (e.g. the turn was undone)
+      if (awaiting.seen) setAwaiting(null);
+      return;
+    }
+    if (!awaiting.seen) { setAwaiting({ ...awaiting, seen: true }); return; }
+    if (awaitingEntries.some(a => a.status === 'waiting') || finishing.current === awaiting.attackId) return;
+    finishing.current = awaiting.attackId;
+    const dodged = new Set(awaitingEntries.filter(a => a.status === 'dodged').map(a => a.targetId));
+    const targets = combatState.combatants.filter(c => awaiting.targetIds.includes(c.id) && !dodged.has(c.id));
+    (async () => {
+      try {
+        if (targets.length > 0) await rollAndApply(awaiting.action, awaiting.attackerId, awaiting.attackerName, targets);
+        await onClearIncomingAttack?.(awaiting.attackId);
+      } finally {
+        setAwaiting(null);
+        finishing.current = null;
+      }
+    })();
+    // rollAndApply reads the latest props each render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [awaiting, awaitingEntries]);
 
   const toggleTarget = (id: string) => {
     if (!pending) return;
@@ -191,6 +270,8 @@ export const MobActionsOverlay: React.FC<MobActionsOverlayProps> = ({
   };
 
   const stop = (e: React.SyntheticEvent) => e.stopPropagation();
+
+  if (mobCombatants.length === 0 && !awaiting) return null;
 
   return (
     <div
@@ -230,10 +311,48 @@ export const MobActionsOverlay: React.FC<MobActionsOverlayProps> = ({
             })()}
             <span className={combatant.hasUsedAction ? 'text-muted-foreground line-through' : 'text-accent'}>Action</span>
             <span className={combatant.hasUsedBonusAction ? 'text-muted-foreground line-through' : 'text-accent'}>Bonus</span>
+            <span className={combatant.hasUsedReaction ? 'text-muted-foreground line-through' : 'text-accent'}>Reaction</span>
             {!isTheirTurn && <span className="text-muted-foreground">· reactions only</span>}
           </div>
 
-          {pending ? (
+          {awaiting ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-1 text-foreground">
+                <Hourglass className="w-3 h-3 text-accent animate-pulse" />
+                <span><span className="font-display text-destructive">{awaiting.action.name}</span> hits. Waiting for Dodge…</span>
+              </div>
+              <div className="space-y-1">
+                {awaitingEntries.map(a => (
+                  <div key={a.targetId} className="flex items-center justify-between gap-1 px-2 py-1 rounded border border-border">
+                    <span className="text-primary truncate">{combatState.combatants.find(c => c.id === a.targetId)?.name ?? 'Crawler'}</span>
+                    {a.status === 'waiting' ? (
+                      <span className="flex gap-1 shrink-0">
+                        <button
+                          onClick={() => onAnswerIncomingAttack?.(a.attackId, a.targetId, 'dodge')}
+                          className="flex items-center gap-0.5 px-1.5 py-0.5 rounded border border-accent/60 text-accent hover:bg-accent/15"
+                          title="Roll their Dodge for them"
+                        >
+                          <Wind className="w-3 h-3" /> Dodge
+                        </button>
+                        <button
+                          onClick={() => onAnswerIncomingAttack?.(a.attackId, a.targetId, 'take')}
+                          className="px-1.5 py-0.5 rounded border border-border text-muted-foreground hover:text-foreground"
+                          title="Don't wait: the hit lands"
+                        >
+                          Hit
+                        </button>
+                      </span>
+                    ) : (
+                      <span className={`text-[10px] shrink-0 ${a.status === 'dodged' ? 'text-accent' : 'text-destructive'}`}>
+                        {a.status === 'dodged' ? `Dodged (${a.dodgeTotal})` : a.dodgeTotal !== undefined ? `Failed dodge (${a.dodgeTotal})` : 'Takes it'}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <p className="text-[10px] text-muted-foreground">Damage rolls once everyone answers. Dodge: d20 + DEX + Acrobatics, meet or beat {awaitingEntries[0]?.hitTotal ?? 'the attack'}.</p>
+            </div>
+          ) : pending ? (
             <div className="space-y-2">
               <div className="text-foreground">
                 <span className="font-display text-destructive">{pending.action.name}</span>

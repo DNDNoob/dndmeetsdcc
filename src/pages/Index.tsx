@@ -16,6 +16,7 @@ import DungeonAIView from "@/views/DungeonAIView";
 import ShowTimeView from "@/views/ShowTimeView";
 import SoundEffectsView from "@/views/SoundEffectsView";
 import MusicBar from "@/components/MusicBar";
+import { DodgePrompt } from "@/components/DodgePrompt";
 import { useMusic } from "@/hooks/useMusic";
 import WikiView from "@/views/WikiView";
 import SpellsView from "@/views/SpellsView";
@@ -32,7 +33,7 @@ import { useUpgradeMeditation } from "@/hooks/useUpgradeMeditation";
 import { useUpgradeIcons } from "@/hooks/useUpgradeIcons";
 import { useNpcSpeechMaker } from "@/hooks/useNpcSpeechMaker";
 import { toast } from "sonner";
-import { getNoChildLeftBehindBump, rollD20, rollsWithDisadvantage, isCheckSuccess, skillForLabel, SKILL_XP_PER_SUCCESS, translateModeUpdate, getEquippedModifiers, getSkillRank, getCheckDC, SKILLS } from "@/lib/gameData";
+import { getNoChildLeftBehindBump, rollD20, rollsWithDisadvantage, isCheckSuccess, skillForLabel, SKILL_XP_PER_SUCCESS, translateModeUpdate, getEquippedModifiers, getSkillRank, getCheckDC, SKILLS, getDodgeBonus } from "@/lib/gameData";
 import { buildDiscoveryView, getLibraryMode, itemDiscoveryKey, KNOWN, type LibraryKind } from "@/lib/discoveries";
 import type { DiscoveryActions } from "@/components/DiscoveryControls";
 import type { Episode, Campaign, CrawlerPlacement, EpisodeMobPlacement, Mob, PublicMap, PublicMob, PublicEpisode, InventoryItem, Spell } from "@/lib/gameData";
@@ -204,6 +205,9 @@ const Index = () => {
     forceRollInitiatives,
     advanceCombatTurn,
     recordCombatAction,
+    sendIncomingAttacks,
+    answerIncomingAttack,
+    clearIncomingAttack,
     applyCombatDamage,
     applyCombatDamageBatch,
     applyCombatConditions,
@@ -944,6 +948,23 @@ const Index = () => {
     return combatState;
   }, [combatState, activeEpisode]);
 
+  // Dodge: mob attacks that would hit the player's crawler, waiting for their answer
+  const myIncomingAttacks = useMemo(() => {
+    if (isAdmin || currentPlayer?.type !== 'crawler' || !activeCombatState?.active) return [];
+    return (activeCombatState.incomingAttacks ?? [])
+      .filter(a => a.targetId === currentPlayer.id && a.status === 'waiting')
+      .sort((a, b) => a.at - b.at);
+  }, [isAdmin, currentPlayer, activeCombatState]);
+  const myDodge = useMemo(() => {
+    const crawler = myIncomingAttacks.length > 0 ? crawlers.find(c => c.id === currentPlayer?.id) : undefined;
+    if (!crawler) return { bonus: 0, ready: false };
+    const dexMod = getEquippedModifiers(crawler, getCrawlerInventory(crawler.id)).dex ?? 0;
+    const ready = !activeCombatState?.combatants.find(c => c.id === crawler.id)?.hasUsedReaction;
+    return { bonus: getDodgeBonus(crawler, dexMod), ready };
+    // getCrawlerInventory changes with the inventory collection
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myIncomingAttacks, crawlers, currentPlayer?.id, activeCombatState, inventory]);
+
   // Stable callbacks for ShowTimeView
   const handleShowtimeActiveChange = useCallback((active: boolean, episode?: Episode | null) => {
     setIsShowtimeActive(active);
@@ -1385,6 +1406,9 @@ const Index = () => {
                 spells={spells}
                 onApplyCombatDamageBatch={isAdmin ? applyCombatDamageBatch : undefined}
                 onRecordCombatAction={isAdmin ? recordCombatAction : undefined}
+                onSendIncomingAttacks={isAdmin ? sendIncomingAttacks : undefined}
+                onAnswerIncomingAttack={isAdmin ? answerIncomingAttack : undefined}
+                onClearIncomingAttack={isAdmin ? clearIncomingAttack : undefined}
                 onOverrideMobHealth={isAdmin ? overrideMobHealth : undefined}
                 onHealCrawler={isAdmin ? healCrawler : undefined}
               />
@@ -1399,6 +1423,13 @@ const Index = () => {
               />
             )}
           </main>
+
+          <DodgePrompt
+            attacks={myIncomingAttacks}
+            reactionReady={myDodge.ready}
+            dodgeBonus={myDodge.bonus}
+            onAnswer={(attackId, choice) => answerIncomingAttack(attackId, currentPlayer.id, choice)}
+          />
 
           <DiceRoller
             crawlerName={currentPlayer.name}

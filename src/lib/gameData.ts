@@ -1768,6 +1768,7 @@ export interface CombatantEntry {
   hasRolledInitiative: boolean;
   hasUsedAction: boolean;
   hasUsedBonusAction: boolean;
+  hasUsedReaction?: boolean; // one reaction (Dodge, Trip, reaction spells) per round; back at the start of its own turn
   avatar?: string; // Deprecated: no longer saved (images made combat docs too big); look up the crawler/mob instead
   currentHP?: number; // per-combatant HP tracking (used for mob instances)
   feetMovedThisTurn?: number; // crawler movement used this turn (reset when the turn ends)
@@ -1790,7 +1791,30 @@ export interface CombatState {
   turnTimerPaused?: boolean; // DM can pause the timer
   turnStartedAt?: number; // epoch ms when current turn started
   turnSnapshot?: CombatTurnSnapshot | null; // checkpoint of the current turn, used to undo it
+  incomingAttacks?: IncomingAttack[]; // mob hits waiting for the target crawler to Dodge or take them
 }
+
+/**
+ * A mob attack that would hit a crawler, waiting for that crawler's answer: Dodge (spend their
+ * reaction on d20 + DEX + Acrobatics; meet or beat the attack roll and it misses) or take the hit.
+ * One entry per target; a splash attack shares one attackId.
+ */
+export interface IncomingAttack {
+  attackId: string;
+  targetId: string;     // crawler id
+  attackerId: string;   // mob combatant id
+  attackerName: string; // '???' for a mob the players haven't met
+  actionName: string;
+  hitTotal: number;
+  dc: number;
+  at: number;           // epoch ms
+  status: 'waiting' | 'dodged' | 'taken';
+  dodgeTotal?: number;
+}
+
+/** d20 + this to Dodge: DEX modifier (gear included) plus Acrobatics rank. */
+export const getDodgeBonus = (crawler: Crawler, equippedDex = 0): number =>
+  Math.floor(((crawler.dex ?? 10) + equippedDex - 10) / 2) + getSkillRank(crawler, 'acrobatics');
 
 // What the game looked like when a combat turn started, so the player can undo the turn.
 // Only small, mutable fields are kept (combatant avatars are not copied) to stay well
@@ -1803,6 +1827,7 @@ export interface CombatTurnSnapshot {
     currentHP?: number;
     hasUsedAction: boolean;
     hasUsedBonusAction: boolean;
+    hasUsedReaction?: boolean;
     feetMovedThisTurn?: number;
     conditions?: ActiveCondition[];
   }[];

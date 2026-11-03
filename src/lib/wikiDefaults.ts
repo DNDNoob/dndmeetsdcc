@@ -611,9 +611,33 @@ The setup list ticks the hostile mobs on the map you're on. Mobs on the episode'
 
 Combat proceeds in turn order (highest initiative first). On your turn:
 
-- **Action**: Perform an attack, use an item, or take another action
-- **Bonus Action**: Use an off-hand attack, dash, disengage, or hide
+- **Action**: Perform an attack, cast a spell, make a skill check, or use a combat action (Help, Ready, Grapple, Shove)
+- **Bonus Action**: Use an off-hand attack, dash, disengage, hide, or use an item
+- **Reaction**: One per round, usable on anyone's turn (Dodge, Opportunity Attack, Trip, reaction spells). It comes back at the start of your own turn
 - The current combatant is highlighted in the combat order bar at the top of the map
+
+## Default Actions & Reactions
+
+Every character has these, whatever their class, items or spells.
+
+| Name | Uses | What it does |
+|------|------|--------------|
+| **Dodge** | Reaction | When a mob's attack would hit you, roll d20 + DEX modifier + Acrobatics rank. Meet or beat the attack roll and it misses |
+| **Opportunity Attack** | Reaction | When an enemy leaves your reach, attack it once from the Attacks tab, even though it isn't your turn |
+| **Trip** | Reaction | DEX check to knock a creature down as it moves past. The DM decides if it falls |
+| **Help** | Action | Pick an ally: they get the **Helped** effect (advantage on their next roll) until the end of their next turn |
+| **Ready** | Action | Write a trigger ("when the door opens, I shoot"). You get the **Readied** effect; when it happens, act right away using your reaction |
+| **Grapple** | Action | Athletics check (d20 + STR modifier + Athletics rank) against the target's Athletics or Acrobatics. Win and it can't move |
+| **Shove** | Action | Athletics check against the target's Athletics or Acrobatics. Win and you push it 5 ft or knock it prone |
+| **Use Item** | Bonus action | Use a potion, scroll or other item from your pack. Tick **Used up** to remove it. The dice log shows what you used and its effects |
+
+Help, Ready, Grapple and Shove are under **Combat Actions** on the Actions tab. Use Item is on the Bonus Actions tab. Dodge, Opportunity Attack and Trip are on the Reactions tab, which shows whether your reaction is ready.
+
+### Dodging
+
+When the DM rolls a mob attack and picks you as the target, and the roll meets or beats your DC, an **Incoming Attack** box pops up on your screen: *"Goblin's Claw rolls 15 vs your DC 12."* Tap **Dodge** to spend your reaction and roll, or **Take it**. The dice log shows your Dodge roll against the attack roll as SUCCESS or FAIL.
+
+The DM's mob panel waits with **Waiting for Dodge…** and lists each target's answer. Damage is rolled once everyone has answered, and only hits the targets who didn't dodge. If a player is away, the DM can tap **Dodge** to roll it for them or **Hit** to stop waiting. You aren't asked if you already used your reaction this round or you're down to 0 HP.
 
 The DM advances turns with the "Next Turn" button. Mobs at 0 HP are skipped, so dead mobs don't get turns.
 
@@ -627,7 +651,9 @@ During combat the DM sees a **mob actions panel** in the top left of the Show Ti
 
 Tap one to roll it. The to-hit roll (d20 plus the attack's bonus) goes to the dice log under the mob's name in red, so every player sees it. Mobs the party hasn't met show as **???**. Then pick the target (each crawler shows their HP and armor DC, marked **hits** or **misses** for the roll), tap **Roll damage**, and the target's health goes down on its own. Tap **Missed** if the attack didn't land. Splash weapons and area spells let you pick several targets. Healing spells skip the to-hit roll and heal the target instead.
 
-Mobs follow the same rules as crawlers: one action and one bonus action on their turn, and only reactions when it isn't their turn. The panel crosses out the action and bonus action once they're used. To use a mob's reaction on someone else's turn, pick the mob from the menu at the top of the panel. Tap the arrow to fold the panel out of the way.
+Mobs follow the same rules as crawlers: one action and one bonus action on their turn, and one reaction per round, usable when it isn't their turn. The panel crosses out the action, bonus action and reaction once they're used.
+
+When an attack would hit a crawler who still has their reaction, tapping **Roll damage** first asks that player to Dodge (see [Dodging](#dodging)). The panel shows **Waiting for Dodge…** until they answer. To use a mob's reaction on someone else's turn, pick the mob from the menu at the top of the panel. Tap the arrow to fold the panel out of the way.
 
 ## Undo Turn
 
@@ -636,7 +662,7 @@ Moved your token by accident or clicked the wrong action? Press **Undo Turn** du
 Undoing puts everything back to how it was when your turn started:
 
 - Your token goes back to where it stood
-- Your movement, action and bonus action are refilled
+- Your movement, action and bonus action are refilled, and anyone who used a reaction during your turn gets it back
 - HP changes from damage or healing this turn are reversed, for crawlers and mobs
 - Mana spent and spell casts this turn are given back
 
