@@ -1,5 +1,12 @@
 [
   {
+    "date": "2026-10-29",
+    "features": [
+      "🎵 Background music: the DM picks a looping track for the campaign from the new Music box on the Sounds page (10 settings like Dungeon corridor, Boss fight and Tavern, plus 12 themes like Royal encounter and Haunted temple). Everyone hears it in step, and each player sets their own volume or mutes it from the bottom bar"
+    ],
+    "fixes": []
+  },
+  {
     "date": "2026-10-27",
     "features": [
       "🎨 Upgrading an item or spell now redraws its pixel icon to match the upgrade (flames for a Fire upgrade, runes for a stat boost, a red glow for a cursed bargain), on that crawler's copy only. The old icon wears a gold frame until the new one is ready",
