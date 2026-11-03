@@ -3308,6 +3308,23 @@ export const useGameState = () => {
     return ok;
   };
 
+  // Chat lines are never read again once they scroll far back, so old ones are deleted to keep every
+  // player's download (and the free Firestore quota) small. Trimming in blocks avoids a delete per message.
+  const CHAT_KEEP = 300;
+  const CHAT_TRIM_AT = 320;
+  const trimChat = async () => {
+    const all = getCollection('chatMessages') as unknown as ChatMessage[];
+    if (all.length <= CHAT_TRIM_AT) return;
+    const oldest = [...all].sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0)).slice(0, all.length - CHAT_KEEP);
+    for (let i = 0; i < oldest.length; i += 400) {
+      await batchWrite(oldest.slice(i, i + 400).map(m => ({
+        type: 'delete' as const,
+        collection: 'chatMessages' as const,
+        id: m.id,
+      })));
+    }
+  };
+
   const sendChatMessage = async (message: Omit<ChatMessage, 'id' | 'createdAt'>) => {
     const text = message.text.trim();
     if (!text) return;
@@ -3318,6 +3335,7 @@ export const useGameState = () => {
       createdAt: Date.now(),
     };
     await addItem('chatMessages', entry as unknown as Record<string, unknown>);
+    trimChat().catch(err => logger.warn('[GameState] Could not trim old chat lines', err));
     if (entry.authorType === 'crawler') {
       await bumpCrawlerStats(entry.authorId, entry.translationOf
         ? [{ path: ['translations'], inc: 1 }]

@@ -8,7 +8,9 @@
       "👁️ DMs can reveal any library entry to the party as Seen or Known, hide it again, and see which crawlers know it",
       "⚡ Faster first load: each page (Profiles, Show Time, Dungeon AI, Wiki and the rest) now downloads when you open it instead of all at once, so the app starts with about 40% less to download"
     ],
-    "fixes": []
+    "fixes": [
+      "💬 Chat history keeps only the newest 300 lines per campaign, so the page loads faster and the free database quota lasts longer (older lines are deleted automatically)"
+    ]
   },
   {
     "date": "2026-10-29",
