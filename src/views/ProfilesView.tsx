@@ -2328,6 +2328,62 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                   </div>
                 ))}
 
+                {/* Help, Ready, Grapple, Shove: actions every character has in combat */}
+                {isCombatActive && (() => {
+                  const strTotal = selected.str + (equippedMods.str ?? 0);
+                  const athleticsBonus = Math.floor((strTotal - 10) / 2) + getSkillRank(selected, 'athletics');
+                  const canCombatAct = !!isMyTurn && !hasUsedAction && !!myCombatant;
+                  const allies = (combatState?.combatants ?? []).filter(c => c.type === 'crawler' && c.id !== selected.id).map(c => ({ id: c.id, name: c.name }));
+                  const logLine = (line: string, detail?: string) => addDiceRoll?.({
+                    id: crypto.randomUUID(),
+                    crawlerName: selected.name,
+                    crawlerId: selected.id,
+                    timestamp: Date.now(),
+                    results: [],
+                    total: 0,
+                    combatActionNotification: { line, ...(detail ? { detail } : {}) },
+                  });
+                  return (
+                    <div>
+                      <h3 className="font-display text-base text-accent mb-3 flex flex-wrap items-baseline gap-2">
+                        <Swords className="w-4 h-4 self-center" /> Default Actions
+                        <span className="text-xs text-muted-foreground font-sans">Every character can do these on their combat turn. Each uses your action.</span>
+                      </h3>
+                      <CombatActionCards
+                        enabled={canCombatAct}
+                        allies={allies}
+                        athleticsBonus={athleticsBonus}
+                        onHelp={async (allyId) => {
+                          const ally = allies.find(a => a.id === allyId);
+                          await onApplyCombatConditions?.([allyId], { condition: 'Helped', turns: 1, description: `Advantage on the next roll (helped by ${selected.name})` }, 'Help', selected.name, selected.id);
+                          await logLine(`helps ${ally?.name ?? 'an ally'}`, 'Advantage on their next roll');
+                          onRecordCombatAction?.(selected.id, 'action');
+                        }}
+                        onReady={async (trigger) => {
+                          // Lasts through the rest of this round (it wears off at the end of your next turn)
+                          await onApplyCombatConditions?.([selected.id], { condition: 'Readied', turns: 2, description: trigger }, 'Ready', selected.name, selected.id);
+                          await logLine('readies an action', trigger);
+                          onRecordCombatAction?.(selected.id, 'action');
+                        }}
+                        onAthletics={(id) => {
+                          const ability = getDefaultAbility(id)!;
+                          const { rawRoll, results, diceLabel } = rollD20(rollsWithDisadvantage(selected, strTotal));
+                          addDiceRoll?.({
+                            id: crypto.randomUUID(),
+                            crawlerName: selected.name,
+                            crawlerId: selected.id,
+                            timestamp: Date.now(),
+                            results,
+                            total: rawRoll + athleticsBonus,
+                            statRoll: { stat: `${ability.name} (Athletics vs target's Athletics or Acrobatics)`, modifier: athleticsBonus, rawRoll, diceLabel },
+                          });
+                          onRecordCombatAction?.(selected.id, 'action');
+                        }}
+                      />
+                    </div>
+                  );
+                })()}
+
                 <CheckDifficultyPicker difficulty={checkDifficulty} onChange={setCheckDifficulty} dungeonFloor={dungeonFloor} />
 
                 {([
@@ -2379,62 +2435,6 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                   </div>
                 </div>
                 ))}
-
-                {/* Help, Ready, Grapple, Shove: actions every character has in combat */}
-                {(() => {
-                  const strTotal = selected.str + (equippedMods.str ?? 0);
-                  const athleticsBonus = Math.floor((strTotal - 10) / 2) + getSkillRank(selected, 'athletics');
-                  const canCombatAct = !!isMyTurn && !hasUsedAction && !!myCombatant;
-                  const allies = (combatState?.combatants ?? []).filter(c => c.id !== selected.id).map(c => ({ id: c.id, name: c.name }));
-                  const logLine = (line: string, detail?: string) => addDiceRoll?.({
-                    id: crypto.randomUUID(),
-                    crawlerName: selected.name,
-                    crawlerId: selected.id,
-                    timestamp: Date.now(),
-                    results: [],
-                    total: 0,
-                    combatActionNotification: { line, ...(detail ? { detail } : {}) },
-                  });
-                  return (
-                    <div>
-                      <h3 className="font-display text-base text-accent mb-3 flex flex-wrap items-baseline gap-2">
-                        <Swords className="w-4 h-4 self-center" /> Combat Actions
-                        <span className="text-xs text-muted-foreground font-sans">Every character can do these on their combat turn. Each uses your action.</span>
-                      </h3>
-                      <CombatActionCards
-                        enabled={canCombatAct}
-                        allies={allies}
-                        athleticsBonus={athleticsBonus}
-                        onHelp={async (allyId) => {
-                          const ally = allies.find(a => a.id === allyId);
-                          await onApplyCombatConditions?.([allyId], { condition: 'Helped', turns: 1, description: `Advantage on the next roll (helped by ${selected.name})` }, 'Help', selected.name, selected.id);
-                          await logLine(`helps ${ally?.name ?? 'an ally'}`, 'Advantage on their next roll');
-                          onRecordCombatAction?.(selected.id, 'action');
-                        }}
-                        onReady={async (trigger) => {
-                          // Lasts through the rest of this round (it wears off at the end of your next turn)
-                          await onApplyCombatConditions?.([selected.id], { condition: 'Readied', turns: 2, description: trigger }, 'Ready', selected.name, selected.id);
-                          await logLine('readies an action', trigger);
-                          onRecordCombatAction?.(selected.id, 'action');
-                        }}
-                        onAthletics={(id) => {
-                          const ability = getDefaultAbility(id)!;
-                          const { rawRoll, results, diceLabel } = rollD20(rollsWithDisadvantage(selected, strTotal));
-                          addDiceRoll?.({
-                            id: crypto.randomUUID(),
-                            crawlerName: selected.name,
-                            crawlerId: selected.id,
-                            timestamp: Date.now(),
-                            results,
-                            total: rawRoll + athleticsBonus,
-                            statRoll: { stat: `${ability.name} (Athletics vs target's Athletics or Acrobatics)`, modifier: athleticsBonus, rawRoll, diceLabel },
-                          });
-                          onRecordCombatAction?.(selected.id, 'action');
-                        }}
-                      />
-                    </div>
-                  );
-                })()}
 
                 {/* Initiative - always visible but context-aware */}
                 {!isInitiativePhase && (
@@ -2811,8 +2811,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                     <div className={card(!reactionUsed).replace('hover:bg-accent/20 hover:border-accent', '')} title={getDefaultAbility('dodge')!.description}>
                       <Wind className={`w-8 h-8 ${reactionUsed ? 'text-muted-foreground' : 'text-accent'}`} />
                       <span className={`text-sm font-display ${reactionUsed ? 'text-muted-foreground' : 'text-accent'}`}>Dodge</span>
-                      <span className="text-[10px] text-muted-foreground">d20 {fmt(dodgeBonus)} (DEX + Acrobatics). Beat the attack roll and it misses.</span>
-                      <span className="text-[10px] text-primary">Pops up when an attack would hit you</span>
+                      <span className="text-[10px] text-muted-foreground">d20 {fmt(dodgeBonus)} vs the attack roll</span>
+                      <span className="text-[10px] text-primary">Asked when a hit comes in</span>
                     </div>
 
                     {/* Opportunity Attack: attack from the Attacks tab off your turn */}
@@ -2824,7 +2824,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                     >
                       <Swords className={`w-8 h-8 ${!reactionUsed && !isMyTurn ? 'text-accent group-hover:scale-110 transition-transform' : 'text-muted-foreground'}`} />
                       <span className={`text-sm font-display ${!reactionUsed && !isMyTurn ? 'text-accent' : 'text-muted-foreground'}`}>Opportunity Attack</span>
-                      <span className="text-[10px] text-muted-foreground">An enemy leaves your reach: attack it once (opens Attacks)</span>
+                      <span className="text-[10px] text-muted-foreground">Enemy leaves your reach? Attack once</span>
                     </button>
 
                     {/* Trip Reaction */}

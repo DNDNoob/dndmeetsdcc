@@ -32,6 +32,7 @@ export const DodgePrompt: React.FC<DodgePromptProps> = ({ attacks, reactionReady
   };
 
   return (
+    <div className="fixed inset-x-0 bottom-20 z-[60] flex justify-center px-4 pointer-events-none">
     <AnimatePresence>
       {attack && (
         <motion.div
@@ -39,7 +40,7 @@ export const DodgePrompt: React.FC<DodgePromptProps> = ({ attacks, reactionReady
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 40 }}
-          className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[60] w-[calc(100%-2rem)] max-w-sm bg-background/95 backdrop-blur-sm border-2 border-destructive rounded-lg shadow-lg p-4"
+          className="pointer-events-auto w-full max-w-sm bg-background/95 backdrop-blur-sm border-2 border-destructive rounded-lg shadow-lg p-4"
           role="alertdialog"
           aria-label="Incoming attack"
         >
@@ -75,5 +76,6 @@ export const DodgePrompt: React.FC<DodgePromptProps> = ({ attacks, reactionReady
         </motion.div>
       )}
     </AnimatePresence>
+    </div>
   );
 };

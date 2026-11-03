@@ -631,7 +631,7 @@ Every character has these, whatever their class, items or spells.
 | **Shove** | Action | Athletics check against the target's Athletics or Acrobatics. Win and you push it 5 ft or knock it prone |
 | **Use Item** | Bonus action | Use a potion, scroll or other item from your pack. Tick **Used up** to remove it. The dice log shows what you used and its effects |
 
-Help, Ready, Grapple and Shove are under **Combat Actions** on the Actions tab. Use Item is on the Bonus Actions tab. Dodge, Opportunity Attack and Trip are on the Reactions tab, which shows whether your reaction is ready.
+Help, Ready, Grapple and Shove are under **Default Actions** on the Actions tab. Use Item is on the Bonus Actions tab. Dodge, Opportunity Attack and Trip are on the Reactions tab, which shows whether your reaction is ready.
 
 ### Dodging
 
