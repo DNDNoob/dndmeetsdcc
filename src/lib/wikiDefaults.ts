@@ -1654,6 +1654,38 @@ Click a sound result to play it. The sound plays for everyone connected to the s
 - **Upload**: Upload your own sound files (coming soon)`,
   },
   {
+    id: 'music',
+    slug: 'music',
+    title: 'Background Music',
+    category: 'Features',
+    order: 32.5,
+    content: `# Background Music
+
+The DM can play looping background music for the whole campaign. Everyone hears the same track, and late joiners land at the same spot in it as everyone else.
+
+## Picking a track (DM)
+
+Open the **Sounds** page. The **Music** box at the top lists every track. Tap one and it starts playing for everyone, fading in over the old track. Tap **Stop music** to fade it out.
+
+**Settings** (one track for each kind of place):
+- Dungeon corridor, Combat, Boss fight, Safe room, Tavern or club, Town or market, Forest at dusk, Crypt or haunted area, Deep cavern or water level, Show Time stage
+
+**Themes** (extra tracks for particular moments):
+- Royal encounter, Desert streets, Safe room (alternate), Grassy meadows, Home screen intro, Temple, Island, Farm, Forest, Eerie desert, Haunted temple, Combat (original)
+
+Each track is about 2 and a half minutes long and loops without a gap.
+
+## Volume and mute (everyone)
+
+While music is playing, the bottom bar shows the track's name. Tap it to change your volume or mute the music. Your volume only changes what you hear, and this browser remembers it.
+
+## "Tap to turn on music"
+
+Browsers don't play sound until you've tapped the page at least once. If the music starts before you've tapped anything, the bottom bar shows **Tap to turn on music**. Tap it and the music joins in at the right spot.
+
+On iPhones and iPads the volume slider has no effect (Apple only lets the device's own volume buttons change it). Use the mute button or your device's volume instead.`,
+  },
+  {
     id: 'dm-console',
     slug: 'dm-console',
     title: 'DM Console',

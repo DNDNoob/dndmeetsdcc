@@ -5,6 +5,8 @@ import { DungeonButton } from "@/components/ui/DungeonButton";
 import { Volume2, Search, Play, Star, Upload, Square } from "lucide-react";
 import { useFirebaseStore } from "@/hooks/useFirebaseStore";
 import { logger } from "@/lib/logger";
+import MusicPanel from "@/components/MusicPanel";
+import type { MusicControls } from "@/hooks/useMusic";
 import { storage, db } from "@/lib/firebase";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { collection, query, where, onSnapshot, serverTimestamp, addDoc, Timestamp } from "firebase/firestore";
@@ -64,7 +66,12 @@ function cleanSoundName(name: string): string {
   return cleaned || name; // Fallback to original if cleaning results in empty string
 }
 
-const SoundEffectsView: React.FC = () => {
+interface SoundEffectsViewProps {
+  music: MusicControls;
+  isDm: boolean;
+}
+
+const SoundEffectsView: React.FC<SoundEffectsViewProps> = ({ music, isDm }) => {
   const { getCollection, addItem, deleteItem, roomId } = useFirebaseStore();
   const [searchQuery, setSearchQuery] = useState("");
   const [results, setResults] = useState<SoundEffect[]>(LOCAL_SOUNDS);
@@ -338,6 +345,7 @@ const SoundEffectsView: React.FC = () => {
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold">Sound Effects Library</h1>
       </div>
+      <MusicPanel music={music} isDm={isDm} />
       <div className="mb-4">
         <input
           type="text"

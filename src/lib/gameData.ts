@@ -939,6 +939,22 @@ export interface IconLibraryEntry {
   createdBy?: string;
 }
 
+/** A looping background music track shipped with the app (public/music). */
+export interface MusicTrack {
+  id: string;
+  name: string;
+  kind: 'setting' | 'theme';  // setting = the main track for a place; theme = an extra named track
+  durationSec: number;        // loop length, used to keep every player at the same spot
+}
+
+/** What the DM is playing for the campaign (singleton doc rooms/{roomId}/music/current). */
+export interface MusicState {
+  trackId: string | null;
+  playing: boolean;
+  startedAt: number;   // epoch ms when the track started from 0, so late joiners land on the same beat
+  updatedBy?: string;
+}
+
 export const SPELL_LEARNED_FROM = ['tome', 'quest', 'level', 'race', 'class', 'granted'] as const;
 export type SpellLearnedFrom = typeof SPELL_LEARNED_FROM[number];
 

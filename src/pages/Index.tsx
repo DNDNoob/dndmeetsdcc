@@ -15,6 +15,8 @@ import MobsView from "@/views/MobsView";
 import DungeonAIView from "@/views/DungeonAIView";
 import ShowTimeView from "@/views/ShowTimeView";
 import SoundEffectsView from "@/views/SoundEffectsView";
+import MusicBar from "@/components/MusicBar";
+import { useMusic } from "@/hooks/useMusic";
 import WikiView from "@/views/WikiView";
 import SpellsView from "@/views/SpellsView";
 
@@ -301,6 +303,7 @@ const Index = () => {
 
   // Online NPC brain: runs in the DM's browser during a live game (keys stay in this browser)
   const { npcKeys, setNpcKeys } = useNpcBrain(roomId, isAdmin);
+  const music = useMusic(roomId, user);
 
   // Item and spell milestones: the DM's browser asks the Dungeon AI for upgrade trees
   useUpgradeMeditation({
@@ -1313,7 +1316,7 @@ const Index = () => {
                 onHealCrawler={isAdmin ? healCrawler : undefined}
               />
             )}
-            {currentView === "sounds" && <SoundEffectsView />}
+            {currentView === "sounds" && <SoundEffectsView music={music} isDm={isAdmin} />}
             {currentView === "wiki" && (
               <WikiView
                 wikiPages={wikiPages}
@@ -1398,8 +1401,9 @@ const Index = () => {
             onClose={() => setShowChangelog(false)}
           />
 
-          <footer className="fixed bottom-0 left-0 right-0 z-10 text-center py-2 bg-background/80 border-t border-border text-xs text-muted-foreground">
-            [ DUNGEON CRAWLER CARL - SYSTEM HUB v1.0 ]
+          <footer className="fixed bottom-0 left-0 right-0 z-10 flex items-center justify-center gap-3 py-2 bg-background/80 border-t border-border text-xs text-muted-foreground">
+            <span className={music.nowPlaying ? "hidden sm:inline" : undefined}>[ DUNGEON CRAWLER CARL - SYSTEM HUB v1.0 ]</span>
+            <MusicBar music={music} />
           </footer>
         </>
       )}
