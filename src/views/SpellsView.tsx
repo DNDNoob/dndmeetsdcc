@@ -10,7 +10,9 @@ import { DungeonCard } from "@/components/ui/DungeonCard";
 import { LanguageSelect } from "@/components/LanguagePicker";
 import { applyUpgradesToSpell } from "@/lib/upgrades";
 import { UpgradeXpEditor } from "@/components/UpgradeXpEditor";
-import { LibraryVisibilityToggle, HiddenLibraryNotice } from "@/components/LibraryVisibilityToggle";
+import { LibraryModePicker, HiddenLibraryNotice, NothingEncounteredNotice } from "@/components/LibraryVisibilityToggle";
+import { DiscoveryControls, SeenBadge, UnknownDetails, type DiscoveryActions } from "@/components/DiscoveryControls";
+import { KNOWN, SEEN, type DiscoveryView, type LibraryMode } from "@/lib/discoveries";
 import {
   Crawler,
   getInitialCrawlerId,
@@ -54,8 +56,10 @@ interface SpellsViewProps {
   iconImages?: Record<string, string>; // iconLibrary id -> pixel icon image
   onRegenerateIcon?: (subject: IconSubject) => Promise<{ id: string; image: string } | null>;
   currentPlayerId?: string; // crawler id of the player at this screen
-  libraryHidden?: boolean; // DM switch: hide the Spell Library from players
-  onSetLibraryHidden?: (hidden: boolean) => void; // DM only
+  libraryMode?: LibraryMode; // DM setting: what players see in the Spell Library
+  onSetLibraryMode?: (mode: LibraryMode) => void; // DM only
+  discoveryView?: DiscoveryView; // what the viewer has encountered
+  discoveryActions?: DiscoveryActions;
   mySpells?: Spell[];
   onSaveSpellToMyContent?: (spell: Spell) => void;
 }
@@ -577,8 +581,14 @@ function SpellCard({
   onSaveToMyContent,
   savedToMyContent,
   iconSrc,
+  limited = false,
+  discovery,
 }: {
   iconSrc?: string;
+  /** Only Seen: name, school and description, the rest is ??? */
+  limited?: boolean;
+  /** Encountered-mode controls shown when expanded */
+  discovery?: React.ReactNode;
   spell: Spell;
   isAdmin: boolean;
   onEdit: () => void;
@@ -612,18 +622,27 @@ function SpellCard({
           <PixelIcon src={iconSrc} alt={spell.name} fallback={<Wand2 className="w-3.5 h-3.5 text-primary shrink-0" />} />
           <span className="text-sm font-display text-primary truncate">{spell.name}</span>
           <span className="text-[10px] text-muted-foreground shrink-0">
-            Lvl {sd.spellLevel} {sd.school}
+            {limited ? sd.school : `Lvl ${sd.spellLevel} ${sd.school}`}
           </span>
+          {limited && <SeenBadge />}
           {expanded ? <ChevronUp className="w-3 h-3 text-muted-foreground ml-auto shrink-0" /> : <ChevronDown className="w-3 h-3 text-muted-foreground ml-auto shrink-0" />}
         </button>
         <div className="flex items-center gap-1 shrink-0">
-          <span className="text-[10px] text-accent font-display">{sd.manaCost} MP</span>
+          <span className="text-[10px] text-accent font-display">{limited ? '??' : sd.manaCost} MP</span>
           <span className="text-[10px] text-muted-foreground">·</span>
           <span className="text-[10px] text-muted-foreground">{sd.actionType}</span>
         </div>
       </div>
 
-      {expanded && (
+      {expanded && limited && (
+        <div className="space-y-1.5 border-t border-border/50 pt-2 text-xs">
+          <p className="text-muted-foreground">{spell.description}</p>
+          {sd.damageType && <div className="text-[11px]"><span className="text-muted-foreground">Type: </span>{sd.damageType}</div>}
+          <UnknownDetails kind="spells" />
+          {discovery}
+        </div>
+      )}
+      {expanded && !limited && (
         <div className="space-y-1.5 border-t border-border/50 pt-2 text-xs">
           <p className="text-muted-foreground">{spell.description}</p>
           <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
@@ -658,6 +677,8 @@ function SpellCard({
               ))}
             </div>
           )}
+
+          {discovery}
 
           {/* Creator + public toggle */}
           <div className="flex items-center gap-2 flex-wrap">
@@ -1048,8 +1069,10 @@ const SpellsView: React.FC<SpellsViewProps> = ({
   mySpells = [],
   onSaveSpellToMyContent,
   currentPlayerId,
-  libraryHidden = false,
-  onSetLibraryHidden,
+  libraryMode = 'full',
+  onSetLibraryMode,
+  discoveryView,
+  discoveryActions = {},
 }) => {
   const [selectedCrawlerId, setSelectedCrawlerId] = useState<string>(() => getInitialCrawlerId(crawlers, currentPlayerId));
   const [editingSpell, setEditingSpell] = useState<Spell | null>(null);
@@ -1058,7 +1081,12 @@ const SpellsView: React.FC<SpellsViewProps> = ({
 
   const selectedCrawler = crawlers.find(c => c.id === selectedCrawlerId);
 
-  const filteredSpells = spells.filter(s => {
+  // "Encountered only": players see just the spells they've come across, Seen ones with limited details
+  const encounteredOnly = libraryMode === 'encountered' && !isAdmin && !!discoveryView;
+  const spellLevel = (s: Spell) => (encounteredOnly ? discoveryView!.levelOf('spells', s.id) : KNOWN);
+  const visibleSpells = encounteredOnly ? spells.filter(s => spellLevel(s) >= SEEN) : spells;
+
+  const filteredSpells = visibleSpells.filter(s => {
     if (searchQuery && !s.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     if (schoolFilter && s.spellData.school !== schoolFilter) return false;
     return true;
@@ -1098,7 +1126,7 @@ const SpellsView: React.FC<SpellsViewProps> = ({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-sm font-display text-muted-foreground">SPELL LIBRARY</h2>
-              {onSetLibraryHidden && <LibraryVisibilityToggle hidden={libraryHidden} onChange={onSetLibraryHidden} />}
+              {onSetLibraryMode && <LibraryModePicker mode={libraryMode} onChange={onSetLibraryMode} />}
             </div>
             {isAdmin && (
               <DungeonButton
@@ -1112,9 +1140,13 @@ const SpellsView: React.FC<SpellsViewProps> = ({
             )}
           </div>
 
-          {libraryHidden && !isAdmin ? (
+          {libraryMode === 'hidden' && !isAdmin ? (
             <DungeonCard className="p-4">
               <HiddenLibraryNotice kind="spells" />
+            </DungeonCard>
+          ) : encounteredOnly && visibleSpells.length === 0 ? (
+            <DungeonCard className="p-4">
+              <NothingEncounteredNotice kind="spells" />
             </DungeonCard>
           ) : (<>
           {/* Filters */}
@@ -1160,6 +1192,10 @@ const SpellsView: React.FC<SpellsViewProps> = ({
                   onSaveToMyContent={onSaveSpellToMyContent ? () => onSaveSpellToMyContent(spell) : undefined}
                   savedToMyContent={mySpells.some(ms => ms.id === spell.id)}
                   iconSrc={spell.iconId ? iconImages[spell.iconId] : undefined}
+                  limited={spellLevel(spell) === SEEN}
+                  discovery={libraryMode === 'encountered' && discoveryView ? (
+                    <DiscoveryControls kind="spells" entryKey={spell.id} name={spell.name} view={discoveryView} actions={discoveryActions} />
+                  ) : undefined}
                 />
               ))}
             </div>

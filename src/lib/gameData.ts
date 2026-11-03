@@ -1942,6 +1942,9 @@ export interface GameSettings {
   dungeonFloor?: number; // the floor the party is on; raises skill check DCs (1 if missing)
   hideItemLibrary?: boolean; // DM switch: players can't see the Item Library on the Inventory page
   hideSpellLibrary?: boolean; // DM switch: players can't see the Spell Library on the Spells page
+  // What players see in each library (see lib/discoveries.ts); unset falls back to the hide switches above
+  itemLibraryMode?: 'full' | 'encountered' | 'hidden';
+  spellLibraryMode?: 'full' | 'encountered' | 'hidden';
 }
 
 // ---- Skill check difficulty ----

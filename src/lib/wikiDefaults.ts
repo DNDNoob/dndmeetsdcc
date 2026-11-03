@@ -457,9 +457,9 @@ Each item can have:
 
 The Item Library can be filtered by rarity with the **All Rarities** menu next to the slot filter. Rarity is optional; items without one show no tag. Rarity and effects can also be set on items in **My Content**.
 
-### Hiding the Item Library from players
+### What players see in the Item Library
 
-The DM sees a **Shown to players** switch next to the Item Library title. Tap it to change it to **Hidden from players**. While it is hidden, players see a short note instead of the library, and the "add from library" search in edit mode is hidden from them too. Items already in a crawler's inventory stay visible to that player. Tap the switch again to show the library. The DM always sees the full library.
+The DM picks **Full**, **Encountered** or **Hidden** next to the Item Library title. **Encountered** is the default: players see only items their crawler (or the party) has come across, and items they've only glimpsed show limited details. **Hidden** shows players a short note instead of the library. Items already in a crawler's inventory always stay visible to that player. The DM always sees the full library. See [Encountered Items & Spells](/wiki/encountered).
 
 ## Managing Inventory
 
@@ -1152,6 +1152,54 @@ Everything in Show Time syncs in real time:
 The chat button in the bottom right opens the **Game Chat** for the running episode. Players talk as their crawler and the DM talks as the DM. Hold the microphone button to speak instead of typing. Mobs with a personality answer in the chat and in speech bubbles over their heads. See [Talking NPCs](/wiki/talking-npcs).
 
 The chat tucks away when you click or tap anywhere outside it, and the dice roller does the same.`,
+  },
+  {
+    id: 'encountered',
+    slug: 'encountered',
+    title: 'Encountered Items & Spells',
+    category: 'Features',
+    order: 33.5,
+    content: `# Encountered Items & Spells
+
+In **Encountered** mode, the Item Library and Spell Library show each player only what their crawler, or the party, has come across. It is the default for every campaign. The DM changes it with the **Full / Encountered / Hidden** picker next to each library's title, separately for items and spells.
+
+## Seen and Known
+
+Each item or spell a crawler comes across is either **Seen** or **Known**.
+
+| | Seen | Known |
+|---|---|---|
+| Name, icon, rarity, description | Yes | Yes |
+| Slot, weapon type, damage type, spell school | Yes | Yes |
+| Value, stats, dice, mana cost, range, effects | ??? | Yes |
+
+Seen entries carry a **Seen** tag in the library.
+
+## How crawlers come across things
+
+Each crawler keeps their own list. Nothing ever goes from Known back to Seen.
+
+- **Known**: an item lands in the crawler's inventory (loot, loot boxes, rewards, buying from a merchant, the DM giving it), or the crawler learns a spell. Items they later sell or use up stay Known.
+- **Seen**: the crawler opens a merchant's shop (everything on sale), carries a spell tome (its spells), or is in a fight where a mob or another crawler uses a spell or a mob uses a weapon.
+- Items sitting in the party loot don't count for anyone until a crawler takes them.
+
+## Sharing with the party
+
+Expand an entry in the library to see its buttons.
+
+- **Share with party** tells every crawler what you know. Sharing a Seen entry passes on only the Seen details. Shared entries show who shared them.
+- **Share translation** appears on items whose description is written in a language you know. Write what the party will read. You can change the meaning (a twist); only you and the DM will know. Party members who can't read the language see your translation under the scrambled text.
+- **Identify** appears on Seen entries. It rolls **Perception** (items) or **Arcana** (spells) against a Medium DC. On a success your crawler knows every detail. It uses one of your rolls during a noncombat turn and can't be used in combat.
+
+## For the DM
+
+The DM always sees the whole library. In Encountered mode, expanding an entry shows:
+
+- **Party sees: Hidden / Seen / Known** to reveal an entry to the whole party, or hide it again. Hiding also clears it for every crawler, except crawlers who are holding it right now.
+- **Known by**: which crawlers know it, and who shared it.
+- Any shared translation, marked **TWISTED** if the translator changed its meaning.
+
+Like Hidden mode, this only hides things in the app.`,
   },
   {
     id: 'merchants',
@@ -1976,7 +2024,7 @@ Vernon's Library is split into two panels:
 - **Left panel — Spell Library**: The shared collection of reusable spells. DMs can create, edit, and delete spells here. Any library spell can be granted directly to a crawler.
 - **Right panel — Known Spells**: Per-crawler spell lists showing cast counts, mastery levels, and effective mana costs.
 
-The DM can hide the Spell Library from players with the **Shown to players / Hidden from players** switch next to the **SPELL LIBRARY** title. While it is hidden, players see a short note instead of the library, but still see the spells their crawlers already know.
+The DM picks what players see with the **Full / Encountered / Hidden** picker next to the **SPELL LIBRARY** title. **Encountered** (the default) shows players only spells they've come across; **Hidden** shows a short note instead of the library. Players always see the spells their crawlers already know. See [Encountered Items & Spells](/wiki/encountered).
 
 Players cast their spells from the **Spells** tab on their crawler's profile. See [Casting & Mastery](/wiki/casting-mastery).
 

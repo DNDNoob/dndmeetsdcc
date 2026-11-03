@@ -32,7 +32,9 @@ import { useUpgradeMeditation } from "@/hooks/useUpgradeMeditation";
 import { useUpgradeIcons } from "@/hooks/useUpgradeIcons";
 import { useNpcSpeechMaker } from "@/hooks/useNpcSpeechMaker";
 import { toast } from "sonner";
-import { getNoChildLeftBehindBump, rollD20, rollsWithDisadvantage, isCheckSuccess, skillForLabel, SKILL_XP_PER_SUCCESS, translateModeUpdate } from "@/lib/gameData";
+import { getNoChildLeftBehindBump, rollD20, rollsWithDisadvantage, isCheckSuccess, skillForLabel, SKILL_XP_PER_SUCCESS, translateModeUpdate, getEquippedModifiers, getSkillRank, getCheckDC, SKILLS } from "@/lib/gameData";
+import { buildDiscoveryView, getLibraryMode, itemDiscoveryKey, KNOWN, type LibraryKind } from "@/lib/discoveries";
+import type { DiscoveryActions } from "@/components/DiscoveryControls";
 import type { Episode, Campaign, CrawlerPlacement, EpisodeMobPlacement, Mob, PublicMap, PublicMob, PublicEpisode, InventoryItem, Spell } from "@/lib/gameData";
 import { publicDocId, buildEpisodeBundle } from "@/lib/publicContent";
 import { LanguagesProvider } from "@/contexts/LanguagesContext";
@@ -148,6 +150,7 @@ const Index = () => {
     addCrawler,
     deleteCrawler,
     getCrawlerInventory,
+    inventory,
     updateCrawlerInventory,
     getSharedInventory,
     updateSharedInventory,
@@ -274,7 +277,14 @@ const Index = () => {
     gameSettings,
     setXPScale,
     setDungeonFloor,
-    setLibraryHidden,
+    setLibraryMode,
+    discoveries,
+    markDiscovered,
+    markSeenInCombat,
+    syncOwnedDiscoveries,
+    shareDiscovery,
+    shareItemTranslation,
+    revealDiscovery,
     awardCrawlerXP,
     spendSkillXP,
     awardSkillXP,
@@ -825,6 +835,7 @@ const Index = () => {
     // A passed check with a roll skill earns that skill XP
     const skill = skillForLabel(stat);
     if (success && skill?.kind === 'roll') void awardSkillXP(crawlerId, skill.id, SKILL_XP_PER_SUCCESS);
+    return success;
   };
 
   const handleToggleMapVisibility = (index: number) => {
@@ -969,6 +980,62 @@ const Index = () => {
     () => (isAdmin ? null : crawlers.find(c => c.id === currentPlayer?.id) ?? null),
     [isAdmin, crawlers, currentPlayer?.id]
   );
+
+  // --- Encountered items and spells ---
+  const itemLibraryMode = getLibraryMode(gameSettings, 'items');
+  const spellLibraryMode = getLibraryMode(gameSettings, 'spells');
+  const discoveryView = useMemo(
+    () => buildDiscoveryView(discoveries, crawlers, getCrawlerInventory, languageReader, isAdmin),
+    // getCrawlerInventory changes with the inventory collection
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [discoveries, crawlers, inventory, languageReader, isAdmin]
+  );
+
+  // Remember what crawlers hold, so items they later sell or use up stay Known. The DM's window
+  // saves for every crawler (covers players who are offline), a player's for their own crawler.
+  const discoverySyncIds = isAdmin ? crawlers.map(c => c.id).join(',') : currentPlayer?.type === 'crawler' ? currentPlayer.id : '';
+  useEffect(() => {
+    if (!isLoaded || !discoverySyncIds) return;
+    syncOwnedDiscoveries(discoverySyncIds.split(','));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded, discoverySyncIds, crawlers, inventory, discoveries]);
+
+  // Identify: a Perception (items) or Arcana (spells) check at Medium DC turns a Seen entry into Known
+  const handleIdentify = (kind: LibraryKind, key: string, name: string) => {
+    const crawler = languageReader;
+    if (!crawler) return;
+    if (activeCombatState?.active && activeCombatState.phase !== 'ended') {
+      toast.error("You can't study things in the middle of a fight.");
+      return;
+    }
+    const turnActive = !!noncombatTurnState && isShowtimeActive;
+    if (turnActive && getNoncombatRollsRemaining(crawler.id) <= 0) {
+      toast.error(`${crawler.name} has no rolls left this turn.`);
+      return;
+    }
+    const skill = SKILLS.find(s => s.id === (kind === 'items' ? 'perception' : 'arcana'))!;
+    const mods = getEquippedModifiers(crawler, getCrawlerInventory(crawler.id));
+    const stat = (crawler[skill.ability] ?? 10) + (mods[skill.ability] ?? 0);
+    const dc = getCheckDC('medium', gameSettings?.dungeonFloor ?? 1);
+    const success = handleStatRoll(crawler.name, crawler.id, `${skill.name} check: identify ${name}`, stat, getSkillRank(crawler, skill.id), dc);
+    if (turnActive) recordNoncombatRoll(crawler.id);
+    if (success) {
+      void markDiscovered([crawler.id], kind, [key], KNOWN);
+      toast.success(`${crawler.name} worked out what ${name} does!`);
+    } else {
+      toast.error(`${crawler.name} couldn't work out ${name}.`);
+    }
+  };
+
+  const discoveryActions: DiscoveryActions = isAdmin
+    ? { reveal: (kind, key, level) => void revealDiscovery(kind, key, level) }
+    : languageReader
+      ? {
+          share: (kind, key, level) => void shareDiscovery(languageReader, kind, key, level),
+          shareTranslation: (key, text, twisted, level) => void shareItemTranslation(languageReader, key, text, twisted, level),
+          identify: handleIdentify,
+        }
+      : {};
 
   // While auth is still loading, show a loading indicator to avoid flashing
   // the splash screen before we know if the user should be redirected to landing
@@ -1161,8 +1228,10 @@ const Index = () => {
                 onConsumeSpellTome={consumeSpellTome}
                 onPromoteSpellToLibrary={promoteSpellToLibrary}
                 isAdmin={isAdmin}
-                libraryHidden={!!gameSettings?.hideItemLibrary}
-                onSetLibraryHidden={isAdmin ? (hidden) => setLibraryHidden('items', hidden) : undefined}
+                libraryMode={itemLibraryMode}
+                onSetLibraryMode={isAdmin ? (mode) => setLibraryMode('items', mode) : undefined}
+                discoveryView={discoveryView}
+                discoveryActions={discoveryActions}
                 currentUserId={user?.uid}
                 currentUsername={userProfile?.username}
                 publicItems={publicItems}
@@ -1186,8 +1255,10 @@ const Index = () => {
                 onCastSpell={castSpell}
                 onPromoteSpellToLibrary={promoteSpellToLibrary}
                 isAdmin={isAdmin}
-                libraryHidden={!!gameSettings?.hideSpellLibrary}
-                onSetLibraryHidden={isAdmin ? (hidden) => setLibraryHidden('spells', hidden) : undefined}
+                libraryMode={spellLibraryMode}
+                onSetLibraryMode={isAdmin ? (mode) => setLibraryMode('spells', mode) : undefined}
+                discoveryView={discoveryView}
+                discoveryActions={discoveryActions}
                 currentUserId={user?.uid}
                 currentUsername={userProfile?.username}
                 publicSpells={publicSpells}
@@ -1305,6 +1376,8 @@ const Index = () => {
                 onSetTranslateMode={async (crawlerId, mode) => { const c = crawlers.find(x => x.id === crawlerId); await updateCrawler(crawlerId, c ? translateModeUpdate(c, mode) : { translateMode: mode }); }}
                 merchants={merchants}
                 onBuyFromMerchant={buyFromMerchant}
+                onSeeMerchantStock={(crawlerId, items) => void markDiscovered([crawlerId], 'items', items.map(itemDiscoveryKey), 1)}
+                onSeeCombatAction={(kind, key) => void markSeenInCombat(kind, [key])}
                 onSellToMerchant={sellToMerchant}
                 onHaggleWithMerchant={haggleWithMerchant}
                 onRestockMerchant={isAdmin ? restockMerchant : undefined}

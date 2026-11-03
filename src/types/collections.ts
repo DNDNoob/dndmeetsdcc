@@ -35,6 +35,7 @@ export type CollectionName =
   | 'merchants'
   | 'crawlerStats'
   | 'gameSettings'
+  | 'discoveries'
   | string; // Allow any string for flexibility
 
 /**
