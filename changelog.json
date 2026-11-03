@@ -9,7 +9,8 @@
       "⚡ Faster first load: each page (Profiles, Show Time, Dungeon AI, Wiki and the rest) now downloads when you open it instead of all at once, so the app starts with about 40% less to download"
     ],
     "fixes": [
-      "💬 Chat history keeps only the newest 300 lines per campaign, so the page loads faster and the free database quota lasts longer (older lines are deleted automatically)"
+      "💬 Chat history keeps only the newest 300 lines per campaign, so the page loads faster and the free database quota lasts longer (older lines are deleted automatically)",
+      "🧹 Removed unused code and packages (33 unused UI parts, old notes and scripts) so the app builds smaller and lint is clean"
     ]
   },
   {
