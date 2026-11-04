@@ -3,7 +3,9 @@
     "date": "2026-11-04",
     "features": [
       "🔗 Items and spells can link to abilities from the Abilities library. Each link can be tweaked for that item or spell only (fewer dice, an easier check, uses per day, mana or HP cost, how long a condition lasts, a note), shows a changed tag, and can Reset or Make my own copy for bigger changes",
-      "✨ New Abilities tab on crawler profiles: every ability from equipped items (or carried items without a slot) and known spells, with a Use button that pays the cost, rolls the check and dice, and logs it. It follows combat turn rules (action, bonus action, one reaction per round)"
+      "✨ New Abilities tab on crawler profiles: every ability from equipped items (or carried items without a slot) and known spells, with a Use button that pays the cost, rolls the check and dice, and logs it. It follows combat turn rules (action, bonus action, one reaction per round)",
+      "👹 Mobs can link abilities too: the DM's Attacks & Spells box has an Abilities list with a to-hit and damage bonus per mob, and New attack saves the attack to the Abilities library so other mobs can reuse it. Linked abilities show up in the mob actions panel on the Show Time map",
+      "🔄 Old spell conditions, spell languages and mob attacks were turned into library abilities and linked (Unstable Intelligence, Frightened, Speak Beast, Shotgun blast, Rifle butt, Tiki torch). Casting a spell now uses a linked ability's condition or language, and spells show their linked abilities"
     ],
     "fixes": []
   },

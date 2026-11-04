@@ -261,6 +261,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
       ...(newMob.merchant ? { merchant: newMob.merchant } : {}),
       ...(newMob.attacks?.length ? { attacks: newMob.attacks } : {}),
       ...(newMob.spellIds?.length ? { spellIds: newMob.spellIds } : {}),
+      ...(newMob.abilities?.length ? { abilities: newMob.abilities } : {}),
     };
     if (!mob.image && autoGenerateMobImage && onGenerateMobImage) {
       setGeneratingMobImage('new');
@@ -276,7 +277,7 @@ const DungeonAIView: React.FC<DungeonAIViewProps> = ({
     } catch (err) {
       console.error('[DungeonAI] ❌ Failed to persist mob', err);
     }
-    setNewMob({ name: "", level: 1, type: "normal", kind: "creature", boss: false, speciesId: "", description: "", weaknesses: "", strengths: "", hitPoints: 50, personality: undefined, merchant: undefined, languages: undefined, attacks: undefined, spellIds: undefined });
+    setNewMob({ name: "", level: 1, type: "normal", kind: "creature", boss: false, speciesId: "", description: "", weaknesses: "", strengths: "", hitPoints: 50, personality: undefined, merchant: undefined, languages: undefined, attacks: undefined, spellIds: undefined, abilities: undefined });
   };
 
   const handleDeleteMob = async (id: string) => {

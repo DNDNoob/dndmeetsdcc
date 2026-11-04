@@ -108,7 +108,7 @@ const CrawlerAbilitiesPanel: React.FC<CrawlerAbilitiesPanelProps> = ({
         <Sparkles className="w-6 h-6" /> ABILITIES
       </h2>
       <p className="text-xs text-muted-foreground">
-        What {crawler.name} can do thanks to equipped items and known spells. Actions every character has are on the Actions, Reactions and Bonus tabs.
+        What {crawler.name} can do thanks to equipped items and known spells. Spell abilities happen when the spell is cast from the Spells tab. Actions every character has are on the Actions, Reactions and Bonus tabs.
       </p>
       {abilities.length === 0 ? (
         <p className="text-sm text-muted-foreground">No abilities yet. Items and spells with linked abilities add them here.</p>
@@ -117,6 +117,8 @@ const CrawlerAbilitiesPanel: React.FC<CrawlerAbilitiesPanelProps> = ({
           {abilities.map(entry => {
             const { ability, link, source } = entry;
             const manaShort = (ability.cost?.mana ?? 0) > crawler.mana;
+            // Spell abilities happen when the spell is cast (Spells tab), so they have no Use button of their own
+            const usable = ability.activation !== 'Passive' && canUse && source.kind !== 'spell';
             const blocked = ability.activation === 'Passive' ? null : manaShort ? 'Not enough mana' : blockedReason(ability.activation);
             const roll = describeAbilityRoll(ability.roll);
             const cost = [ability.cost?.mana ? `${ability.cost.mana} mana` : '', ability.cost?.hp ? `${ability.cost.hp} HP` : ''].filter(Boolean).join(', ');
@@ -129,11 +131,11 @@ const CrawlerAbilitiesPanel: React.FC<CrawlerAbilitiesPanelProps> = ({
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-display text-primary">{ability.name}</span>
                       <span className="text-[10px] text-muted-foreground border border-border px-1">{ability.activation}</span>
-                      <span className="text-[10px] text-muted-foreground">from {source.name}</span>
+                      <span className="text-[10px] text-muted-foreground">{source.kind === 'spell' ? `when you cast ${source.name}` : `from ${source.name}`}</span>
                     </div>
                     {ability.description && <p className="text-xs text-muted-foreground">{ability.description}</p>}
                   </div>
-                  {ability.activation !== 'Passive' && canUse && (
+                  {usable && (
                     <button type="button" onClick={() => use(entry)} disabled={!!blocked} title={blocked ?? `Use ${ability.name}`}
                       className="px-3 py-1.5 border-2 border-accent/60 text-accent text-xs font-display rounded hover:bg-accent/20 disabled:opacity-40 disabled:cursor-not-allowed shrink-0">
                       Use
@@ -154,7 +156,7 @@ const CrawlerAbilitiesPanel: React.FC<CrawlerAbilitiesPanelProps> = ({
                   </ul>
                 )}
                 {link.note && <p className="text-[11px] italic text-accent">{link.note}</p>}
-                {blocked && ability.activation !== 'Passive' && canUse && <p className="text-[10px] text-muted-foreground">{blocked}</p>}
+                {blocked && usable && <p className="text-[10px] text-muted-foreground">{blocked}</p>}
               </div>
             );
           })}

@@ -38,6 +38,8 @@ import {
   type Ability,
 } from "@/lib/gameData";
 import AbilityLinksEditor from "@/components/AbilityLinksEditor";
+import { useAbilityLibrary } from "@/contexts/AbilitiesContext";
+import { applyAbilityTweaks, findAbility, summarizeAbility } from "@/lib/abilities";
 
 interface SpellsViewProps {
   crawlers: Crawler[];
@@ -606,6 +608,11 @@ function SpellCard({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [showGrantMenu, setShowGrantMenu] = useState(false);
+  const { abilities: abilityLibrary } = useAbilityLibrary();
+  const linkedAbilities = (spell.abilities ?? []).flatMap(link => {
+    const base = findAbility(abilityLibrary, link.abilityId);
+    return base ? [{ link, ability: applyAbilityTweaks(base, link.tweaks) }] : [];
+  });
   const sd = spell.spellData;
 
   const diceStr = (sd.damageDice ?? []).map(d => `${d.count}d${d.sides}`).join(' + ');
@@ -672,6 +679,17 @@ function SpellCard({
             <div className="text-primary text-[11px]">
               <span className="text-muted-foreground">Effect: </span>{describeSpellEffect(sd.effect)}
               {sd.effect.description && <span className="text-muted-foreground italic"> · {sd.effect.description}</span>}
+            </div>
+          )}
+          {linkedAbilities.length > 0 && (
+            <div className="text-[11px] space-y-0.5">
+              <span className="text-muted-foreground">Abilities: </span>
+              {linkedAbilities.map(({ link, ability }) => (
+                <div key={link.abilityId} className="text-primary">
+                  {ability.name}<span className="text-muted-foreground"> · {summarizeAbility(ability)}</span>
+                  {link.note && <span className="text-accent italic"> · {link.note}</span>}
+                </div>
+              ))}
             </div>
           )}
           {(spell.tags ?? []).length > 0 && (

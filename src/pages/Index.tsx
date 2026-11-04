@@ -40,6 +40,7 @@ import type { DiscoveryActions } from "@/components/DiscoveryControls";
 import type { Episode, Campaign, CrawlerPlacement, EpisodeMobPlacement, Mob, PublicMap, PublicMob, PublicEpisode, InventoryItem, Spell, Ability } from "@/lib/gameData";
 import { publicDocId, buildEpisodeBundle } from "@/lib/publicContent";
 import { LanguagesProvider } from "@/contexts/LanguagesContext";
+import { AbilitiesProvider } from "@/contexts/AbilitiesContext";
 
 type AppScreen = "splash" | "menu" | "game";
 type GameView = "profiles" | "maps" | "inventory" | "mobs" | "dungeonai" | "showtime" | "sounds" | "wiki" | "spells" | "abilities";
@@ -1146,6 +1147,7 @@ const Index = () => {
       createLanguage={createLanguage}
       deleteLanguage={deleteLanguage}
     >
+    <AbilitiesProvider abilities={abilities} addAbility={handleAddAbility} iconImages={iconImages}>
     <div className="min-h-screen">
       <a href="#main-content" className="skip-nav">Skip to main content</a>
       <AnimatePresence mode="wait">
@@ -1557,6 +1559,7 @@ const Index = () => {
         </>
       )}
     </div>
+    </AbilitiesProvider>
     </LanguagesProvider>
   );
 };
