@@ -264,7 +264,7 @@ export const CrawlerStatsPanel: React.FC<CrawlerStatsPanelProps> = ({ crawler, p
         <SmallStat label="Checks passed" value={checks > 0 ? `${stats.checksPassed ?? 0} of ${checks}` : '–'} />
       </div>
       <p className="text-xs text-muted-foreground mt-2">
-        Rolls by ability: {abilityRolls.map(([k, n]) => `${k.toUpperCase()} ${n}`).join(' · ')}
+        Rolls by stat: {abilityRolls.map(([k, n]) => `${k.toUpperCase()} ${n}`).join(' · ')}
       </p>
     </motion.div>
   );

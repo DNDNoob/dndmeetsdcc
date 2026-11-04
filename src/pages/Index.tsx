@@ -20,6 +20,7 @@ import { DodgePrompt } from "@/components/DodgePrompt";
 import { useMusic } from "@/hooks/useMusic";
 import WikiView from "@/views/WikiView";
 import SpellsView from "@/views/SpellsView";
+import AbilitiesView from "@/views/AbilitiesView";
 
 import { useGameState, DiceRollEntry } from "@/hooks/useGameState";
 import { useAuth } from "@/contexts/AuthContext";
@@ -36,14 +37,14 @@ import { toast } from "sonner";
 import { getNoChildLeftBehindBump, rollD20, rollsWithDisadvantage, isCheckSuccess, skillForLabel, SKILL_XP_PER_SUCCESS, translateModeUpdate, getEquippedModifiers, getSkillRank, getCheckDC, SKILLS, getDodgeBonus } from "@/lib/gameData";
 import { buildDiscoveryView, getLibraryMode, itemDiscoveryKey, KNOWN, type LibraryKind } from "@/lib/discoveries";
 import type { DiscoveryActions } from "@/components/DiscoveryControls";
-import type { Episode, Campaign, CrawlerPlacement, EpisodeMobPlacement, Mob, PublicMap, PublicMob, PublicEpisode, InventoryItem, Spell } from "@/lib/gameData";
+import type { Episode, Campaign, CrawlerPlacement, EpisodeMobPlacement, Mob, PublicMap, PublicMob, PublicEpisode, InventoryItem, Spell, Ability } from "@/lib/gameData";
 import { publicDocId, buildEpisodeBundle } from "@/lib/publicContent";
 import { LanguagesProvider } from "@/contexts/LanguagesContext";
 
 type AppScreen = "splash" | "menu" | "game";
-type GameView = "profiles" | "maps" | "inventory" | "mobs" | "dungeonai" | "showtime" | "sounds" | "wiki" | "spells";
+type GameView = "profiles" | "maps" | "inventory" | "mobs" | "dungeonai" | "showtime" | "sounds" | "wiki" | "spells" | "abilities";
 
-const GAME_VIEWS: readonly string[] = ["profiles", "maps", "inventory", "mobs", "dungeonai", "showtime", "sounds", "wiki", "spells"];
+const GAME_VIEWS: readonly string[] = ["profiles", "maps", "inventory", "mobs", "dungeonai", "showtime", "sounds", "wiki", "spells", "abilities"];
 
 const STORAGE_KEY_PLAYER = "dcc_current_player";
 const STORAGE_KEY_MAP_VISIBILITY = "dcc_map_visibility";
@@ -263,6 +264,10 @@ const Index = () => {
     addSpell,
     updateSpell,
     deleteSpell,
+    abilities,
+    addAbility,
+    updateAbility,
+    deleteAbility,
     learnSpell,
     forgetSpell,
     castSpell,
@@ -349,7 +354,7 @@ const Index = () => {
   } = usePublicContent(showPublicContent);
 
   // Personal content: items and spells linked to the user's profile, not to a campaign
-  const { myItems, mySpells, saveMyItem, deleteMyItem, saveMySpell, deleteMySpell, setMyContentIcon } =
+  const { myItems, mySpells, myAbilities, saveMyItem, deleteMyItem, saveMySpell, deleteMySpell, saveMyAbility, deleteMyAbility, setMyContentIcon } =
     useMyContent(isAuthenticated ? user?.uid ?? null : null, userProfile?.username);
 
   // Pixel-art icons: every new item or spell gets one generated (Cloudflare Workers AI), or, once
@@ -383,6 +388,24 @@ const Index = () => {
     assignIcon({ kind: 'spell', spell })
       .then(iconId => iconId && updateSpell(spell.id, { iconId }))
       .catch(err => console.error('[Icons] spell icon failed:', err));
+  };
+
+  // New abilities get a pixel icon the same way new spells do
+  const handleAddAbility = async (ability: Ability) => {
+    await addAbility(ability);
+    if (ability.iconId) return;
+    assignIcon({ kind: 'ability', ability })
+      .then(iconId => iconId && updateAbility(ability.id, { iconId }))
+      .catch(err => console.error('[Icons] ability icon failed:', err));
+  };
+  const handleSaveMyAbility = async (ability: Ability) => {
+    const isNew = !myAbilities.some(a => a.id === ability.id);
+    await saveMyAbility(ability);
+    toast.success(`Saved ${ability.name} to My Content`);
+    if (!isNew || ability.iconId) return;
+    assignIcon({ kind: 'ability', ability })
+      .then(iconId => iconId && setMyContentIcon('abilities', ability.id, iconId))
+      .catch(err => console.error('[Icons] ability icon failed:', err));
   };
 
   const handleSaveMyItem = async (item: InventoryItem) => {
@@ -1290,6 +1313,22 @@ const Index = () => {
                 iconImages={iconImages}
                 onRegenerateIcon={regenerateIcon}
                 currentPlayerId={currentPlayer?.id}
+              />
+            )}
+            {currentView === "abilities" && (
+              <AbilitiesView
+                abilities={abilities}
+                myAbilities={myAbilities}
+                isAdmin={isAdmin}
+                currentUserId={isAuthenticated ? user?.uid : undefined}
+                currentUsername={userProfile?.username}
+                onAddAbility={handleAddAbility}
+                onUpdateAbility={updateAbility}
+                onDeleteAbility={deleteAbility}
+                onSaveMyAbility={handleSaveMyAbility}
+                onDeleteMyAbility={deleteMyAbility}
+                iconImages={iconImages}
+                onRegenerateIcon={regenerateIcon}
               />
             )}
             {currentView === "mobs" && <MobsView mobs={mobs} />}

@@ -990,7 +990,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                         {/* Hit Roll Stat Modifiers */}
                         <div>
                           <label className="text-[10px] text-muted-foreground block mb-0.5">Hit Roll Stat Modifiers</label>
-                          <p className="text-[9px] text-muted-foreground/60 mb-1">Adds the crawler&apos;s ability modifier (with gear) to the hit roll</p>
+                          <p className="text-[9px] text-muted-foreground/60 mb-1">Adds the crawler&apos;s stat modifier (with gear) to the hit roll</p>
                           <div className="flex gap-3">
                             {(['str', 'dex', 'con', 'int', 'cha'] as const).map((stat) => (
                               <label key={stat} className="flex items-center gap-1 text-[10px] cursor-pointer">
@@ -1008,7 +1008,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                         {/* Damage Stat Modifiers */}
                         <div>
                           <label className="text-[10px] text-muted-foreground block mb-0.5">Damage Stat Modifiers</label>
-                          <p className="text-[9px] text-muted-foreground/60 mb-1">Adds the crawler&apos;s ability modifier (with gear) to the damage roll</p>
+                          <p className="text-[9px] text-muted-foreground/60 mb-1">Adds the crawler&apos;s stat modifier (with gear) to the damage roll</p>
                           <div className="flex gap-3">
                             {(['str', 'dex', 'con', 'int', 'cha'] as const).map((stat) => (
                               <label key={stat} className="flex items-center gap-1 text-[10px] cursor-pointer">

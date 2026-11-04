@@ -2,6 +2,8 @@
   {
     "date": "2026-11-03",
     "features": [
+      "✨ New Abilities page (in the menu): one place to make anything someone can do, like Fireball, Speak with Animals, Unlock a Door or Dodge. Set what it uses up (action, bonus action, reaction or passive), how often, its cost and range, a skill check it rolls, a saving throw, and what it does (dice, conditions, stat bonuses, languages, defense, movement or free text). Everyone can make abilities, keep them private in My Content or share them with the campaign, and Make my own copy of any ability to change it. Built-in actions like Dodge and Grapple are listed too. Items and spells will link to abilities next",
+      "📊 STR, DEX, CON, INT and CHA are now called stats (stat points, stat modifier) so they don't get mixed up with the new abilities. Nothing about how they work changed",
       "💨 Dodge: every character can dodge. When a mob's attack would hit you, an Incoming Attack box asks you to Dodge (d20 + DEX + Acrobatics; meet or beat the attack roll and it misses) or take it. The DM's mob panel waits for your answer, and the DM can roll it for you or skip if you're away",
       "🔁 Reactions are now limited to one per round, usable on anyone's turn, and come back at the start of your own turn. Dodge, Opportunity Attack, Trip and reaction spells all use it, and mobs follow the same rule",
       "⚔️ Opportunity Attack: off your turn, the Attacks tab lets you attack once with your reaction when an enemy leaves your reach",

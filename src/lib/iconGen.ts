@@ -1,5 +1,5 @@
 import { toast } from 'sonner';
-import type { IconLibraryEntry, InventoryItem, ItemUpgrade, Mob, Spell } from '@/lib/gameData';
+import type { Ability, IconLibraryEntry, InventoryItem, ItemUpgrade, Mob, Spell } from '@/lib/gameData';
 
 /**
  * Pixel-art icon helpers: prompt building, descriptor tags, library matching and the
@@ -9,6 +9,7 @@ import type { IconLibraryEntry, InventoryItem, ItemUpgrade, Mob, Spell } from '@
 export type IconSubject =
   | { kind: 'item'; item: InventoryItem }
   | { kind: 'spell'; spell: Spell }
+  | { kind: 'ability'; ability: Ability }
   | { kind: 'mob'; mob: Pick<Mob, 'name' | 'description'> & Partial<Mob> };
 
 export const ICON_SIZE = 48;
@@ -18,6 +19,7 @@ export const PORTRAIT_SIZE = 128;
 function subjectTarget(subject: IconSubject): { name: string; description: string; tags?: string[] } {
   if (subject.kind === 'item') return subject.item;
   if (subject.kind === 'spell') return subject.spell;
+  if (subject.kind === 'ability') return subject.ability;
   const { mob } = subject;
   return { name: mob.name, description: [mob.description, mob.strengths, mob.weaknesses].filter(Boolean).join('. ') };
 }
@@ -150,6 +152,10 @@ export function getIconTags(subject: IconSubject): Map<string, number> {
     const { mob } = subject;
     if (mob.boss) add('strength', 1);
     if (mob.kind === 'character' && !weights.size) add('humanoid', 1);
+  } else if (subject.kind === 'ability') {
+    for (const e of subject.ability.effects ?? []) {
+      if (e.type === 'dice' && e.damageType) add(DAMAGE_CONCEPT[e.damageType], 2);
+    }
   } else {
     const { spellData } = subject.spell;
     add(SCHOOL_CONCEPT[spellData?.school], 2);
@@ -179,6 +185,11 @@ export function buildIconPrompt(subject: IconSubject, extra = ''): string {
       item.equipSlot && !item.weaponData && `worn on the ${item.equipSlot.replace(/([A-Z])/g, ' $1').toLowerCase()}`,
     ].filter(Boolean);
     detail = bits.length ? ` (${bits.join(', ')})` : '';
+  } else if (subject.kind === 'ability') {
+    const { ability } = subject;
+    const damage = ability.effects?.find(e => e.type === 'dice' && e.damageType && e.damageType !== 'Basic');
+    const bits = [damage?.type === 'dice' ? damage.damageType?.toLowerCase() : '', ability.activation === 'Passive' ? 'passive trait' : 'special ability'].filter(Boolean);
+    detail = ` (${bits.join(' ')} symbol)`;
   } else {
     const sd = subject.spell.spellData;
     detail = ` (${[sd?.school, sd?.damageType && sd.damageType !== 'Basic' ? sd.damageType : '', 'spell effect'].filter(Boolean).join(' ').toLowerCase()})`;

@@ -153,10 +153,10 @@ export const CharacterCreator: React.FC<CharacterCreatorProps> = ({ onCreate, on
       case 'abilities':
         return (
           <div className="space-y-3">
-            <h4 className="font-display text-lg text-primary">Assign your ability points</h4>
+            <h4 className="font-display text-lg text-primary">Assign your stat points</h4>
             <p className="text-sm text-muted-foreground">
-              Spend all {ABILITY_POINTS_TOTAL} points, up to {ABILITY_POINTS_MAX} in one ability. Each point adds +1 to that ability's rolls.
-              Abilities left at 0 roll with disadvantage (two d20s, take the lower).
+              Spend all {ABILITY_POINTS_TOTAL} points, up to {ABILITY_POINTS_MAX} in one stat. Each point adds +1 to that stat's rolls.
+              Stats left at 0 roll with disadvantage (two d20s, take the lower).
             </p>
             <p className={`text-sm font-bold ${pointsLeft === 0 ? 'text-primary' : 'text-accent'}`}>Points left: {pointsLeft}</p>
             <div className="space-y-2">

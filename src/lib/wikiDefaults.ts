@@ -86,7 +86,7 @@ Tap **New** next to the crawler picker on the Profiles page. The character creat
    - **Hobby**: what you did for fun
    - **Where you were when the world ended**
    - **The most important person, thing or animal in the world to you**
-3. **Ability points**: spend 10 points (2 per ability) however you like, up to 5 in one ability. Each point adds +1 to that ability's rolls. An ability left at **0 points rolls with disadvantage** (two d20s, take the lower), and shows **DIS** next to it on your profile.
+3. **Stat points**: spend 10 points (2 per stat) however you like, up to 5 in one stat. Each point adds +1 to that stat's rolls. A stat left at **0 points rolls with disadvantage** (two d20s, take the lower), and shows **DIS** next to it on your profile.
 4. **Languages**: everyone speaks Worldspeech, plus 2 more you pick. Mindspeech, Beast, Plant and Dead can't be picked at the start; they need a gift or a spell.
 5. **Review**, then **Create crawler**.
 
@@ -108,7 +108,7 @@ Every crawler has these core attributes:
 | Intelligence | INT | Knowledge, magic power |
 | Charisma | CHA | Social skills, some special abilities |
 
-Stats start at a base value and can be modified by equipped items. For crawlers made with the character creator, each ability point is worth 2 stat points (0 points = 10, 5 points = 20), so the modifier equals the points. The modifier for any stat is calculated as: **(stat - 10) / 2**, rounded down. For example, a STR of 14 gives a +2 modifier.
+Stats start at a base value and can be modified by equipped items. For crawlers made with the character creator, each stat point adds 2 to the score (0 points = 10, 5 points = 20), so the modifier equals the points. The modifier for any stat is calculated as: **(stat - 10) / 2**, rounded down. For example, a STR of 14 gives a +2 modifier.
 
 ## Health and Mana
 
@@ -119,7 +119,7 @@ Both HP and Mana have maximum values that can be boosted by equipment.
 
 ## Stat Rolls
 
-Click on any stat value on your profile page to roll a d20 plus your stat modifier. The result appears in the dice roller panel. This is used for ability checks during gameplay.
+Click on any stat value on your profile page to roll a d20 plus your stat modifier. The result appears in the dice roller panel. This is used for stat checks during gameplay.
 
 ## Equipment
 
@@ -177,7 +177,7 @@ The **Stats** tab (chart icon) shows every stat above, where the crawler ranks i
 - **Talking and trading**: lines said to NPCs, Persuasion rolls, haggles won, lines translated for the party, gold earned (loot, loot boxes, selling) and spent, items bought and sold, and gear swaps.
 - **Progress**: quests finished, noncombat rolls and loot boxes opened by tier.
 - **Habits**: your average combat turn time, turns undone, and voice versus typed chat lines.
-- **Dice**: d20 rolls, your average d20 (10.5 is average luck), natural 1s, rolls with disadvantage, checks passed, and how often you roll each ability.
+- **Dice**: d20 rolls, your average d20 (10.5 is average luck), natural 1s, rolls with disadvantage, checks passed, and how often you roll each stat.
 
 ### Play Style (DM only)
 
@@ -306,7 +306,7 @@ Each weapon has the following configurable properties:
 1. **Attack Roll**: Roll d20 (plus any hit die bonus, stat modifiers and your weapon proficiency) to determine if the attack connects
 2. **Damage Roll**: If the attack hits, roll the weapon's damage dice plus stat modifiers
 
-A stat the weapon uses adds that ability's modifier, counting gear bonuses, the same as any other roll. For example, a sword that uses STR adds +2 for a crawler with STR 14.
+A stat the weapon uses adds that stat's modifier, counting gear bonuses, the same as any other roll. For example, a sword that uses STR adds +2 for a crawler with STR 14.
 
 ## Weapon Proficiency
 
@@ -1346,7 +1346,7 @@ Level-ups happen automatically. Each level gives:
 
 - **+5% max HP and +5% max mana**, rounded up (always at least +1). Your current HP and mana go up by the same amount. A 25 HP, 3 mana crawler reaching Level 2 gets +2 HP and +1 mana.
 - **100 skill XP** to spend on any skills you like. See [Skills](/wiki/skills).
-- **1 ability point.** Each point is +1 to that ability's rolls. The 5-point limit from the character creator doesn't apply to level-up points.
+- **1 stat point.** Each point is +1 to that stat's rolls. The 5-point limit from the character creator doesn't apply to level-up points.
 
 When you have skill XP or points to spend, a gold badge shows on your profile and on the Skills tab. Spend them on the **Skills** tab.
 
@@ -1368,7 +1368,7 @@ When you have skill XP or points to spend, a gold badge shows on your profile an
 
 Skills make a crawler better at one kind of thing. Each skill has ranks from 0 to 10, shown on the profile's **Skills** tab and on the **Actions** tab buttons. Every rank is +1 to that skill's checks.
 
-| Skill | Ability | Kind | Extra |
+| Skill | Stat | Kind | Extra |
 |-------|---------|------|-------|
 | Acrobatics | DEX | Roll | |
 | Animal Handling | CHA | Roll | |
@@ -1411,7 +1411,7 @@ Weapon proficiency works the same way for weapon types, earned by landing hits. 
 
 ## Skill checks
 
-Press a skill on the **Actions** tab, or **Roll** on the Skills tab, to roll d20 + the linked ability modifier + your rank. The roll goes to the dice history. A skill check uses an action: in combat it takes your action on your turn, and between fights it uses one of your rolls for the turn.
+Press a skill on the **Actions** tab, or **Roll** on the Skills tab, to roll d20 + the linked stat modifier + your rank. The roll goes to the dice history. A skill check uses an action: in combat it takes your action on your turn, and between fights it uses one of your rolls for the turn.
 
 Pick the check's difficulty above the skills before you roll; both tabs share the same choice. The dice history shows whether you beat it.
 
@@ -1424,6 +1424,51 @@ Pick the check's difficulty above the skills before you roll; both tabs share th
 A natural 1 always fails and a natural 20 always succeeds, however big your bonus is. Haggle rolls follow the same rule. Bonuses keep growing as you level, and DCs grow as the party goes deeper, so the d20 still matters on every floor.
 
 The DM sets the party's current floor next to **Auto XP** on any crawler's Profile tab.`,
+  },
+  {
+    id: 'abilities',
+    slug: 'abilities',
+    title: 'Abilities',
+    category: 'Game Mechanics',
+    order: 15.7,
+    content: `# Abilities
+
+An **ability** is anything someone can do: cast a fireball, speak with animals, unlock a door, dodge an attack. You make an ability once on the **Abilities** page (in the menu). Soon items and spells will link to abilities instead of each describing the same thing again.
+
+Your five scores (STR, DEX, CON, INT, CHA) are now called **stats**, so the two don't get mixed up. Stat points work exactly as before.
+
+## Making an ability
+
+Press **New ability**. Everyone can make abilities, not just the DM.
+
+| Field | What it means |
+| --- | --- |
+| Uses up | Action, Bonus Action, Reaction, or Nothing (passive, always on) |
+| Trigger | Reactions only: what sets it off, e.g. "when an attack would hit you" |
+| How often | At will, or a number of times per combat, per day or per rest |
+| Mana / HP cost | What using it costs |
+| Range | Self, Touch, a distance in feet, or not needed |
+| The user rolls a check | Pick a **skill** (its stat is filled in for you) or just a stat, and a difficulty (Easy, Medium, Hard, or the DM decides). Skill check DCs and ranks work the same as on the Skills tab. |
+| Targets resist with | A saving throw the targets roll, e.g. DEX save |
+| What it does | One or more effects: roll dice (damage, healing or an attack bonus), put a condition on the target (Stunned for 1 turn), a stat bonus, grant a language, defense (armor rating, resist, vulnerable), movement, or something else for the DM to judge |
+
+New abilities get a pixel icon automatically. Open an ability and press **Edit** to make a new icon.
+
+## Where abilities are kept
+
+- **This campaign**: everyone in the campaign sees these. The DM can edit or delete any of them; players can edit or delete the ones they made.
+- **My Content**: when you save a new ability, pick **My Content** to keep it on your profile, private to you. Press **Add to campaign** to share it with the party later. On a campaign ability you made, **Mine** saves a copy to My Content.
+- **Everyone has these**: the built-in actions every character has (Dodge, Opportunity Attack, Trip, Help, Ready, Grapple, Shove, Use Item). They can't be edited.
+
+## Make my own copy
+
+Don't like how an ability works? Open it and press **Make my own copy**. You get an editable copy that remembers which ability it came from; the original stays as it was. This works on built-in abilities too.
+
+## Coming next
+
+- Items and spells link to abilities, with small tweaks per link (fewer dice, a different DC, more uses).
+- An **Abilities** tab on the profile with a **Use** button that rolls and logs it.
+- Abilities in Encountered mode, like items and spells.`,
   },
   {
     id: 'talking-npcs',
@@ -2134,7 +2179,7 @@ Pressing **Cast**:
 - Adds one to the spell's cast count, which drives mastery.
 - **Damage spells** without a saving throw roll a spell attack (d20, plus the spell's hit die and any hit stat modifiers). In combat you then pick the target, or several targets for splash, area or multi-target spells, roll damage and apply it, the same as weapon attacks. Outside combat the damage is rolled straight away.
 - **Healing spells** heal you right away if they only target yourself. Otherwise you pick which crawler to heal (several, for area or multi-target spells). Healing never goes above a crawler's max HP, including equipment bonuses.
-- Spell stat modifiers add the crawler's ability modifier for that stat (for example, INT 14 adds +2).
+- Spell stat modifiers add the crawler's stat modifier (for example, INT 14 adds +2).
 
 In combat, spells follow the same turn rules as the Attacks and Bonus Actions tabs: Action spells use your action and Bonus Action spells use your bonus action, both only on your turn. Reaction spells can be cast at any time.
 

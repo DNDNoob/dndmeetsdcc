@@ -35,6 +35,7 @@ import {
   NpcMemory,
   NpcSecretState,
   Spell,
+  Ability,
   KnownSpell,
   SpellLearnedFrom,
   getSpellMasteryLevel,
@@ -953,7 +954,7 @@ export const useGameState = () => {
     return transact([{ collection: 'crawlers', id: crawlerId }], ([doc]) => {
       const crawler = doc as unknown as Crawler | null;
       if (!crawler) throw new Error('Crawler not found.');
-      if ((crawler.abilityPoints ?? 0) <= 0) throw new Error('No ability points to spend.');
+      if ((crawler.abilityPoints ?? 0) <= 0) throw new Error('No stat points to spend.');
       return [{
         type: 'update', collection: 'crawlers', id: crawlerId,
         data: { [ability]: (Number(crawler[ability]) || 10) + 2, abilityPoints: (crawler.abilityPoints ?? 0) - 1 },
@@ -2757,6 +2758,23 @@ export const useGameState = () => {
     await deleteItem('spells', id);
   };
 
+  // ======== Abilities ========
+  const abilities = useMemo(() => {
+    return getStableCollection<Ability>('abilities');
+  }, [getCollection, isLoaded]);
+
+  const addAbility = async (ability: Ability) => {
+    await addItem('abilities', ability as unknown as Record<string, unknown>);
+  };
+
+  const updateAbility = async (id: string, updates: Partial<Ability>) => {
+    await updateItem('abilities', id, updates as unknown as Record<string, unknown>);
+  };
+
+  const deleteAbility = async (id: string) => {
+    await deleteItem('abilities', id);
+  };
+
   // Add a spell to a crawler's knownSpells; blocks duplicates
   const learnSpell = async (crawlerId: string, spell: Spell, source: SpellLearnedFrom) => {
     const crawler = crawlers.find(c => c.id === crawlerId);
@@ -3637,6 +3655,10 @@ export const useGameState = () => {
     haggleWithMerchant,
     resolveMerchantHaggle,
     spells,
+    abilities,
+    addAbility,
+    updateAbility,
+    deleteAbility,
     addSpell,
     updateSpell,
     deleteSpell,
