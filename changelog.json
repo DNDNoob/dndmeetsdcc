@@ -1,5 +1,13 @@
 [
   {
+    "date": "2026-11-04",
+    "features": [
+      "🔗 Items and spells can link to abilities from the Abilities library. Each link can be tweaked for that item or spell only (fewer dice, an easier check, uses per day, mana or HP cost, how long a condition lasts, a note), shows a changed tag, and can Reset or Make my own copy for bigger changes",
+      "✨ New Abilities tab on crawler profiles: every ability from equipped items (or carried items without a slot) and known spells, with a Use button that pays the cost, rolls the check and dice, and logs it. It follows combat turn rules (action, bonus action, one reaction per round)"
+    ],
+    "fixes": []
+  },
+  {
     "date": "2026-11-03",
     "features": [
       "✨ New Abilities page (in the menu): one place to make anything someone can do, like Fireball, Speak with Animals, Unlock a Door or Dodge. Set what it uses up (action, bonus action, reaction or passive), how often, its cost and range, a skill check it rolls, a saving throw, and what it does (dice, conditions, stat bonuses, languages, defense, movement or free text). Everyone can make abilities, keep them private in My Content or share them with the campaign, and Make my own copy of any ability to change it. Built-in actions like Dodge and Grapple are listed too. Items and spells will link to abilities next",

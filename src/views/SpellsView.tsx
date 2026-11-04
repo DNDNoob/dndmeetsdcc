@@ -35,7 +35,9 @@ import {
   getSpellMasteryLevel,
   getEffectiveManaCost,
   getCastsUntilNextMastery,
+  type Ability,
 } from "@/lib/gameData";
+import AbilityLinksEditor from "@/components/AbilityLinksEditor";
 
 interface SpellsViewProps {
   crawlers: Crawler[];
@@ -62,6 +64,8 @@ interface SpellsViewProps {
   discoveryActions?: DiscoveryActions;
   mySpells?: Spell[];
   onSaveSpellToMyContent?: (spell: Spell) => void;
+  abilities?: Ability[]; // campaign ability library, for linking
+  onCreateAbility?: (ability: Ability) => Promise<void>;
 }
 
 const createDefaultSpellData = (): SpellData => ({
@@ -906,7 +910,11 @@ function SpellEditorModal({
   onClose,
   iconImages,
   onRegenerateIcon,
+  abilities = [],
+  onCreateAbility,
 }: {
+  abilities?: Ability[];
+  onCreateAbility?: (ability: Ability) => Promise<void>;
   spell: Spell;
   onSave: (spell: Spell) => void;
   onClose: () => void;
@@ -1022,6 +1030,15 @@ function SpellEditorModal({
             <SpellDataEditor spellData={draft.spellData} onChange={updateSpellData} />
           </div>
 
+          <AbilityLinksEditor
+            kind="spell"
+            links={draft.abilities}
+            onChange={(links) => setDraft(prev => ({ ...prev, abilities: links }))}
+            library={abilities}
+            iconImages={iconImages}
+            onCreateAbility={onCreateAbility}
+          />
+
           <UpgradeXpEditor
             kind="spell"
             value={draft.upgradeXp}
@@ -1068,6 +1085,8 @@ const SpellsView: React.FC<SpellsViewProps> = ({
   onRegenerateIcon,
   mySpells = [],
   onSaveSpellToMyContent,
+  abilities = [],
+  onCreateAbility,
   currentPlayerId,
   libraryMode = 'full',
   onSetLibraryMode,
@@ -1353,6 +1372,8 @@ const SpellsView: React.FC<SpellsViewProps> = ({
           onClose={() => setEditingSpell(null)}
           iconImages={iconImages}
           onRegenerateIcon={spells.some(s => s.id === editingSpell.id) ? onRegenerateIcon : undefined}
+          abilities={abilities}
+          onCreateAbility={onCreateAbility}
         />
       )}
     </motion.div>

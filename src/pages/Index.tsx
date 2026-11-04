@@ -1247,6 +1247,8 @@ const Index = () => {
                 onChooseUpgradeTree={chooseUpgradeTree}
                 onClaimUpgradeStep={claimUpgradeStep}
                 onHealCrawler={healCrawler}
+                abilities={abilities}
+                iconImages={iconImages}
               />
             )}
             {currentView === "maps" && (
@@ -1285,6 +1287,8 @@ const Index = () => {
                 showPublicContent={showPublicContent}
                 iconImages={iconImages}
                 onRegenerateIcon={regenerateIcon}
+                abilities={abilities}
+                onCreateAbility={handleAddAbility}
               />
             )}
             {currentView === "spells" && (
@@ -1313,6 +1317,8 @@ const Index = () => {
                 iconImages={iconImages}
                 onRegenerateIcon={regenerateIcon}
                 currentPlayerId={currentPlayer?.id}
+                abilities={abilities}
+                onCreateAbility={handleAddAbility}
               />
             )}
             {currentView === "abilities" && (

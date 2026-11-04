@@ -6,9 +6,15 @@ import {
   type AbilityEffect,
   type AbilityEffectType,
   type AbilityKey,
+  type AbilityLink,
+  type AbilityTweaks,
+  type Crawler,
+  type InventoryItem,
+  type Spell,
   type WeaponDie,
 } from '@/lib/gameData';
 import { DEFAULT_ABILITIES } from '@/lib/defaultAbilities';
+import { resolveKnownSpell } from '@/lib/upgrades';
 
 // ======== Abilities: labels and helpers (no Firebase access here) ========
 
@@ -129,3 +135,114 @@ export const copyAbility = (source: Ability): Ability => {
     copiedFrom: source.copiedFrom ?? source.id,
   };
 };
+
+// ======== Links: items and spells point at library abilities ========
+
+const isSet = (v: unknown) => v !== undefined && v !== null && v !== '';
+
+/** True when the link changes anything about the ability. */
+export const hasTweaks = (link: Pick<AbilityLink, 'tweaks'>): boolean =>
+  !!link.tweaks && Object.values(link.tweaks).some(isSet);
+
+/** The ability as this link uses it: the library card with the link's tweaks applied. */
+export const applyAbilityTweaks = (ability: Ability, tweaks?: AbilityTweaks): Ability => {
+  if (!tweaks) return ability;
+  let effects = ability.effects;
+  if (isSet(tweaks.diceCount)) {
+    const i = effects.findIndex(e => e.type === 'dice' && e.dice.length > 0);
+    if (i >= 0) {
+      effects = effects.map((e, j) => (j === i && e.type === 'dice'
+        ? { ...e, dice: e.dice.map((d, k) => (k === 0 ? { ...d, count: tweaks.diceCount! } : d)) }
+        : e));
+    }
+  }
+  if (isSet(tweaks.turns)) {
+    const i = effects.findIndex(e => e.type === 'condition');
+    if (i >= 0) effects = effects.map((e, j) => (j === i && e.type === 'condition' ? { ...e, turns: tweaks.turns! } : e));
+  }
+  const cost = isSet(tweaks.mana) || isSet(tweaks.hp)
+    ? { ...ability.cost, ...(isSet(tweaks.mana) ? { mana: tweaks.mana } : {}), ...(isSet(tweaks.hp) ? { hp: tweaks.hp } : {}) }
+    : ability.cost;
+  return {
+    ...ability,
+    effects,
+    cost,
+    ...(isSet(tweaks.uses) ? { uses: tweaks.uses! } : {}),
+    ...(isSet(tweaks.usesCount) ? { usesCount: tweaks.usesCount } : {}),
+    ...(ability.roll && isSet(tweaks.difficulty) ? { roll: { ...ability.roll, difficulty: tweaks.difficulty } } : {}),
+  };
+};
+
+/** Finds a linked ability in the campaign library, or among the built-in ones. */
+export const findAbility = (library: Ability[], id: string): Ability | undefined =>
+  library.find(a => a.id === id) ?? BUILT_IN_ABILITIES.find(a => a.id === id);
+
+/** A copy of the ability with the link's tweaks baked in, for "Make my own copy" from a link. */
+export const copyWithTweaks = (ability: Ability, link: AbilityLink): Ability =>
+  copyAbility(applyAbilityTweaks(ability, link.tweaks));
+
+export interface CrawlerAbility {
+  key: string;            // unique per source, e.g. "item:<itemId>:<abilityId>"
+  ability: Ability;       // with the link's tweaks applied
+  base: Ability;          // the library card
+  link: AbilityLink;
+  source: { kind: 'item' | 'spell'; id: string; name: string };
+}
+
+/**
+ * Abilities a crawler has right now: from equipped items (or carried items that have no slot)
+ * and from known spells. Links to abilities that no longer exist are skipped.
+ */
+export const getCrawlerAbilities = (
+  crawler: Pick<Crawler, 'equippedItems' | 'knownSpells'>,
+  inventory: InventoryItem[],
+  spells: Spell[],
+  library: Ability[],
+): CrawlerAbility[] => {
+  const equippedIds = new Set(Object.values(crawler.equippedItems ?? {}).filter(Boolean));
+  const out: CrawlerAbility[] = [];
+  const add = (links: AbilityLink[] | undefined, source: CrawlerAbility['source']) => {
+    for (const link of links ?? []) {
+      const base = findAbility(library, link.abilityId);
+      if (!base) continue;
+      out.push({ key: `${source.kind}:${source.id}:${link.abilityId}`, ability: applyAbilityTweaks(base, link.tweaks), base, link, source });
+    }
+  };
+  for (const item of inventory) {
+    if (!item.abilities?.length) continue;
+    if (item.equipSlot && !equippedIds.has(item.id)) continue;
+    add(item.abilities, { kind: 'item', id: item.id, name: item.name });
+  }
+  for (const ks of crawler.knownSpells ?? []) {
+    const spell = resolveKnownSpell(ks, spells);
+    if (spell?.abilities?.length) add(spell.abilities, { kind: 'spell', id: spell.id, name: spell.name });
+  }
+  return out;
+};
+
+/** Rolls dice, e.g. for an ability's damage or healing. */
+export const rollAbilityDice = (dice: WeaponDie[]): { results: { dice: string; result: number }[]; total: number } => {
+  const results: { dice: string; result: number }[] = [];
+  for (const d of dice) {
+    for (let i = 0; i < d.count; i++) {
+      results.push({ dice: `D${d.sides}`, result: Math.floor(Math.random() * d.sides) + 1 });
+    }
+  }
+  return { results, total: results.reduce((sum, r) => sum + r.result, 0) };
+};
+
+export const formatAbilityDice = (dice: WeaponDie[]): string => diceText(dice);
+
+/** Short one-line summary of what an ability does, for chips and lists. */
+export const summarizeAbility = (ability: Ability): string => {
+  const parts = [
+    ability.activation,
+    describeAbilityUses(ability),
+    ability.cost?.mana ? `${ability.cost.mana} mana` : '',
+    ability.cost?.hp ? `${ability.cost.hp} HP` : '',
+    describeAbilityRoll(ability.roll) ?? '',
+    ...ability.effects.slice(0, 2).map(e => describeAbilityEffect(e)),
+  ].filter(Boolean);
+  return parts.join(' · ');
+};
+
