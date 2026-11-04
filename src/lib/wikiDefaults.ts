@@ -1433,7 +1433,7 @@ The DM sets the party's current floor next to **Auto XP** on any crawler's Profi
     order: 15.7,
     content: `# Abilities
 
-An **ability** is anything someone can do: cast a fireball, speak with animals, unlock a door, dodge an attack. You make an ability once on the **Abilities** page (in the menu). Soon items and spells will link to abilities instead of each describing the same thing again.
+An **ability** is anything someone can do: cast a fireball, speak with animals, unlock a door, dodge an attack. You make an ability once on the **Abilities** page (in the menu), then link it to items and spells.
 
 Your five scores (STR, DEX, CON, INT, CHA) are now called **stats**, so the two don't get mixed up. Stat points work exactly as before.
 
@@ -1464,10 +1464,42 @@ New abilities get a pixel icon automatically. Open an ability and press **Edit**
 
 Don't like how an ability works? Open it and press **Make my own copy**. You get an editable copy that remembers which ability it came from; the original stays as it was. This works on built-in abilities too.
 
+## Linking abilities to items and spells
+
+When you create or edit an item in the Item Library, or a spell in Vernon's Library, the **Abilities** box lets you link library abilities to it. Pick one under **Link an ability...** and press **+**.
+
+- **Items**: a crawler has the item's abilities while it's **equipped**. Items with no equip slot (a lockpick set, a charm) give their abilities while carried.
+- **Spells**: a crawler who knows the spell has its abilities.
+
+### Small tweaks per link
+
+Open a linked ability to change it for this item or spell only. The library ability stays as it is:
+
+| Tweak | Example |
+| --- | --- |
+| Dice | A Fireball wand rolls 4d6 instead of 8d6 (changes the first dice of the first dice effect) |
+| Difficulty | Thieves' tools make Unlock a Door an Easy check |
+| How often / Times | 1 per day instead of at will |
+| Mana / HP cost | A cheaper casting |
+| Condition turns | Stunned for 2 turns instead of 1 |
+| Note | "Only works in darkness" |
+
+A tweaked link shows a **changed** tag. **Reset** puts it back to the original. Need a bigger change? **Make my own copy** saves a copy of the ability (with your tweaks) to the campaign library and points the link at the copy, so you can edit it on the Abilities page.
+
+## The Abilities tab on a profile
+
+Each crawler profile has an **Abilities** tab listing every ability they get from equipped items and known spells, with where it comes from. Press **Use** to:
+
+- pay its mana or HP cost
+- roll its check (d20 + stat modifier, plus the skill rank if it uses a skill) against its difficulty's DC; a passed skill check earns skill XP like any skill check
+- roll its damage, healing or attack dice
+- write it all to the dice log (an ability with nothing to roll is logged as used)
+
+In combat it follows the turn rules: an Action or Bonus Action only on your turn and once each, a Reaction once per round. Passive abilities are always on and have no Use button. Uses per day are shown but not counted yet, so the DM keeps track.
+
 ## Coming next
 
-- Items and spells link to abilities, with small tweaks per link (fewer dice, a different DC, more uses).
-- An **Abilities** tab on the profile with a **Use** button that rolls and logs it.
+- A DM button to turn old item and spell effects (conditions, language grants) and mob attacks into abilities.
 - Abilities in Encountered mode, like items and spells.`,
   },
   {

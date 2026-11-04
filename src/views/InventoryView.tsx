@@ -10,7 +10,8 @@ import { UpgradeList } from "@/components/UpgradeList";
 import { UpgradeXpEditor } from "@/components/UpgradeXpEditor";
 import { ArmorEditor } from "@/components/ArmorEditor";
 import { canWearArmor } from "@/lib/armor";
-import { Crawler, InventoryItem, getUpgradeKind, type UpgradeXpSettings, getItemStackKey, stackItems, EquipmentSlot as SlotType, StatModifiers, WeaponData, type ArmorData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, Spell, SpellData, ITEM_RARITIES, ItemRarity, getItemRarityColor } from "@/lib/gameData";
+import { Crawler, InventoryItem, getUpgradeKind, type UpgradeXpSettings, getItemStackKey, stackItems, EquipmentSlot as SlotType, StatModifiers, WeaponData, type ArmorData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, Spell, SpellData, ITEM_RARITIES, ItemRarity, getItemRarityColor, type Ability, type AbilityLink } from "@/lib/gameData";
+import AbilityLinksEditor from "@/components/AbilityLinksEditor";
 import { RarityBadge } from "@/components/ui/RarityBadge";
 import { Coins, Package, Sword, Shield, Plus, Trash2, Edit2, Save, HardHat, Search, BookOpen, Gem, Footprints, Shirt, Hand, Crosshair, ChevronDown, ChevronUp, Wand2, Globe, Lock, Users, Bookmark } from "lucide-react";
 import { SpellDataEditor } from "@/views/SpellsView";
@@ -78,6 +79,8 @@ interface InventoryViewProps {
   showPublicContent?: boolean;
   iconImages?: Record<string, string>; // iconLibrary id -> pixel icon image
   onRegenerateIcon?: (subject: IconSubject) => Promise<{ id: string; image: string } | null>;
+  abilities?: Ability[]; // campaign ability library, for linking
+  onCreateAbility?: (ability: Ability) => Promise<void>;
 }
 
 // Copies of the same item are grouped into one stack
@@ -116,6 +119,8 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   showPublicContent = false,
   iconImages = {},
   onRegenerateIcon,
+  abilities = [],
+  onCreateAbility,
 }) => {
   const [editMode, setEditMode] = useState(false);
   // Expanded item details state
@@ -160,6 +165,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     spellTomeData?: { entries: Array<{ spellId?: string; customSpell?: Spell }> };
     language?: string;
     grantsLanguage?: string;
+    abilities?: AbilityLink[];
     rarity?: ItemRarity;
     effects?: string;
     iconId?: string;
@@ -242,6 +248,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
       spellTomeData: item.spellTomeData,
       language: item.language,
       grantsLanguage: item.grantsLanguage,
+      abilities: item.abilities,
       rarity: item.rarity,
       effects: item.effects,
       iconId: item.iconId,
@@ -286,6 +293,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
               goldValue: newLibraryItem.goldValue,
               language: newLibraryItem.language,
               grantsLanguage: newLibraryItem.grantsLanguage,
+              abilities: newLibraryItem.abilities,
               rarity: newLibraryItem.rarity,
               effects: newLibraryItem.effects?.trim() || undefined,
               ...(newLibraryItem.iconId ? { iconId: newLibraryItem.iconId } : {}),
@@ -319,6 +327,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 goldValue: newLibraryItem.goldValue,
                 language: newLibraryItem.language,
                 grantsLanguage: newLibraryItem.grantsLanguage,
+                abilities: newLibraryItem.abilities,
                 rarity: newLibraryItem.rarity,
                 effects: newLibraryItem.effects?.trim() || undefined,
                 ...(newLibraryItem.iconId ? { iconId: newLibraryItem.iconId } : {}),
@@ -346,6 +355,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
         goldValue: newLibraryItem.goldValue,
         ...(newLibraryItem.language ? { language: newLibraryItem.language } : {}),
         ...(newLibraryItem.grantsLanguage ? { grantsLanguage: newLibraryItem.grantsLanguage } : {}),
+        ...(newLibraryItem.abilities?.length ? { abilities: newLibraryItem.abilities } : {}),
         ...(newLibraryItem.rarity ? { rarity: newLibraryItem.rarity } : {}),
         ...(newLibraryItem.effects?.trim() ? { effects: newLibraryItem.effects.trim() } : {}),
         ...(mods && Object.keys(mods).length > 0 ? { statModifiers: mods } : {}),
@@ -828,6 +838,14 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 optionLabel={(name) => `While equipped, knows ${name}`}
                 ariaLabel="Grants language while equipped"
                 className="bg-muted border border-border px-2 py-1 text-sm w-full"
+              />
+              <AbilityLinksEditor
+                kind="item"
+                links={newLibraryItem.abilities}
+                onChange={(abilities) => setNewLibraryItem({ ...newLibraryItem, abilities })}
+                library={abilities}
+                iconImages={iconImages}
+                onCreateAbility={onCreateAbility}
               />
               <div className="flex gap-2">
                 <select value={newLibraryItem.equipSlot || ""}

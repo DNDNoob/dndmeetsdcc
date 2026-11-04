@@ -925,6 +925,7 @@ export interface Spell {
   createdByUsername?: string; // Denormalized for display
   isPublic?: boolean;        // Whether visible to players outside the campaign
   upgradeXp?: UpgradeXpSettings; // How this spell earns upgrade XP (unset fields use the spell defaults)
+  abilities?: AbilityLink[]; // Library abilities a crawler gets by knowing this spell
 }
 
 // ======== Abilities ========
@@ -955,6 +956,24 @@ export type AbilityEffect =
   | { type: 'movement'; feet: number }
   | { type: 'text'; text: string };
 export type AbilityEffectType = AbilityEffect['type'];
+
+/** Small per-link changes, e.g. a weaker Fireball wand (4d6 instead of 8d6). Anything bigger = make a copy. */
+export interface AbilityTweaks {
+  diceCount?: number;               // number of dice in its first dice effect
+  difficulty?: CheckDifficultyId;   // the check's difficulty
+  uses?: AbilityUses;
+  usesCount?: number;
+  mana?: number;                    // mana cost
+  hp?: number;                      // HP cost
+  turns?: number;                   // how long its first condition lasts
+}
+
+/** An item or spell pointing at a library ability, with optional tweaks and a note. */
+export interface AbilityLink {
+  abilityId: string;
+  tweaks?: AbilityTweaks;
+  note?: string;
+}
 
 export interface Ability {
   id: string;
@@ -1087,6 +1106,7 @@ export interface InventoryItem {
   upgrades?: ItemUpgrade[];  // Upgrades given to this crawler's copy, oldest first (see src/lib/upgrades.ts)
   upgradePath?: UpgradePath; // Milestones reached, the trees the Dungeon AI offered and the one picked
   upgradeIconPending?: boolean; // Upgraded since the icon was last redrawn (the DM's browser redraws it)
+  abilities?: AbilityLink[]; // Library abilities a crawler gets from it: while equipped, or while carried if it has no slot
 }
 
 export interface ArmorData {

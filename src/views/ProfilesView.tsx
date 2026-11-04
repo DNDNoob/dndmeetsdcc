@@ -16,7 +16,7 @@ import { SkillsPanel, CheckDifficultyPicker } from "@/components/SkillsPanel";
 import { usableLanguageIds } from "@/lib/languages";
 import { HealthBar } from "@/components/ui/HealthBar";
 import { EquipmentSlot } from "@/components/ui/EquipmentSlot";
-import { Crawler, getQuestProgress, Mob, InventoryItem, getItemStackKey, stackItems, getLootingLevel, getLootsUntilNextLevel, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery, getInitialCrawlerId, rollD20, rollsWithDisadvantage, ABILITY_KEYS, baseItemName, type SpellEffect, describeSpellEffect, getSkillRank, getSkillXPToSpend, getWeaponProficiency, HAND_TO_HAND, getCheckDC, SKILLS, type SkillDef, type CheckDifficultyId, getCrawlerXP, type SkillId, type AbilityKey, getCrawlerStatValue, getHighlightStats, type StatSource, type CrawlerStats, type CrawlerStatsById, getUpgradeKind, resolveUpgradeXp, getUpgradeXp, getUpgradeTier, statKey, type UpgradeXpBreakdown, type EquippedItems, getDodgeBonus } from "@/lib/gameData";
+import { Crawler, getQuestProgress, Mob, InventoryItem, getItemStackKey, stackItems, getLootingLevel, getLootsUntilNextLevel, EquipmentSlot as SlotType, getEquippedModifiers, StatModifiers, SentLootBox, getLootBoxTierColor, NoncombatTurnState, CombatState, WeaponData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, WeaponDie, DEFAULT_MOVE_SPEED, getEffectiveMoveSpeed, Spell, KnownSpell, SpellActionType, SPELL_ACTION_TYPES, getSpellMasteryLevel, getEffectiveManaCost, getCastsUntilNextMastery, getInitialCrawlerId, rollD20, rollsWithDisadvantage, ABILITY_KEYS, baseItemName, type SpellEffect, describeSpellEffect, getSkillRank, getSkillXPToSpend, getWeaponProficiency, HAND_TO_HAND, getCheckDC, SKILLS, type SkillDef, type CheckDifficultyId, getCrawlerXP, type SkillId, type AbilityKey, getCrawlerStatValue, getHighlightStats, type StatSource, type CrawlerStats, type CrawlerStatsById, getUpgradeKind, resolveUpgradeXp, getUpgradeXp, getUpgradeTier, statKey, type UpgradeXpBreakdown, type EquippedItems, getDodgeBonus, type Ability } from "@/lib/gameData";
 import { UpgradeXpBar } from "@/components/UpgradeXpBar";
 import { UpgradeList } from "@/components/UpgradeList";
 import { UpgradePathPrompt } from "@/components/UpgradePathPrompt";
@@ -28,7 +28,9 @@ import { ItemName } from "@/components/ItemName";
 import type { DiceRollEntry } from "@/hooks/useGameState";
 import UndoTurnButton, { canUndoCombatTurn } from "@/components/UndoTurnButton";
 import { getCrawlerArmor } from "@/lib/armor";
-import { Shield, Zap, Heart, Brain, Wind, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Backpack, HardHat, Package, Lock, Unlock, ChevronDown, ChevronUp, Check, Search, Send, BookOpen, Filter, X, Gem, Footprints, Shirt, Hand, Target, Swords, RefreshCw, Timer, ScrollText, Eye, EyeOff, CheckSquare, Trophy, Skull, HeartCrack, Crown, Minus, Wand2, Star, BarChart3 } from "lucide-react";
+import { Shield, Zap, Heart, Brain, Wind, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Backpack, HardHat, Package, Lock, Unlock, ChevronDown, ChevronUp, Check, Search, Send, BookOpen, Filter, X, Gem, Footprints, Shirt, Hand, Target, Swords, RefreshCw, Timer, ScrollText, Eye, EyeOff, CheckSquare, Trophy, Skull, HeartCrack, Crown, Minus, Wand2, Star, BarChart3, Stars } from "lucide-react";
+import CrawlerAbilitiesPanel from "@/components/CrawlerAbilitiesPanel";
+import { getCrawlerAbilities } from "@/lib/abilities";
 
 const NO_CRAWLER_STATS: CrawlerStats[] = [];
 
@@ -89,7 +91,7 @@ const stableJson = (value: unknown): string => {
   return JSON.stringify(clean(value));
 };
 
-type ProfileTab = 'profile' | 'inventory' | 'actions' | 'skills' | 'spells' | 'reactions' | 'attacks' | 'bonus' | 'quests' | 'stats';
+type ProfileTab = 'profile' | 'inventory' | 'actions' | 'skills' | 'spells' | 'abilities' | 'reactions' | 'attacks' | 'bonus' | 'quests' | 'stats';
 
 // Actions tab buttons: the roll skills, then the INT knowledge skills (Barter is used by trading)
 const ROLL_SKILLS = SKILLS.filter(sk => sk.kind === 'roll');
@@ -145,6 +147,8 @@ interface ProfilesViewProps {
   onChooseUpgradeTree?: (crawlerId: string, target: { kind: 'item' | 'spell'; id: string }, treeIndex: number) => Promise<void>;
   onClaimUpgradeStep?: (crawlerId: string, target: { kind: 'item' | 'spell'; id: string }) => Promise<void>;
   onHealCrawler?: (crawlerId: string, amount: number, healerId?: string, source?: StatSource) => Promise<void>;
+  abilities?: Ability[]; // campaign ability library: items and spells link to it
+  iconImages?: Record<string, string>;
 }
 
 const SPELL_LEARNED_FROM_LABELS: Record<string, string> = {
@@ -560,6 +564,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
   onChooseUpgradeTree,
   onClaimUpgradeStep,
   onHealCrawler,
+  abilities: abilityLibrary = [],
+  iconImages = {},
 }) => {
   // Players land on their own crawler; the DM (and spectators) start on the first one
   const [selectedId, setSelectedId] = useState(() => getInitialCrawlerId(crawlers, currentPlayerId));
@@ -1177,6 +1183,18 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
             >
               <BookOpen className="w-5 h-5" />
               <span className="hidden xl:inline text-sm font-medium">Spells</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('abilities')}
+              className={`p-3 rounded-l-lg transition-colors flex items-center gap-2 ${
+                activeTab === 'abilities'
+                  ? 'bg-primary/20 text-primary border-r-2 border-primary'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              }`}
+              title="Abilities"
+            >
+              <Stars className="w-5 h-5" />
+              <span className="hidden xl:inline text-sm font-medium">Abilities</span>
             </button>
             <button
               onClick={() => setActiveTab('reactions')}
@@ -2529,6 +2547,41 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 rangedItemIds={inventory.filter(i => i.weaponData?.isRanged).map(i => i.id)}
               />
             )}
+
+            {/* Abilities Tab: abilities from equipped items and known spells */}
+            {activeTab === 'abilities' && (() => {
+              const isCombatActive = combatState?.active && combatState.phase !== 'ended';
+              const isCombatPhaseLocal = combatState?.active && combatState.phase === 'combat';
+              const myCombatant = combatState?.combatants.find(c => c.id === selected.id);
+              const isMyTurn = !!isCombatPhaseLocal && combatState?.combatants[combatState.currentTurnIndex]?.id === selected.id;
+              const blockedReason = (activation: Ability['activation']): string | null => {
+                if (!isCombatActive || !myCombatant) return null;
+                if (activation === 'Reaction') return myCombatant.hasUsedReaction ? 'Reaction used this round' : null;
+                if (!isCombatPhaseLocal) return 'Rolling initiative';
+                if (!isMyTurn) return 'Not your turn';
+                if (activation === 'Action' && myCombatant.hasUsedAction) return 'Action already used';
+                if (activation === 'Bonus Action' && myCombatant.hasUsedBonusAction) return 'Bonus action already used';
+                return null;
+              };
+              return (
+                <CrawlerAbilitiesPanel
+                  crawler={selected}
+                  abilities={getCrawlerAbilities(selected, inventory, spellLibrary, abilityLibrary)}
+                  equippedMods={equippedMods}
+                  dungeonFloor={dungeonFloor}
+                  iconImages={iconImages}
+                  canUse={isAdmin || currentPlayerId === selected.id}
+                  blockedReason={blockedReason}
+                  addDiceRoll={addDiceRoll}
+                  onStatRoll={onStatRoll}
+                  onUpdateCrawler={onUpdateCrawler}
+                  onUsed={(activation) => {
+                    if (!isCombatActive || !myCombatant || activation === 'Passive') return;
+                    onRecordCombatAction?.(selected.id, activation === 'Reaction' ? 'reaction' : activation === 'Bonus Action' ? 'bonus' : 'action');
+                  }}
+                />
+              );
+            })()}
 
             {/* Spells Tab */}
             {activeTab === 'spells' && (() => {
