@@ -139,6 +139,7 @@ import { logger } from "@/lib/logger";
 import { toast } from "sonner";
 import { sortableMapIds, planEpisodeImport } from "@/lib/publicContent";
 import { PARTY_DISCOVERY_ID, getOwnedDiscoveries, type DiscoveryDoc, type LibraryKind, type LibraryMode, type ItemTranslation } from "@/lib/discoveries";
+import { getSpellLanguage } from "@/lib/abilities";
 
 export interface DiceRollEntry {
   id: string;
@@ -3025,7 +3026,7 @@ export const useGameState = () => {
     const newMastery = getSpellMasteryLevel(newCastCount);
     knownSpells[idx] = { ...prev, castCount: newCastCount };
     // Spells like Speak with Animals: know the language for the spell's duration (casting again restarts it)
-    const grants = spell?.spellData.grantsLanguage;
+    const grants = spell ? getSpellLanguage(spell, abilities) : undefined;
     let languageEffects: LanguageEffect[] | undefined;
     if (spell && grants) {
       const d = spell.spellData.duration;

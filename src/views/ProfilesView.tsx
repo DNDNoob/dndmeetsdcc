@@ -30,7 +30,7 @@ import UndoTurnButton, { canUndoCombatTurn } from "@/components/UndoTurnButton";
 import { getCrawlerArmor } from "@/lib/armor";
 import { Shield, Zap, Heart, Brain, Wind, Sparkles, Save, Plus, Trash2, Coins, Sword, User, Upload, Backpack, HardHat, Package, Lock, Unlock, ChevronDown, ChevronUp, Check, Search, Send, BookOpen, Filter, X, Gem, Footprints, Shirt, Hand, Target, Swords, RefreshCw, Timer, ScrollText, Eye, EyeOff, CheckSquare, Trophy, Skull, HeartCrack, Crown, Minus, Wand2, Star, BarChart3, Stars } from "lucide-react";
 import CrawlerAbilitiesPanel from "@/components/CrawlerAbilitiesPanel";
-import { getCrawlerAbilities } from "@/lib/abilities";
+import { getCrawlerAbilities, getSpellCondition } from "@/lib/abilities";
 
 const NO_CRAWLER_STATS: CrawlerStats[] = [];
 
@@ -2651,7 +2651,7 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                 const dice = (sd.damageDice ?? []).filter(d => d.count > 0);
                 const isHealing = sd.damageType === 'Healing';
                 // Effects only land in combat, where their turns can count down
-                const effect = isCombatPhaseLocal && sd.effect?.condition?.trim() ? sd.effect : undefined;
+                const effect = isCombatPhaseLocal ? getSpellCondition(spell, abilityLibrary) : undefined;
                 const isSelfSpell = sd.target === 'Self' || sd.range === 'Self';
                 const source: StatSource = { kind: 'spell', id: ks.spellId, name: spell.name, ...(sd.damageType ? { damageType: sd.damageType } : {}) };
 

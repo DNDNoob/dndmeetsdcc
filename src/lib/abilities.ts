@@ -10,7 +10,10 @@ import {
   type AbilityTweaks,
   type Crawler,
   type InventoryItem,
+  type Mob,
+  type MobCombatAction,
   type Spell,
+  type SpellEffect,
   type WeaponDie,
 } from '@/lib/gameData';
 import { DEFAULT_ABILITIES } from '@/lib/defaultAbilities';
@@ -246,3 +249,59 @@ export const summarizeAbility = (ability: Ability): string => {
   return parts.join(' · ');
 };
 
+
+// ======== Spells and mobs read from linked abilities ========
+
+/** The condition a spell leaves on its targets: its own (older spells) or its first linked condition ability. */
+export const getSpellCondition = (spell: Spell, library: Ability[]): SpellEffect | undefined => {
+  const own = spell.spellData.effect;
+  if (own?.condition?.trim()) return own;
+  for (const link of spell.abilities ?? []) {
+    const base = findAbility(library, link.abilityId);
+    if (!base) continue;
+    const ability = applyAbilityTweaks(base, link.tweaks);
+    const e = ability.effects.find(x => x.type === 'condition');
+    if (e?.type === 'condition' && e.condition.trim()) {
+      return { condition: e.condition, turns: e.turns, ...(e.description ? { description: e.description } : {}) };
+    }
+  }
+  return undefined;
+};
+
+/** The language casting a spell grants: its own (older spells) or one from a linked ability. */
+export const getSpellLanguage = (spell: Spell, library: Ability[]): string | undefined => {
+  if (spell.spellData.grantsLanguage) return spell.spellData.grantsLanguage;
+  for (const link of spell.abilities ?? []) {
+    const e = findAbility(library, link.abilityId)?.effects.find(x => x.type === 'language');
+    if (e?.type === 'language' && e.language) return e.language;
+  }
+  return undefined;
+};
+
+/** A mob's linked abilities that roll dice, as combat actions for the DM's mob panel. */
+export const getMobAbilityActions = (mob: Pick<Mob, 'abilities'>, library: Ability[]): MobCombatAction[] => {
+  const actions: MobCombatAction[] = [];
+  for (const link of mob.abilities ?? []) {
+    const base = findAbility(library, link.abilityId);
+    if (!base || base.activation === 'Passive') continue;
+    const ability = applyAbilityTweaks(base, link.tweaks);
+    const dice = ability.effects.find(e => e.type === 'dice' && e.purpose !== 'attack');
+    const hitDice = ability.effects.find(e => e.type === 'dice' && e.purpose === 'attack');
+    actions.push({
+      key: `ability:${ability.id}`,
+      source: 'ability',
+      name: ability.name,
+      actionType: ability.activation === 'Passive' ? 'Action' : ability.activation,
+      hitBonus: link.tweaks?.hitBonus ?? 0,
+      ...(hitDice?.type === 'dice' && hitDice.dice[0]?.count ? { hitDie: hitDice.dice[0] } : {}),
+      damageDice: dice?.type === 'dice' ? dice.dice : [],
+      damageBonus: link.tweaks?.damageBonus ?? 0,
+      ...(dice?.type === 'dice' && dice.damageType ? { damageType: dice.damageType } : {}),
+      healing: dice?.type === 'dice' && dice.purpose === 'healing',
+      splash: false,
+      ...(ability.range !== undefined ? { range: ability.range } : {}),
+      notes: [link.note, ability.description].filter(Boolean).join(' · ') || undefined,
+    });
+  }
+  return actions;
+};

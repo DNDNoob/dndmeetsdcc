@@ -966,6 +966,8 @@ export interface AbilityTweaks {
   mana?: number;                    // mana cost
   hp?: number;                      // HP cost
   turns?: number;                   // how long its first condition lasts
+  hitBonus?: number;                // mobs only: flat bonus on the d20 to-hit roll
+  damageBonus?: number;             // mobs only: flat bonus on the damage roll
 }
 
 /** An item or spell pointing at a library ability, with optional tweaks and a note. */
@@ -1224,6 +1226,7 @@ export interface Mob {
   merchant?: MerchantConfig;  // NPCs that buy and sell items with crawlers
   attacks?: MobAttack[];     // Natural attacks the DM rolls in combat (claws, bites...)
   spellIds?: string[];       // Spells from the campaign spell library this mob can cast
+  abilities?: AbilityLink[]; // Library abilities this mob can use (its attacks), with per-mob hit/damage bonuses
 }
 
 // ======== Mob combat actions ========
@@ -1244,7 +1247,7 @@ export interface MobAttack {
 /** One thing a mob can do in combat: a natural attack, an equipped weapon or a spell. */
 export interface MobCombatAction {
   key: string;
-  source: 'attack' | 'weapon' | 'spell';
+  source: 'attack' | 'weapon' | 'spell' | 'ability';
   name: string;
   actionType: SpellActionType;
   hitBonus: number;

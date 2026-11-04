@@ -885,7 +885,8 @@ Each mob has:
 
 Open **Attacks & Spells** when adding or editing a mob in the DM Console:
 
-- **Add attack**: give it a name, whether it uses an Action, Bonus Action or Reaction, a to-hit bonus, damage dice plus a flat damage bonus, a damage type, a range (leave blank for melee) and optional notes. Mobs have no ability scores, so the bonuses are flat numbers
+- **Abilities**: link any ability from the [Abilities](/wiki/abilities) library, like Shotgun blast or Tiki torch. Open a linked ability to give this mob a flat **to-hit bonus** and **+ damage** (mobs have no stats, so the bonuses are flat numbers), or any other small tweak
+- **New attack**: give it a name, whether it uses an Action, Bonus Action or Reaction, a to-hit bonus, damage dice plus a flat damage bonus, a damage type, a range (leave blank for melee) and optional notes. Saving it adds it to the Abilities library (so other mobs can use it too) and links it to this mob with its bonuses
 - **Spells**: add any spell from the campaign's spell library. Mobs don't spend mana
 - **Weapons** the mob has equipped from its default inventory are added on their own
 
@@ -1469,7 +1470,8 @@ Don't like how an ability works? Open it and press **Make my own copy**. You get
 When you create or edit an item in the Item Library, or a spell in Vernon's Library, the **Abilities** box lets you link library abilities to it. Pick one under **Link an ability...** and press **+**.
 
 - **Items**: a crawler has the item's abilities while it's **equipped**. Items with no equip slot (a lockpick set, a charm) give their abilities while carried.
-- **Spells**: a crawler who knows the spell has its abilities.
+- **Spells**: a crawler who knows the spell has its abilities. They happen when the spell is cast from the Spells tab: a linked condition lands on the target in combat, and a linked language lets the caster speak it for the spell's duration. On the Abilities tab they show as "when you cast ..." with no Use button of their own.
+- **Mobs**: the DM links abilities to mobs under **Attacks & Spells** in the DM Console, with a to-hit and damage bonus per mob. See [Mobs](/wiki/mobs).
 
 ### Small tweaks per link
 
@@ -1497,9 +1499,12 @@ Each crawler profile has an **Abilities** tab listing every ability they get fro
 
 In combat it follows the turn rules: an Action or Bonus Action only on your turn and once each, a Reaction once per round. Passive abilities are always on and have no Use button. Uses per day are shown but not counted yet, so the DM keeps track.
 
+## Older spell effects and mob attacks
+
+Spell conditions, spell language grants and mob attacks made before abilities existed have been turned into library abilities and linked for you (for example Frightened on Bad Vibes, Speak Beast on Speak with Animals, Shotgun blast on the Creepy Neighbor). Older attacks still saved on a mob only are listed under "Older attacks saved on this mob only" and keep working.
+
 ## Coming next
 
-- A DM button to turn old item and spell effects (conditions, language grants) and mob attacks into abilities.
 - Abilities in Encountered mode, like items and spells.`,
   },
   {

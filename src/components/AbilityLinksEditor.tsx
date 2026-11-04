@@ -25,6 +25,8 @@ import {
 const inputClass = "bg-muted border border-border px-2 py-1 text-xs w-full";
 const labelClass = "text-[10px] text-muted-foreground block mb-0.5";
 
+const l0 = (n: number | undefined) => n !== undefined && n !== 0;
+
 const numOrUndefined = (value: string): number | undefined => {
   if (value.trim() === '') return undefined;
   const n = parseInt(value, 10);
@@ -38,9 +40,17 @@ interface LinkRowProps {
   onChange: (link: AbilityLink) => void;
   onRemove: () => void;
   onMakeCopy?: () => void;
+  /** Mobs also get to-hit and damage bonuses */
+  forMob?: boolean;
 }
 
-const LinkRow: React.FC<LinkRowProps> = ({ link, base, iconSrc, onChange, onRemove, onMakeCopy }) => {
+const intOrUndefined = (value: string): number | undefined => {
+  if (value.trim() === '') return undefined;
+  const n = parseInt(value, 10);
+  return Number.isFinite(n) && n !== 0 ? n : undefined;
+};
+
+const LinkRow: React.FC<LinkRowProps> = ({ link, base, iconSrc, onChange, onRemove, onMakeCopy, forMob }) => {
   const [open, setOpen] = useState(false);
   if (!base) {
     return (
@@ -68,7 +78,7 @@ const LinkRow: React.FC<LinkRowProps> = ({ link, base, iconSrc, onChange, onRemo
         <button type="button" onClick={() => setOpen(!open)} className="flex-1 min-w-0 text-left">
           <span className="text-xs font-display text-primary">{base.name}</span>
           {changed && <span className="ml-1 text-[9px] border border-accent/60 text-accent px-1">changed</span>}
-          <span className="block text-[10px] text-muted-foreground truncate">{summarizeAbility(resolved)}</span>
+          <span className="block text-[10px] text-muted-foreground truncate">{summarizeAbility(resolved)}{forMob && tweaks.hitBonus ? ` · ${tweaks.hitBonus > 0 ? '+' : ''}${tweaks.hitBonus} to hit` : ''}{forMob && tweaks.damageBonus ? ` · ${tweaks.damageBonus > 0 ? '+' : ''}${tweaks.damageBonus} damage` : ''}</span>
         </button>
         <button type="button" onClick={() => setOpen(!open)} aria-label={open ? 'Hide tweaks' : 'Tweak'} className="text-muted-foreground hover:text-primary">
           {open ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
@@ -122,6 +132,20 @@ const LinkRow: React.FC<LinkRowProps> = ({ link, base, iconSrc, onChange, onRemo
               <input type="number" min={0} value={tweaks.hp ?? ''} placeholder={String(base.cost?.hp ?? 0)}
                 onChange={(e) => setTweak({ hp: numOrUndefined(e.target.value) })} className={inputClass} />
             </div>
+            {forMob && (
+              <div>
+                <label className={labelClass}>To-hit bonus</label>
+                <input type="number" value={tweaks.hitBonus ?? ''} placeholder="0"
+                  onChange={(e) => setTweak({ hitBonus: intOrUndefined(e.target.value) })} className={inputClass} />
+              </div>
+            )}
+            {forMob && firstDice?.type === 'dice' && (
+              <div>
+                <label className={labelClass}>+ Damage</label>
+                <input type="number" value={tweaks.damageBonus ?? ''} placeholder="0"
+                  onChange={(e) => setTweak({ damageBonus: intOrUndefined(e.target.value) })} className={inputClass} />
+              </div>
+            )}
             {firstCondition?.type === 'condition' && (
               <div>
                 <label className={labelClass}>{firstCondition.condition} turns</label>
@@ -160,8 +184,8 @@ interface AbilityLinksEditorProps {
   iconImages?: Record<string, string>;
   /** Saves a new library ability (a copy); the link then points at it. */
   onCreateAbility?: (ability: Ability) => Promise<void>;
-  /** "item" or "spell", for the hint text */
-  kind: 'item' | 'spell';
+  /** "item", "spell" or "mob", for the hint text */
+  kind: 'item' | 'spell' | 'mob';
 }
 
 /** Pick library abilities for an item or spell, with small per-link tweaks. */
@@ -179,7 +203,9 @@ const AbilityLinksEditor: React.FC<AbilityLinksEditorProps> = ({ links, onChange
     if (!base || !onCreateAbility) return;
     const copy = copyWithTweaks(base, link);
     await onCreateAbility(copy);
-    set(current.map((l, i) => (i === index ? { abilityId: copy.id, ...(l.note ? { note: l.note } : {}) } : l)));
+    // Mob bonuses aren't part of the ability card, so they stay on the link
+    const keep = { ...(l0(link.tweaks?.hitBonus) ? { hitBonus: link.tweaks!.hitBonus } : {}), ...(l0(link.tweaks?.damageBonus) ? { damageBonus: link.tweaks!.damageBonus } : {}) };
+    set(current.map((l, i) => (i === index ? { abilityId: copy.id, ...(Object.keys(keep).length ? { tweaks: keep } : {}), ...(l.note ? { note: l.note } : {}) } : l)));
   };
 
   return (
@@ -191,7 +217,9 @@ const AbilityLinksEditor: React.FC<AbilityLinksEditorProps> = ({ links, onChange
       <p className="text-[10px] text-muted-foreground">
         {kind === 'item'
           ? 'Crawlers get these while the item is equipped (or while carried, if it has no slot).'
-          : 'Crawlers who know this spell get these.'} Make new ones on the Abilities page.
+          : kind === 'spell'
+            ? 'Casting this spell does these.'
+            : 'The mob can use these in combat. Attacks and other abilities from the library work here.'} Make new ones on the Abilities page.
       </p>
       {current.map((link, i) => {
         const base = findAbility(library, link.abilityId);
@@ -204,6 +232,7 @@ const AbilityLinksEditor: React.FC<AbilityLinksEditorProps> = ({ links, onChange
             onChange={(next) => set(current.map((l, j) => (j === i ? next : l)))}
             onRemove={() => set(current.filter((_, j) => j !== i))}
             onMakeCopy={onCreateAbility && base ? () => void makeCopy(i) : undefined}
+            forMob={kind === 'mob'}
           />
         );
       })}

@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useAbilityLibrary } from "@/contexts/AbilitiesContext";
+import { getMobAbilityActions } from "@/lib/abilities";
 import { ChevronDown, ChevronUp, Dices, Heart, Hourglass, Shield, Sparkles, Swords, Wind, X } from "lucide-react";
 import { getCrawlerArmor } from "@/lib/armor";
 import {
@@ -61,7 +63,7 @@ const rollDice = (dice: WeaponDie[]) => {
   return results;
 };
 
-const SOURCE_ICON = { attack: Swords, weapon: Shield, spell: Sparkles } as const;
+const SOURCE_ICON = { attack: Swords, weapon: Shield, spell: Sparkles, ability: Swords } as const;
 
 /**
  * DM-only panel in the top left of the Show Time map during combat: everything the mob whose
@@ -101,7 +103,8 @@ export const MobActionsOverlay: React.FC<MobActionsOverlayProps> = ({
 
   const combatant = mobCombatants.find(c => c.id === selectedId) ?? (current?.type === 'mob' ? current : undefined);
   const mob = combatant ? mobs.find(m => m.id === (combatant.sourceId || combatant.id)) : undefined;
-  const actions = useMemo(() => (mob ? getMobCombatActions(mob, spells) : []), [mob, spells]);
+  const { abilities: abilityLibrary } = useAbilityLibrary();
+  const actions = useMemo(() => (mob ? [...getMobCombatActions(mob, spells), ...getMobAbilityActions(mob, abilityLibrary)] : []), [mob, spells, abilityLibrary]);
 
   const isTheirTurn = !!combatant && current?.id === combatant.id;
   // Players can't see a mob's name until they have met it
