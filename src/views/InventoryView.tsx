@@ -13,7 +13,8 @@ import { canWearArmor } from "@/lib/armor";
 import { Crawler, InventoryItem, getUpgradeKind, type UpgradeXpSettings, getItemStackKey, stackItems, EquipmentSlot as SlotType, StatModifiers, WeaponData, type ArmorData, DAMAGE_TYPES, WEAPON_TYPES, DamageType, WeaponType, Spell, SpellData, ITEM_RARITIES, ItemRarity, getItemRarityColor, type Ability, type AbilityLink } from "@/lib/gameData";
 import AbilityLinksEditor from "@/components/AbilityLinksEditor";
 import { RarityBadge } from "@/components/ui/RarityBadge";
-import { Coins, Package, Sword, Shield, Plus, Trash2, Edit2, Save, HardHat, Search, BookOpen, Gem, Footprints, Shirt, Hand, Crosshair, ChevronDown, ChevronUp, Wand2, Globe, Lock, Users, Bookmark } from "lucide-react";
+import { Coins, Package, Sword, Shield, Plus, Trash2, Edit2, Save, HardHat, Search, BookOpen, Gem, Footprints, Shirt, Hand, Crosshair, ChevronDown, ChevronUp, Wand2, Globe, Lock, Users, Bookmark, MoreHorizontal } from "lucide-react";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { SpellDataEditor } from "@/views/SpellsView";
 import { LibraryModePicker, HiddenLibraryNotice, NothingEncounteredNotice } from "@/components/LibraryVisibilityToggle";
 import { DiscoveryControls, SeenBadge, SharedTranslation, UnknownDetails, type DiscoveryActions } from "@/components/DiscoveryControls";
@@ -734,53 +735,55 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                               by {item.createdByUsername}
                             </span>
                           )}
-                          {/* Public/private toggle (own items only) */}
-                          {currentUserId && item.createdBy === currentUserId && onToggleItemPublic && (
-                            <button
-                              onClick={() => onToggleItemPublic(item, !item.isPublic)}
-                              title={item.isPublic ? 'Make private' : 'Make public'}
-                              className={`flex items-center gap-0.5 text-[9px] px-1 py-0.5 border transition-colors ${
-                                item.isPublic
-                                  ? 'border-primary/50 text-primary hover:bg-primary/10'
-                                  : 'border-border text-muted-foreground hover:border-primary/30 hover:text-primary'
-                              }`}
-                            >
-                              {item.isPublic
-                                ? <><Globe className="w-2.5 h-2.5" /> Public</>
-                                : <><Lock className="w-2.5 h-2.5" /> Private</>
-                              }
-                            </button>
-                          )}
-                          {/* Save a copy to My Content (own items only) */}
-                          {currentUserId && item.createdBy === currentUserId && onSaveItemToMyContent && (
-                            <button
-                              onClick={() => onSaveItemToMyContent(item)}
-                              title={myItems.some(mi => mi.id === item.id) ? 'Update the copy in My Content' : 'Save to My Content'}
-                              className={`flex items-center gap-0.5 text-[9px] px-1 py-0.5 border transition-colors ${
-                                myItems.some(mi => mi.id === item.id)
-                                  ? 'border-accent/50 text-accent hover:bg-accent/10'
-                                  : 'border-border text-muted-foreground hover:border-accent/30 hover:text-accent'
-                              }`}
-                            >
-                              <Bookmark className="w-2.5 h-2.5" /> Mine
-                            </button>
-                          )}
-                          {/* Show public badge on items from others */}
-                          {item.isPublic && item.createdBy !== currentUserId && (
-                            <span className="flex items-center gap-0.5 text-[9px] text-primary">
+                          {/* Public items show a small globe; everything else lives in the ⋯ menu */}
+                          {item.isPublic && (
+                            <span className="flex items-center gap-0.5 text-[9px] text-primary" title="Public">
                               <Globe className="w-2.5 h-2.5" />
                             </span>
                           )}
-                          {editMode && (
-                            <>
-                              <button onClick={() => handleStartEditLibraryItem(item)} className="text-primary hover:text-primary/80" title="Edit item">
-                                <Edit2 className="w-4 h-4" />
-                              </button>
-                              <button onClick={() => handleRemoveLibraryItem(item.id)} className="text-destructive hover:text-destructive/80" title="Delete item">
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </>
-                          )}
+                          {(() => {
+                            const isOwn = !!currentUserId && item.createdBy === currentUserId;
+                            const canTogglePublic = isOwn && !!onToggleItemPublic;
+                            const canSaveMine = isOwn && !!onSaveItemToMyContent;
+                            if (!canTogglePublic && !canSaveMine && !editMode) return null;
+                            const inMine = myItems.some(mi => mi.id === item.id);
+                            return (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <button className="text-muted-foreground hover:text-primary p-0.5" title="Item options" aria-label={`Options for ${item.name}`}>
+                                    <MoreHorizontal className="w-4 h-4" />
+                                  </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  {editMode && (
+                                    <DropdownMenuItem onSelect={() => handleStartEditLibraryItem(item)}>
+                                      <Edit2 className="w-4 h-4 mr-2" /> Edit
+                                    </DropdownMenuItem>
+                                  )}
+                                  {canTogglePublic && (
+                                    <DropdownMenuItem onSelect={() => onToggleItemPublic!(item, !item.isPublic)}>
+                                      {item.isPublic
+                                        ? <><Lock className="w-4 h-4 mr-2" /> Make private</>
+                                        : <><Globe className="w-4 h-4 mr-2" /> Make public</>}
+                                    </DropdownMenuItem>
+                                  )}
+                                  {canSaveMine && (
+                                    <DropdownMenuItem onSelect={() => onSaveItemToMyContent!(item)}>
+                                      <Bookmark className="w-4 h-4 mr-2" /> {inMine ? 'Update my copy' : 'Save to My Content'}
+                                    </DropdownMenuItem>
+                                  )}
+                                  {editMode && (
+                                    <>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem onSelect={() => handleRemoveLibraryItem(item.id)} className="text-destructive focus:text-destructive">
+                                        <Trash2 className="w-4 h-4 mr-2" /> Delete
+                                      </DropdownMenuItem>
+                                    </>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            );
+                          })()}
                         </div>
                       </div>
                     </div>

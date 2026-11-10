@@ -152,29 +152,13 @@ const MapsView: React.FC<MapsViewProps> = ({
               );
             })
           ) : (
-            <>
-              <div className="border border-dashed border-primary/50 bg-background/50 p-8 text-center">
-                <Layers className="w-12 h-12 text-primary/50 mx-auto mb-4" />
-                <h3 className="font-display text-lg text-primary mb-2">FLOOR 1 - THE DESCENT</h3>
-                <p className="text-muted-foreground text-sm mb-4">
-                  [ Upload map image to display here ]
-                </p>
-                <p className="text-xs text-muted-foreground/60">
-                  Tip: You can add custom map images in the Dungeon AI console
-                </p>
-              </div>
-
-              <div className="border border-dashed border-primary/50 bg-background/50 p-8 text-center">
-                <MapPin className="w-12 h-12 text-primary/50 mx-auto mb-4" />
-                <h3 className="font-display text-lg text-primary mb-2">TOPEKA OVERWORLD</h3>
-                <p className="text-muted-foreground text-sm mb-4">
-                  [ Upload overworld map to display here ]
-                </p>
-                <p className="text-xs text-muted-foreground/60">
-                  Current Location: Unknown
-                </p>
-              </div>
-            </>
+            <div className="border border-dashed border-primary/50 bg-background/50 p-8 text-center">
+              <Layers className="w-12 h-12 text-primary/50 mx-auto mb-4" />
+              <p className="text-muted-foreground text-sm">No maps yet.</p>
+              <p className="text-xs text-muted-foreground/60 mt-2">
+                {isAdmin ? "Upload maps in the DM Console under Maps." : "Maps show up here once the DM adds them."}
+              </p>
+            </div>
           )}
         </div>
 

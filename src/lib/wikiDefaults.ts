@@ -61,6 +61,10 @@ The navigation bar at the top of the screen gives you quick access to all sectio
 
 On mobile devices, the navigation collapses into a **hamburger menu** (☰) — tap it to access all sections from a dropdown.
 
+On a crawler's profile, the tabs (Profile, Inventory, Actions, Skills and so on) run down the left side on bigger screens. On a phone they become a row of named tabs across the top; swipe the row sideways to see them all.
+
+The **[ DUNGEON CRAWLER CARL - SYSTEM HUB ]** strip at the bottom only shows on bigger screens and never in Show Time. While campaign music plays, the bottom bar stays so you can change the volume.
+
 In **Show Time**, the navigation bar hides to give the map more room. Rest your mouse at the top-left edge of the screen for a moment to bring it back, or pin it open. Moving across the top of the screen on your way to the map tools won't pop it open.
 
 Use the **Campaigns** button to return to the campaign list at any time.`,
@@ -208,7 +212,7 @@ Your **Speed** (feet per combat turn) is shown next to the Activity heading. See
 
 Trophies are for things that can't be measured automatically, like great roleplay, a clever plan or a heroic save. Only the DM can award them.
 
-- On a crawler's profile, the DM enters a trophy name and an optional note, then clicks **Award Trophy**.
+- On a crawler's profile, the DM opens **Award a trophy** under the trophies, enters a trophy name and an optional note, then clicks **Award Trophy**.
 - Awarding a trophy with the same name again counts it up, for example *Best Roleplay ×3*.
 - The **−** button next to a trophy takes back one award, and removes the trophy when its count reaches zero.
 
@@ -496,7 +500,7 @@ Everything you create (items, spells, maps, mobs, episodes, quests and loot boxe
 Content you want to keep for yourself, outside any one campaign, goes in **My Content**. It is linked to your profile only and only you can see it.
 
 - Open **My Content** on the campaign list screen to create, edit or delete personal items (name, description, equipment slot and gold value).
-- In a campaign, items and spells you made have a **Mine** button. Click it to save a copy to My Content, with all its stats, weapon details and spell data. Clicking it again updates that copy.
+- In a campaign, items and spells you made can be saved to My Content. For items, open the **⋯** menu on the item and pick **Save to My Content**; for spells, click the **Mine** button. This saves a copy to My Content, with all its stats, weapon details and spell data. Clicking it again updates that copy.
 - In a campaign, the Inventory page shows **My Items**. Click **+** to add one to the campaign's item library. On the Spells page the DM sees **My Spells** and can add them the same way.
 - Deleting something from My Content never removes copies already added to a campaign.
 
@@ -506,8 +510,9 @@ Every item in the shared library shows who created it. The creator's username ap
 
 Library items are **private by default** — they are only visible within your campaign. You can toggle an item public to share it with the broader community:
 
-- Click the **globe icon** on any item you created to make it public
-- Click the **lock icon** to revert it to private
+- Open the **⋯** menu on any item you created and pick **Make public**
+- Pick **Make private** from the same menu to revert it
+- Public items show a small globe next to their name
 - Only the item's creator can toggle its visibility
 
 Public items appear in the **Community Items** section for any player who has enabled public content in their account settings.
@@ -1353,8 +1358,8 @@ When you have skill XP or points to spend, a gold badge shows on your profile an
 
 ## For the DM
 
-- **Award XP** is on each crawler's Profile tab, next to the trophies. Enter an amount and a reason, and tick one or more crawlers. DM awards are exactly what you type.
-- **Auto XP** next to it scales all automatic XP in the campaign, from 50% to 200%.
+- **Award XP** is on each crawler's Profile tab, under the level bar. It starts folded; click it to open. Enter an amount and a reason, and tick one or more crawlers. DM awards are exactly what you type.
+- **Auto XP** inside it scales all automatic XP in the campaign, from 50% to 200%.
 - **Admin Override** can set a crawler's level or total XP by hand. Changing the level moves their XP to the start of that level.
 - Set a quest's XP in the quest editor in the DM Console.
 - Crawlers from before XP start with exactly the XP their level needs, so nobody loses a level.`,
@@ -1424,7 +1429,7 @@ Pick the check's difficulty above the skills before you roll; both tabs share th
 
 A natural 1 always fails and a natural 20 always succeeds, however big your bonus is. Haggle rolls follow the same rule. Bonuses keep growing as you level, and DCs grow as the party goes deeper, so the d20 still matters on every floor.
 
-The DM sets the party's current floor next to **Auto XP** on any crawler's Profile tab.`,
+The DM sets the party's current floor next to **Auto XP** in the **Award XP** box on any crawler's Profile tab.`,
   },
   {
     id: 'abilities',
@@ -2422,12 +2427,12 @@ All content (shared library items and spells) is **private by default**. This me
 
 ## Making Content Public
 
-Every item in the Item Library and every spell in the Spell Library that you created has a **globe/lock toggle badge**:
+Every item in the Item Library that you created has **Make public / Make private** in its **⋯** menu, and every spell in the Spell Library that you created has a **globe/lock toggle badge**:
 
 - 🔒 **Private** (default) — only visible within your campaign
 - 🌐 **Public** — visible to all players who have opted in to public content
 
-Click the badge to toggle. The change takes effect immediately.
+Click the badge (or the menu option) to toggle. The change takes effect immediately.
 
 > Items created by others show a read-only attribution badge ("by username") so you know who made them.
 

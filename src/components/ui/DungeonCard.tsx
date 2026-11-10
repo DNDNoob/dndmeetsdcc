@@ -7,17 +7,18 @@ interface DungeonCardProps extends React.HTMLAttributes<HTMLDivElement> {
 
 const DungeonCard = React.forwardRef<HTMLDivElement, DungeonCardProps>(
   ({ className, glowColor = "cyan", children, ...props }, ref) => {
+    // A quiet frame: big page cards no longer glow on hover, so the glow is saved for what needs attention
     const glowClasses = {
-      cyan: "border-primary hover:glow-cyan",
-      red: "border-destructive hover:glow-red",
-      gold: "border-accent hover:glow-gold",
+      cyan: "border-primary/60",
+      red: "border-destructive/70",
+      gold: "border-accent/70",
     };
 
     return (
       <div
         ref={ref}
         className={cn(
-          "bg-card/95 border-2 p-6 transition-all duration-300",
+          "bg-card/95 border p-6 transition-all duration-300",
           glowClasses[glowColor],
           className
         )}

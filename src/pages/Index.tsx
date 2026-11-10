@@ -1552,10 +1552,15 @@ const Index = () => {
             onClose={() => setShowChangelog(false)}
           />
 
-          <footer className="fixed bottom-0 left-0 right-0 z-10 flex items-center justify-center gap-3 py-2 bg-background/80 border-t border-border text-xs text-muted-foreground">
-            <span className={music.nowPlaying ? "hidden sm:inline" : undefined}>[ DUNGEON CRAWLER CARL - SYSTEM HUB v1.0 ]</span>
-            <MusicBar music={music} />
-          </footer>
+          {/* The title strip only shows on bigger screens outside Show Time; the bar stays while music plays */}
+          {(music.nowPlaying || currentView !== "showtime") && (
+            <footer className={`fixed bottom-0 left-0 right-0 z-10 items-center justify-center gap-3 py-2 bg-background/80 border-t border-border text-xs text-muted-foreground ${music.nowPlaying ? "flex" : "hidden sm:flex"}`}>
+              {currentView !== "showtime" && (
+                <span className={music.nowPlaying ? "hidden md:inline" : undefined}>[ DUNGEON CRAWLER CARL - SYSTEM HUB v1.0 ]</span>
+              )}
+              <MusicBar music={music} />
+            </footer>
+          )}
         </>
       )}
     </div>
