@@ -101,8 +101,11 @@ export const ExperienceCard: React.FC<ExperienceCardProps> = ({
         </div>
 
         {isAdmin && (
-          <div className="bg-muted/30 border border-border/50 rounded p-3 space-y-2">
-            <h4 className="font-display text-sm text-primary">AWARD XP</h4>
+          <details className="bg-muted/30 border border-border/50 rounded p-3 self-start">
+            <summary className="cursor-pointer font-display text-sm text-primary select-none">
+              AWARD XP <span className="text-[10px] text-accent font-mono ml-1">DM</span>
+            </summary>
+            <div className="space-y-2 mt-2">
             <div className="flex gap-2">
               <input
                 type="number"
@@ -160,7 +163,8 @@ export const ExperienceCard: React.FC<ExperienceCardProps> = ({
                 />
               </label>
             </div>
-          </div>
+            </div>
+          </details>
         )}
       </div>
     </div>

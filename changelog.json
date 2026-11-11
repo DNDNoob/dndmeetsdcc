@@ -1,5 +1,17 @@
 [
   {
+    "date": "2026-11-10",
+    "features": [
+      "📱 Crawler profile tabs show their names on phones: a row of named tabs across the top you can swipe, instead of a column of unlabeled icons",
+      "🧹 Item Library cards are tidier: Edit, Delete, Make public/private and Save to My Content moved into one ⋯ menu on each item",
+      "🧹 The DM's Award XP and Award a trophy forms on a profile start folded, so the profile is shorter. Click to open them",
+      "🧹 The SYSTEM HUB strip at the bottom is gone on phones and in Show Time, giving the map more room. It still shows the music controls while music plays",
+      "🧹 Calmer page frames: big cards no longer glow when you hover over them, and their borders are thinner",
+      "🗺️ The Maps page no longer shows made-up \"Floor 1\" and \"Topeka\" placeholders when there are no maps"
+    ],
+    "fixes": []
+  },
+  {
     "date": "2026-11-04",
     "features": [
       "🔗 Items and spells can link to abilities from the Abilities library. Each link can be tweaked for that item or spell only (fewer dice, an easier check, uses per day, mana or HP cost, how long a condition lasts, a note), shows a changed tag, and can Reset or Make my own copy for bigger changes",

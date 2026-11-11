@@ -1,5 +1,5 @@
 import { closeOnBackdrop } from "@/hooks/useClickAway";
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, type ComponentType, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { DungeonCard } from "@/components/ui/DungeonCard";
 import { DungeonButton } from "@/components/ui/DungeonButton";
@@ -1002,6 +1002,32 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
     setSendQuantities({});
   };
 
+  const assignedQuestCount = getCrawlerAssignedQuests ? getCrawlerAssignedQuests(selected?.id || '').length : 0;
+  const profileTabs: { id: ProfileTab; label: string; title?: string; icon: ComponentType<{ className?: string }>; badge?: ReactNode }[] = [
+    { id: 'profile', label: 'Profile', icon: User },
+    {
+      id: 'inventory', label: 'Inventory', icon: Backpack,
+      badge: inventory.length > 0 && <span className="bg-accent/20 text-accent text-xs px-1.5 py-0.5 rounded-full">{inventory.length}</span>,
+    },
+    { id: 'actions', label: 'Actions', icon: Target },
+    {
+      id: 'skills', label: 'Skills', icon: Sparkles,
+      badge: (getSkillXPToSpend(selected) > 0 || (selected?.abilityPoints ?? 0) > 0) && (
+        <span className="bg-accent/20 text-accent text-xs px-1.5 py-0.5 rounded-full" title="Skill XP or stat points to spend">!</span>
+      ),
+    },
+    { id: 'spells', label: 'Spells', icon: BookOpen },
+    { id: 'abilities', label: 'Abilities', icon: Stars },
+    { id: 'reactions', label: 'Reactions', icon: RefreshCw },
+    { id: 'attacks', label: 'Attacks', icon: Swords },
+    { id: 'bonus', label: 'Bonus', title: 'Bonus Actions', icon: Timer },
+    {
+      id: 'quests', label: 'Quests', icon: ScrollText,
+      badge: assignedQuestCount > 0 && <span className="bg-emerald-500/20 text-emerald-400 text-xs px-1.5 py-0.5 rounded-full">{assignedQuestCount}</span>,
+    },
+    { id: 'stats', label: 'Stats', icon: BarChart3 },
+  ];
+
   if (!selected) return null;
 
   const currentAvatar = editMode ? (editData.avatar ?? selected.avatar) : selected.avatar;
@@ -1115,152 +1141,25 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
       </div>
 
       <DungeonCard className="min-h-[400px] overflow-hidden">
-        <div className="flex">
-          {/* Tab buttons - Far Left */}
-          <div className="flex flex-col border-r border-border/50 pr-2 mr-4">
-            <button
-              onClick={() => setActiveTab('profile')}
-              className={`p-3 rounded-l-lg transition-colors flex items-center gap-2 ${
-                activeTab === 'profile'
-                  ? 'bg-primary/20 text-primary border-r-2 border-primary'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-              }`}
-              title="Profile"
-            >
-              <User className="w-5 h-5" />
-              <span className="hidden xl:inline text-sm font-medium">Profile</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('inventory')}
-              className={`p-3 rounded-l-lg transition-colors flex items-center gap-2 ${
-                activeTab === 'inventory'
-                  ? 'bg-primary/20 text-primary border-r-2 border-primary'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-              }`}
-              title="Inventory"
-            >
-              <Backpack className="w-5 h-5" />
-              <span className="hidden xl:inline text-sm font-medium">Inventory</span>
-              {inventory.length > 0 && (
-                <span className="bg-accent/20 text-accent text-xs px-1.5 py-0.5 rounded-full">{inventory.length}</span>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab('actions')}
-              className={`p-3 rounded-l-lg transition-colors flex items-center gap-2 ${
-                activeTab === 'actions'
-                  ? 'bg-primary/20 text-primary border-r-2 border-primary'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-              }`}
-              title="Actions"
-            >
-              <Target className="w-5 h-5" />
-              <span className="hidden xl:inline text-sm font-medium">Actions</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('skills')}
-              className={`p-3 rounded-l-lg transition-colors flex items-center gap-2 ${
-                activeTab === 'skills'
-                  ? 'bg-primary/20 text-primary border-r-2 border-primary'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-              }`}
-              title="Skills"
-            >
-              <Sparkles className="w-5 h-5" />
-              <span className="hidden xl:inline text-sm font-medium">Skills</span>
-              {(getSkillXPToSpend(selected) > 0 || (selected?.abilityPoints ?? 0) > 0) && (
-                <span className="bg-accent/20 text-accent text-xs px-1.5 py-0.5 rounded-full" title="Skill XP or stat points to spend">!</span>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab('spells')}
-              className={`p-3 rounded-l-lg transition-colors flex items-center gap-2 ${
-                activeTab === 'spells'
-                  ? 'bg-primary/20 text-primary border-r-2 border-primary'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-              }`}
-              title="Spells"
-            >
-              <BookOpen className="w-5 h-5" />
-              <span className="hidden xl:inline text-sm font-medium">Spells</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('abilities')}
-              className={`p-3 rounded-l-lg transition-colors flex items-center gap-2 ${
-                activeTab === 'abilities'
-                  ? 'bg-primary/20 text-primary border-r-2 border-primary'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-              }`}
-              title="Abilities"
-            >
-              <Stars className="w-5 h-5" />
-              <span className="hidden xl:inline text-sm font-medium">Abilities</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('reactions')}
-              className={`p-3 rounded-l-lg transition-colors flex items-center gap-2 ${
-                activeTab === 'reactions'
-                  ? 'bg-primary/20 text-primary border-r-2 border-primary'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-              }`}
-              title="Reactions"
-            >
-              <RefreshCw className="w-5 h-5" />
-              <span className="hidden xl:inline text-sm font-medium">Reactions</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('attacks')}
-              className={`p-3 rounded-l-lg transition-colors flex items-center gap-2 ${
-                activeTab === 'attacks'
-                  ? 'bg-primary/20 text-primary border-r-2 border-primary'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-              }`}
-              title="Attacks"
-            >
-              <Swords className="w-5 h-5" />
-              <span className="hidden xl:inline text-sm font-medium">Attacks</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('bonus')}
-              className={`p-3 rounded-l-lg transition-colors flex items-center gap-2 ${
-                activeTab === 'bonus'
-                  ? 'bg-primary/20 text-primary border-r-2 border-primary'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-              }`}
-              title="Bonus Actions"
-            >
-              <Timer className="w-5 h-5" />
-              <span className="hidden xl:inline text-sm font-medium">Bonus</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('quests')}
-              className={`p-3 rounded-l-lg transition-colors flex items-center gap-2 ${
-                activeTab === 'quests'
-                  ? 'bg-primary/20 text-primary border-r-2 border-primary'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-              }`}
-              title="Quests"
-            >
-              <ScrollText className="w-5 h-5" />
-              <span className="hidden xl:inline text-sm font-medium">Quests</span>
-              {getCrawlerAssignedQuests && getCrawlerAssignedQuests(selected?.id || '').length > 0 && (
-                <span className="bg-emerald-500/20 text-emerald-400 text-xs px-1.5 py-0.5 rounded-full">
-                  {getCrawlerAssignedQuests(selected?.id || '').length}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab('stats')}
-              className={`p-3 rounded-l-lg transition-colors flex items-center gap-2 ${
-                activeTab === 'stats'
-                  ? 'bg-primary/20 text-primary border-r-2 border-primary'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-              }`}
-              title="Stats"
-            >
-              <BarChart3 className="w-5 h-5" />
-              <span className="hidden xl:inline text-sm font-medium">Stats</span>
-            </button>
+        <div className="flex flex-col md:flex-row">
+          {/* Tab buttons: a labeled, scrollable row on phones; a rail on the left from tablet up */}
+          <div className="flex md:flex-col overflow-x-auto md:overflow-visible border-b md:border-b-0 md:border-r border-border/50 pb-2 md:pb-0 md:pr-2 mb-4 md:mb-0 md:mr-4 -mx-1 md:mx-0">
+            {profileTabs.map(({ id, label, title, icon: Icon, badge }) => (
+              <button
+                key={id}
+                onClick={() => setActiveTab(id)}
+                className={`shrink-0 px-3 py-2 md:p-3 rounded-t-lg md:rounded-t-none md:rounded-l-lg transition-colors flex items-center gap-2 whitespace-nowrap ${
+                  activeTab === id
+                    ? 'bg-primary/20 text-primary border-b-2 md:border-b-0 md:border-r-2 border-primary'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                }`}
+                title={title ?? label}
+              >
+                <Icon className="w-4 h-4 md:w-5 md:h-5" />
+                <span className="text-sm font-medium md:hidden xl:inline">{label}</span>
+                {badge}
+              </button>
+            ))}
           </div>
 
           {/* Tab Content */}
@@ -1792,7 +1691,11 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                     </div>
                   ))}
                   {isAdmin && (
-                    <div className="pt-2 border-t border-border/50 space-y-2">
+                    <details className="pt-2 border-t border-border/50">
+                      <summary className="cursor-pointer text-sm text-accent font-display select-none">
+                        Award a trophy <span className="text-[10px] font-mono ml-1">DM</span>
+                      </summary>
+                      <div className="space-y-2 mt-2">
                       <input
                         value={trophyName}
                         onChange={(e) => setTrophyName(e.target.value)}
@@ -1814,7 +1717,8 @@ const ProfilesView: React.FC<ProfilesViewProps> = ({
                       <DungeonButton variant="default" size="sm" onClick={handleAward} disabled={!trophyName.trim()}>
                         <Trophy className="w-4 h-4 mr-1" /> Award Trophy
                       </DungeonButton>
-                    </div>
+                      </div>
+                    </details>
                   )}
                 </div>
               </div>
